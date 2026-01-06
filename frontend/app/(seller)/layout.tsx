@@ -1,0 +1,58 @@
+'use client';
+
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Sidebar } from '@/components/shared/Sidebar';
+import { Header } from '@/components/shared/Header';
+import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
+import { Toaster } from '@/components/ui/toast';
+import { useAuth } from '@/lib/hooks/useAuth';
+import { LoadingSpinner } from '@/components/shared/LoadingState';
+
+export default function SellerLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  const { user, isLoading, hasPermission } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push('/login');
+      return;
+    }
+
+    if (!isLoading && user && !hasPermission('VENDEDOR_INTERNO')) {
+      router.push('/dashboard');
+    }
+  }, [user, isLoading, hasPermission, router]);
+
+  if (isLoading) {
+    return <LoadingSpinner />;
+  }
+
+  if (!user || !hasPermission('VENDEDOR_INTERNO')) {
+    return null;
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="flex h-screen overflow-hidden bg-mineral">
+        <Sidebar />
+        
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          
+          <main className="flex-1 overflow-y-auto">
+            <div className="container mx-auto px-6 py-8">
+              {children}
+            </div>
+          </main>
+        </div>
+      </div>
+      
+      <Toaster />
+    </ErrorBoundary>
+  );
+}
