@@ -1,0 +1,59 @@
+﻿@import "tailwindcss";
+
+:root {
+  /* Cores da Identidade CAVA */
+  --color-obsidian: #121212;
+  --color-obsidian-hover: #0F0F0F;
+  --color-porcelain: #FFFFFF;
+  --color-mineral: #F9F9FB;
+  --color-off-white: #FAFAFA;
+
+  /* Variáveis de fontes */
+  --font-sans: var(--font-inter);
+  --font-serif: var(--font-playfair);
+  --font-mono: var(--font-jetbrains);
+
+  /* Background padrão */
+  --background: var(--color-mineral);
+  --foreground: var(--color-obsidian);
+}
+
+@theme inline {
+  /* Cores customizadas */
+  --color-obsidian: var(--color-obsidian);
+  --color-obsidian-hover: var(--color-obsidian-hover);
+  --color-porcelain: var(--color-porcelain);
+  --color-mineral: var(--color-mineral);
+  --color-off-white: var(--color-off-white);
+
+  /* Fontes */
+  --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
+  --font-mono: var(--font-mono);
+
+  /* Letter spacing customizado */
+  --letter-spacing-widest: 0.15em;
+
+  /* Sombras premium */
+  --shadow-premium: 0 4px 24px rgba(0, 0, 0, 0.08);
+  --shadow-premium-lg: 0 8px 40px rgba(0, 0, 0, 0.12);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+}
+
+/* Utilitários customizados */
+.shadow-premium {
+  box-shadow: var(--shadow-premium);
+}
+
+.shadow-premium-lg {
+  box-shadow: var(--shadow-premium-lg);
+}
+
+.tracking-widest {
+  letter-spacing: var(--letter-spacing-widest);
+}
