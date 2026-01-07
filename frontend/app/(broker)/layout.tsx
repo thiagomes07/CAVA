@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { Header } from '@/components/shared/Header';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
-import { Toaster } from '@/components/ui/toast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { LoadingSpinner } from '@/components/shared/LoadingState';
 
@@ -24,7 +23,7 @@ export default function BrokerLayout({
     }
 
     if (!isLoading && user && !hasPermission('BROKER')) {
-      router.push('/dashboard');
+      router.push('/admin/dashboard');
     }
   }, [user, isLoading, hasPermission, router]);
 
@@ -51,8 +50,6 @@ export default function BrokerLayout({
           </main>
         </div>
       </div>
-      
-      <Toaster />
     </ErrorBoundary>
   );
 }

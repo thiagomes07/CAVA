@@ -1,35 +1,52 @@
 ﻿@import "tailwindcss";
 
 :root {
-  /* Cores da Identidade CAVA */
+  /* Cores da Identidade CAVA - Premium Stone Platform */
   --color-obsidian: #121212;
   --color-obsidian-hover: #0F0F0F;
   --color-porcelain: #FFFFFF;
   --color-mineral: #F9F9FB;
   --color-off-white: #FAFAFA;
+  
+  /* Cores de status */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
 
   /* Variáveis de fontes */
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-playfair);
-  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 
   /* Background padrão */
   --background: var(--color-mineral);
   --foreground: var(--color-obsidian);
+  
+  /* Transições padrão */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
 }
 
 @theme inline {
-  /* Cores customizadas */
-  --color-obsidian: var(--color-obsidian);
-  --color-obsidian-hover: var(--color-obsidian-hover);
-  --color-porcelain: var(--color-porcelain);
-  --color-mineral: var(--color-mineral);
-  --color-off-white: var(--color-off-white);
+  /* Cores customizadas - valores diretos para Tailwind v4 */
+  --color-obsidian: #121212;
+  --color-obsidian-hover: #0F0F0F;
+  --color-porcelain: #FFFFFF;
+  --color-mineral: #F9F9FB;
+  --color-off-white: #FAFAFA;
+  
+  /* Cores de status */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
 
   /* Fontes */
-  --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif);
-  --font-mono: var(--font-mono);
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 
   /* Letter spacing customizado */
   --letter-spacing-widest: 0.15em;
@@ -37,12 +54,19 @@
   /* Sombras premium */
   --shadow-premium: 0 4px 24px rgba(0, 0, 0, 0.08);
   --shadow-premium-lg: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --shadow-premium-xl: 0 12px 48px rgba(0, 0, 0, 0.16);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* Tipografia Serif Premium */
+.font-serif {
+  font-family: var(--font-serif);
 }
 
 /* Utilitários customizados */
@@ -54,6 +78,65 @@ body {
   box-shadow: var(--shadow-premium-lg);
 }
 
+.shadow-premium-xl {
+  box-shadow: var(--shadow-premium-xl);
+}
+
 .tracking-widest {
   letter-spacing: var(--letter-spacing-widest);
+}
+
+/* Estados de foco acessíveis */
+*:focus-visible {
+  outline: 2px solid var(--color-obsidian);
+  outline-offset: 2px;
+}
+
+/* Scrollbar premium */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-mineral);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 18, 18, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 18, 18, 0.4);
+}
+
+/* Animações suaves */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease forwards;
+}
+
+/* Prevent layout shift on scrollbar */
+html {
+  overflow-y: scroll;
 }

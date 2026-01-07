@@ -4,9 +4,7 @@ export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO'] as
 
 export const salesLinkSchema = z
   .object({
-    linkType: z.enum(linkTypes, {
-      required_error: 'Tipo de link é obrigatório',
-    }),
+    linkType: z.enum(linkTypes),
     batchId: z.string().optional(),
     productId: z.string().optional(),
     title: z
@@ -26,10 +24,10 @@ export const salesLinkSchema = z
         'Slug deve conter apenas letras minúsculas, números e hífens'
       ),
     displayPrice: z
-      .number({ invalid_type_error: 'Preço deve ser um número' })
+      .number({ message: 'Preço deve ser um número' })
       .positive('Preço deve ser maior que zero')
       .optional(),
-    showPrice: z.boolean().default(true),
+    showPrice: z.boolean(),
     expiresAt: z
       .string()
       .refine((val) => !val || !isNaN(Date.parse(val)), 'Data inválida')
@@ -38,7 +36,7 @@ export const salesLinkSchema = z
         'Data de expiração deve ser futura'
       )
       .optional(),
-    isActive: z.boolean().default(true),
+    isActive: z.boolean(),
   })
   .refine(
     (data) => {
@@ -87,7 +85,7 @@ export const leadCaptureSchema = z.object({
     .string()
     .max(500, 'Mensagem deve ter no máximo 500 caracteres')
     .optional(),
-  marketingOptIn: z.boolean().default(false),
+  marketingOptIn: z.boolean(),
 });
 
 export const linkFilterSchema = z.object({

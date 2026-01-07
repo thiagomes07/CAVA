@@ -13,7 +13,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center rounded-sm font-bold uppercase tracking-widest text-xs transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-obsidian/20 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-      primary: 'bg-obsidian text-porcelain hover:shadow-premium active:scale-[0.98]',
+      primary: 'bg-obsidian text-porcelain hover:shadow-premium hover:scale-[1.02] active:scale-[0.98]',
       secondary: 'bg-porcelain border border-slate-200 text-slate-600 hover:border-obsidian hover:text-obsidian active:scale-[0.98]',
       destructive: 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 active:scale-[0.98]',
       ghost: 'bg-transparent text-slate-600 hover:bg-slate-50 active:bg-slate-100',

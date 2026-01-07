@@ -41,16 +41,19 @@ export function useAuth() {
   const canAccessRoute = (route: string): boolean => {
     if (!user) return false;
 
-    if (route.startsWith('/dashboard') || route.startsWith('/catalog') || route.startsWith('/inventory') || route.startsWith('/brokers') || route.startsWith('/sales') || route.startsWith('/team')) {
+    // Admin/Industry routes
+    if (route.startsWith('/admin')) {
       return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO']);
     }
 
-    if (route.startsWith('/shared-inventory')) {
+    // Broker routes
+    if (route.startsWith('/broker')) {
       return hasPermission('BROKER');
     }
 
-    if (route.startsWith('/links') || route.startsWith('/leads')) {
-      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
+    // Seller routes (also uses admin routes but limited)
+    if (route.startsWith('/seller')) {
+      return hasPermission('VENDEDOR_INTERNO');
     }
 
     return true;
@@ -62,9 +65,9 @@ export function useAuth() {
     switch (user.role) {
       case 'ADMIN_INDUSTRIA':
       case 'VENDEDOR_INTERNO':
-        return '/dashboard';
+        return '/admin/dashboard';
       case 'BROKER':
-        return '/dashboard';
+        return '/broker/dashboard';
       default:
         return '/login';
     }

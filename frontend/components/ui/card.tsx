@@ -10,7 +10,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     const variants = {
       default: 'bg-porcelain border border-slate-100',
       flat: 'bg-mineral border-0',
-      elevated: 'bg-porcelain border border-slate-100 shadow-premium hover:shadow-premium-lg transition-shadow duration-200',
+      elevated: 'bg-porcelain border border-slate-100 shadow-premium hover:shadow-premium-lg hover:translate-y-[-2px] transition-all duration-200',
       glass: 'bg-white/95 backdrop-blur-md border border-white/20',
     };
 

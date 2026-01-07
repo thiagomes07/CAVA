@@ -4,6 +4,19 @@ interface RequestConfig extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
 }
 
+// Custom error class with status code
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
 class ApiClient {
   private baseURL: string;
   private isRefreshing: boolean = false;
@@ -29,8 +42,11 @@ class ApiClient {
 
   private async refreshToken(): Promise<void> {
     if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
-        this.failedQueue.push({ resolve, reject });
+      return new Promise<void>((resolve, reject) => {
+        this.failedQueue.push({ 
+          resolve: () => resolve(), 
+          reject: (reason) => reject(reason) 
+        });
       });
     }
 
@@ -110,7 +126,11 @@ class ApiClient {
         
         if (!retryResponse.ok) {
           const errorData: ErrorResponse = await retryResponse.json();
-          throw new Error(errorData.error.message || 'Request failed');
+          throw new ApiError(
+            errorData.error.message || 'Request failed',
+            retryResponse.status,
+            errorData.error.code
+          );
         }
         
         return retryResponse.json();
@@ -118,7 +138,11 @@ class ApiClient {
 
       if (!response.ok) {
         const errorData: ErrorResponse = await response.json();
-        throw new Error(errorData.error.message || 'Request failed');
+        throw new ApiError(
+          errorData.error.message || 'Request failed',
+          response.status,
+          errorData.error.code
+        );
       }
 
       const data: ApiResponse<T> = await response.json();

@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserRole } from '@/lib/types';
 import { apiClient } from '@/lib/api/client';
 
@@ -16,19 +15,18 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: true,
+  (set, get) => ({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
 
-      setUser: (user) => {
-        set({
-          user,
-          isAuthenticated: !!user,
-          isLoading: false,
-        });
-      },
+    setUser: (user) => {
+      set({
+        user,
+        isAuthenticated: !!user,
+        isLoading: false,
+      });
+    },
 
       login: async (email: string, password: string) => {
         try {
@@ -95,30 +93,12 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      hasPermission: (requiredRole: UserRole | UserRole[]) => {
-        const { user } = get();
-        if (!user) return false;
+    hasPermission: (requiredRole: UserRole | UserRole[]) => {
+      const { user } = get();
+      if (!user) return false;
 
-        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-        return roles.includes(user.role);
-      },
-    }),
-    {
-      name: 'cava-auth-storage',
-      storage: createJSONStorage(() => {
-        if (typeof window === 'undefined') {
-          return {
-            getItem: () => null,
-            setItem: () => {},
-            removeItem: () => {},
-          };
-        }
-        return window.localStorage;
-      }),
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
-  )
+      const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      return roles.includes(user.role);
+    },
+  })
 );

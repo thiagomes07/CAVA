@@ -21,7 +21,7 @@ export const leadFilterSchema = z.object({
 
 export const updateLeadStatusSchema = z.object({
   status: z.enum(leadStatuses, {
-    required_error: 'Status é obrigatório',
+    message: 'Status é obrigatório',
   }),
 });
 

@@ -11,11 +11,12 @@ import { useAuthStore } from '@/store/auth.store';
 import { useToast } from '@/lib/hooks/useToast';
 import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
 import { cn } from '@/lib/utils/cn';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const { getDashboardRoute } = useAuth();
   
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +39,11 @@ export default function LoginPage() {
       await login(data.email, data.password);
       
       success('Login realizado com sucesso');
-      router.push(callbackUrl);
+      
+      // Use callback URL if provided, otherwise use role-based dashboard
+      const callbackUrl = searchParams.get('callbackUrl');
+      const redirectTo = callbackUrl || getDashboardRoute();
+      router.push(redirectTo);
     } catch (err) {
       error('Email ou senha incorretos');
     } finally {

@@ -28,16 +28,16 @@ export const productSchema = z.object({
     .max(50, 'SKU deve ter no máximo 50 caracteres')
     .optional(),
   material: z.enum(materialTypes, {
-    required_error: 'Tipo de material é obrigatório',
+    message: 'Tipo de material é obrigatório',
   }),
   finish: z.enum(finishTypes, {
-    required_error: 'Acabamento é obrigatório',
+    message: 'Acabamento é obrigatório',
   }),
   description: z
     .string()
     .max(1000, 'Descrição deve ter no máximo 1000 caracteres')
     .optional(),
-  isPublic: z.boolean().default(true),
+  isPublic: z.boolean(),
 });
 
 export const productFilterSchema = z.object({

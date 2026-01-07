@@ -46,6 +46,12 @@ export default function PublicLinkPage() {
     reset,
   } = useForm<LeadCaptureInput>({
     resolver: zodResolver(leadCaptureSchema),
+    defaultValues: {
+      name: '',
+      contact: '',
+      message: '',
+      marketingOptIn: false,
+    },
   });
 
   useEffect(() => {
@@ -475,6 +481,32 @@ export default function PublicLinkPage() {
           )}
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="py-8 bg-mineral border-t border-slate-200">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-obsidian rounded-sm" />
+              <span className="font-serif text-lg font-semibold text-obsidian">CAVA</span>
+            </div>
+
+            {/* Text */}
+            <p className="text-sm text-slate-500">
+              Powered by CAVA Stone Platform
+            </p>
+
+            {/* Links */}
+            <a
+              href="/privacy"
+              className="text-sm text-slate-500 hover:text-obsidian transition-colors"
+            >
+              Política de Privacidade
+            </a>
+          </div>
+        </div>
+      </footer>
     </>
   );
 }

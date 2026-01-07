@@ -16,24 +16,23 @@ export const batchSchema = z.object({
     .regex(/^[A-Z0-9-]+$/, 'Código deve conter apenas letras maiúsculas, números e hífens')
     .transform((val) => val.toUpperCase()),
   height: z
-    .number({ invalid_type_error: 'Altura deve ser um número' })
+    .number({ message: 'Altura deve ser um número' })
     .positive('Altura deve ser maior que zero')
     .max(1000, 'Altura deve ser menor que 1000 cm'),
   width: z
-    .number({ invalid_type_error: 'Largura deve ser um número' })
+    .number({ message: 'Largura deve ser um número' })
     .positive('Largura deve ser maior que zero')
     .max(1000, 'Largura deve ser menor que 1000 cm'),
   thickness: z
-    .number({ invalid_type_error: 'Espessura deve ser um número' })
+    .number({ message: 'Espessura deve ser um número' })
     .positive('Espessura deve ser maior que zero')
     .max(100, 'Espessura deve ser menor que 100 cm'),
   quantitySlabs: z
-    .number({ invalid_type_error: 'Quantidade deve ser um número' })
+    .number({ message: 'Quantidade deve ser um número' })
     .int('Quantidade deve ser um número inteiro')
-    .positive('Quantidade deve ser maior que zero')
-    .default(1),
+    .positive('Quantidade deve ser maior que zero'),
   industryPrice: z
-    .number({ invalid_type_error: 'Preço deve ser um número' })
+    .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero'),
   originQuarry: z
     .string()
@@ -41,8 +40,7 @@ export const batchSchema = z.object({
     .optional(),
   entryDate: z
     .string()
-    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida')
-    .default(() => new Date().toISOString().split('T')[0]),
+    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida'),
 });
 
 export const batchFilterSchema = z.object({
@@ -85,7 +83,7 @@ export const reservationSchema = z.object({
 
 export const updateBatchPriceSchema = z.object({
   negotiatedPrice: z
-    .number({ invalid_type_error: 'Preço deve ser um número' })
+    .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero')
     .optional(),
 });

@@ -2,43 +2,66 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const publicRoutes = ['/login', '/register'];
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico'];
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy'];
+
+// Routes that require authentication - using prefixed routes
+const protectedPrefixes = [
+  '/admin',   // Industry admin routes
+  '/broker',  // Broker routes  
+  '/seller',  // Seller routes
+  '/profile',
+];
 
 const roleRouteMap: Record<string, string[]> = {
   ADMIN_INDUSTRIA: [
-    '/dashboard',
-    '/catalog',
-    '/inventory',
-    '/brokers',
-    '/sales',
-    '/team',
-    '/links',
-    '/leads',
+    '/admin/dashboard',
+    '/admin/catalog',
+    '/admin/inventory',
+    '/admin/brokers',
+    '/admin/sales',
+    '/admin/team',
+    '/admin/links',
+    '/admin/leads',
   ],
   VENDEDOR_INTERNO: [
-    '/dashboard',
-    '/inventory',
-    '/sales',
-    '/links',
-    '/leads',
+    '/admin/dashboard',
+    '/admin/inventory',
+    '/admin/sales',
+    '/admin/links',
+    '/admin/leads',
   ],
   BROKER: [
-    '/dashboard',
-    '/shared-inventory',
-    '/links',
-    '/leads',
+    '/broker/dashboard',
+    '/broker/shared-inventory',
+    '/broker/links',
+    '/broker/leads',
   ],
 };
 
 const roleDashboards: Record<string, string> = {
-  ADMIN_INDUSTRIA: '/dashboard',
-  VENDEDOR_INTERNO: '/dashboard',
-  BROKER: '/dashboard',
+  ADMIN_INDUSTRIA: '/admin/dashboard',
+  VENDEDOR_INTERNO: '/admin/dashboard',
+  BROKER: '/broker/dashboard',
 };
 
 function isPublicRoute(pathname: string): boolean {
+  // Explicit public routes
   if (publicRoutes.includes(pathname)) return true;
-  return publicPrefixes.some(prefix => pathname.startsWith(prefix));
+  
+  // Check public prefixes
+  if (publicPrefixes.some(prefix => pathname.startsWith(prefix))) return true;
+  
+  // Check if it's a protected route
+  const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix));
+  
+  // If not a protected route and is a single-segment path (like /my-link-slug), it's a public landing page
+  if (!isProtected) {
+    const segments = pathname.split('/').filter(Boolean);
+    // Single segment paths that aren't protected are public (landing pages)
+    if (segments.length === 1) return true;
+  }
+  
+  return false;
 }
 
 function canAccessRoute(pathname: string, userRole: string): boolean {

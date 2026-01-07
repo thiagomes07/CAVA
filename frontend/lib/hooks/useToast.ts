@@ -1,4 +1,5 @@
 import { toast as sonnerToast } from 'sonner';
+import { createElement } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 
 interface ToastOptions {
@@ -14,8 +15,8 @@ export function useToast() {
   const success = (message: string, options?: ToastOptions) => {
     sonnerToast.success(message, {
       description: options?.description,
-      duration: options?.duration || 3000,
-      icon: CheckCircle,
+      duration: options?.duration || 3000, // 3 segundos conforme doc
+      icon: createElement(CheckCircle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -23,8 +24,8 @@ export function useToast() {
   const error = (message: string, options?: ToastOptions) => {
     sonnerToast.error(message, {
       description: options?.description,
-      duration: options?.duration || 5000,
-      icon: XCircle,
+      duration: options?.duration || 5000, // 5 segundos conforme doc
+      icon: createElement(XCircle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -32,8 +33,8 @@ export function useToast() {
   const warning = (message: string, options?: ToastOptions) => {
     sonnerToast.warning(message, {
       description: options?.description,
-      duration: options?.duration || 4000,
-      icon: AlertTriangle,
+      duration: options?.duration || 4000, // 4 segundos conforme doc
+      icon: createElement(AlertTriangle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -41,8 +42,8 @@ export function useToast() {
   const info = (message: string, options?: ToastOptions) => {
     sonnerToast.info(message, {
       description: options?.description,
-      duration: options?.duration || 3000,
-      icon: Info,
+      duration: options?.duration || 3000, // 3 segundos conforme doc
+      icon: createElement(Info, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };

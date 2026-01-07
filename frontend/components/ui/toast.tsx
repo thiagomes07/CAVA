@@ -18,6 +18,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
           title: 'text-sm font-semibold',
           description: 'text-xs',
         },
+        // Durações padrão conforme documentação:
+        // success: 3s, error: 5s, warning: 4s, info: 3s
+        // O Sonner usa duration global, mas hooks podem sobrescrever
         duration: 3000,
       }}
       {...props}

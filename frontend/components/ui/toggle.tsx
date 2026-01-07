@@ -23,12 +23,11 @@ const Toggle = forwardRef<HTMLInputElement, ToggleProps>(
             className
           )}
           onClick={() => {
-            const event = new Event('change', { bubbles: true });
-            Object.defineProperty(event, 'target', {
-              value: { checked: !props.checked },
-              writable: false,
-            });
-            props.onChange?.(event as any);
+            const syntheticEvent = {
+              target: { checked: !props.checked },
+              currentTarget: { checked: !props.checked },
+            } as React.ChangeEvent<HTMLInputElement>;
+            props.onChange?.(syntheticEvent);
           }}
           disabled={props.disabled}
         >

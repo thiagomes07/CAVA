@@ -1,19 +1,37 @@
-import { forwardRef, type HTMLAttributes, type ReactNode, useEffect } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactNode, useEffect, useRef, useId } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 export interface ModalProps extends HTMLAttributes<HTMLDivElement> {
   open: boolean;
   onClose: () => void;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
 }
 
 const Modal = forwardRef<HTMLDivElement, ModalProps>(
-  ({ className, open, onClose, children, ...props }, ref) => {
+  ({ className, open, onClose, children, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const generatedId = useId();
+    const labelId = ariaLabelledBy || `modal-title-${generatedId}`;
+    const descriptionId = ariaDescribedBy || `modal-description-${generatedId}`;
+
     useEffect(() => {
       if (open) {
+        // Store previously focused element
+        previousFocusRef.current = document.activeElement as HTMLElement;
         document.body.style.overflow = 'hidden';
+        
+        // Focus the modal
+        setTimeout(() => {
+          modalRef.current?.focus();
+        }, 0);
       } else {
         document.body.style.overflow = 'unset';
+        
+        // Restore focus to previously focused element
+        previousFocusRef.current?.focus();
       }
 
       return () => {
@@ -32,21 +50,68 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
       return () => document.removeEventListener('keydown', handleEscape);
     }, [open, onClose]);
 
+    // Focus trap
+    useEffect(() => {
+      if (!open) return;
+
+      const modal = modalRef.current;
+      if (!modal) return;
+
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+
+        const focusableElements = modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      };
+
+      document.addEventListener('keydown', handleTabKey);
+      return () => document.removeEventListener('keydown', handleTabKey);
+    }, [open]);
+
     if (!open) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div 
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        role="presentation"
+      >
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
           onClick={onClose}
           aria-hidden="true"
         />
         <div
-          ref={ref}
+          ref={(node) => {
+            // Handle both refs
+            (modalRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+            if (typeof ref === 'function') {
+              ref(node);
+            } else if (ref) {
+              ref.current = node;
+            }
+          }}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby={labelId}
+          aria-describedby={descriptionId}
+          tabIndex={-1}
           className={cn(
             'relative bg-porcelain rounded-xl shadow-premium-lg',
             'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
             'animate-in fade-in-0 zoom-in-95 duration-200',
+            'focus:outline-none',
             className
           )}
           {...props}

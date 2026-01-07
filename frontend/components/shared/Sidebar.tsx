@@ -29,60 +29,109 @@ interface MenuItem {
   children?: MenuItem[];
 }
 
-const menuItems: MenuItem[] = [
+// Menu items organized by role with proper route prefixes
+const industryMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
-    href: '/dashboard',
+    href: '/admin/dashboard',
     icon: LayoutDashboard,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Catálogo',
-    href: '/catalog',
+    href: '/admin/catalog',
     icon: Package,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
     label: 'Estoque',
-    href: '/inventory',
+    href: '/admin/inventory',
     icon: Layers,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Estoque Compartilhado',
-    href: '/shared-inventory',
-    icon: PackageOpen,
-    roles: ['BROKER'],
-  },
-  {
     label: 'Vendas',
-    href: '/sales',
+    href: '/admin/sales',
     icon: Receipt,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Links',
-    href: '/links',
+    href: '/admin/links',
     icon: Link2,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Leads',
-    href: '/leads',
+    href: '/admin/leads',
     icon: Inbox,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Parceiros',
-    href: '/brokers',
+    href: '/admin/brokers',
     icon: Users,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
     label: 'Equipe',
-    href: '/team',
+    href: '/admin/team',
     icon: UserPlus,
     roles: ['ADMIN_INDUSTRIA'],
+  },
+];
+
+const brokerMenuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/broker/dashboard',
+    icon: LayoutDashboard,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Estoque Compartilhado',
+    href: '/broker/shared-inventory',
+    icon: PackageOpen,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Links',
+    href: '/broker/links',
+    icon: Link2,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Leads',
+    href: '/broker/leads',
+    icon: Inbox,
+    roles: ['BROKER'],
+  },
+];
+
+const sellerMenuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/seller/dashboard',
+    icon: LayoutDashboard,
+    roles: ['VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Estoque',
+    href: '/seller/inventory',
+    icon: Layers,
+    roles: ['VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Links',
+    href: '/seller/links',
+    icon: Link2,
+    roles: ['VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Leads',
+    href: '/seller/leads',
+    icon: Inbox,
+    roles: ['VENDEDOR_INTERNO'],
   },
 ];
 
@@ -93,12 +142,24 @@ export function Sidebar() {
 
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
-    return menuItems.filter((item) => item.roles.includes(user.role));
+    
+    // Select menu items based on user role
+    if (user.role === 'ADMIN_INDUSTRIA') {
+      return industryMenuItems.filter((item) => item.roles.includes(user.role));
+    } else if (user.role === 'VENDEDOR_INTERNO') {
+      // Vendedores use the admin routes but with limited options
+      return industryMenuItems.filter((item) => item.roles.includes(user.role));
+    } else if (user.role === 'BROKER') {
+      return brokerMenuItems;
+    }
+    
+    return [];
   }, [user]);
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
+    // Check for exact match on dashboard routes
+    if (href.endsWith('/dashboard')) {
+      return pathname === href;
     }
     return pathname.startsWith(href);
   };
