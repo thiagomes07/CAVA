@@ -1,5 +1,663 @@
 # 📁 Dump Completo do Repositório
 
+## `.\app\(auth)\login\page.tsx`:
+
+```
+'use client';
+
+import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { useAuthStore } from '@/store/auth.store';
+import { useToast } from '@/lib/hooks/useToast';
+import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
+import { cn } from '@/lib/utils/cn';
+
+export default function LoginPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const login = useAuthStore((state) => state.login);
+  const { success, error } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+  } = useForm<LoginInput>({
+    resolver: zodResolver(loginSchema),
+  });
+
+  const onSubmit = async (data: LoginInput) => {
+    try {
+      setIsLoading(true);
+      
+      await login(data.email, data.password);
+      
+      success('Login realizado com sucesso');
+      router.push(callbackUrl);
+    } catch (err) {
+      error('Email ou senha incorretos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex">
+      {/* Left Side - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-12 bg-mineral">
+        <div className="w-full max-w-md">
+          {/* Logo */}
+          <div className="flex items-center gap-3 mb-12">
+            <div className="w-10 h-10 bg-obsidian rounded-sm" />
+            <span className="font-serif text-2xl font-semibold text-obsidian">CAVA</span>
+          </div>
+
+          {/* Title */}
+          <div className="mb-8">
+            <h1 className="font-serif text-4xl text-obsidian mb-2">
+              Acesse sua conta
+            </h1>
+            <p className="text-slate-500">
+              Entre com suas credenciais para continuar
+            </p>
+          </div>
+
+          {/* Form */}
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+            {/* Email */}
+            <div className="relative">
+              <Input
+                {...register('email')}
+                type="email"
+                placeholder="seu@email.com"
+                error={errors.email?.message}
+                disabled={isLoading}
+                className="pl-12"
+              />
+              <Mail className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
+            </div>
+
+            {/* Password */}
+            <div className="relative">
+              <Input
+                {...register('password')}
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Sua senha"
+                error={errors.password?.message}
+                disabled={isLoading}
+                className="pl-12 pr-12"
+              />
+              <Lock className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-[14px] text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showPassword ? (
+                  <EyeOff className="w-5 h-5" />
+                ) : (
+                  <Eye className="w-5 h-5" />
+                )}
+              </button>
+            </div>
+
+            {/* Forgot Password */}
+            <div className="flex justify-end">
+              <button
+                type="button"
+                className="text-sm text-slate-500 hover:text-obsidian transition-colors"
+              >
+                Esqueci minha senha
+              </button>
+            </div>
+
+            {/* Submit */}
+            <Button
+              type="submit"
+              variant="primary"
+              size="lg"
+              loading={isLoading}
+              className="w-full"
+            >
+              ENTRAR
+            </Button>
+          </form>
+
+          {/* Footer */}
+          <p className="text-xs text-slate-400 text-center mt-8">
+            Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade
+          </p>
+        </div>
+      </div>
+
+      {/* Right Side - Hero Image */}
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+        {/* Placeholder for hero image */}
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800" />
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+        
+        {/* Content */}
+        <div className="relative z-10 flex items-center justify-center p-12 text-center">
+          <div className="max-w-lg">
+            <h2 className="font-serif text-5xl text-porcelain mb-6 leading-tight">
+              Transforme pedras em obras de arte
+            </h2>
+            <p className="text-lg text-porcelain/80 leading-relaxed">
+              A plataforma completa para gestão e comercialização de pedras naturais premium
+            </p>
+          </div>
+        </div>
+
+        {/* Decorative Elements */}
+        <div className="absolute top-0 right-0 w-64 h-64 bg-porcelain/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-96 h-96 bg-porcelain/5 rounded-full blur-3xl" />
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## `.\app\(public)\[slug]\page.tsx`:
+
+```
+'use client';
+
+import { useState, useEffect } from 'react';
+import { useParams } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { 
+  ChevronDown, 
+  CheckCircle, 
+  Ruler, 
+  Package, 
+  Calendar,
+  MapPin,
+  X
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { apiClient } from '@/lib/api/client';
+import { useToast } from '@/lib/hooks/useToast';
+import { leadCaptureSchema, type LeadCaptureInput } from '@/lib/schemas/link.schema';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
+import { formatDate } from '@/lib/utils/formatDate';
+import { cn } from '@/lib/utils/cn';
+import type { SalesLink } from '@/lib/types';
+
+export default function PublicLinkPage() {
+  const params = useParams();
+  const slug = params.slug as string;
+  
+  const [link, setLink] = useState<SalesLink | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { success, error } = useToast();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    reset,
+  } = useForm<LeadCaptureInput>({
+    resolver: zodResolver(leadCaptureSchema),
+  });
+
+  useEffect(() => {
+    const fetchLink = async () => {
+      try {
+        setIsLoading(true);
+        const data = await apiClient.get<SalesLink>(`/public/links/${slug}`);
+        setLink(data);
+      } catch (err) {
+        error('Link não encontrado ou expirado');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchLink();
+  }, [slug, error]);
+
+  const onSubmit = async (data: LeadCaptureInput) => {
+    if (!link) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      await apiClient.post('/public/leads/interest', {
+        salesLinkId: link.id,
+        ...data,
+      });
+
+      setIsSubmitted(true);
+      reset();
+      
+      setTimeout(() => {
+        document.getElementById('cta-section')?.scrollIntoView({ 
+          behavior: 'smooth' 
+        });
+      }, 100);
+    } catch (err) {
+      error('Erro ao enviar interesse. Tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-obsidian" />
+      </div>
+    );
+  }
+
+  if (!link || !link.batch) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <div className="text-center max-w-md">
+          <h1 className="font-serif text-3xl text-obsidian mb-4">
+            Link não encontrado
+          </h1>
+          <p className="text-slate-600">
+            Este link não existe ou expirou
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  const batch = link.batch;
+  const product = batch.product;
+  const images = batch.medias?.length > 0 ? batch.medias : product?.medias || [];
+  const mainImage = images[selectedImageIndex];
+
+  return (
+    <>
+      {/* Hero Section */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* Background Image */}
+        {mainImage && (
+          <div
+            className="absolute inset-0 bg-cover bg-center"
+            style={{
+              backgroundImage: `url(${mainImage.url})`,
+              backgroundAttachment: 'fixed',
+            }}
+          />
+        )}
+        
+        {/* Overlay */}
+        <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+
+        {/* Content */}
+        <div className="relative z-10 text-center px-6 py-20">
+          {/* Material Badge */}
+          {product && (
+            <div className="inline-flex items-center px-4 py-2 rounded-full bg-white/20 backdrop-blur-md border border-white/40 mb-8">
+              <span className="text-xs uppercase tracking-widest font-semibold text-porcelain">
+                {product.material}
+              </span>
+            </div>
+          )}
+
+          {/* Title */}
+          <h1 className="font-serif text-5xl md:text-7xl text-porcelain mb-4 leading-tight">
+            {link.title || product?.name || 'Pedra Natural Premium'}
+          </h1>
+
+          {/* Batch Code */}
+          <p className="font-mono text-xl text-porcelain/80 mb-12">
+            Lote {batch.batchCode}
+          </p>
+
+          {/* CTA Button */}
+          <Button
+            size="lg"
+            variant="primary"
+            onClick={() => {
+              document.getElementById('cta-section')?.scrollIntoView({ 
+                behavior: 'smooth' 
+              });
+            }}
+            className="bg-porcelain text-obsidian hover:shadow-premium-lg"
+          >
+            TENHO INTERESSE
+          </Button>
+
+          {/* Scroll Indicator */}
+          <div className="absolute bottom-12 left-1/2 -translate-x-1/2 animate-bounce">
+            <ChevronDown className="w-8 h-8 text-porcelain/60" />
+          </div>
+        </div>
+      </section>
+
+      {/* Custom Message */}
+      {link.customMessage && (
+        <section className="py-16 bg-mineral">
+          <div className="container mx-auto px-6 max-w-3xl text-center">
+            <p className="text-lg text-slate-600 leading-relaxed">
+              {link.customMessage}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* Gallery Section */}
+      {images.length > 1 && (
+        <section className="py-20 bg-porcelain">
+          <div className="container mx-auto px-6">
+            <h2 className="font-serif text-4xl text-obsidian text-center mb-12">
+              Galeria
+            </h2>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-6xl mx-auto">
+              {images.map((image, index) => (
+                <button
+                  key={image.id}
+                  onClick={() => {
+                    setSelectedImageIndex(index);
+                    setIsLightboxOpen(true);
+                  }}
+                  className="relative aspect-[4/3] overflow-hidden rounded-sm border border-white/20 group"
+                >
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
+                    style={{ backgroundImage: `url(${image.url})` }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Specifications Section */}
+      <section className="py-20 bg-mineral">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <h2 className="font-serif text-4xl text-obsidian text-center mb-12">
+            Especificações Técnicas
+          </h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            {/* Dimensions */}
+            <div>
+              <h3 className="uppercase tracking-widest text-xs font-semibold text-slate-500 mb-6">
+                Dimensões
+              </h3>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  <Ruler className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Altura</p>
+                    <p className="font-mono text-lg text-obsidian">{batch.height} cm</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Ruler className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Largura</p>
+                    <p className="font-mono text-lg text-obsidian">{batch.width} cm</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Ruler className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Espessura</p>
+                    <p className="font-mono text-lg text-obsidian">{batch.thickness} cm</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Package className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Área Total</p>
+                    <p className="font-mono text-lg text-obsidian">
+                      {formatArea(batch.totalArea)}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Package className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Chapas</p>
+                    <p className="font-mono text-lg text-obsidian">
+                      {batch.quantitySlabs}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Details */}
+            <div>
+              <h3 className="uppercase tracking-widest text-xs font-semibold text-slate-500 mb-6">
+                Origem e Detalhes
+              </h3>
+              <div className="space-y-4">
+                {batch.originQuarry && (
+                  <div className="flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="text-sm text-slate-500">Pedreira</p>
+                      <p className="text-lg text-obsidian">{batch.originQuarry}</p>
+                    </div>
+                  </div>
+                )}
+                {product?.finish && (
+                  <div className="flex items-center gap-3">
+                    <Package className="w-5 h-5 text-slate-400" />
+                    <div>
+                      <p className="text-sm text-slate-500">Acabamento</p>
+                      <p className="text-lg text-obsidian">{product.finish}</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center gap-3">
+                  <Calendar className="w-5 h-5 text-slate-400" />
+                  <div>
+                    <p className="text-sm text-slate-500">Data de Entrada</p>
+                    <p className="text-lg text-obsidian">
+                      {formatDate(batch.entryDate)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Product Description */}
+          {product?.description && (
+            <div className="mt-12 pt-12 border-t border-slate-200">
+              <h3 className="uppercase tracking-widest text-xs font-semibold text-slate-500 mb-4">
+                Sobre o Material
+              </h3>
+              <p className="text-slate-600 leading-relaxed">
+                {product.description}
+              </p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Price Section */}
+      {link.showPrice && link.displayPrice && (
+        <section className="py-20 bg-porcelain">
+          <div className="container mx-auto px-6 text-center">
+            <p className="text-sm uppercase tracking-widest text-slate-500 mb-4">
+              Investimento
+            </p>
+            <p className="font-serif text-6xl text-obsidian mb-4">
+              {formatCurrency(link.displayPrice)}
+            </p>
+            <p className="text-sm text-slate-500">
+              Valor total do lote
+            </p>
+          </div>
+        </section>
+      )}
+
+      {!link.showPrice && (
+        <section className="py-20 bg-porcelain">
+          <div className="container mx-auto px-6 text-center">
+            <p className="font-serif text-4xl text-obsidian">
+              Preço Sob Consulta
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* CTA Section */}
+      <section id="cta-section" className="py-20 bg-obsidian text-porcelain">
+        <div className="container mx-auto px-6 max-w-2xl">
+          {isSubmitted ? (
+            <div className="text-center py-12">
+              <CheckCircle className="w-16 h-16 text-emerald-400 mx-auto mb-6" />
+              <h2 className="font-serif text-4xl mb-4">
+                Interesse Enviado!
+              </h2>
+              <p className="text-porcelain/80 text-lg">
+                Obrigado pelo seu interesse. O vendedor responsável entrará em contato em breve.
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="text-center mb-12">
+                <h2 className="font-serif text-4xl mb-4">
+                  Interessado nesta pedra?
+                </h2>
+                <p className="text-porcelain/80 text-lg">
+                  Preencha o formulário abaixo e entraremos em contato
+                </p>
+              </div>
+
+              <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                <Input
+                  {...register('name')}
+                  placeholder="Seu nome completo"
+                  error={errors.name?.message}
+                  disabled={isSubmitting}
+                  className="bg-white/10 border-white/20 text-porcelain placeholder:text-porcelain/50"
+                />
+
+                <Input
+                  {...register('contact')}
+                  placeholder="Email ou WhatsApp"
+                  error={errors.contact?.message}
+                  disabled={isSubmitting}
+                  className="bg-white/10 border-white/20 text-porcelain placeholder:text-porcelain/50"
+                />
+
+                <Textarea
+                  {...register('message')}
+                  placeholder="Mensagem (opcional)"
+                  error={errors.message?.message}
+                  disabled={isSubmitting}
+                  rows={4}
+                  className="bg-white/10 border-white/20 text-porcelain placeholder:text-porcelain/50"
+                />
+
+                <div className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    {...register('marketingOptIn')}
+                    id="marketing"
+                    className="mt-1 w-4 h-4 rounded border-white/20 bg-white/10"
+                  />
+                  <label htmlFor="marketing" className="text-sm text-porcelain/80">
+                    Quero receber novidades sobre pedras similares
+                  </label>
+                </div>
+
+                <Button
+                  type="submit"
+                  size="lg"
+                  loading={isSubmitting}
+                  className="w-full bg-porcelain text-obsidian hover:shadow-premium-lg"
+                >
+                  ENVIAR INTERESSE
+                </Button>
+
+                <p className="text-xs text-porcelain/60 text-center">
+                  Seu contato será enviado para o vendedor responsável
+                </p>
+              </form>
+            </>
+          )}
+        </div>
+      </section>
+
+      {/* Lightbox */}
+      {isLightboxOpen && (
+        <div
+          className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setIsLightboxOpen(false)}
+        >
+          <button
+            onClick={() => setIsLightboxOpen(false)}
+            className="absolute top-4 right-4 text-white hover:text-white/70 transition-colors"
+          >
+            <X className="w-8 h-8" />
+          </button>
+
+          <div
+            className="max-w-6xl max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <img
+              src={images[selectedImageIndex]?.url}
+              alt="Imagem ampliada"
+              className="max-w-full max-h-[90vh] object-contain"
+            />
+          </div>
+
+          {/* Navigation */}
+          {images.length > 1 && (
+            <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex gap-2">
+              {images.map((_, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedImageIndex(index)}
+                  className={cn(
+                    'w-3 h-3 rounded-full transition-all',
+                    index === selectedImageIndex
+                      ? 'bg-white w-8'
+                      : 'bg-white/30 hover:bg-white/50'
+                  )}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+```
+
+---
+
 ## `.\app\globals.css`:
 
 ```
@@ -132,6 +790,912 @@ export default function Home() {
         </div>
       </main>
     </div>
+  );
+}
+```
+
+---
+
+## `.\components\shared\EmptyState.tsx`:
+
+```
+import { type LucideIcon } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils/cn';
+
+interface EmptyStateProps {
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  actionLabel?: string;
+  onAction?: () => void;
+  className?: string;
+}
+
+export function EmptyState({
+  icon: Icon,
+  title,
+  description,
+  actionLabel,
+  onAction,
+  className,
+}: EmptyStateProps) {
+  return (
+    <div
+      className={cn(
+        'flex flex-col items-center justify-center min-h-[400px] py-12 px-6',
+        className
+      )}
+    >
+      <Icon className="w-12 h-12 text-slate-300 mb-6" strokeWidth={1.5} />
+      
+      <h3 className="font-serif text-2xl text-slate-400 mb-2 text-center">
+        {title}
+      </h3>
+      
+      <p className="text-sm text-slate-400 max-w-md text-center mb-6">
+        {description}
+      </p>
+      
+      {actionLabel && onAction && (
+        <Button onClick={onAction} variant="primary">
+          {actionLabel}
+        </Button>
+      )}
+    </div>
+  );
+}
+```
+
+---
+
+## `.\components\shared\ErrorBoundary.tsx`:
+
+```
+'use client';
+
+import { Component, type ReactNode } from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onReset?: () => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: React.ErrorInfo | null;
+}
+
+export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = {
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    };
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    this.setState({
+      error,
+      errorInfo,
+    });
+
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production') {
+      // Aqui você pode enviar o erro para um serviço de monitoramento
+      // Ex: Sentry, LogRocket, etc.
+    }
+  }
+
+  handleReset = () => {
+    this.setState({
+      hasError: false,
+      error: null,
+      errorInfo: null,
+    });
+
+    if (this.props.onReset) {
+      this.props.onReset();
+    } else {
+      window.location.reload();
+    }
+  };
+
+  render() {
+    if (this.state.hasError) {
+      if (this.props.fallback) {
+        return this.props.fallback;
+      }
+
+      return (
+        <div className="min-h-screen bg-mineral flex items-center justify-center p-6">
+          <Card className="max-w-2xl w-full" variant="elevated">
+            <CardContent className="text-center py-12">
+              <AlertCircle className="w-16 h-16 text-rose-500 mx-auto mb-6" strokeWidth={1.5} />
+              
+              <h1 className="font-serif text-3xl text-obsidian mb-4">
+                Algo deu errado
+              </h1>
+              
+              <p className="text-slate-600 mb-8 max-w-md mx-auto">
+                Ocorreu um erro inesperado. Nossa equipe foi notificada e está trabalhando para
+                resolver o problema.
+              </p>
+
+              {process.env.NODE_ENV === 'development' && this.state.error && (
+                <div className="mb-8 text-left bg-rose-50 border border-rose-200 rounded-sm p-4 overflow-auto max-h-64">
+                  <p className="font-mono text-sm text-rose-900 mb-2">
+                    <strong>Error:</strong> {this.state.error.toString()}
+                  </p>
+                  {this.state.errorInfo && (
+                    <pre className="font-mono text-xs text-rose-800 whitespace-pre-wrap">
+                      {this.state.errorInfo.componentStack}
+                    </pre>
+                  )}
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                <Button
+                  variant="primary"
+                  onClick={this.handleReset}
+                  className="w-full sm:w-auto"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Tentar Novamente
+                </Button>
+                
+                <Button
+                  variant="secondary"
+                  onClick={() => window.location.href = '/dashboard'}
+                  className="w-full sm:w-auto"
+                >
+                  Ir para Dashboard
+                </Button>
+              </div>
+
+              <p className="text-xs text-slate-400 mt-8">
+                Se o problema persistir, entre em contato com o suporte.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export function ErrorFallback({
+  error,
+  reset,
+}: {
+  error: Error;
+  reset: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-center min-h-[400px] p-6">
+      <div className="text-center max-w-md">
+        <AlertCircle className="w-12 h-12 text-rose-500 mx-auto mb-4" strokeWidth={1.5} />
+        
+        <h3 className="font-serif text-xl text-obsidian mb-2">
+          Erro ao carregar dados
+        </h3>
+        
+        <p className="text-sm text-slate-600 mb-6">
+          {error.message || 'Não foi possível carregar as informações'}
+        </p>
+        
+        <Button onClick={reset} variant="secondary">
+          Tentar Novamente
+        </Button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## `.\components\shared\Header.tsx`:
+
+```
+'use client';
+
+import { usePathname, useRouter } from 'next/navigation';
+import { Menu, LogOut, User, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/dropdown';
+import { useAuthStore } from '@/store/auth.store';
+import { useUIStore } from '@/store/ui.store';
+import { useToast } from '@/lib/hooks/useToast';
+import { cn } from '@/lib/utils/cn';
+
+const routeLabels: Record<string, string> = {
+  '/dashboard': 'Dashboard',
+  '/catalog': 'Catálogo',
+  '/inventory': 'Estoque',
+  '/shared-inventory': 'Estoque Compartilhado',
+  '/brokers': 'Parceiros',
+  '/sales': 'Vendas',
+  '/links': 'Links',
+  '/leads': 'Leads',
+  '/team': 'Equipe',
+};
+
+function getBreadcrumbs(pathname: string): Array<{ label: string; href: string }> {
+  const segments = pathname.split('/').filter(Boolean);
+  const breadcrumbs: Array<{ label: string; href: string }> = [];
+
+  let currentPath = '';
+  for (const segment of segments) {
+    currentPath += `/${segment}`;
+    
+    const label = routeLabels[currentPath] || segment.charAt(0).toUpperCase() + segment.slice(1);
+    
+    if (segment !== 'new' && !segment.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i)) {
+      breadcrumbs.push({ label, href: currentPath });
+    }
+  }
+
+  return breadcrumbs;
+}
+
+export function Header() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
+  const { toggleSidebar, toggleMobileMenu } = useUIStore();
+  const { success, error } = useToast();
+
+  const breadcrumbs = getBreadcrumbs(pathname);
+  const currentPage = breadcrumbs[breadcrumbs.length - 1]?.label || 'Dashboard';
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      success('Logout realizado com sucesso');
+      router.push('/login');
+    } catch (err) {
+      error('Erro ao fazer logout');
+    }
+  };
+
+  if (!user) return null;
+
+  return (
+    <header className="sticky top-0 z-30 bg-porcelain border-b border-slate-100">
+      <div className="flex items-center justify-between px-6 py-4">
+        {/* Left: Mobile Menu + Breadcrumbs */}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={toggleSidebar}
+            className={cn(
+              'p-2 rounded-sm hover:bg-slate-100 transition-colors lg:hidden',
+              'focus:outline-none focus:ring-2 focus:ring-obsidian/20'
+            )}
+          >
+            <Menu className="w-5 h-5 text-slate-600" />
+          </button>
+
+          {/* Breadcrumbs */}
+          <div className="hidden md:flex items-center gap-2 text-sm">
+            {breadcrumbs.map((crumb, index) => (
+              <div key={crumb.href} className="flex items-center gap-2">
+                {index > 0 && (
+                  <ChevronRight className="w-4 h-4 text-slate-400" />
+                )}
+                {index === breadcrumbs.length - 1 ? (
+                  <span className="font-medium text-obsidian">{crumb.label}</span>
+                ) : (
+                  <button
+                    onClick={() => router.push(crumb.href)}
+                    className="text-slate-500 hover:text-obsidian transition-colors"
+                  >
+                    {crumb.label}
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile: Current Page */}
+          <h1 className="md:hidden font-serif text-xl font-semibold text-obsidian">
+            {currentPage}
+          </h1>
+        </div>
+
+        {/* Right: User Menu */}
+        <div className="flex items-center gap-3">
+          <Dropdown
+            trigger={
+              <div className="flex items-center gap-3 px-3 py-2 rounded-sm hover:bg-slate-50 transition-colors cursor-pointer">
+                <div className="w-8 h-8 rounded-full bg-obsidian text-porcelain flex items-center justify-center">
+                  <span className="text-xs font-semibold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <div className="hidden lg:block text-left">
+                  <p className="text-sm font-medium text-obsidian">{user.name}</p>
+                  <p className="text-xs text-slate-500">{user.email}</p>
+                </div>
+              </div>
+            }
+          >
+            <div className="py-2 px-4 border-b border-slate-100">
+              <p className="text-xs uppercase tracking-widest text-slate-400 font-semibold">
+                {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
+                {user.role === 'VENDEDOR_INTERNO' && 'Vendedor Interno'}
+                {user.role === 'BROKER' && 'Broker'}
+              </p>
+            </div>
+            
+            <DropdownItem onClick={() => router.push('/profile')}>
+              <User className="w-4 h-4 mr-2" />
+              Meu Perfil
+            </DropdownItem>
+            
+            <DropdownSeparator />
+            
+            <DropdownItem onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sair
+            </DropdownItem>
+          </Dropdown>
+        </div>
+      </div>
+    </header>
+  );
+}
+```
+
+---
+
+## `.\components\shared\LoadingState.tsx`:
+
+```
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils/cn';
+
+interface LoadingStateProps {
+  variant?: 'cards' | 'table' | 'form' | 'dashboard';
+  rows?: number;
+  columns?: number;
+  className?: string;
+}
+
+export function LoadingState({
+  variant = 'cards',
+  rows = 5,
+  columns = 4,
+  className,
+}: LoadingStateProps) {
+  if (variant === 'cards') {
+    return (
+      <div className={cn('grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6', className)}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="bg-porcelain border border-slate-100 rounded-sm p-6">
+            <Skeleton className="aspect-[4/3] w-full mb-4" />
+            <Skeleton className="h-6 w-3/4 mb-2" />
+            <Skeleton className="h-4 w-full mb-2" />
+            <Skeleton className="h-4 w-5/6" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === 'table') {
+    return (
+      <div className={cn('w-full', className)}>
+        <div className="bg-mineral border-b-2 border-slate-200 p-4 flex gap-6">
+          {Array.from({ length: columns }).map((_, i) => (
+            <Skeleton key={i} className="h-4 w-24" />
+          ))}
+        </div>
+        {Array.from({ length: rows }).map((_, rowIndex) => (
+          <div key={rowIndex} className="border-b border-slate-100 p-4 flex gap-6">
+            {Array.from({ length: columns }).map((_, colIndex) => (
+              <Skeleton key={colIndex} className="h-4 w-32" />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (variant === 'form') {
+    return (
+      <div className={cn('space-y-6 max-w-2xl', className)}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div key={i} className="space-y-2">
+            <Skeleton className="h-4 w-32 mb-2" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ))}
+        <div className="flex justify-end gap-3 pt-6">
+          <Skeleton className="h-10 w-24" />
+          <Skeleton className="h-10 w-32" />
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'dashboard') {
+    return (
+      <div className={cn('space-y-8', className)}>
+        {/* Metric Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-porcelain border border-slate-100 rounded-sm p-8">
+              <Skeleton className="h-12 w-24 mb-4" />
+              <Skeleton className="h-4 w-32" />
+            </div>
+          ))}
+        </div>
+
+        {/* Quick Actions */}
+        <div className="flex gap-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} className="h-10 w-40" />
+          ))}
+        </div>
+
+        {/* Table */}
+        <div>
+          <Skeleton className="h-6 w-48 mb-4" />
+          <LoadingState variant="table" rows={5} columns={5} />
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+export function LoadingSpinner({ className }: { className?: string }) {
+  return (
+    <div className={cn('flex items-center justify-center min-h-[400px]', className)}>
+      <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-obsidian" />
+    </div>
+  );
+}
+
+export function LoadingOverlay() {
+  return (
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center">
+      <div className="bg-porcelain rounded-xl p-8 shadow-premium-lg">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-slate-200 border-t-obsidian" />
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## `.\components\shared\Pagination.tsx`:
+
+```
+'use client';
+
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+
+interface PaginationProps {
+  currentPage: number;
+  totalPages: number;
+  totalItems: number;
+  itemsPerPage: number;
+  onPageChange?: (page: number) => void;
+  variant?: 'full' | 'simple';
+}
+
+export function Pagination({
+  currentPage,
+  totalPages,
+  totalItems,
+  itemsPerPage,
+  onPageChange,
+  variant = 'full',
+}: PaginationProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  const startItem = (currentPage - 1) * itemsPerPage + 1;
+  const endItem = Math.min(currentPage * itemsPerPage, totalItems);
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+
+    if (onPageChange) {
+      onPageChange(page);
+    } else {
+      const params = new URLSearchParams(searchParams);
+      params.set('page', page.toString());
+      router.push(`${pathname}?${params.toString()}`);
+      
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const getPageNumbers = () => {
+    const pages: (number | string)[] = [];
+    const maxVisible = 5;
+
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      pages.push(1);
+
+      if (currentPage > 3) {
+        pages.push('...');
+      }
+
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+
+      for (let i = start; i <= end; i++) {
+        pages.push(i);
+      }
+
+      if (currentPage < totalPages - 2) {
+        pages.push('...');
+      }
+
+      pages.push(totalPages);
+    }
+
+    return pages;
+  };
+
+  if (totalPages <= 1 && variant === 'full') return null;
+
+  if (variant === 'simple') {
+    return (
+      <div className="flex items-center justify-center gap-2 py-4">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={cn(
+            'p-2 rounded-sm transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+            currentPage === 1
+              ? 'opacity-50 cursor-not-allowed text-slate-300'
+              : 'text-slate-600 hover:bg-slate-50'
+          )}
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        <span className="text-sm text-slate-600 px-4">
+          Página {currentPage} de {totalPages}
+        </span>
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={cn(
+            'p-2 rounded-sm transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+            currentPage === totalPages
+              ? 'opacity-50 cursor-not-allowed text-slate-300'
+              : 'text-slate-600 hover:bg-slate-50'
+          )}
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center justify-between py-4 border-t border-slate-100">
+      {/* Items Info */}
+      <div className="text-sm text-slate-500">
+        Mostrando {startItem}-{endItem} de {totalItems} itens
+      </div>
+
+      {/* Page Numbers */}
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => handlePageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className={cn(
+            'w-10 h-10 rounded-sm flex items-center justify-center transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+            currentPage === 1
+              ? 'opacity-50 cursor-not-allowed text-slate-300'
+              : 'text-slate-600 hover:bg-slate-50'
+          )}
+        >
+          <ChevronLeft className="w-5 h-5" />
+        </button>
+
+        {getPageNumbers().map((page, index) => {
+          if (page === '...') {
+            return (
+              <span
+                key={`ellipsis-${index}`}
+                className="w-10 h-10 flex items-center justify-center text-slate-400"
+              >
+                ...
+              </span>
+            );
+          }
+
+          const pageNumber = page as number;
+          const isActive = pageNumber === currentPage;
+
+          return (
+            <button
+              key={pageNumber}
+              onClick={() => handlePageChange(pageNumber)}
+              className={cn(
+                'w-10 h-10 rounded-sm flex items-center justify-center transition-colors text-sm font-medium',
+                'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+                isActive
+                  ? 'bg-obsidian text-porcelain'
+                  : 'text-slate-600 hover:bg-slate-50'
+              )}
+            >
+              {pageNumber}
+            </button>
+          );
+        })}
+
+        <button
+          onClick={() => handlePageChange(currentPage + 1)}
+          disabled={currentPage === totalPages}
+          className={cn(
+            'w-10 h-10 rounded-sm flex items-center justify-center transition-colors',
+            'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+            currentPage === totalPages
+              ? 'opacity-50 cursor-not-allowed text-slate-300'
+              : 'text-slate-600 hover:bg-slate-50'
+          )}
+        >
+          <ChevronRight className="w-5 h-5" />
+        </button>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## `.\components\shared\Sidebar.tsx`:
+
+```
+'use client';
+
+import { useMemo } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { 
+  LayoutDashboard, 
+  Package, 
+  Layers, 
+  Users, 
+  Receipt, 
+  Link2, 
+  Inbox, 
+  UserPlus,
+  PackageOpen,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import { useAuthStore } from '@/store/auth.store';
+import { useUIStore } from '@/store/ui.store';
+import type { UserRole } from '@/lib/types';
+
+interface MenuItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: UserRole[];
+  children?: MenuItem[];
+}
+
+const menuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Catálogo',
+    href: '/catalog',
+    icon: Package,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+  {
+    label: 'Estoque',
+    href: '/inventory',
+    icon: Layers,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Estoque Compartilhado',
+    href: '/shared-inventory',
+    icon: PackageOpen,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Vendas',
+    href: '/sales',
+    icon: Receipt,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Links',
+    href: '/links',
+    icon: Link2,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Leads',
+    href: '/leads',
+    icon: Inbox,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Parceiros',
+    href: '/brokers',
+    icon: Users,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+  {
+    label: 'Equipe',
+    href: '/team',
+    icon: UserPlus,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
+  const { sidebarOpen, toggleSidebar } = useUIStore();
+
+  const filteredMenuItems = useMemo(() => {
+    if (!user) return [];
+    return menuItems.filter((item) => item.roles.includes(user.role));
+  }, [user]);
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    return pathname.startsWith(href);
+  };
+
+  if (!user) return null;
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed top-0 left-0 z-50 h-screen bg-obsidian text-porcelain transition-all duration-300',
+          'flex flex-col',
+          sidebarOpen ? 'w-64' : 'w-0 lg:w-20',
+          'lg:relative lg:z-auto'
+        )}
+      >
+        {/* Logo & Toggle */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div
+            className={cn(
+              'flex items-center gap-3 transition-opacity duration-200',
+              !sidebarOpen && 'lg:opacity-0'
+            )}
+          >
+            <div className="w-8 h-8 bg-porcelain rounded-sm" />
+            {sidebarOpen && (
+              <span className="font-serif text-xl font-semibold">CAVA</span>
+            )}
+          </div>
+          
+          <button
+            onClick={toggleSidebar}
+            className={cn(
+              'p-2 rounded-sm hover:bg-white/10 transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-white/20',
+              !sidebarOpen && 'lg:mx-auto'
+            )}
+          >
+            {sidebarOpen ? (
+              <ChevronLeft className="w-5 h-5" />
+            ) : (
+              <ChevronRight className="w-5 h-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-6">
+          <ul className="space-y-1 px-3">
+            {filteredMenuItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
+                      'text-sm font-medium',
+                      'focus:outline-none focus:ring-2 focus:ring-white/20',
+                      active
+                        ? 'bg-porcelain text-obsidian'
+                        : 'text-porcelain/80 hover:bg-white/10 hover:text-porcelain',
+                      !sidebarOpen && 'lg:justify-center'
+                    )}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    {sidebarOpen && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* User Info */}
+        {sidebarOpen && (
+          <div className="p-6 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center">
+                <span className="text-sm font-semibold">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{user.name}</p>
+                <p className="text-xs text-porcelain/60 truncate">
+                  {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
+                  {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
+                  {user.role === 'BROKER' && 'Broker'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }
 ```
@@ -1196,6 +2760,422 @@ export default eslintConfig;
 
 ---
 
+## `.\lib\api\client.ts`:
+
+```
+import type { ApiResponse, ErrorResponse, PaginatedResponse } from '@/lib/types/api';
+
+interface RequestConfig extends RequestInit {
+  params?: Record<string, string | number | boolean | undefined>;
+}
+
+class ApiClient {
+  private baseURL: string;
+  private isRefreshing: boolean = false;
+  private failedQueue: Array<{
+    resolve: (value?: unknown) => void;
+    reject: (reason?: unknown) => void;
+  }> = [];
+
+  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api') {
+    this.baseURL = baseURL;
+  }
+
+  private processQueue(error: Error | null, token: string | null = null) {
+    this.failedQueue.forEach(prom => {
+      if (error) {
+        prom.reject(error);
+      } else {
+        prom.resolve(token);
+      }
+    });
+    this.failedQueue = [];
+  }
+
+  private async refreshToken(): Promise<void> {
+    if (this.isRefreshing) {
+      return new Promise((resolve, reject) => {
+        this.failedQueue.push({ resolve, reject });
+      });
+    }
+
+    this.isRefreshing = true;
+
+    try {
+      const response = await fetch(`${this.baseURL}/auth/refresh`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to refresh token');
+      }
+
+      this.processQueue(null);
+      this.isRefreshing = false;
+    } catch (error) {
+      this.processQueue(error as Error);
+      this.isRefreshing = false;
+      
+      if (typeof window !== 'undefined') {
+        const currentPath = window.location.pathname;
+        if (!currentPath.startsWith('/login')) {
+          window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
+        }
+      }
+      
+      throw error;
+    }
+  }
+
+  private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
+    
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+    
+    return url.toString();
+  }
+
+  private async request<T>(
+    endpoint: string,
+    config: RequestConfig = {}
+  ): Promise<T> {
+    const { params, ...fetchConfig } = config;
+    const url = this.buildURL(endpoint, params);
+
+    const defaultHeaders: HeadersInit = {
+      'Content-Type': 'application/json',
+    };
+
+    const requestConfig: RequestInit = {
+      ...fetchConfig,
+      headers: {
+        ...defaultHeaders,
+        ...fetchConfig.headers,
+      },
+      credentials: 'include',
+    };
+
+    try {
+      const response = await fetch(url, requestConfig);
+
+      if (response.status === 401) {
+        await this.refreshToken();
+        
+        const retryResponse = await fetch(url, requestConfig);
+        
+        if (!retryResponse.ok) {
+          const errorData: ErrorResponse = await retryResponse.json();
+          throw new Error(errorData.error.message || 'Request failed');
+        }
+        
+        return retryResponse.json();
+      }
+
+      if (!response.ok) {
+        const errorData: ErrorResponse = await response.json();
+        throw new Error(errorData.error.message || 'Request failed');
+      }
+
+      const data: ApiResponse<T> = await response.json();
+      return data.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('An unexpected error occurred');
+    }
+  }
+
+  async get<T>(endpoint: string, config?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: 'GET',
+    });
+  }
+
+  async post<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async put<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: 'PUT',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async patch<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: 'PATCH',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async delete<T>(endpoint: string, config?: RequestConfig): Promise<T> {
+    return this.request<T>(endpoint, {
+      ...config,
+      method: 'DELETE',
+    });
+  }
+
+  async upload<T>(
+    endpoint: string,
+    formData: FormData,
+    config?: Omit<RequestConfig, 'body'>
+  ): Promise<T> {
+    const url = this.buildURL(endpoint, config?.params);
+
+    const requestConfig: RequestInit = {
+      method: 'POST',
+      body: formData,
+      credentials: 'include',
+      headers: config?.headers,
+    };
+
+    try {
+      const response = await fetch(url, requestConfig);
+
+      if (response.status === 401) {
+        await this.refreshToken();
+        const retryResponse = await fetch(url, requestConfig);
+        
+        if (!retryResponse.ok) {
+          const errorData: ErrorResponse = await retryResponse.json();
+          throw new Error(errorData.error.message || 'Upload failed');
+        }
+        
+        return retryResponse.json();
+      }
+
+      if (!response.ok) {
+        const errorData: ErrorResponse = await response.json();
+        throw new Error(errorData.error.message || 'Upload failed');
+      }
+
+      const data: ApiResponse<T> = await response.json();
+      return data.data;
+    } catch (error) {
+      if (error instanceof Error) {
+        throw error;
+      }
+      throw new Error('Upload failed');
+    }
+  }
+}
+
+export const apiClient = new ApiClient();
+
+export type { ApiResponse, ErrorResponse, PaginatedResponse };
+```
+
+---
+
+## `.\lib\hooks\useAuth.ts`:
+
+```
+import { useEffect } from 'react';
+import { useAuthStore } from '@/store/auth.store';
+import type { UserRole } from '@/lib/types';
+
+export function useAuth() {
+  const {
+    user,
+    isAuthenticated,
+    isLoading,
+    setUser,
+    login,
+    logout,
+    refreshSession,
+    hasPermission,
+  } = useAuthStore();
+
+  useEffect(() => {
+    if (!isAuthenticated && !isLoading) {
+      refreshSession().catch(() => {
+        setUser(null);
+      });
+    }
+  }, [isAuthenticated, isLoading, refreshSession, setUser]);
+
+  const checkPermission = (requiredRole: UserRole | UserRole[]): boolean => {
+    return hasPermission(requiredRole);
+  };
+
+  const isAdmin = (): boolean => {
+    return hasPermission('ADMIN_INDUSTRIA');
+  };
+
+  const isBroker = (): boolean => {
+    return hasPermission('BROKER');
+  };
+
+  const isSeller = (): boolean => {
+    return hasPermission('VENDEDOR_INTERNO');
+  };
+
+  const canAccessRoute = (route: string): boolean => {
+    if (!user) return false;
+
+    if (route.startsWith('/dashboard') || route.startsWith('/catalog') || route.startsWith('/inventory') || route.startsWith('/brokers') || route.startsWith('/sales') || route.startsWith('/team')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO']);
+    }
+
+    if (route.startsWith('/shared-inventory')) {
+      return hasPermission('BROKER');
+    }
+
+    if (route.startsWith('/links') || route.startsWith('/leads')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
+    }
+
+    return true;
+  };
+
+  const getDashboardRoute = (): string => {
+    if (!user) return '/login';
+
+    switch (user.role) {
+      case 'ADMIN_INDUSTRIA':
+      case 'VENDEDOR_INTERNO':
+        return '/dashboard';
+      case 'BROKER':
+        return '/dashboard';
+      default:
+        return '/login';
+    }
+  };
+
+  return {
+    user,
+    isAuthenticated,
+    isLoading,
+    login,
+    logout,
+    refreshSession,
+    hasPermission: checkPermission,
+    isAdmin,
+    isBroker,
+    isSeller,
+    canAccessRoute,
+    getDashboardRoute,
+  };
+}
+```
+
+---
+
+## `.\lib\hooks\useToast.ts`:
+
+```
+import { toast as sonnerToast } from 'sonner';
+import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
+
+interface ToastOptions {
+  description?: string;
+  duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
+}
+
+export function useToast() {
+  const success = (message: string, options?: ToastOptions) => {
+    sonnerToast.success(message, {
+      description: options?.description,
+      duration: options?.duration || 3000,
+      icon: CheckCircle,
+      action: options?.action,
+    });
+  };
+
+  const error = (message: string, options?: ToastOptions) => {
+    sonnerToast.error(message, {
+      description: options?.description,
+      duration: options?.duration || 5000,
+      icon: XCircle,
+      action: options?.action,
+    });
+  };
+
+  const warning = (message: string, options?: ToastOptions) => {
+    sonnerToast.warning(message, {
+      description: options?.description,
+      duration: options?.duration || 4000,
+      icon: AlertTriangle,
+      action: options?.action,
+    });
+  };
+
+  const info = (message: string, options?: ToastOptions) => {
+    sonnerToast.info(message, {
+      description: options?.description,
+      duration: options?.duration || 3000,
+      icon: Info,
+      action: options?.action,
+    });
+  };
+
+  const promise = <T,>(
+    promise: Promise<T>,
+    messages: {
+      loading: string;
+      success: string;
+      error: string;
+    }
+  ) => {
+    return sonnerToast.promise(promise, {
+      loading: messages.loading,
+      success: messages.success,
+      error: messages.error,
+    });
+  };
+
+  return {
+    success,
+    error,
+    warning,
+    info,
+    promise,
+    toast: sonnerToast,
+  };
+}
+
+export const errorMessages: Record<string, string> = {
+  BATCH_NOT_AVAILABLE: 'Este lote não está mais disponível',
+  UNAUTHORIZED: 'Você não tem permissão para esta ação',
+  VALIDATION_ERROR: 'Erro de validação nos dados enviados',
+  NETWORK_ERROR: 'Erro de conexão. Verifique sua internet.',
+  SESSION_EXPIRED: 'Sua sessão expirou. Faça login novamente.',
+  GENERIC_ERROR: 'Algo deu errado. Tente novamente.',
+  FILE_TOO_LARGE: 'Arquivo excede o limite de 5MB',
+  INVALID_FORMAT: 'Formato não suportado. Use JPG, PNG ou WebP',
+  PERMISSION_DENIED: 'Você não tem permissão para esta ação',
+};
+
+export function getErrorMessage(code: string): string {
+  return errorMessages[code] || errorMessages.GENERIC_ERROR;
+}
+```
+
+---
+
 ## `.\lib\schemas\auth.schema.ts`:
 
 ```
@@ -1850,6 +3830,225 @@ export interface Activity {
 
 ---
 
+## `.\lib\utils\calculateArea.ts`:
+
+```
+'use client';
+
+import { useMemo } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { 
+  LayoutDashboard, 
+  Package, 
+  Layers, 
+  Users, 
+  Receipt, 
+  Link2, 
+  Inbox, 
+  UserPlus,
+  PackageOpen,
+  ChevronLeft,
+  ChevronRight
+} from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+import { useAuthStore } from '@/store/auth.store';
+import { useUIStore } from '@/store/ui.store';
+import type { UserRole } from '@/lib/types';
+
+interface MenuItem {
+  label: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  roles: UserRole[];
+  children?: MenuItem[];
+}
+
+const menuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Catálogo',
+    href: '/catalog',
+    icon: Package,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+  {
+    label: 'Estoque',
+    href: '/inventory',
+    icon: Layers,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Estoque Compartilhado',
+    href: '/shared-inventory',
+    icon: PackageOpen,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Vendas',
+    href: '/sales',
+    icon: Receipt,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'Links',
+    href: '/links',
+    icon: Link2,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Leads',
+    href: '/leads',
+    icon: Inbox,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  },
+  {
+    label: 'Parceiros',
+    href: '/brokers',
+    icon: Users,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+  {
+    label: 'Equipe',
+    href: '/team',
+    icon: UserPlus,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+  const user = useAuthStore((state) => state.user);
+  const { sidebarOpen, toggleSidebar } = useUIStore();
+
+  const filteredMenuItems = useMemo(() => {
+    if (!user) return [];
+    return menuItems.filter((item) => item.roles.includes(user.role));
+  }, [user]);
+
+  const isActive = (href: string) => {
+    if (href === '/dashboard') {
+      return pathname === '/dashboard';
+    }
+    return pathname.startsWith(href);
+  };
+
+  if (!user) return null;
+
+  return (
+    <>
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={toggleSidebar}
+        />
+      )}
+
+      {/* Sidebar */}
+      <aside
+        className={cn(
+          'fixed top-0 left-0 z-50 h-screen bg-obsidian text-porcelain transition-all duration-300',
+          'flex flex-col',
+          sidebarOpen ? 'w-64' : 'w-0 lg:w-20',
+          'lg:relative lg:z-auto'
+        )}
+      >
+        {/* Logo & Toggle */}
+        <div className="flex items-center justify-between p-6 border-b border-white/10">
+          <div
+            className={cn(
+              'flex items-center gap-3 transition-opacity duration-200',
+              !sidebarOpen && 'lg:opacity-0'
+            )}
+          >
+            <div className="w-8 h-8 bg-porcelain rounded-sm" />
+            {sidebarOpen && (
+              <span className="font-serif text-xl font-semibold">CAVA</span>
+            )}
+          </div>
+          
+          <button
+            onClick={toggleSidebar}
+            className={cn(
+              'p-2 rounded-sm hover:bg-white/10 transition-colors',
+              'focus:outline-none focus:ring-2 focus:ring-white/20',
+              !sidebarOpen && 'lg:mx-auto'
+            )}
+          >
+            {sidebarOpen ? (
+              <ChevronLeft className="w-5 h-5" />
+            ) : (
+              <ChevronRight className="w-5 h-5" />
+            )}
+          </button>
+        </div>
+
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto py-6">
+          <ul className="space-y-1 px-3">
+            {filteredMenuItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+
+              return (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
+                      'text-sm font-medium',
+                      'focus:outline-none focus:ring-2 focus:ring-white/20',
+                      active
+                        ? 'bg-porcelain text-obsidian'
+                        : 'text-porcelain/80 hover:bg-white/10 hover:text-porcelain',
+                      !sidebarOpen && 'lg:justify-center'
+                    )}
+                  >
+                    <Icon className="w-5 h-5 shrink-0" />
+                    {sidebarOpen && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
+
+        {/* User Info */}
+        {sidebarOpen && (
+          <div className="p-6 border-t border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center">
+                <span className="text-sm font-semibold">
+                  {user.name.charAt(0).toUpperCase()}
+                </span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{user.name}</p>
+                <p className="text-xs text-porcelain/60 truncate">
+                  {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
+                  {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
+                  {user.role === 'BROKER' && 'Broker'}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </aside>
+    </>
+  );
+}
+```
+
+---
+
 ## `.\lib\utils\cn.ts`:
 
 ```
@@ -1881,6 +4080,126 @@ export function parseCurrency(value: string): number {
 export function formatCurrencyInput(value: string): string {
   const number = parseCurrency(value);
   return formatCurrency(number);
+}
+```
+
+---
+
+## `.\lib\utils\formatDate.ts`:
+
+```
+import { format, formatDistance, formatRelative, parseISO, isValid } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+
+export function formatDate(date: string | Date, formatStr: string = 'dd/MM/yyyy'): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '-';
+    return format(dateObj, formatStr, { locale: ptBR });
+  } catch {
+    return '-';
+  }
+}
+
+export function formatDateTime(date: string | Date): string {
+  return formatDate(date, "dd/MM/yyyy 'às' HH:mm");
+}
+
+export function formatDateLong(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '-';
+    return format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+  } catch {
+    return '-';
+  }
+}
+
+export function formatDateShort(date: string | Date): string {
+  return formatDate(date, 'dd/MM/yy');
+}
+
+export function formatDateISO(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '';
+    return format(dateObj, 'yyyy-MM-dd');
+  } catch {
+    return '';
+  }
+}
+
+export function formatDateTimeISO(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '';
+    return dateObj.toISOString();
+  } catch {
+    return '';
+  }
+}
+
+export function formatRelativeDate(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '-';
+    return formatRelative(dateObj, new Date(), { locale: ptBR });
+  } catch {
+    return '-';
+  }
+}
+
+export function formatDistanceToNow(date: string | Date): string {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return '-';
+    return formatDistance(dateObj, new Date(), { 
+      addSuffix: true, 
+      locale: ptBR 
+    });
+  } catch {
+    return '-';
+  }
+}
+
+export function formatDateForInput(date: string | Date): string {
+  return formatDate(date, 'yyyy-MM-dd');
+}
+
+export function addDays(date: string | Date, days: number): Date {
+  const dateObj = typeof date === 'string' ? parseISO(date) : date;
+  const result = new Date(dateObj);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+export function isExpired(date: string | Date): boolean {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return false;
+    return dateObj < new Date();
+  } catch {
+    return false;
+  }
+}
+
+export function getDaysUntil(date: string | Date): number {
+  try {
+    const dateObj = typeof date === 'string' ? parseISO(date) : date;
+    if (!isValid(dateObj)) return 0;
+    
+    const now = new Date();
+    const diff = dateObj.getTime() - now.getTime();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  } catch {
+    return 0;
+  }
+}
+
+export function getDefaultExpirationDate(daysFromNow: number = 7): string {
+  const date = new Date();
+  date.setDate(date.getDate() + daysFromNow);
+  return formatDateForInput(date);
 }
 ```
 
@@ -2025,6 +4344,143 @@ export function formatPhone(phone: string): string {
 
 ---
 
+## `.\middleware.ts`:
+
+```
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+const publicRoutes = ['/login', '/register'];
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico'];
+
+const roleRouteMap: Record<string, string[]> = {
+  ADMIN_INDUSTRIA: [
+    '/dashboard',
+    '/catalog',
+    '/inventory',
+    '/brokers',
+    '/sales',
+    '/team',
+    '/links',
+    '/leads',
+  ],
+  VENDEDOR_INTERNO: [
+    '/dashboard',
+    '/inventory',
+    '/sales',
+    '/links',
+    '/leads',
+  ],
+  BROKER: [
+    '/dashboard',
+    '/shared-inventory',
+    '/links',
+    '/leads',
+  ],
+};
+
+const roleDashboards: Record<string, string> = {
+  ADMIN_INDUSTRIA: '/dashboard',
+  VENDEDOR_INTERNO: '/dashboard',
+  BROKER: '/dashboard',
+};
+
+function isPublicRoute(pathname: string): boolean {
+  if (publicRoutes.includes(pathname)) return true;
+  return publicPrefixes.some(prefix => pathname.startsWith(prefix));
+}
+
+function canAccessRoute(pathname: string, userRole: string): boolean {
+  const allowedRoutes = roleRouteMap[userRole];
+  if (!allowedRoutes) return false;
+
+  return allowedRoutes.some(route => pathname.startsWith(route));
+}
+
+function getDashboardForRole(role: string): string {
+  return roleDashboards[role] || '/login';
+}
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  if (isPublicRoute(pathname)) {
+    return NextResponse.next();
+  }
+
+  const accessToken = request.cookies.get('access_token')?.value;
+  const userRole = request.cookies.get('user_role')?.value;
+
+  if (!accessToken) {
+    try {
+      const refreshToken = request.cookies.get('refresh_token')?.value;
+      
+      if (!refreshToken) {
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('callbackUrl', pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+      const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cookie': `refresh_token=${refreshToken}`,
+        },
+        credentials: 'include',
+      });
+
+      if (!refreshResponse.ok) {
+        const loginUrl = new URL('/login', request.url);
+        loginUrl.searchParams.set('callbackUrl', pathname);
+        return NextResponse.redirect(loginUrl);
+      }
+
+      const response = NextResponse.next();
+      
+      const setCookieHeader = refreshResponse.headers.get('set-cookie');
+      if (setCookieHeader) {
+        response.headers.set('set-cookie', setCookieHeader);
+      }
+
+      return response;
+    } catch (error) {
+      console.error('Token refresh error:', error);
+      const loginUrl = new URL('/login', request.url);
+      loginUrl.searchParams.set('callbackUrl', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+  }
+
+  if (!userRole) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  if (pathname === '/login' && accessToken) {
+    const dashboardUrl = getDashboardForRole(userRole);
+    return NextResponse.redirect(new URL(dashboardUrl, request.url));
+  }
+
+  if (!canAccessRoute(pathname, userRole)) {
+    const dashboardUrl = getDashboardForRole(userRole);
+    return NextResponse.redirect(new URL(dashboardUrl, request.url));
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: [
+    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+};
+```
+
+---
+
 ## `.\next-env.d.ts`:
 
 ```
@@ -2120,6 +4576,179 @@ export default config;
 
 ---
 
+## `.\store\auth.store.ts`:
+
+```
+import { create } from 'zustand';
+import { persist, createJSONStorage } from 'zustand/middleware';
+import type { User, UserRole } from '@/lib/types';
+import { apiClient } from '@/lib/api/client';
+
+interface AuthState {
+  user: User | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  
+  setUser: (user: User | null) => void;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
+  hasPermission: (requiredRole: UserRole | UserRole[]) => boolean;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      user: null,
+      isAuthenticated: false,
+      isLoading: true,
+
+      setUser: (user) => {
+        set({
+          user,
+          isAuthenticated: !!user,
+          isLoading: false,
+        });
+      },
+
+      login: async (email: string, password: string) => {
+        try {
+          set({ isLoading: true });
+
+          const response = await apiClient.post<{
+            user: User;
+            role: UserRole;
+          }>('/auth/login', { email, password });
+
+          set({
+            user: response.user,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (error) {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      logout: async () => {
+        try {
+          await apiClient.post('/auth/logout');
+        } catch (error) {
+          console.error('Logout error:', error);
+        } finally {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+        }
+      },
+
+      refreshSession: async () => {
+        try {
+          set({ isLoading: true });
+
+          const response = await apiClient.post<{
+            user: User;
+          }>('/auth/refresh');
+
+          set({
+            user: response.user,
+            isAuthenticated: true,
+            isLoading: false,
+          });
+        } catch (error) {
+          set({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
+          throw error;
+        }
+      },
+
+      hasPermission: (requiredRole: UserRole | UserRole[]) => {
+        const { user } = get();
+        if (!user) return false;
+
+        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+        return roles.includes(user.role);
+      },
+    }),
+    {
+      name: 'cava-auth-storage',
+      storage: createJSONStorage(() => {
+        if (typeof window === 'undefined') {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return window.localStorage;
+      }),
+      partialize: (state) => ({
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    }
+  )
+);
+```
+
+---
+
+## `.\store\ui.store.ts`:
+
+```
+import { create } from 'zustand';
+
+interface UIState {
+  sidebarOpen: boolean;
+  setSidebarOpen: (open: boolean) => void;
+  toggleSidebar: () => void;
+  
+  mobileMenuOpen: boolean;
+  setMobileMenuOpen: (open: boolean) => void;
+  toggleMobileMenu: () => void;
+  
+  activeModal: string | null;
+  openModal: (modalId: string) => void;
+  closeModal: () => void;
+  
+  isPageLoading: boolean;
+  setPageLoading: (loading: boolean) => void;
+}
+
+export const useUIStore = create<UIState>((set) => ({
+  sidebarOpen: true,
+  setSidebarOpen: (open) => set({ sidebarOpen: open }),
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+  
+  mobileMenuOpen: false,
+  setMobileMenuOpen: (open) => set({ mobileMenuOpen: open }),
+  toggleMobileMenu: () => set((state) => ({ mobileMenuOpen: !state.mobileMenuOpen })),
+  
+  activeModal: null,
+  openModal: (modalId) => set({ activeModal: modalId }),
+  closeModal: () => set({ activeModal: null }),
+  
+  isPageLoading: false,
+  setPageLoading: (loading) => set({ isPageLoading: loading }),
+}));
+```
+
+---
+
 ## `.\tsconfig.json`:
 
 ```
@@ -2165,8 +4794,16 @@ export default config;
 # 📌 Resumo
 
 ## Arquivos com conteúdo:
+- .\app\(auth)\login\page.tsx
+- .\app\(public)\[slug]\page.tsx
 - .\app\globals.css
 - .\app\page.tsx
+- .\components\shared\EmptyState.tsx
+- .\components\shared\ErrorBoundary.tsx
+- .\components\shared\Header.tsx
+- .\components\shared\LoadingState.tsx
+- .\components\shared\Pagination.tsx
+- .\components\shared\Sidebar.tsx
 - .\components\ui\badge.tsx
 - .\components\ui\button.tsx
 - .\components\ui\card.tsx
@@ -2182,6 +4819,9 @@ export default config;
 - .\components\ui\toast.tsx
 - .\components\ui\toggle.tsx
 - .\eslint.config.mjs
+- .\lib\api\client.ts
+- .\lib\hooks\useAuth.ts
+- .\lib\hooks\useToast.ts
 - .\lib\schemas\auth.schema.ts
 - .\lib\schemas\batch.schema.ts
 - .\lib\schemas\lead.schema.ts
@@ -2189,18 +4829,22 @@ export default config;
 - .\lib\schemas\product.schema.ts
 - .\lib\types\api.ts
 - .\lib\types\index.ts
+- .\lib\utils\calculateArea.ts
 - .\lib\utils\cn.ts
 - .\lib\utils\formatCurrency.ts
+- .\lib\utils\formatDate.ts
 - .\lib\utils\formatDimensions.ts
 - .\lib\utils\validators.ts
+- .\middleware.ts
 - .\next-env.d.ts
 - .\next.config.ts
 - .\package.json
 - .\postcss.config.mjs
+- .\store\auth.store.ts
+- .\store\ui.store.ts
 - .\tsconfig.json
 
 ## Arquivos vazios:
-- .\app\(auth)\login\page.tsx
 - .\app\(broker)\dashboard\page.tsx
 - .\app\(broker)\leads\page.tsx
 - .\app\(broker)\links\new\page.tsx
@@ -2220,24 +4864,9 @@ export default config;
 - .\app\(industry)\links\page.tsx
 - .\app\(industry)\sales\page.tsx
 - .\app\(industry)\team\page.tsx
-- .\app\(public)\[slug]\page.tsx
 - .\app\(seller)\dashboard\page.tsx
 - .\app\(seller)\inventory\page.tsx
 - .\app\(seller)\leads\page.tsx
 - .\app\(seller)\links\new\page.tsx
 - .\app\(seller)\links\page.tsx
-- .\components\shared\EmptyState.tsx
-- .\components\shared\ErrorBoundary.tsx
-- .\components\shared\Header.tsx
-- .\components\shared\LoadingState.tsx
-- .\components\shared\Pagination.tsx
-- .\components\shared\Sidebar.tsx
-- .\lib\api\client.ts
-- .\lib\hooks\useAuth.ts
-- .\lib\hooks\useToast.ts
 - .\lib\types\database.ts
-- .\lib\utils\calculateArea.ts
-- .\lib\utils\formatDate.ts
-- .\middleware.ts
-- .\store\auth.store.ts
-- .\store\ui.store.ts
