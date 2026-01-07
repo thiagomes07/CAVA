@@ -1,6 +1,6 @@
 'use client';
 
-import { forwardRef, type InputHTMLAttributes } from 'react';
+import { forwardRef, type InputHTMLAttributes, type ChangeEvent, type ReactNode } from 'react';
 import InputMask from 'react-input-mask';
 import { cn } from '@/lib/utils/cn';
 
@@ -17,11 +17,21 @@ const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
   ({ className, label, error, helperText, mask, maskChar = '_', id, onChange, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
       const value = e.target.value;
-      const rawValue = value.replace(/\D/g, '');
+      const rawValue = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
       onChange?.(value, rawValue);
     };
+
+    const inputClassName = cn(
+      'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+      'disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed',
+      error
+        ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
+        : 'border-slate-200 bg-white focus:border-obsidian',
+      className
+    );
 
     return (
       <div className="w-full">
@@ -42,22 +52,14 @@ const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
           onChange={handleChange}
           {...props}
         >
-          {(inputProps: Record<string, unknown>) => (
+          {((inputProps: InputHTMLAttributes<HTMLInputElement>): ReactNode => (
             <input
               {...inputProps}
               ref={ref}
               id={inputId}
-              className={cn(
-                'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',
-                'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
-                'disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed',
-                error
-                  ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
-                  : 'border-slate-200 bg-white focus:border-obsidian',
-                className
-              )}
+              className={inputClassName}
             />
-          )}
+          )) as unknown as undefined}
         </InputMask>
         {error && (
           <p className="mt-1 text-xs text-rose-600">{error}</p>

@@ -1,8 +1,7 @@
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, LogOut, User, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Menu, LogOut, ChevronRight } from 'lucide-react';
 import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/dropdown';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
@@ -44,7 +43,7 @@ export function Header() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const { toggleSidebar, toggleMobileMenu } = useUIStore();
+  const { toggleSidebar } = useUIStore();
   const { success, error } = useToast();
 
   const breadcrumbs = getBreadcrumbs(pathname);
@@ -55,7 +54,7 @@ export function Header() {
       await logout();
       success('Logout realizado com sucesso');
       router.push('/login');
-    } catch (err) {
+    } catch {
       error('Erro ao fazer logout');
     }
   };
@@ -128,12 +127,7 @@ export function Header() {
                 {user.role === 'BROKER' && 'Broker'}
               </p>
             </div>
-            
-            <DropdownItem onClick={() => router.push('/profile')}>
-              <User className="w-4 h-4 mr-2" />
-              Meu Perfil
-            </DropdownItem>
-            
+
             <DropdownSeparator />
             
             <DropdownItem onClick={handleLogout}>

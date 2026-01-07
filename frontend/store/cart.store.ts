@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import type { Batch } from '@/lib/types';
 
 interface CartItem {
@@ -21,62 +20,49 @@ interface CartState {
 }
 
 export const useCartStore = create<CartState>()(
-  persist(
-    (set, get) => ({
-      items: [],
+  (set, get) => ({
+    items: [],
 
-      addItem: (batch: Batch) => {
-        const { items } = get();
-        const exists = items.some(item => item.batchId === batch.id);
-        
-        if (!exists) {
-          set({
-            items: [
-              ...items,
-              {
-                batchId: batch.id,
-                batch,
-                addedAt: new Date().toISOString(),
-              },
-            ],
-          });
-        }
-      },
+    addItem: (batch: Batch) => {
+      const { items } = get();
+      const exists = items.some((item) => item.batchId === batch.id);
 
-      removeItem: (batchId: string) => {
+      if (!exists) {
         set({
-          items: get().items.filter(item => item.batchId !== batchId),
+          items: [
+            ...items,
+            {
+              batchId: batch.id,
+              batch,
+              addedAt: new Date().toISOString(),
+            },
+          ],
         });
-      },
+      }
+    },
 
-      clearCart: () => {
-        set({ items: [] });
-      },
+    removeItem: (batchId: string) => {
+      set({
+        items: get().items.filter((item) => item.batchId !== batchId),
+      });
+    },
 
-      isInCart: (batchId: string) => {
-        return get().items.some(item => item.batchId === batchId);
-      },
+    clearCart: () => {
+      set({ items: [] });
+    },
 
-      getItemCount: () => {
-        return get().items.length;
-      },
+    isInCart: (batchId: string) => {
+      return get().items.some((item) => item.batchId === batchId);
+    },
 
-      getTotalValue: () => {
-        return get().items.reduce((total, item) => {
-          return total + (item.batch.industryPrice || 0);
-        }, 0);
-      },
-    }),
-    {
-      name: 'cava-cart-storage',
-      // Apenas persistir os IDs, não os dados completos
-      partialize: (state) => ({
-        items: state.items.map(item => ({
-          batchId: item.batchId,
-          batch: item.batch,
-          addedAt: item.addedAt,
-        })),
-      }),
-    }
-  )
+    getItemCount: () => {
+      return get().items.length;
+    },
+
+    getTotalValue: () => {
+      return get().items.reduce((total, item) => {
+        return total + (item.batch.industryPrice || 0);
+      }, 0);
+    },
+  })
 );

@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'CAVA Stone Platform',
@@ -27,12 +28,12 @@ export default function PublicLayout({
           </p>
           
           <div className="mt-4">
-            <a
+            <Link
               href="/privacy"
               className="text-xs text-slate-500 hover:text-obsidian transition-colors"
             >
               Política de Privacidade
-            </a>
+            </Link>
           </div>
         </div>
       </footer>

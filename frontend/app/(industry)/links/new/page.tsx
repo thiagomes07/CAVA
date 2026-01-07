@@ -191,12 +191,11 @@ export default function CreateSalesLinkPage() {
         data
       );
 
-      const fullUrl = `${window.location.origin}/${data.slugToken}`;
+      const fullUrl = response.fullUrl || `${window.location.origin}/${data.slugToken}`;
       setGeneratedLink(fullUrl);
       setShowSuccessModal(true);
 
       await navigator.clipboard.writeText(fullUrl);
-      success('Link criado! Copiado para área de transferência');
     } catch (err) {
       error('Erro ao criar link');
     } finally {
@@ -593,7 +592,7 @@ export default function CreateSalesLinkPage() {
                   label="Exibir preço no link"
                 />
                 <p className="text-xs text-slate-500 ml-14">
-                  Se desativado, aparecerá "Sob Consulta"
+                  Se desativado, aparecerá &quot;Sob Consulta&quot;
                 </p>
 
                 <Input
@@ -749,7 +748,7 @@ export default function CreateSalesLinkPage() {
           </Button>
           <Button
             variant="primary"
-            onClick={() => router.push('/admin/links')}
+            onClick={() => router.push('/links')}
           >
             Ver Meus Links
           </Button>

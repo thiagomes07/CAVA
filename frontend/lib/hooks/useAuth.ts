@@ -56,6 +56,43 @@ export function useAuth() {
       return hasPermission('VENDEDOR_INTERNO');
     }
 
+    // Canonical routes
+    if (route === '/dashboard' || route.startsWith('/dashboard/')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
+    }
+
+    if (route === '/shared-inventory' || route.startsWith('/shared-inventory/')) {
+      return hasPermission('BROKER');
+    }
+
+    if (route === '/inventory' || route.startsWith('/inventory/')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO']);
+    }
+
+    if (route === '/catalog' || route.startsWith('/catalog/')) {
+      return hasPermission('ADMIN_INDUSTRIA');
+    }
+
+    if (route === '/brokers' || route.startsWith('/brokers/')) {
+      return hasPermission('ADMIN_INDUSTRIA');
+    }
+
+    if (route === '/team' || route.startsWith('/team/')) {
+      return hasPermission('ADMIN_INDUSTRIA');
+    }
+
+    if (route === '/sales' || route.startsWith('/sales/')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO']);
+    }
+
+    if (route === '/links' || route.startsWith('/links/')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
+    }
+
+    if (route === '/leads' || route.startsWith('/leads/')) {
+      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
+    }
+
     return true;
   };
 
@@ -65,9 +102,9 @@ export function useAuth() {
     switch (user.role) {
       case 'ADMIN_INDUSTRIA':
       case 'VENDEDOR_INTERNO':
-        return '/admin/dashboard';
+        return '/dashboard';
       case 'BROKER':
-        return '/broker/dashboard';
+        return '/dashboard';
       default:
         return '/login';
     }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -498,12 +499,12 @@ export default function PublicLinkPage() {
             </p>
 
             {/* Links */}
-            <a
+            <Link
               href="/privacy"
               className="text-sm text-slate-500 hover:text-obsidian transition-colors"
             >
               Política de Privacidade
-            </a>
+            </Link>
           </div>
         </div>
       </footer>

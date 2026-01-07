@@ -33,49 +33,49 @@ interface MenuItem {
 const industryMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
-    href: '/admin/dashboard',
+    href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Catálogo',
-    href: '/admin/catalog',
+    href: '/catalog',
     icon: Package,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
     label: 'Estoque',
-    href: '/admin/inventory',
+    href: '/inventory',
     icon: Layers,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Vendas',
-    href: '/admin/sales',
+    href: '/sales',
     icon: Receipt,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Links',
-    href: '/admin/links',
+    href: '/links',
     icon: Link2,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Leads',
-    href: '/admin/leads',
+    href: '/leads',
     icon: Inbox,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Parceiros',
-    href: '/admin/brokers',
+    href: '/brokers',
     icon: Users,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
     label: 'Equipe',
-    href: '/admin/team',
+    href: '/team',
     icon: UserPlus,
     roles: ['ADMIN_INDUSTRIA'],
   },
@@ -84,54 +84,27 @@ const industryMenuItems: MenuItem[] = [
 const brokerMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
-    href: '/broker/dashboard',
+    href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['BROKER'],
   },
   {
     label: 'Estoque Compartilhado',
-    href: '/broker/shared-inventory',
+    href: '/shared-inventory',
     icon: PackageOpen,
     roles: ['BROKER'],
   },
   {
     label: 'Links',
-    href: '/broker/links',
+    href: '/links',
     icon: Link2,
     roles: ['BROKER'],
   },
   {
     label: 'Leads',
-    href: '/broker/leads',
+    href: '/leads',
     icon: Inbox,
     roles: ['BROKER'],
-  },
-];
-
-const sellerMenuItems: MenuItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/seller/dashboard',
-    icon: LayoutDashboard,
-    roles: ['VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'Estoque',
-    href: '/seller/inventory',
-    icon: Layers,
-    roles: ['VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'Links',
-    href: '/seller/links',
-    icon: Link2,
-    roles: ['VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'Leads',
-    href: '/seller/leads',
-    icon: Inbox,
-    roles: ['VENDEDOR_INTERNO'],
   },
 ];
 

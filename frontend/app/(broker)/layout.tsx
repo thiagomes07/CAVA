@@ -23,7 +23,7 @@ export default function BrokerLayout({
     }
 
     if (!isLoading && user && !hasPermission('BROKER')) {
-      router.push('/admin/dashboard');
+      router.push('/dashboard');
     }
   }, [user, isLoading, hasPermission, router]);
 

@@ -10,8 +10,18 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/auth.store';
 import { useToast } from '@/lib/hooks/useToast';
 import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
-import { cn } from '@/lib/utils/cn';
 import { useAuth } from '@/lib/hooks/useAuth';
+
+import { toCanonicalPath } from '@/lib/utils/routes';
+
+function getSafeRedirectTarget(callbackUrl: string | null): string | null {
+  if (!callbackUrl) return null;
+
+  // Prevent open-redirects; only allow same-origin path
+  if (!callbackUrl.startsWith('/')) return null;
+
+  return toCanonicalPath(callbackUrl);
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -38,13 +48,17 @@ export default function LoginPage() {
 
       await login(data.email, data.password);
 
-      success('Login realizado com sucesso');
+      // Obter o nome do usuário do store após o login
+      const user = useAuthStore.getState().user;
+      const userName = user?.name?.split(' ')[0] || 'usuário';
+      
+      success(`Bem-vindo de volta, ${userName}!`);
 
       // Use callback URL if provided, otherwise use role-based dashboard
       const callbackUrl = searchParams.get('callbackUrl');
-      const redirectTo = callbackUrl || getDashboardRoute();
+      const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
       router.push(redirectTo);
-    } catch (err) {
+    } catch {
       error('Email ou senha incorretos');
     } finally {
       setIsLoading(false);

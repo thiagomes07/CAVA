@@ -128,7 +128,7 @@ export default function LeadsManagementPage() {
       page: 1,
       limit: 50,
     });
-    router.push('/admin/leads');
+    router.push('/leads');
   };
 
   const handleCopyContact = async (contact: string) => {

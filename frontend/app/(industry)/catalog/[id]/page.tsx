@@ -441,7 +441,7 @@ export default function EditProductPage() {
         </ModalHeader>
         <ModalContent>
           <p className="text-slate-600">
-            Tem certeza que deseja excluir o produto <strong>"{product.name}"</strong>?
+            Tem certeza que deseja excluir o produto <strong>&quot;{product.name}&quot;</strong>?
           </p>
           <p className="text-rose-600 text-sm mt-4">
             Esta ação não pode ser desfeita.

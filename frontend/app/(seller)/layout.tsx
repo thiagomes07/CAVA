@@ -23,7 +23,7 @@ export default function SellerLayout({
     }
 
     if (!isLoading && user && !hasPermission('VENDEDOR_INTERNO')) {
-      router.push('/admin/dashboard');
+      router.push('/dashboard');
     }
   }, [user, isLoading, hasPermission, router]);
 

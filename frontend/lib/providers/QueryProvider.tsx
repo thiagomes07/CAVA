@@ -9,6 +9,34 @@ interface QueryProviderProps {
   children: ReactNode;
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'BATCH_NOT_AVAILABLE') {
+      return 'Este lote não está mais disponível';
+    }
+
+    if (error.code === 'UNAUTHORIZED') {
+      return 'Você não tem permissão para esta ação';
+    }
+
+    if (error.code === 'VALIDATION_ERROR') {
+      return error.message || 'Verifique os campos e tente novamente';
+    }
+
+    return error.message || 'Algo deu errado. Tente novamente.';
+  }
+
+  if (error instanceof Error) {
+    // Fetch/network errors commonly surface as TypeError
+    if (error.name === 'TypeError') {
+      return 'Erro de conexão. Verifique sua internet.';
+    }
+    return error.message;
+  }
+
+  return 'Algo deu errado. Tente novamente.';
+}
+
 // Custom error handler for global error management
 const handleError = (error: unknown) => {
   // Don't show toast for 401 errors (handled by auth interceptor)
@@ -21,10 +49,14 @@ const handleError = (error: unknown) => {
     return;
   }
 
-  const message = error instanceof Error ? error.message : 'Ocorreu um erro inesperado';
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Query error:', error);
+  }
+
+  const message = getErrorMessage(error);
   
   toast.error(message, {
-    duration: 4000,
+    duration: 5000,
     position: 'top-right',
   });
 };

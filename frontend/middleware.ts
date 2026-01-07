@@ -1,90 +1,111 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicRoutes = ['/login', '/register'];
+// Rotas de autenticação (públicas)
+const authRoutes = ['/login'];
+
+// Prefixos de rotas públicas
 const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy'];
 
-// Routes that require authentication - using prefixed routes
-const protectedPrefixes = [
-  '/admin',   // Industry admin routes
-  '/broker',  // Broker routes  
-  '/seller',  // Seller routes
-  '/profile',
-];
-
-const roleRouteMap: Record<string, string[]> = {
-  ADMIN_INDUSTRIA: [
-    '/admin/dashboard',
-    '/admin/catalog',
-    '/admin/inventory',
-    '/admin/brokers',
-    '/admin/sales',
-    '/admin/team',
-    '/admin/links',
-    '/admin/leads',
-  ],
-  VENDEDOR_INTERNO: [
-    '/admin/dashboard',
-    '/admin/inventory',
-    '/admin/sales',
-    '/admin/links',
-    '/admin/leads',
-  ],
-  BROKER: [
-    '/broker/dashboard',
-    '/broker/shared-inventory',
-    '/broker/links',
-    '/broker/leads',
-  ],
+// Rotas protegidas e suas permissões por role
+const routePermissions: Record<string, string[]> = {
+  // Industry routes (ADMIN_INDUSTRIA e VENDEDOR_INTERNO)
+  '/dashboard': ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  '/catalog': ['ADMIN_INDUSTRIA'],
+  '/inventory': ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  '/brokers': ['ADMIN_INDUSTRIA'],
+  '/sales': ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  '/team': ['ADMIN_INDUSTRIA'],
+  '/links': ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  '/leads': ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+  // Broker-only routes
+  '/shared-inventory': ['BROKER'],
 };
 
-const roleDashboards: Record<string, string> = {
-  ADMIN_INDUSTRIA: '/admin/dashboard',
-  VENDEDOR_INTERNO: '/admin/dashboard',
-  BROKER: '/broker/dashboard',
+// Rotas que requerem redirecionamento baseado em role
+const roleBasedRedirects: Record<string, Record<string, string>> = {
+  '/dashboard': {
+    'ADMIN_INDUSTRIA': '/dashboard',
+    'VENDEDOR_INTERNO': '/dashboard',
+    'BROKER': '/dashboard',
+  },
+  '/inventory': {
+    'ADMIN_INDUSTRIA': '/inventory',
+    'VENDEDOR_INTERNO': '/inventory',
+    'BROKER': '/shared-inventory', // Broker vê shared-inventory ao invés de inventory
+  },
 };
+
+function isAuthRoute(pathname: string): boolean {
+  return authRoutes.includes(pathname);
+}
 
 function isPublicRoute(pathname: string): boolean {
-  // Explicit public routes
-  if (publicRoutes.includes(pathname)) return true;
-  
-  // Check public prefixes
-  if (publicPrefixes.some(prefix => pathname.startsWith(prefix))) return true;
-  
-  // Check if it's a protected route
-  const isProtected = protectedPrefixes.some(prefix => pathname.startsWith(prefix));
-  
-  // If not a protected route and is a single-segment path (like /my-link-slug), it's a public landing page
-  if (!isProtected) {
-    const segments = pathname.split('/').filter(Boolean);
-    // Single segment paths that aren't protected are public (landing pages)
-    if (segments.length === 1) return true;
+  if (isAuthRoute(pathname)) return true;
+  if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
+
+  // Rotas públicas de landing page: /[slug]
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 1) {
+    const top = `/${segments[0]}`;
+    const reservedPrefixes = Object.keys(routePermissions);
+    const isReserved = [...reservedPrefixes, '/api'].some((p) => top === p || top.startsWith(`${p}/`));
+    if (!isReserved) return true;
   }
-  
+
   return false;
 }
 
-function canAccessRoute(pathname: string, userRole: string): boolean {
-  const allowedRoutes = roleRouteMap[userRole];
-  if (!allowedRoutes) return false;
-
-  return allowedRoutes.some(route => pathname.startsWith(route));
+function getDashboardForRole(role: string): string {
+  return '/dashboard';
 }
 
-function getDashboardForRole(role: string): string {
-  return roleDashboards[role] || '/login';
+function canAccessRoute(pathname: string, role: string): boolean {
+  // Encontrar a rota base que corresponde ao pathname
+  for (const [route, allowedRoles] of Object.entries(routePermissions)) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      return allowedRoles.includes(role);
+    }
+  }
+  // Se não encontrar regra específica, permitir (para rotas não protegidas)
+  return true;
+}
+
+function getRedirectForRole(pathname: string, role: string): string | null {
+  // Verificar se há redirecionamento específico para esta rota/role
+  for (const [route, redirects] of Object.entries(roleBasedRedirects)) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      const redirect = redirects[role];
+      if (redirect && redirect !== pathname) {
+        // Substituir a base da rota pelo redirecionamento
+        return pathname.replace(route, redirect);
+      }
+    }
+  }
+  return null;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const accessToken = request.cookies.get('access_token')?.value;
+  const userRole = request.cookies.get('user_role')?.value;
+
+  // Rotas de auth são públicas, mas redireciona se já autenticado
+  if (isAuthRoute(pathname)) {
+    if (accessToken && userRole) {
+      const dashboardUrl = getDashboardForRole(userRole);
+      return NextResponse.redirect(new URL(dashboardUrl, request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Rotas públicas - permitir acesso
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
-  const accessToken = request.cookies.get('access_token')?.value;
-  const userRole = request.cookies.get('user_role')?.value;
-
+  // Sem token - tentar refresh ou redirecionar para login
   if (!accessToken) {
     try {
       const refreshToken = request.cookies.get('refresh_token')?.value;
@@ -111,8 +132,10 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(loginUrl);
       }
 
-      const response = NextResponse.next();
-      
+      // Redirecionar de volta para aplicar os novos cookies
+      const redirectUrl = request.nextUrl.clone();
+      const response = NextResponse.redirect(redirectUrl);
+
       const setCookieHeader = refreshResponse.headers.get('set-cookie');
       if (setCookieHeader) {
         response.headers.set('set-cookie', setCookieHeader);
@@ -127,18 +150,22 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  // Sem role definida - redirecionar para login
   if (!userRole) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname === '/login' && accessToken) {
-    const dashboardUrl = getDashboardForRole(userRole);
-    return NextResponse.redirect(new URL(dashboardUrl, request.url));
+  // Verificar redirecionamento baseado em role (ex: broker acessando /inventory vai para /shared-inventory)
+  const redirect = getRedirectForRole(pathname, userRole);
+  if (redirect) {
+    return NextResponse.redirect(new URL(redirect, request.url));
   }
 
+  // Verificar permissão de acesso
   if (!canAccessRoute(pathname, userRole)) {
+    // Sem permissão - redirecionar para dashboard
     const dashboardUrl = getDashboardForRole(userRole);
     return NextResponse.redirect(new URL(dashboardUrl, request.url));
   }

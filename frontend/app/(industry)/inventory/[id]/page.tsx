@@ -513,7 +513,7 @@ export default function EditBatchPage() {
         <ModalContent>
           <p className="text-slate-600">
             Tem certeza que deseja arquivar o lote{' '}
-            <strong className="font-mono">"{batch.batchCode}"</strong>?
+            <strong className="font-mono">&quot;{batch.batchCode}&quot;</strong>?
           </p>
           <p className="text-amber-600 text-sm mt-4">
             O lote será marcado como inativo e não aparecerá mais nas listagens.

@@ -69,7 +69,7 @@ export default function CatalogPage() {
           </div>
           <Button
             variant="primary"
-            onClick={() => router.push('/admin/catalog/new')}
+            onClick={() => router.push('/catalog/new')}
           >
             <Plus className="w-4 h-4 mr-2" />
             NOVO PRODUTO
@@ -155,7 +155,7 @@ export default function CatalogPage() {
                   limit: 24,
                 });
               } else {
-                router.push('/admin/catalog/new');
+                router.push('/catalog/new');
               }
             }}
           />

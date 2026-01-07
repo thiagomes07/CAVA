@@ -23,7 +23,7 @@ export default function IndustryLayout({
     }
 
     if (!isLoading && user && !hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'])) {
-      router.push('/broker/dashboard');
+      router.push('/dashboard');
     }
   }, [user, isLoading, hasPermission, router]);
 
