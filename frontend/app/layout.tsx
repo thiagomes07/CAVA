@@ -28,8 +28,8 @@ export const metadata: Metadata = {
     default: "CAVA Stone Platform",
     template: "%s | CAVA",
   },
-  description: "Plataforma premium para gestão de pedras naturais de luxo",
-  keywords: ["pedras naturais", "mármores", "granitos", "quartzitos", "luxo"],
+  description: "Plataforma premium para gestão de pedras ornamentais",
+  keywords: ["pedras ornamentais", "mármores", "granitos", "quartzitos", "luxo"],
   authors: [{ name: "CAVA" }],
   robots: "index, follow",
 };

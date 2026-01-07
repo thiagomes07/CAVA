@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata: Metadata = {
   title: 'CAVA Stone Platform',
-  description: 'Produtos premium de pedras naturais',
+  description: 'Produtos luxuosos de pedras ornamentais',
 };
 
 export default function PublicLayout({

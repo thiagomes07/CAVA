@@ -203,7 +203,7 @@ export default function PublicLinkPage() {
 
           {/* Title */}
           <h1 className="font-serif text-5xl md:text-7xl text-porcelain mb-4 leading-tight">
-            {sanitizeText(link.title) || product?.name || 'Pedra Natural Premium'}
+            {sanitizeText(link.title) || product?.name || 'Pedra Ornamental'}
           </h1>
 
           {/* Batch Code */}

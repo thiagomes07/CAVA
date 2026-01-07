@@ -45,7 +45,7 @@ export default function NotFound() {
             <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
           </div>
           <p className="text-xs text-slate-400">
-            Plataforma de gestão e comercialização de pedras naturais
+            Plataforma de gestão e comercialização de pedras ornamentais
           </p>
         </div>
       </div>
