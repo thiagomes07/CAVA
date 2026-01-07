@@ -2,305 +2,369 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX } from 'lucide-react';
+import { PackageOpen, Link2, Inbox, TrendingUp, Plus, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import {
-  Modal,
-  ModalHeader,
-  ModalTitle,
-  ModalContent,
-  ModalFooter,
-  ModalClose,
-} from '@/components/ui/modal';
-import { EmptyState } from '@/components/shared/EmptyState';
+import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
-import { inviteBrokerSchema, type InviteBrokerInput } from '@/lib/schemas/auth.schema';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
-import { formatPhone } from '@/lib/utils/validators';
-import type { User } from '@/lib/types';
+import { formatArea } from '@/lib/utils/formatDimensions';
+import type { SharedInventoryBatch, Sale } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
-interface BrokerWithStats extends User {
-  sharedBatchesCount: number;
+interface BrokerMetrics {
+  availableBatches: number;
+  activeLinks: number;
+  leadsCount: number;
+  monthlyCommission: number;
 }
 
-export default function BrokersManagementPage() {
+export default function BrokerDashboardPage() {
   const router = useRouter();
-  const { success, error } = useToast();
+  const { error } = useToast();
 
-  const [brokers, setBrokers] = useState<BrokerWithStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-  } = useForm<InviteBrokerInput>({
-    resolver: zodResolver(inviteBrokerSchema),
-  });
+  const [metrics, setMetrics] = useState<BrokerMetrics | null>(null);
+  const [recentBatches, setRecentBatches] = useState<SharedInventoryBatch[]>([]);
+  const [recentSales, setRecentSales] = useState<Sale[]>([]);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(true);
+  const [isLoadingSales, setIsLoadingSales] = useState(true);
 
   useEffect(() => {
-    fetchBrokers();
+    fetchMetrics();
+    fetchRecentBatches();
+    fetchRecentSales();
   }, []);
 
-  const fetchBrokers = async () => {
+  const fetchMetrics = async () => {
     try {
-      setIsLoading(true);
-      const data = await apiClient.get<BrokerWithStats[]>('/brokers');
-      setBrokers(data);
+      setIsLoadingMetrics(true);
+      const data = await apiClient.get<BrokerMetrics>('/broker/dashboard/metrics');
+      setMetrics(data);
     } catch (err) {
-      error('Erro ao carregar brokers');
+      error('Erro ao carregar métricas');
     } finally {
-      setIsLoading(false);
+      setIsLoadingMetrics(false);
     }
   };
 
-  const onSubmit = async (data: InviteBrokerInput) => {
+  const fetchRecentBatches = async () => {
     try {
-      setIsSubmitting(true);
-
-      await apiClient.post('/brokers/invite', data);
-
-      success(`Convite enviado para ${data.email}`);
-      setShowInviteModal(false);
-      reset();
-      fetchBrokers();
-    } catch (err) {
-      error('Erro ao convidar broker');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleToggleStatus = async (brokerId: string, currentStatus: boolean) => {
-    try {
-      await apiClient.patch(`/users/${brokerId}/status`, {
-        isActive: !currentStatus,
-      });
-
-      success(
-        currentStatus ? 'Broker desativado com sucesso' : 'Broker ativado com sucesso'
+      setIsLoadingBatches(true);
+      const data = await apiClient.get<SharedInventoryBatch[]>(
+        '/broker/shared-inventory',
+        { params: { recent: true, limit: 5 } }
       );
-      fetchBrokers();
+      setRecentBatches(data);
     } catch (err) {
-      error('Erro ao alterar status do broker');
+      error('Erro ao carregar lotes recentes');
+    } finally {
+      setIsLoadingBatches(false);
     }
   };
 
-  const isEmpty = brokers.length === 0;
+  const fetchRecentSales = async () => {
+    try {
+      setIsLoadingSales(true);
+      const data = await apiClient.get<Sale[]>('/broker/sales', {
+        params: { limit: 10 },
+      });
+      setRecentSales(data);
+    } catch (err) {
+      error('Erro ao carregar vendas');
+    } finally {
+      setIsLoadingSales(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Parceiros (Brokers)
-            </h1>
-            <p className="text-sm text-slate-500">
-              Gerencie seus parceiros comerciais
-            </p>
-          </div>
-          <Button variant="primary" onClick={() => setShowInviteModal(true)}>
-            <Plus className="w-4 h-4 mr-2" />
-            CONVIDAR BROKER
-          </Button>
+      <div className="bg-obsidian text-porcelain px-8 py-12">
+        <div className="max-w-7xl mx-auto">
+          <h1 className="font-serif text-4xl mb-2">Painel de Controle</h1>
+          <p className="text-porcelain/60 text-lg">
+            Visão geral das suas oportunidades
+          </p>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="px-8 py-8">
-        {isLoading ? (
-          <LoadingState variant="table" rows={5} columns={6} />
-        ) : isEmpty ? (
-          <EmptyState
-            icon={Plus}
-            title="Nenhum parceiro cadastrado"
-            description="Convide brokers para expandir sua rede de vendas"
-            actionLabel="+ Convidar Broker"
-            onAction={() => setShowInviteModal(true)}
-          />
-        ) : (
-          <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>WhatsApp</TableHead>
-                  <TableHead>Lotes Compartilhados</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {brokers.map((broker) => (
-                  <TableRow key={broker.id}>
-                    <TableCell>
-                      <div>
-                        <p className="font-medium text-obsidian">{broker.name}</p>
-                        <p className="text-xs text-slate-500">
-                          Desde {formatDate(broker.createdAt, 'MMM yyyy')}
-                        </p>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm text-slate-600">
-                          {broker.email}
-                        </span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {broker.phone ? (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm text-slate-600">
-                            {formatPhone(broker.phone)}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {broker.phone ? (
-                        <a
-                          href={`https://wa.me/${broker.phone.replace(/\D/g, '')}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 transition-colors"
-                        >
-                          <MessageCircle className="w-4 h-4" />
-                          Abrir
-                        </a>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <button
-                        onClick={() => router.push(`/brokers/${broker.id}/shared`)}
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                      >
-                        <Share2 className="w-4 h-4" />
-                        <span className="font-mono">
-                          {broker.sharedBatchesCount || 0}
-                        </span>
-                      </button>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={broker.isActive ? 'DISPONIVEL' : 'INATIVO'}>
-                        {broker.isActive ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => router.push(`/brokers/${broker.id}/shared`)}
-                          className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                          title="Ver compartilhamentos"
-                        >
-                          <Eye className="w-4 h-4 text-slate-600" />
-                        </button>
+      <div className="max-w-7xl mx-auto px-8 py-8">
+        {/* Metrics Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {isLoadingMetrics ? (
+            <>
+              <MetricCardSkeleton />
+              <MetricCardSkeleton />
+              <MetricCardSkeleton />
+              <MetricCardSkeleton />
+            </>
+          ) : (
+            <>
+              <MetricCard
+                icon={PackageOpen}
+                title="Lotes Disponíveis"
+                value={metrics?.availableBatches || 0}
+                subtitle="PARA MIM"
+                color="emerald"
+              />
+              <MetricCard
+                icon={Link2}
+                title="Links Ativos"
+                value={metrics?.activeLinks || 0}
+                subtitle="GERADOS"
+                color="blue"
+              />
+              <MetricCard
+                icon={Inbox}
+                title="Leads Capturados"
+                value={metrics?.leadsCount || 0}
+                subtitle="TOTAL"
+                color="purple"
+              />
+              <MetricCard
+                icon={TrendingUp}
+                title="Comissão do Mês"
+                value={formatCurrency(metrics?.monthlyCommission || 0)}
+                subtitle="FATURAMENTO"
+                color="amber"
+              />
+            </>
+          )}
+        </div>
 
-                        <button
-                          onClick={() => handleToggleStatus(broker.id, broker.isActive)}
-                          className={cn(
-                            'p-2 rounded-sm transition-colors',
-                            broker.isActive
-                              ? 'hover:bg-rose-50 text-rose-600'
-                              : 'hover:bg-emerald-50 text-emerald-600'
-                          )}
-                          title={broker.isActive ? 'Desativar' : 'Ativar'}
-                        >
-                          <UserX className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <h2 className="text-lg font-semibold text-obsidian mb-4">
+            Ações Rápidas
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Button
+              variant="secondary"
+              className="justify-start h-auto py-4"
+              onClick={() => router.push('/shared-inventory')}
+            >
+              <Eye className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <p className="font-semibold">Ver Estoque</p>
+                <p className="text-xs text-slate-500 font-normal">
+                  Lotes compartilhados comigo
+                </p>
+              </div>
+            </Button>
+
+            <Button
+              variant="secondary"
+              className="justify-start h-auto py-4"
+              onClick={() => router.push('/links/new')}
+            >
+              <Plus className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <p className="font-semibold">Criar Link</p>
+                <p className="text-xs text-slate-500 font-normal">
+                  Gerar link de venda
+                </p>
+              </div>
+            </Button>
+
+            <Button
+              variant="secondary"
+              className="justify-start h-auto py-4"
+              onClick={() => router.push('/leads')}
+            >
+              <Inbox className="w-5 h-5 mr-3" />
+              <div className="text-left">
+                <p className="font-semibold">Ver Leads</p>
+                <p className="text-xs text-slate-500 font-normal">
+                  Gerenciar interessados
+                </p>
+              </div>
+            </Button>
           </div>
-        )}
+        </div>
+
+        {/* Recent Shared Batches */}
+        <Card className="mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-obsidian">
+              Novos Lotes Compartilhados
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/shared-inventory')}
+            >
+              Ver tudo
+            </Button>
+          </div>
+
+          {isLoadingBatches ? (
+            <LoadingState variant="cards" rows={3} />
+          ) : recentBatches.length === 0 ? (
+            <div className="text-center py-12">
+              <PackageOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-400">
+                Nenhum lote compartilhado recentemente
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {recentBatches.map((shared) => (
+                <div
+                  key={shared.id}
+                  className="flex items-center gap-4 p-4 border border-slate-200 rounded-sm hover:border-obsidian transition-colors cursor-pointer"
+                  onClick={() => router.push('/shared-inventory')}
+                >
+                  {shared.batch.medias?.[0] && (
+                    <img
+                      src={shared.batch.medias[0].url}
+                      alt={shared.batch.batchCode}
+                      className="w-20 h-20 rounded-sm object-cover"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-mono text-sm font-semibold text-obsidian">
+                      {shared.batch.batchCode}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      {shared.batch.product?.name}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatArea(shared.batch.totalArea)} •{' '}
+                      {formatCurrency(shared.negotiatedPrice || shared.batch.industryPrice)}
+                    </p>
+                  </div>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push('/links/new');
+                    }}
+                  >
+                    Criar Link
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+
+        {/* Recent Sales */}
+        <Card>
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-obsidian">
+              Minhas Vendas Recentes
+            </h2>
+          </div>
+
+          {isLoadingSales ? (
+            <LoadingState variant="table" rows={5} columns={5} />
+          ) : recentSales.length === 0 ? (
+            <div className="text-center py-12">
+              <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <p className="text-slate-400">Nenhuma venda registrada ainda</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Lote</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Valor Vendido</TableHead>
+                    <TableHead>Minha Comissão</TableHead>
+                    <TableHead>Data</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentSales.map((sale) => (
+                    <TableRow key={sale.id}>
+                      <TableCell>
+                        <span className="font-mono text-sm text-obsidian">
+                          {sale.batch?.batchCode || '-'}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-slate-600">{sale.customerName}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-serif text-obsidian">
+                          {formatCurrency(sale.salePrice)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-semibold text-emerald-600">
+                          {formatCurrency(sale.brokerCommission || 0)}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="text-sm text-slate-500">
+                          {formatDate(sale.saleDate)}
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+interface MetricCardProps {
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  value: string | number;
+  subtitle: string;
+  color: 'emerald' | 'blue' | 'amber' | 'purple';
+}
+
+function MetricCard({ icon: Icon, title, value, subtitle, color }: MetricCardProps) {
+  const colorClasses = {
+    emerald: 'text-emerald-600 bg-emerald-50',
+    blue: 'text-blue-600 bg-blue-50',
+    amber: 'text-amber-600 bg-amber-50',
+    purple: 'text-purple-600 bg-purple-50',
+  };
+
+  return (
+    <Card variant="elevated" className="relative overflow-hidden">
+      <div className="flex items-start justify-between mb-4">
+        <div className={cn('p-3 rounded-sm', colorClasses[color])}>
+          <Icon className="w-6 h-6" />
+        </div>
       </div>
 
-      {/* Invite Modal */}
-      <Modal open={showInviteModal} onClose={() => setShowInviteModal(false)}>
-        <ModalClose onClose={() => setShowInviteModal(false)} />
-        <ModalHeader>
-          <ModalTitle>Convidar Broker</ModalTitle>
-        </ModalHeader>
+      <div className="mb-2">
+        <p className="font-serif text-5xl text-obsidian mb-1">
+          {typeof value === 'number' && !value.toString().includes('R$')
+            ? value.toLocaleString('pt-BR')
+            : value}
+        </p>
+        <p className="uppercase tracking-widest text-[10px] text-slate-500 font-semibold">
+          {subtitle}
+        </p>
+      </div>
+    </Card>
+  );
+}
 
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <ModalContent>
-            <div className="space-y-6">
-              <Input
-                {...register('name')}
-                label="Nome Completo"
-                placeholder="Maria Santos"
-                error={errors.name?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('email')}
-                type="email"
-                label="Email"
-                placeholder="maria@exemplo.com"
-                helperText="Um convite de acesso será enviado para este email"
-                error={errors.email?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('phone')}
-                label="Telefone (Opcional)"
-                placeholder="(11) 98765-4321"
-                error={errors.phone?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('whatsapp')}
-                label="WhatsApp (Opcional)"
-                placeholder="(11) 98765-4321"
-                helperText="Para facilitar a comunicação"
-                error={errors.whatsapp?.message}
-                disabled={isSubmitting}
-              />
-            </div>
-          </ModalContent>
-
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowInviteModal(false)}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              ENVIAR CONVITE
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
-    </div>
+function MetricCardSkeleton() {
+  return (
+    <Card variant="elevated">
+      <div className="animate-pulse">
+        <div className="w-12 h-12 bg-slate-200 rounded-sm mb-4" />
+        <div className="h-12 bg-slate-200 rounded w-32 mb-2" />
+        <div className="h-4 bg-slate-200 rounded w-24" />
+      </div>
+    </Card>
   );
 }

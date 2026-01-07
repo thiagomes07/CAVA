@@ -1,452 +1,467 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { ArrowLeft, Plus, X, Search, Package } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Search, Eye, Link2, Edit2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Toggle } from '@/components/ui/toggle';
 import { Card } from '@/components/ui/card';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import {
-  Modal,
-  ModalHeader,
-  ModalTitle,
-  ModalContent,
-  ModalFooter,
-  ModalClose,
-} from '@/components/ui/modal';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
+import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
-import { formatDate } from '@/lib/utils/formatDate';
-import type { User, Batch, SharedInventoryBatch } from '@/lib/types';
+import type { SharedInventoryBatch, BatchStatus } from '@/lib/types';
+import { batchStatuses } from '@/lib/schemas/batch.schema';
 import { cn } from '@/lib/utils/cn';
+
+interface SharedInventoryFilter {
+  search: string;
+  status: BatchStatus | '';
+}
 
 export default function BrokerSharedInventoryPage() {
   const router = useRouter();
-  const params = useParams();
-  const brokerId = params.id as string;
   const { success, error } = useToast();
 
-  const [broker, setBroker] = useState<User | null>(null);
   const [sharedBatches, setSharedBatches] = useState<SharedInventoryBatch[]>([]);
-  const [availableBatches, setAvailableBatches] = useState<Batch[]>([]);
-  const [catalogPermission, setCatalogPermission] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  const { register, handleSubmit, reset } = useForm<{ negotiatedPrice?: number }>();
+  const [filters, setFilters] = useState<SharedInventoryFilter>({
+    search: '',
+    status: '',
+  });
+  const [editingPrice, setEditingPrice] = useState<string | null>(null);
+  const [newPrice, setNewPrice] = useState<number>(0);
+  const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
+  const [selectedBatch, setSelectedBatch] = useState<SharedInventoryBatch | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   useEffect(() => {
-    fetchBrokerData();
-  }, [brokerId]);
+    fetchSharedInventory();
+  }, []);
 
-  const fetchBrokerData = async () => {
+  const fetchSharedInventory = async () => {
     try {
       setIsLoading(true);
-
-      const [brokerData, sharedData, availableData, permissionData] = await Promise.all([
-        apiClient.get<User>(`/brokers/${brokerId}`),
-        apiClient.get<SharedInventoryBatch[]>(`/brokers/${brokerId}/shared-inventory`),
-        apiClient.get<{ batches: Batch[] }>('/batches', {
-          params: { status: 'DISPONIVEL', limit: 1000 },
-        }),
-        apiClient.get<{ hasPermission: boolean }>(
-          `/brokers/${brokerId}/catalog-permission`
-        ),
-      ]);
-
-      setBroker(brokerData);
-      setSharedBatches(sharedData);
-      setAvailableBatches(availableData.batches);
-      setCatalogPermission(permissionData.hasPermission);
+      const data = await apiClient.get<SharedInventoryBatch[]>('/broker/shared-inventory');
+      setSharedBatches(data);
     } catch (err) {
-      error('Erro ao carregar dados');
-      router.push('/brokers');
+      error('Erro ao carregar estoque');
+      setSharedBatches([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOpenShareModal = (batch: Batch) => {
-    setSelectedBatch(batch);
-    reset({ negotiatedPrice: batch.industryPrice });
-    setShowShareModal(true);
-  };
-
-  const onSubmitShare = async (data: { negotiatedPrice?: number }) => {
-    if (!selectedBatch) return;
-
+  const handleUpdatePrice = async (sharedId: string) => {
     try {
-      setIsSubmitting(true);
+      setIsUpdatingPrice(true);
 
-      await apiClient.post('/shared-inventory-batches', {
-        batchId: selectedBatch.id,
-        brokerUserId: brokerId,
-        negotiatedPrice: data.negotiatedPrice || selectedBatch.industryPrice,
+      await apiClient.patch(`/broker/shared-inventory/${sharedId}/price`, {
+        negotiatedPrice: newPrice,
       });
 
-      success(`Lote compartilhado com ${broker?.name}`);
-      setShowShareModal(false);
-      setSelectedBatch(null);
-      fetchBrokerData();
+      success('Preço sugerido atualizado');
+      setEditingPrice(null);
+      fetchSharedInventory();
     } catch (err) {
-      error('Erro ao compartilhar lote');
+      error('Erro ao atualizar preço');
     } finally {
-      setIsSubmitting(false);
+      setIsUpdatingPrice(false);
     }
   };
 
-  const handleRemoveShare = async (shareId: string) => {
-    try {
-      await apiClient.delete(`/shared-inventory-batches/${shareId}`);
-      success('Compartilhamento removido');
-      fetchBrokerData();
-    } catch (err) {
-      error('Erro ao remover compartilhamento');
-    }
+  const handleStartEditPrice = (shared: SharedInventoryBatch) => {
+    setEditingPrice(shared.id);
+    setNewPrice(shared.negotiatedPrice || shared.batch.industryPrice);
   };
 
-  const handleToggleCatalogPermission = async (newValue: boolean) => {
-    try {
-      if (newValue) {
-        await apiClient.post('/shared-catalog-permissions', {
-          brokerUserId: brokerId,
-        });
-        success('Acesso ao catálogo concedido');
-      } else {
-        await apiClient.delete(`/shared-catalog-permissions/${brokerId}`);
-        success('Acesso ao catálogo removido');
-      }
-      setCatalogPermission(newValue);
-    } catch (err) {
-      error('Erro ao alterar permissão');
-    }
+  const handleCancelEditPrice = () => {
+    setEditingPrice(null);
+    setNewPrice(0);
   };
 
-  const filteredAvailableBatches = availableBatches.filter((batch) => {
-    const isAlreadyShared = sharedBatches.some((sb) => sb.batchId === batch.id);
-    if (isAlreadyShared) return false;
+  const handleViewDetails = (shared: SharedInventoryBatch) => {
+    setSelectedBatch(shared);
+    setShowDetailModal(true);
+  };
 
-    if (!searchTerm) return true;
+  const filteredBatches = sharedBatches.filter((shared) => {
+    if (filters.status && shared.batch.status !== filters.status) {
+      return false;
+    }
 
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      batch.batchCode.toLowerCase().includes(searchLower) ||
-      batch.product?.name.toLowerCase().includes(searchLower)
-    );
+    if (filters.search) {
+      const searchLower = filters.search.toLowerCase();
+      return (
+        shared.batch.batchCode.toLowerCase().includes(searchLower) ||
+        shared.batch.product?.name.toLowerCase().includes(searchLower)
+      );
+    }
+
+    return true;
   });
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-mineral">
-        <div className="px-8 py-8">
-          <LoadingState variant="dashboard" />
-        </div>
-      </div>
-    );
-  }
+  const isEmpty = filteredBatches.length === 0;
+  const hasFilters = filters.search || filters.status;
 
-  if (!broker) return null;
+  const calculateMargin = (shared: SharedInventoryBatch) => {
+    const basePrice = shared.batch.industryPrice;
+    const suggestedPrice = shared.negotiatedPrice || basePrice;
+    return suggestedPrice - basePrice;
+  };
 
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
       <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="font-serif text-3xl text-obsidian">
-                  Estoque Compartilhado
-                </h1>
-              </div>
-              <p className="text-sm text-slate-500">
-                Gerenciar compartilhamentos com <strong>{broker.name}</strong>
-              </p>
-            </div>
+          <div>
+            <h1 className="font-serif text-3xl text-obsidian mb-2">
+              Estoque Disponível
+            </h1>
+            <p className="text-sm text-slate-500">
+              Lotes compartilhados pela indústria
+            </p>
           </div>
-
           <Button
             variant="primary"
-            onClick={() => {
-              if (filteredAvailableBatches.length > 0) {
-                handleOpenShareModal(filteredAvailableBatches[0]);
-              }
-            }}
-            disabled={availableBatches.length === 0}
+            onClick={() => router.push('/links/new')}
           >
-            <Plus className="w-4 h-4 mr-2" />
-            COMPARTILHAR LOTE
+            <Link2 className="w-4 h-4 mr-2" />
+            CRIAR LINK DE VENDA
           </Button>
         </div>
       </div>
 
-      <div className="px-8 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Shared Batches */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <h2 className="text-lg font-semibold text-obsidian mb-6">
-                Lotes Compartilhados ({sharedBatches.length})
-              </h2>
+      {/* Filters */}
+      <div className="px-8 py-6">
+        <div className="bg-porcelain rounded-sm border border-slate-100 p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Input
+                placeholder="Buscar por código ou produto"
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters({ ...filters, search: e.target.value })
+                }
+              />
+              <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
+            </div>
 
-              {sharedBatches.length === 0 ? (
-                <EmptyState
-                  icon={Package}
-                  title="Nenhum lote compartilhado"
-                  description="Compartilhe lotes do seu estoque com este broker"
-                />
-              ) : (
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Lote</TableHead>
-                        <TableHead>Produto</TableHead>
-                        <TableHead>Dimensões</TableHead>
-                        <TableHead>Preço Negociado</TableHead>
-                        <TableHead>Compartilhado em</TableHead>
-                        <TableHead>Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {sharedBatches.map((shared) => (
-                        <TableRow key={shared.id}>
-                          <TableCell>
-                            <span className="font-mono text-sm text-obsidian">
-                              {shared.batch.batchCode}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-slate-600">
-                              {shared.batch.product?.name || '-'}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-mono text-sm text-slate-600">
-                              {formatDimensions(
-                                shared.batch.height,
-                                shared.batch.width,
-                                shared.batch.thickness
-                              )}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="font-serif text-obsidian">
-                              {formatCurrency(
-                                shared.negotiatedPrice || shared.batch.industryPrice
-                              )}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm text-slate-500">
-                              {formatDate(shared.sharedAt)}
-                            </span>
-                          </TableCell>
-                          <TableCell>
-                            <button
-                              onClick={() => handleRemoveShare(shared.id)}
-                              className="p-2 hover:bg-rose-50 rounded-sm transition-colors text-rose-600"
-                              title="Remover compartilhamento"
-                            >
-                              <X className="w-4 h-4" />
-                            </button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </Card>
-          </div>
+            <Select
+              value={filters.status}
+              onChange={(e) =>
+                setFilters({ ...filters, status: e.target.value as BatchStatus | '' })
+              }
+            >
+              <option value="">Todos os Status</option>
+              <option value="DISPONIVEL">Disponível</option>
+              <option value="RESERVADO">Reservado</option>
+            </Select>
 
-          {/* Right Column - Catalog Permission */}
-          <div className="space-y-6">
-            <Card>
-              <h2 className="text-lg font-semibold text-obsidian mb-6">
-                Permissões
-              </h2>
-
-              <div className="space-y-4">
-                <div className="p-4 bg-mineral rounded-sm">
-                  <Toggle
-                    checked={catalogPermission}
-                    onChange={(e) => handleToggleCatalogPermission(e.target.checked)}
-                    label="Permitir acesso ao catálogo completo"
-                  />
-                  <p className="text-xs text-slate-500 mt-2 ml-14">
-                    Broker poderá ver todos os produtos, mas não necessariamente os lotes
-                  </p>
-                </div>
-
-                <div className="pt-4 border-t border-slate-200">
-                  <p className="text-sm text-slate-600 mb-2">
-                    <strong>Lotes compartilhados:</strong> {sharedBatches.length}
-                  </p>
-                  <p className="text-sm text-slate-600">
-                    <strong>Catálogo público:</strong>{' '}
-                    {catalogPermission ? 'Liberado' : 'Restrito'}
-                  </p>
-                </div>
-              </div>
-            </Card>
+            {hasFilters && (
+              <Button
+                variant="secondary"
+                onClick={() => setFilters({ search: '', status: '' })}
+              >
+                Limpar Filtros
+              </Button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Share Modal */}
-      <Modal open={showShareModal} onClose={() => setShowShareModal(false)}>
-        <ModalClose onClose={() => setShowShareModal(false)} />
-        <ModalHeader>
-          <ModalTitle>Compartilhar Lote</ModalTitle>
-        </ModalHeader>
+      {/* Content */}
+      <div className="px-8 pb-8">
+        {isLoading ? (
+          <LoadingState variant="cards" rows={6} />
+        ) : isEmpty ? (
+          <EmptyState
+            icon={Search}
+            title={
+              hasFilters
+                ? 'Nenhum lote encontrado'
+                : 'Nenhum lote disponível'
+            }
+            description={
+              hasFilters
+                ? 'Tente ajustar os filtros de busca'
+                : 'Aguarde a indústria compartilhar lotes com você'
+            }
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredBatches.map((shared) => {
+              const margin = calculateMargin(shared);
+              const marginPercent = (margin / shared.batch.industryPrice) * 100;
+              const isEditing = editingPrice === shared.id;
 
-        <form onSubmit={handleSubmit(onSubmitShare)}>
-          <ModalContent>
-            <div className="space-y-6">
-              {/* Search Available Batches */}
-              <div className="relative">
-                <Input
-                  placeholder="Buscar lote por código ou produto"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-                <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
-              </div>
-
-              {/* Available Batches List */}
-              <div className="max-h-64 overflow-y-auto border border-slate-200 rounded-sm">
-                {filteredAvailableBatches.length === 0 ? (
-                  <div className="p-8 text-center">
-                    <p className="text-slate-400">
-                      {searchTerm
-                        ? 'Nenhum lote encontrado'
-                        : 'Todos os lotes já foram compartilhados'}
-                    </p>
-                  </div>
-                ) : (
-                  filteredAvailableBatches.map((batch) => (
-                    <button
-                      key={batch.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedBatch(batch);
-                        reset({ negotiatedPrice: batch.industryPrice });
-                      }}
-                      className={cn(
-                        'w-full p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors text-left',
-                        selectedBatch?.id === batch.id && 'bg-blue-50'
-                      )}
-                    >
-                      <div className="flex items-center gap-4">
-                        {batch.medias?.[0] && (
-                          <img
-                            src={batch.medias[0].url}
-                            alt={batch.batchCode}
-                            className="w-16 h-16 rounded-sm object-cover"
-                          />
-                        )}
-                        <div className="flex-1">
-                          <p className="font-mono text-sm font-semibold text-obsidian">
-                            {batch.batchCode}
-                          </p>
-                          <p className="text-sm text-slate-600">
-                            {batch.product?.name}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {formatArea(batch.totalArea)} •{' '}
-                            {formatCurrency(batch.industryPrice)}
-                          </p>
-                        </div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
-
-              {/* Selected Batch Preview */}
-              {selectedBatch && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-                  <p className="text-xs uppercase tracking-widest text-blue-600 mb-2">
-                    Lote Selecionado
-                  </p>
-                  <div className="flex items-center gap-4">
-                    {selectedBatch.medias?.[0] && (
+              return (
+                <Card
+                  key={shared.id}
+                  variant="elevated"
+                  className="relative overflow-hidden"
+                >
+                  {/* Image */}
+                  <div className="relative aspect-[4/3] -m-8 mb-4 overflow-hidden bg-slate-200">
+                    {shared.batch.medias?.[0] ? (
                       <img
-                        src={selectedBatch.medias[0].url}
-                        alt={selectedBatch.batchCode}
-                        className="w-20 h-20 rounded-sm object-cover"
+                        src={shared.batch.medias[0].url}
+                        alt={shared.batch.batchCode}
+                        className="w-full h-full object-cover"
                       />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <span className="text-slate-400 text-sm">Sem foto</span>
+                      </div>
                     )}
-                    <div>
-                      <p className="font-mono font-semibold text-obsidian">
-                        {selectedBatch.batchCode}
-                      </p>
-                      <p className="text-sm text-slate-600">
-                        {selectedBatch.product?.name}
-                      </p>
-                      <p className="text-sm font-mono text-slate-500">
-                        {formatDimensions(
-                          selectedBatch.height,
-                          selectedBatch.width,
-                          selectedBatch.thickness
-                        )}
-                      </p>
+                    
+                    {/* Status Badge */}
+                    <div className="absolute top-4 right-4">
+                      <Badge variant={shared.batch.status}>
+                        {shared.batch.status}
+                      </Badge>
                     </div>
                   </div>
+
+                  {/* Content */}
+                  <div className="space-y-4">
+                    {/* Product Info */}
+                    <div>
+                      <p className="font-mono text-sm font-semibold text-obsidian mb-1">
+                        {shared.batch.batchCode}
+                      </p>
+                      <p className="font-serif text-xl text-obsidian">
+                        {shared.batch.product?.name}
+                      </p>
+                    </div>
+
+                    {/* Dimensions */}
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span className="font-mono">
+                        {formatDimensions(
+                          shared.batch.height,
+                          shared.batch.width,
+                          shared.batch.thickness
+                        )}
+                      </span>
+                      <span className="font-mono font-semibold">
+                        {formatArea(shared.batch.totalArea)}
+                      </span>
+                    </div>
+
+                    {/* Pricing Section */}
+                    <div className="pt-4 border-t border-slate-200">
+                      <div className="mb-3">
+                        <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
+                          Preço Base Indústria
+                        </p>
+                        <p className="text-lg font-serif text-slate-500 line-through">
+                          {formatCurrency(shared.batch.industryPrice)}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-xs uppercase tracking-widest text-emerald-600 mb-2">
+                          Meu Preço Sugerido
+                        </p>
+                        {isEditing ? (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              value={newPrice}
+                              onChange={(e) => setNewPrice(parseFloat(e.target.value))}
+                              disabled={isUpdatingPrice}
+                              className="flex-1"
+                            />
+                            <button
+                              onClick={() => handleUpdatePrice(shared.id)}
+                              disabled={isUpdatingPrice}
+                              className="p-2 bg-emerald-500 text-white rounded-sm hover:bg-emerald-600 transition-colors"
+                            >
+                              <Check className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={handleCancelEditPrice}
+                              disabled={isUpdatingPrice}
+                              className="p-2 bg-slate-200 text-slate-600 rounded-sm hover:bg-slate-300 transition-colors"
+                            >
+                              ×
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-between">
+                            <p className="text-2xl font-serif text-emerald-700">
+                              {formatCurrency(shared.negotiatedPrice || shared.batch.industryPrice)}
+                            </p>
+                            <button
+                              onClick={() => handleStartEditPrice(shared)}
+                              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
+                              title="Editar preço"
+                            >
+                              <Edit2 className="w-4 h-4 text-slate-600" />
+                            </button>
+                          </div>
+                        )}
+
+                        {!isEditing && margin > 0 && (
+                          <p className="text-xs text-emerald-600 mt-1">
+                            Margem: {formatCurrency(margin)} ({marginPercent.toFixed(1)}%)
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex gap-2 pt-4">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => handleViewDetails(shared)}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        Ver Detalhes
+                      </Button>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => router.push('/links/new')}
+                        disabled={shared.batch.status !== 'DISPONIVEL'}
+                      >
+                        <Link2 className="w-4 h-4 mr-2" />
+                        Gerar Link
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Detail Modal */}
+      <Modal open={showDetailModal} onClose={() => setShowDetailModal(false)}>
+        <ModalClose onClose={() => setShowDetailModal(false)} />
+        <ModalHeader>
+          <ModalTitle>Detalhes do Lote</ModalTitle>
+        </ModalHeader>
+        <ModalContent>
+          {selectedBatch && (
+            <div className="space-y-6">
+              {/* Images Gallery */}
+              {selectedBatch.batch.medias && selectedBatch.batch.medias.length > 0 && (
+                <div className="grid grid-cols-2 gap-2">
+                  {selectedBatch.batch.medias.map((media) => (
+                    <img
+                      key={media.id}
+                      src={media.url}
+                      alt="Lote"
+                      className="w-full aspect-[4/3] object-cover rounded-sm"
+                    />
+                  ))}
                 </div>
               )}
 
-              {/* Negotiated Price */}
-              {selectedBatch && (
-                <Input
-                  {...register('negotiatedPrice', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  label="Preço de Repasse para este Broker (R$)"
-                  helperText="Deixe vazio para usar o preço padrão do lote"
-                  disabled={isSubmitting}
-                />
-              )}
-            </div>
-          </ModalContent>
+              {/* Basic Info */}
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">
+                  Identificação
+                </p>
+                <p className="font-mono text-lg font-semibold text-obsidian">
+                  {selectedBatch.batch.batchCode}
+                </p>
+                <p className="text-slate-600">
+                  {selectedBatch.batch.product?.name}
+                </p>
+              </div>
 
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowShareModal(false)}
-              disabled={isSubmitting}
-            >
-              Cancelar
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              loading={isSubmitting}
-              disabled={!selectedBatch}
-            >
-              COMPARTILHAR
-            </Button>
-          </ModalFooter>
-        </form>
+              {/* Specifications */}
+              <div>
+                <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
+                  Especificações
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-slate-500">Dimensões</p>
+                    <p className="font-mono text-sm text-obsidian">
+                      {formatDimensions(
+                        selectedBatch.batch.height,
+                        selectedBatch.batch.width,
+                        selectedBatch.batch.thickness
+                      )}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Área Total</p>
+                    <p className="font-mono text-sm text-obsidian">
+                      {formatArea(selectedBatch.batch.totalArea)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Quantidade</p>
+                    <p className="font-mono text-sm text-obsidian">
+                      {selectedBatch.batch.quantitySlabs} chapa(s)
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Material</p>
+                    <p className="text-sm text-obsidian">
+                      {selectedBatch.batch.product?.material}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Pricing */}
+              <div className="pt-4 border-t border-slate-200">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-slate-50 rounded-sm">
+                    <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
+                      Preço Base
+                    </p>
+                    <p className="text-xl font-serif text-slate-700">
+                      {formatCurrency(selectedBatch.batch.industryPrice)}
+                    </p>
+                  </div>
+                  <div className="p-4 bg-emerald-50 rounded-sm">
+                    <p className="text-xs uppercase tracking-widest text-emerald-600 mb-1">
+                      Meu Preço
+                    </p>
+                    <p className="text-xl font-serif text-emerald-700">
+                      {formatCurrency(selectedBatch.negotiatedPrice || selectedBatch.batch.industryPrice)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => setShowDetailModal(false)}
+          >
+            Fechar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              setShowDetailModal(false);
+              router.push('/links/new');
+            }}
+          >
+            Criar Link de Venda
+          </Button>
+        </ModalFooter>
       </Modal>
     </div>
   );
