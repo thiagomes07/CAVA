@@ -1,0 +1,111 @@
+version: '3.9'
+
+networks:
+  cava-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  minio-data:
+
+services:
+  # =============================================
+  # POSTGRESQL
+  # =============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cava-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: cava_user
+      POSTGRES_PASSWORD: cava_password_dev
+      POSTGRES_DB: cava_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cava_user -d cava_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =============================================
+  # MINIO (S3-Compatible Storage)
+  # =============================================
+  minio:
+    image: minio/minio:latest
+    container_name: cava-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console Web
+    volumes:
+      - minio-data:/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 20s
+
+  # =============================================
+  # MINIO INIT (Criar bucket automaticamente)
+  # =============================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: cava-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Aguardando MinIO estar pronto...';
+      sleep 5;
+      mc alias set minio http://minio:9000 minio_access_key minio_secret_key;
+      mc mb --ignore-existing minio/cava-media;
+      mc anonymous set download minio/cava-media;
+      echo 'Bucket cava-media criado e configurado com sucesso!';
+      exit 0;
+      "
+    networks:
+      - cava-network
+
+  # =============================================
+  # API (Backend Go)
+  # =============================================
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: cava-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DB_HOST: postgres
+      STORAGE_ENDPOINT: http://minio:9000
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
