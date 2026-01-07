@@ -17,10 +17,10 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getDashboardRoute } = useAuth();
-  
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const login = useAuthStore((state) => state.login);
   const { success, error } = useToast();
 
@@ -35,11 +35,11 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginInput) => {
     try {
       setIsLoading(true);
-      
+
       await login(data.email, data.password);
-      
+
       success('Login realizado com sucesso');
-      
+
       // Use callback URL if provided, otherwise use role-based dashboard
       const callbackUrl = searchParams.get('callbackUrl');
       const redirectTo = callbackUrl || getDashboardRoute();
@@ -54,7 +54,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-12 bg-mineral">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12 bg-mineral">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
@@ -141,21 +141,21 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Hero Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative min-h-screen">
         {/* Placeholder for hero image */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800" />
-        
+
         {/* Overlay */}
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        
+
         {/* Content */}
-        <div className="relative z-10 flex items-center justify-center p-12 text-center">
+        <div className="relative z-10 flex items-center justify-center w-full p-12 text-center">
           <div className="max-w-lg">
             <h2 className="font-serif text-5xl text-porcelain mb-6 leading-tight">
               Transforme pedras em obras de arte
             </h2>
             <p className="text-lg text-porcelain/80 leading-relaxed">
-              A plataforma completa para gestão e comercialização de pedras naturais premium
+              A plataforma completa para gestão de pedras ornamentais
             </p>
           </div>
         </div>

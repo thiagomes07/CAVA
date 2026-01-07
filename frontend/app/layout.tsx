@@ -47,7 +47,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" className={`${inter.variable} ${playfair.variable} ${jetbrainsMono.variable}`}>
-      <body className="font-sans antialiased bg-porcelain text-obsidian min-h-screen">
+      <body className="font-sans antialiased bg-porcelain text-obsidian h-full">
         <QueryProvider>
           {children}
           <Toaster />
