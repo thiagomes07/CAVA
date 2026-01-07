@@ -2,51 +2,74 @@ import type { ApiResponse, ErrorResponse, PaginatedResponse } from '@/lib/types/
 
 interface RequestConfig extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  timeoutMs?: number;
+  skipAuthRetry?: boolean;
 }
 
-// Custom error class with status code
 export class ApiError extends Error {
-  status: number;
+  status?: number;
   code?: string;
 
-  constructor(message: string, status: number, code?: string) {
+  constructor(message: string, status?: number, code?: string) {
     super(message);
-    this.name = 'ApiError';
     this.status = status;
     this.code = code;
   }
 }
 
+type QueueEntry = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
+
 class ApiClient {
   private baseURL: string;
-  private isRefreshing: boolean = false;
-  private failedQueue: Array<{
-    resolve: (value?: unknown) => void;
-    reject: (reason?: unknown) => void;
-  }> = [];
+  private defaultTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS) || 15000;
+  private isRefreshing = false;
+  private failedQueue: QueueEntry[] = [];
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api') {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE ||
+      'http://localhost:3001/api';
   }
 
-  private processQueue(error: Error | null, token: string | null = null) {
-    this.failedQueue.forEach(prom => {
+  private processQueue(error: Error | null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
-        prom.reject(error);
+        reject(error);
       } else {
-        prom.resolve(token);
+        resolve();
       }
     });
     this.failedQueue = [];
   }
 
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    return url.toString();
+  }
+
   private async refreshToken(): Promise<void> {
     if (this.isRefreshing) {
       return new Promise<void>((resolve, reject) => {
-        this.failedQueue.push({ 
-          resolve: () => resolve(), 
-          reject: (reason) => reject(reason) 
-        });
+        this.failedQueue.push({ resolve, reject });
       });
     }
 
@@ -62,104 +85,101 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to refresh token');
+        throw new ApiError('Failed to refresh token', response.status);
       }
 
       this.processQueue(null);
-      this.isRefreshing = false;
     } catch (error) {
       this.processQueue(error as Error);
-      this.isRefreshing = false;
-      
+
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
         if (!currentPath.startsWith('/login')) {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
         }
       }
-      
+
       throw error;
+    } finally {
+      this.isRefreshing = false;
     }
   }
 
-  private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
-    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
-    
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          url.searchParams.append(key, String(value));
-        }
-      });
-    }
-    
-    return url.toString();
+  private withTimeout(timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return { controller, timer };
   }
 
-  private async request<T>(
-    endpoint: string,
-    config: RequestConfig = {}
-  ): Promise<T> {
-    const { params, ...fetchConfig } = config;
+  private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
+    const { params, timeoutMs = this.defaultTimeout, skipAuthRetry, ...fetchConfig } = config;
     const url = this.buildURL(endpoint, params);
+    const csrfToken = this.getCsrfToken();
 
-    const defaultHeaders: HeadersInit = {
+    // Surface missing CSRF token early for state-changing requests
+    const method = (fetchConfig.method || 'GET').toUpperCase();
+    const isStateChanging = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+    if (isStateChanging && !csrfToken) {
+      throw new ApiError('CSRF token ausente. Recarregue a página para continuar.', 419);
+    }
+
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      ...fetchConfig.headers,
     };
 
-    const requestConfig: RequestInit = {
-      ...fetchConfig,
-      headers: {
-        ...defaultHeaders,
-        ...fetchConfig.headers,
-      },
-      credentials: 'include',
-    };
+    const { controller, timer } = this.withTimeout(timeoutMs);
+
+    const doFetch = () =>
+      fetch(url, {
+        ...fetchConfig,
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+      });
 
     try {
-      const response = await fetch(url, requestConfig);
+      let response = await doFetch();
 
-      if (response.status === 401) {
+      if (response.status === 401 && !skipAuthRetry) {
         await this.refreshToken();
-        
-        const retryResponse = await fetch(url, requestConfig);
-        
-        if (!retryResponse.ok) {
-          const errorData: ErrorResponse = await retryResponse.json();
-          throw new ApiError(
-            errorData.error.message || 'Request failed',
-            retryResponse.status,
-            errorData.error.code
-          );
-        }
-        
-        return retryResponse.json();
+        response = await doFetch();
       }
 
       if (!response.ok) {
-        const errorData: ErrorResponse = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+        const errorData: ErrorResponse | undefined = isJson
+          ? await response.clone().json().catch(() => undefined)
+          : undefined;
+
         throw new ApiError(
-          errorData.error.message || 'Request failed',
+          errorData?.error.message || 'Request failed',
           response.status,
-          errorData.error.code
+          errorData?.error.code
         );
       }
 
       const data: ApiResponse<T> = await response.json();
       return data.data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (error instanceof ApiError) {
         throw error;
       }
-      throw new Error('An unexpected error occurred');
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError('Request timed out', 408);
+      }
+
+      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      clearTimeout(timer);
     }
   }
 
   async get<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...config,
-      method: 'GET',
-    });
+    return this.request<T>(endpoint, { ...config, method: 'GET' });
   }
 
   async post<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
@@ -187,53 +207,66 @@ class ApiClient {
   }
 
   async delete<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...config,
-      method: 'DELETE',
-    });
+    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
   }
 
-  async upload<T>(
-    endpoint: string,
-    formData: FormData,
-    config?: Omit<RequestConfig, 'body'>
-  ): Promise<T> {
-    const url = this.buildURL(endpoint, config?.params);
+  async upload<T>(endpoint: string, formData: FormData, config?: Omit<RequestConfig, 'body'>): Promise<T> {
+    const { params, timeoutMs = Math.max(this.defaultTimeout, 60000), ...fetchConfig } = config || {};
+    const url = this.buildURL(endpoint, params);
+    const csrfToken = this.getCsrfToken();
 
-    const requestConfig: RequestInit = {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-      headers: config?.headers,
+    const headers: HeadersInit = {
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      ...fetchConfig.headers,
     };
 
+    const { controller, timer } = this.withTimeout(timeoutMs);
+
+    const doFetch = () =>
+      fetch(url, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers,
+        signal: controller.signal,
+        ...fetchConfig,
+      });
+
     try {
-      const response = await fetch(url, requestConfig);
+      let response = await doFetch();
 
       if (response.status === 401) {
         await this.refreshToken();
-        const retryResponse = await fetch(url, requestConfig);
-        
-        if (!retryResponse.ok) {
-          const errorData: ErrorResponse = await retryResponse.json();
-          throw new Error(errorData.error.message || 'Upload failed');
-        }
-        
-        return retryResponse.json();
+        response = await doFetch();
       }
 
       if (!response.ok) {
-        const errorData: ErrorResponse = await response.json();
-        throw new Error(errorData.error.message || 'Upload failed');
+        const errorData: ErrorResponse | undefined = await response
+          .clone()
+          .json()
+          .catch(() => undefined);
+
+        throw new ApiError(
+          errorData?.error.message || 'Upload failed',
+          response.status,
+          errorData?.error.code
+        );
       }
 
       const data: ApiResponse<T> = await response.json();
       return data.data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (error instanceof ApiError) {
         throw error;
       }
-      throw new Error('Upload failed');
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError('Upload timed out', 408);
+      }
+
+      throw new ApiError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      clearTimeout(timer);
     }
   }
 }

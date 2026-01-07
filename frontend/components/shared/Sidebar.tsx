@@ -137,6 +137,14 @@ export function Sidebar() {
     return pathname.startsWith(href);
   };
 
+  const closeOnMobile = () => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile && sidebarOpen) {
+      toggleSidebar();
+    }
+  };
+
   if (!user) return null;
 
   return (
@@ -199,6 +207,7 @@ export function Sidebar() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    onClick={closeOnMobile}
                     className={cn(
                       'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
                       'text-sm font-medium',

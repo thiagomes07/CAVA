@@ -171,6 +171,14 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       onChange?.(numericValue);
     };
 
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      const pasted = e.clipboardData.getData('text');
+      const numericValue = parseCurrency(pasted);
+      onChange?.(numericValue);
+      // Prevent raw pasted text; we re-render formatted value instead
+      e.preventDefault();
+    };
+
     const displayValue = value !== undefined ? formatCurrency(value) : '';
 
     return (
@@ -193,6 +201,7 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
           inputMode="numeric"
           value={displayValue}
           onChange={handleChange}
+          onPaste={handlePaste}
           placeholder="R$ 0,00"
           className={cn(
             'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',

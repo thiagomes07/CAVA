@@ -228,6 +228,7 @@ export default function InventoryPage() {
                             <img
                               src={batch.medias[0].url}
                               alt={batch.batchCode}
+                              loading="lazy"
                               className="w-full h-full object-cover"
                             />
                           ) : (

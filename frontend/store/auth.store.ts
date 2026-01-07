@@ -2,6 +2,25 @@ import { create } from 'zustand';
 import type { User, UserRole } from '@/lib/types';
 import { apiClient } from '@/lib/api/client';
 
+const setReadableAuthCookies = (user: User | null) => {
+  if (typeof document === 'undefined') return;
+
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  const base = `; Path=/; SameSite=Strict${secureFlag}`;
+
+  if (user?.role) {
+    document.cookie = `user_role=${encodeURIComponent(user.role)}${base}`;
+  } else {
+    document.cookie = `user_role=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
+  }
+
+  if (user?.industryId) {
+    document.cookie = `industry_id=${encodeURIComponent(user.industryId)}${base}`;
+  } else {
+    document.cookie = `industry_id=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
+  }
+};
+
 interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
@@ -21,6 +40,7 @@ export const useAuthStore = create<AuthState>()(
     isLoading: true,
 
     setUser: (user) => {
+      setReadableAuthCookies(user);
       set({
         user,
         isAuthenticated: !!user,
@@ -28,70 +48,77 @@ export const useAuthStore = create<AuthState>()(
       });
     },
 
-      login: async (email: string, password: string) => {
-        try {
-          set({ isLoading: true });
+    login: async (email: string, password: string) => {
+      try {
+        set({ isLoading: true });
 
-          const response = await apiClient.post<{
-            user: User;
-            role: UserRole;
-          }>('/auth/login', { email, password });
+        const response = await apiClient.post<{
+          user: User;
+          role: UserRole;
+        }>('/auth/login', { email, password }, { skipAuthRetry: true });
 
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          throw error;
+        setReadableAuthCookies(response.user);
+
+        set({
+          user: response.user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        throw error;
+      }
+    },
+
+    logout: async () => {
+      try {
+        await apiClient.post('/auth/logout', undefined, { skipAuthRetry: true });
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
         }
-      },
+      }
+    },
 
-      logout: async () => {
-        try {
-          await apiClient.post('/auth/logout');
-        } catch (error) {
-          console.error('Logout error:', error);
-        } finally {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-        }
-      },
+    refreshSession: async () => {
+      try {
+        set({ isLoading: true });
 
-      refreshSession: async () => {
-        try {
-          set({ isLoading: true });
+        const response = await apiClient.post<{
+          user: User;
+        }>('/auth/refresh', undefined, { skipAuthRetry: true });
 
-          const response = await apiClient.post<{
-            user: User;
-          }>('/auth/refresh');
+        setReadableAuthCookies(response.user);
 
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          throw error;
-        }
-      },
+        set({
+          user: response.user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        throw error;
+      }
+    },
 
     hasPermission: (requiredRole: UserRole | UserRole[]) => {
       const { user } = get();

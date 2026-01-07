@@ -30,6 +30,7 @@ import type { SalesLink } from '@/lib/types';
 export default function PublicLinkPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const isSlugValid = /^[a-zA-Z0-9_-]+$/.test(slug || '');
   
   const [link, setLink] = useState<SalesLink | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,9 +58,15 @@ export default function PublicLinkPage() {
 
   useEffect(() => {
     const fetchLink = async () => {
+      if (!isSlugValid) {
+        setIsLoading(false);
+        error('Slug inválido');
+        return;
+      }
+
       try {
         setIsLoading(true);
-        const data = await apiClient.get<SalesLink>(`/public/links/${slug}`);
+        const data = await apiClient.get<SalesLink>(`/public/links/${encodeURIComponent(slug)}`);
         setLink(data);
       } catch (err) {
         error('Link não encontrado ou expirado');
@@ -69,7 +76,35 @@ export default function PublicLinkPage() {
     };
 
     fetchLink();
-  }, [slug, error]);
+  }, [slug, error, isSlugValid]);
+
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+
+    const gallery = link?.batch
+      ? (link.batch.medias?.length ? link.batch.medias : link.batch.product?.medias) ?? []
+      : [];
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsLightboxOpen(false);
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        setSelectedImageIndex((prev) => (gallery.length ? (prev + 1) % gallery.length : 0));
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        setSelectedImageIndex((prev) => (gallery.length ? (prev - 1 + gallery.length) % gallery.length : 0));
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isLightboxOpen, link]);
 
   const onSubmit = async (data: LeadCaptureInput) => {
     if (!link) return;
@@ -97,6 +132,18 @@ export default function PublicLinkPage() {
     }
   };
 
+  const sanitizeText = (text?: string) =>
+    text?.replace(/[<>&"']/g, (char) => {
+      const map: Record<string, string> = {
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+        '&': '&amp;',
+      };
+      return map[char];
+    });
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -105,7 +152,7 @@ export default function PublicLinkPage() {
     );
   }
 
-  if (!link || !link.batch) {
+  if (!isSlugValid || !link || !link.batch) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center max-w-md">
@@ -156,7 +203,7 @@ export default function PublicLinkPage() {
 
           {/* Title */}
           <h1 className="font-serif text-5xl md:text-7xl text-porcelain mb-4 leading-tight">
-            {link.title || product?.name || 'Pedra Natural Premium'}
+            {sanitizeText(link.title) || product?.name || 'Pedra Natural Premium'}
           </h1>
 
           {/* Batch Code */}
@@ -190,7 +237,7 @@ export default function PublicLinkPage() {
         <section className="py-16 bg-mineral">
           <div className="container mx-auto px-6 max-w-3xl text-center">
             <p className="text-lg text-slate-600 leading-relaxed">
-              {link.customMessage}
+              {sanitizeText(link.customMessage)}
             </p>
           </div>
         </section>
@@ -217,6 +264,7 @@ export default function PublicLinkPage() {
                   <div
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
                     style={{ backgroundImage: `url(${image.url})` }}
+                    aria-label="Abrir imagem em destaque"
                   />
                 </button>
               ))}
@@ -325,7 +373,7 @@ export default function PublicLinkPage() {
                 Sobre o Material
               </h3>
               <p className="text-slate-600 leading-relaxed">
-                {product.description}
+                {sanitizeText(product.description)}
               </p>
             </div>
           )}
@@ -445,6 +493,19 @@ export default function PublicLinkPage() {
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setIsLightboxOpen(false)}
         >
+          {images.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-white/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length);
+              }}
+              aria-label="Imagem anterior"
+            >
+              <ChevronDown className="w-10 h-10 rotate-90" />
+            </button>
+          )}
+
           <button
             onClick={() => setIsLightboxOpen(false)}
             className="absolute top-4 right-4 text-white hover:text-white/70 transition-colors"
@@ -459,9 +520,23 @@ export default function PublicLinkPage() {
             <img
               src={images[selectedImageIndex]?.url}
               alt="Imagem ampliada"
+              loading="lazy"
               className="max-w-full max-h-[90vh] object-contain"
             />
           </div>
+
+          {images.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-white/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImageIndex((prev) => (prev + 1) % images.length);
+              }}
+              aria-label="Próxima imagem"
+            >
+              <ChevronDown className="w-10 h-10 -rotate-90" />
+            </button>
+          )}
 
           {/* Navigation */}
           {images.length > 1 && (

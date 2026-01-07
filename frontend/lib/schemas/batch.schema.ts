@@ -13,7 +13,7 @@ export const batchSchema = z.object({
     .string()
     .min(1, 'Código do lote é obrigatório')
     .max(50, 'Código deve ter no máximo 50 caracteres')
-    .regex(/^[A-Z0-9-]+$/, 'Código deve conter apenas letras maiúsculas, números e hífens')
+    .regex(/^[A-Z]{3}-\d{6}$/i, 'Formato inválido. Use AAA-999999')
     .transform((val) => val.toUpperCase()),
   height: z
     .number({ message: 'Altura deve ser um número' })
@@ -40,7 +40,13 @@ export const batchSchema = z.object({
     .optional(),
   entryDate: z
     .string()
-    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida'),
+    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida')
+    .refine((val) => {
+      const parsed = new Date(val);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      return parsed <= today;
+    }, 'Data de entrada não pode ser futura'),
 });
 
 export const batchFilterSchema = z.object({

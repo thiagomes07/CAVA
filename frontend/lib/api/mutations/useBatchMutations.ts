@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/api/client';
 import { batchKeys } from '@/lib/api/queries/useBatches';
 import type { Batch } from '@/lib/types';
 import type { BatchInput, ReservationInput } from '@/lib/schemas/batch.schema';
+import { useToast } from '@/lib/hooks/useToast';
 
 export function useCreateBatch() {
   const queryClient = useQueryClient();
@@ -50,6 +51,7 @@ export function useUpdateBatchStatus() {
 
 export function useReserveBatch() {
   const queryClient = useQueryClient();
+  const { error: toastError } = useToast();
 
   return useMutation({
     mutationFn: async (data: ReservationInput) => {
@@ -89,6 +91,8 @@ export function useReserveBatch() {
           context.previousBatches
         );
       }
+
+      toastError('Reserva não pôde ser concluída. Tente novamente.');
     },
   });
 }

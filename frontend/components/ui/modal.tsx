@@ -1,4 +1,4 @@
-import { forwardRef, type HTMLAttributes, type ReactNode, useEffect, useRef, useId } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactNode, useEffect, useRef, useId, useContext, createContext } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
@@ -8,6 +8,13 @@ export interface ModalProps extends HTMLAttributes<HTMLDivElement> {
   'aria-labelledby'?: string;
   'aria-describedby'?: string;
 }
+
+interface ModalContextValue {
+  labelId: string;
+  descriptionId: string;
+}
+
+const ModalContext = createContext<ModalContextValue | null>(null);
 
 const Modal = forwardRef<HTMLDivElement, ModalProps>(
   ({ className, open, onClose, children, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
@@ -83,42 +90,45 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
     if (!open) return null;
 
     return (
-      <div 
-        className="fixed inset-0 z-50 flex items-center justify-center p-4"
-        role="presentation"
-      >
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-        <div
-          ref={(node) => {
-            // Handle both refs
-            (modalRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
-            if (typeof ref === 'function') {
-              ref(node);
-            } else if (ref) {
-              ref.current = node;
-            }
-          }}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={labelId}
-          aria-describedby={descriptionId}
-          tabIndex={-1}
-          className={cn(
-            'relative bg-porcelain rounded-xl shadow-premium-lg',
-            'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
-            'animate-in fade-in-0 zoom-in-95 duration-200',
-            'focus:outline-none',
-            className
-          )}
-          {...props}
+      <ModalContext.Provider value={{ labelId, descriptionId }}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="presentation"
         >
-          {children}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <div
+            ref={(node) => {
+              // Handle both refs
+              (modalRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+              if (typeof ref === 'function') {
+                ref(node);
+              } else if (ref) {
+                ref.current = node;
+              }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={labelId}
+            aria-describedby={descriptionId}
+            aria-live="assertive"
+            tabIndex={-1}
+            className={cn(
+              'relative bg-porcelain rounded-xl shadow-premium-lg',
+              'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
+              'animate-in fade-in-0 zoom-in-95 duration-200',
+              'focus:outline-none',
+              className
+            )}
+            {...props}
+          >
+            {children}
+          </div>
         </div>
-      </div>
+      </ModalContext.Provider>
     );
   }
 );
@@ -138,25 +148,33 @@ const ModalHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 ModalHeader.displayName = 'ModalHeader';
 
 const ModalTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h2
-      ref={ref}
-      className={cn('font-serif text-3xl font-semibold', className)}
-      {...props}
-    />
-  )
+  ({ className, id, ...props }, ref) => {
+    const context = useContext(ModalContext);
+    return (
+      <h2
+        ref={ref}
+        id={id || context?.labelId}
+        className={cn('font-serif text-3xl font-semibold', className)}
+        {...props}
+      />
+    );
+  }
 );
 
 ModalTitle.displayName = 'ModalTitle';
 
 const ModalDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p
-      ref={ref}
-      className={cn('mt-2 text-sm text-slate-600', className)}
-      {...props}
-    />
-  )
+  ({ className, id, ...props }, ref) => {
+    const context = useContext(ModalContext);
+    return (
+      <p
+        ref={ref}
+        id={id || context?.descriptionId}
+        className={cn('mt-2 text-sm text-slate-600', className)}
+        {...props}
+      />
+    );
+  }
 );
 
 ModalDescription.displayName = 'ModalDescription';

@@ -24,7 +24,12 @@ const defaultFilters: BatchFilter = {
 };
 
 export function useBatches(filters: Partial<BatchFilter> = {}) {
-  const mergedFilters = { ...defaultFilters, ...filters };
+  const mergedFilters = {
+    ...defaultFilters,
+    ...filters,
+    // Defensive clamp to avoid excessively large requests
+    limit: Math.min(filters.limit ?? defaultFilters.limit, 100),
+  };
   
   return useQuery({
     queryKey: batchKeys.list(mergedFilters),

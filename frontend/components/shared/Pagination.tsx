@@ -28,6 +28,17 @@ export function Pagination({
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
+  const handleKeyNavigation = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handlePageChange(currentPage - 1);
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handlePageChange(currentPage + 1);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
 
@@ -78,7 +89,12 @@ export function Pagination({
 
   if (variant === 'simple') {
     return (
-      <div className="flex items-center justify-center gap-2 py-4">
+      <div
+        className="flex items-center justify-center gap-2 py-4"
+        tabIndex={0}
+        onKeyDown={handleKeyNavigation}
+        aria-label={`Paginação de ${totalItems} itens`}
+      >
         <button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
@@ -115,7 +131,12 @@ export function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-between py-4 border-t border-slate-100">
+    <div
+      className="flex items-center justify-between py-4 border-t border-slate-100"
+      tabIndex={0}
+      onKeyDown={handleKeyNavigation}
+      aria-label={`Paginação de ${totalItems} itens`}
+    >
       {/* Items Info */}
       <div className="text-sm text-slate-500">
         Mostrando {startItem}-{endItem} de {totalItems} itens

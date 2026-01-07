@@ -13,6 +13,28 @@ const nextConfig: NextConfig = {
     // Ensure the app root is this frontend folder even if there are lockfiles above it.
     root: path.resolve(__dirname),
   },
+
+  // Configuração de imagens para otimização com next/image
+  images: {
+    // Permitir imagens de qualquer domínio (para URLs dinâmicas do backend)
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3001',
+      },
+    ],
+    // Formatos de imagem otimizados
+    formats: ['image/avif', 'image/webp'],
+    // Tamanhos de dispositivo para responsive images
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    // Tamanhos para imagens com width fixo
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
 };
 
 export default nextConfig;

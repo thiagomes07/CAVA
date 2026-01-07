@@ -20,8 +20,8 @@ export const salesLinkSchema = z
       .min(3, 'Slug deve ter no mínimo 3 caracteres')
       .max(50, 'Slug deve ter no máximo 50 caracteres')
       .regex(
-        /^[a-z0-9-]+$/,
-        'Slug deve conter apenas letras minúsculas, números e hífens'
+        /^(?!-)(?!.*--)[a-z0-9-]+(?<!-)$/,
+        'Slug deve conter apenas letras minúsculas e números, não pode iniciar/terminar com hífen nem ter hífens consecutivos'
       ),
     displayPrice: z
       .number({ message: 'Preço deve ser um número' })

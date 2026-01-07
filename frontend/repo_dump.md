@@ -15,16 +15,27 @@ import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/store/auth.store';
 import { useToast } from '@/lib/hooks/useToast';
 import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
-import { cn } from '@/lib/utils/cn';
+import { useAuth } from '@/lib/hooks/useAuth';
+
+import { toCanonicalPath } from '@/lib/utils/routes';
+
+function getSafeRedirectTarget(callbackUrl: string | null): string | null {
+  if (!callbackUrl) return null;
+
+  // Prevent open-redirects; only allow same-origin path
+  if (!callbackUrl.startsWith('/')) return null;
+
+  return toCanonicalPath(callbackUrl);
+}
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
-  
+  const { getDashboardRoute } = useAuth();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  
+
   const login = useAuthStore((state) => state.login);
   const { success, error } = useToast();
 
@@ -39,12 +50,20 @@ export default function LoginPage() {
   const onSubmit = async (data: LoginInput) => {
     try {
       setIsLoading(true);
-      
+
       await login(data.email, data.password);
+
+      // Obter o nome do usuário do store após o login
+      const user = useAuthStore.getState().user;
+      const userName = user?.name?.split(' ')[0] || 'usuário';
       
-      success('Login realizado com sucesso');
-      router.push(callbackUrl);
-    } catch (err) {
+      success(`Bem-vindo de volta, ${userName}!`);
+
+      // Use callback URL if provided, otherwise use role-based dashboard
+      const callbackUrl = searchParams.get('callbackUrl');
+      const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
+      router.push(redirectTo);
+    } catch {
       error('Email ou senha incorretos');
     } finally {
       setIsLoading(false);
@@ -54,7 +73,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-12 bg-mineral">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12 bg-mineral">
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
@@ -141,21 +160,21 @@ export default function LoginPage() {
       </div>
 
       {/* Right Side - Hero Image */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative min-h-screen">
         {/* Placeholder for hero image */}
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-800" />
-        
+
         {/* Overlay */}
         <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-        
+
         {/* Content */}
-        <div className="relative z-10 flex items-center justify-center p-12 text-center">
+        <div className="relative z-10 flex items-center justify-center w-full p-12 text-center">
           <div className="max-w-lg">
             <h2 className="font-serif text-5xl text-porcelain mb-6 leading-tight">
               Transforme pedras em obras de arte
             </h2>
             <p className="text-lg text-porcelain/80 leading-relaxed">
-              A plataforma completa para gestão e comercialização de pedras naturais premium
+              A plataforma completa para gestão de pedras ornamentais
             </p>
           </div>
         </div>
@@ -553,7 +572,7 @@ function MetricCardSkeleton() {
 ```
 'use client';
 
-export { default } from '@/app/(industry)/leads/page';
+export { default } from '@/app/(industry)/admin/leads/page';
 ```
 
 ---
@@ -563,7 +582,7 @@ export { default } from '@/app/(industry)/leads/page';
 ```
 'use client';
 
-export { default } from '@/app/(industry)/links/new/page';
+export { default } from '@/app/(industry)/admin/links/new/page';
 ```
 
 ---
@@ -573,7 +592,7 @@ export { default } from '@/app/(industry)/links/new/page';
 ```
 'use client';
 
-export { default } from '@/app/(industry)/links/page';
+export { default } from '@/app/(industry)/admin/links/page';
 ```
 
 ---
@@ -1880,6 +1899,14 @@ export default function EditProductPage() {
     reset,
   } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
+    defaultValues: {
+      name: '',
+      sku: '',
+      material: 'GRANITO',
+      finish: 'POLIDO',
+      description: '',
+      isPublic: true,
+    },
   });
 
   const isPublic = watch('isPublic');
@@ -2264,7 +2291,7 @@ export default function EditProductPage() {
         </ModalHeader>
         <ModalContent>
           <p className="text-slate-600">
-            Tem certeza que deseja excluir o produto <strong>"{product.name}"</strong>?
+            Tem certeza que deseja excluir o produto <strong>&quot;{product.name}&quot;</strong>?
           </p>
           <p className="text-rose-600 text-sm mt-4">
             Esta ação não pode ser desfeita.
@@ -2388,6 +2415,11 @@ export default function NewProductPage() {
   } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
+      name: '',
+      sku: '',
+      material: 'GRANITO',
+      finish: 'POLIDO',
+      description: '',
       isPublic: true,
     },
   });
@@ -2811,7 +2843,11 @@ export default function CatalogPage() {
             <Select
               value={filters.material}
               onChange={(e) =>
-                setFilters({ ...filters, material: e.target.value, page: 1 })
+                setFilters({ 
+                  ...filters, 
+                  material: e.target.value as ProductFilter['material'], 
+                  page: 1 
+                })
               }
             >
               <option value="">Todos os Materiais</option>
@@ -2877,8 +2913,8 @@ export default function CatalogPage() {
               <ProductCard
                 key={product.id}
                 product={product}
-                onView={() => router.push(`/inventory?productId=${product.id}`)}
-                onEdit={() => router.push(`/catalog/${product.id}`)}
+                onView={() => router.push(`/admin/inventory?productId=${product.id}`)}
+                onEdit={() => router.push(`/admin/catalog/${product.id}`)}
               />
             ))}
           </div>
@@ -3779,7 +3815,7 @@ export default function EditBatchPage() {
         <ModalContent>
           <p className="text-slate-600">
             Tem certeza que deseja arquivar o lote{' '}
-            <strong className="font-mono">"{batch.batchCode}"</strong>?
+            <strong className="font-mono">&quot;{batch.batchCode}&quot;</strong>?
           </p>
           <p className="text-amber-600 text-sm mt-4">
             O lote será marcado como inativo e não aparecerá mais nas listagens.
@@ -4517,6 +4553,7 @@ export default function InventoryPage() {
                             <img
                               src={batch.medias[0].url}
                               alt={batch.batchCode}
+                              loading="lazy"
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -4611,7 +4648,7 @@ export default function InventoryPage() {
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox } from 'lucide-react';
+import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -4752,8 +4789,8 @@ export default function LeadsManagementPage() {
   const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate || filters.status;
   const isEmpty = leads.length === 0;
 
-  const getStatusBadge = (status: typeof leadStatuses[number]) => {
-    const variants = {
+  const getStatusBadge = (status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO') => {
+    const variants: Record<'NOVO' | 'CONTATADO' | 'RESOLVIDO', string> = {
       NOVO: 'bg-blue-50 text-blue-700 border-blue-200',
       CONTATADO: 'bg-amber-50 text-amber-700 border-amber-200',
       RESOLVIDO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
@@ -4789,7 +4826,7 @@ export default function LeadsManagementPage() {
               <Input
                 placeholder="Nome ou Contato"
                 value={filters.search}
-                onChange={(e) =>
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFilters({ ...filters, search: e.target.value, page: 1 })
                 }
               />
@@ -4798,7 +4835,7 @@ export default function LeadsManagementPage() {
 
             <Select
               value={filters.linkId}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
                 setFilters({ ...filters, linkId: e.target.value, page: 1 })
               }
             >
@@ -4812,8 +4849,8 @@ export default function LeadsManagementPage() {
 
             <Select
               value={filters.status}
-              onChange={(e) =>
-                setFilters({ ...filters, status: e.target.value, page: 1 })
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setFilters({ ...filters, status: e.target.value as '' | 'NOVO' | 'CONTATADO' | 'RESOLVIDO', page: 1 })
               }
             >
               <option value="">Todos os Status</option>
@@ -4826,7 +4863,7 @@ export default function LeadsManagementPage() {
               type="date"
               label="Data Início"
               value={filters.startDate}
-              onChange={(e) =>
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                 setFilters({ ...filters, startDate: e.target.value, page: 1 })
               }
             />
@@ -4959,10 +4996,10 @@ export default function LeadsManagementPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div onClick={(e) => e.stopPropagation()}>
+                          <div onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                             <Select
                               value={lead.status}
-                              onChange={(e) => handleUpdateStatus(lead.id, e.target.value as typeof leadStatuses[number])}
+                              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(lead.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
                               disabled={isUpdatingStatus}
                               className="text-xs"
                             >
@@ -4981,7 +5018,7 @@ export default function LeadsManagementPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={(e) => {
+                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                               e.stopPropagation();
                               handleViewDetails(lead);
                             }}
@@ -5001,7 +5038,7 @@ export default function LeadsManagementPage() {
               totalPages={Math.ceil(totalItems / filters.limit)}
               totalItems={totalItems}
               itemsPerPage={filters.limit}
-              onPageChange={(page) => setFilters({ ...filters, page })}
+              onPageChange={(page: number) => setFilters({ ...filters, page })}
             />
           </>
         )}
@@ -5117,7 +5154,7 @@ export default function LeadsManagementPage() {
                 </p>
                 <Select
                   value={selectedLead.status}
-                  onChange={(e) => handleUpdateStatus(selectedLead.id, e.target.value as typeof leadStatuses[number])}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(selectedLead.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
                   disabled={isUpdatingStatus}
                 >
                   <option value="NOVO">Novo</option>
@@ -5174,7 +5211,7 @@ import { salesLinkSchema, type SalesLinkInput } from '@/lib/schemas/link.schema'
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { nanoid } from 'nanoid';
-import QRCode from 'qrcode.react';
+import { QRCodeCanvas } from 'qrcode.react';
 import type { Batch, Product, LinkType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -5197,6 +5234,8 @@ export default function CreateSalesLinkPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string>('');
   const [calculatedMargin, setCalculatedMargin] = useState<number>(0);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const [isSlugAvailable, setIsSlugAvailable] = useState(true);
 
   const {
     register,
@@ -5224,6 +5263,18 @@ export default function CreateSalesLinkPage() {
       fetchAvailableContent();
     }
   }, [currentStep, linkType]);
+
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      if (!slugToken) return;
+      setIsCheckingSlug(true);
+      const available = await validateSlug(slugToken);
+      setIsSlugAvailable(available);
+      setIsCheckingSlug(false);
+    }, 400);
+
+    return () => clearTimeout(handle);
+  }, [slugToken]);
 
   useEffect(() => {
     if (isBroker() && selectedBatch && displayPrice) {
@@ -5347,12 +5398,11 @@ export default function CreateSalesLinkPage() {
         data
       );
 
-      const fullUrl = `${window.location.origin}/${data.slugToken}`;
+      const fullUrl = response.fullUrl || `${window.location.origin}/${data.slugToken}`;
       setGeneratedLink(fullUrl);
       setShowSuccessModal(true);
 
       await navigator.clipboard.writeText(fullUrl);
-      success('Link criado! Copiado para área de transferência');
     } catch (err) {
       error('Erro ao criar link');
     } finally {
@@ -5536,7 +5586,7 @@ export default function CreateSalesLinkPage() {
                     <Input
                       placeholder={linkType === 'LOTE_UNICO' ? 'Buscar lote por código ou produto' : 'Buscar produto por nome'}
                       value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
                     />
                     <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
                   </div>
@@ -5568,6 +5618,7 @@ export default function CreateSalesLinkPage() {
                                 <img
                                   src={batch.medias[0].url}
                                   alt={batch.batchCode}
+                                  loading="lazy"
                                   className="w-16 h-16 rounded-sm object-cover"
                                 />
                               )}
@@ -5611,6 +5662,7 @@ export default function CreateSalesLinkPage() {
                                 <img
                                   src={product.medias[0].url}
                                   alt={product.name}
+                                  loading="lazy"
                                   className="w-16 h-16 rounded-sm object-cover"
                                 />
                               )}
@@ -5650,6 +5702,7 @@ export default function CreateSalesLinkPage() {
                       <img
                         src={(selectedBatch?.medias?.[0] || selectedProduct?.medias?.[0])?.url}
                         alt="Preview"
+                        loading="lazy"
                         className="w-20 h-20 rounded-sm object-cover"
                       />
                     )}
@@ -5745,11 +5798,11 @@ export default function CreateSalesLinkPage() {
                 <Toggle
                   {...register('showPrice')}
                   checked={showPrice}
-                  onChange={(e) => setValue('showPrice', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('showPrice', e.target.checked)}
                   label="Exibir preço no link"
                 />
                 <p className="text-xs text-slate-500 ml-14">
-                  Se desativado, aparecerá "Sob Consulta"
+                  Se desativado, aparecerá &quot;Sob Consulta&quot;
                 </p>
 
                 <Input
@@ -5798,6 +5851,12 @@ export default function CreateSalesLinkPage() {
                     >
                       Gerar novo
                     </button>
+                    {!isSlugAvailable && (
+                      <span className="text-xs text-rose-600">Slug já em uso</span>
+                    )}
+                    {isCheckingSlug && (
+                      <span className="text-xs text-slate-500">Verificando...</span>
+                    )}
                   </div>
                 </div>
 
@@ -5812,7 +5871,7 @@ export default function CreateSalesLinkPage() {
                 <Toggle
                   {...register('isActive')}
                   checked={watch('isActive')}
-                  onChange={(e) => setValue('isActive', e.target.checked)}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('isActive', e.target.checked)}
                   label="Link Ativo"
                 />
               </div>
@@ -5865,7 +5924,7 @@ export default function CreateSalesLinkPage() {
         <ModalContent>
           <div className="space-y-6 text-center">
             <div className="flex justify-center">
-              <QRCode value={generatedLink} size={200} />
+              <QRCodeCanvas value={generatedLink} size={200} />
             </div>
 
             <div>
@@ -6073,7 +6132,11 @@ export default function LinksManagementPage() {
             <Select
               value={filters.type}
               onChange={(e) =>
-                setFilters({ ...filters, type: e.target.value as LinkType | '', page: 1 })
+                setFilters({ 
+                  ...filters, 
+                  type: e.target.value as LinkFilter['type'], 
+                  page: 1 
+                })
               }
             >
               <option value="">Todos os Tipos</option>
@@ -6085,7 +6148,11 @@ export default function LinksManagementPage() {
             <Select
               value={filters.status}
               onChange={(e) =>
-                setFilters({ ...filters, status: e.target.value, page: 1 })
+                setFilters({ 
+                  ...filters, 
+                  status: e.target.value as LinkFilter['status'], 
+                  page: 1 
+                })
               }
             >
               <option value="">Todos os Status</option>
@@ -6373,6 +6440,7 @@ interface SalesFilter {
   sellerId: string;
   page: number;
   limit: number;
+  [key: string]: string | number | boolean | undefined;
 }
 
 interface SalesSummary {
@@ -7059,6 +7127,7 @@ export default function TeamManagementPage() {
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -7087,6 +7156,7 @@ import type { SalesLink } from '@/lib/types';
 export default function PublicLinkPage() {
   const params = useParams();
   const slug = params.slug as string;
+  const isSlugValid = /^[a-zA-Z0-9_-]+$/.test(slug || '');
   
   const [link, setLink] = useState<SalesLink | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -7104,13 +7174,25 @@ export default function PublicLinkPage() {
     reset,
   } = useForm<LeadCaptureInput>({
     resolver: zodResolver(leadCaptureSchema),
+    defaultValues: {
+      name: '',
+      contact: '',
+      message: '',
+      marketingOptIn: false,
+    },
   });
 
   useEffect(() => {
     const fetchLink = async () => {
+      if (!isSlugValid) {
+        setIsLoading(false);
+        error('Slug inválido');
+        return;
+      }
+
       try {
         setIsLoading(true);
-        const data = await apiClient.get<SalesLink>(`/public/links/${slug}`);
+        const data = await apiClient.get<SalesLink>(`/public/links/${encodeURIComponent(slug)}`);
         setLink(data);
       } catch (err) {
         error('Link não encontrado ou expirado');
@@ -7120,7 +7202,35 @@ export default function PublicLinkPage() {
     };
 
     fetchLink();
-  }, [slug, error]);
+  }, [slug, error, isSlugValid]);
+
+  useEffect(() => {
+    if (!isLightboxOpen) return;
+
+    const gallery = link?.batch
+      ? (link.batch.medias?.length ? link.batch.medias : link.batch.product?.medias) ?? []
+      : [];
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        setIsLightboxOpen(false);
+      }
+
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        setSelectedImageIndex((prev) => (gallery.length ? (prev + 1) % gallery.length : 0));
+      }
+
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        setSelectedImageIndex((prev) => (gallery.length ? (prev - 1 + gallery.length) % gallery.length : 0));
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isLightboxOpen, link]);
 
   const onSubmit = async (data: LeadCaptureInput) => {
     if (!link) return;
@@ -7156,7 +7266,7 @@ export default function PublicLinkPage() {
     );
   }
 
-  if (!link || !link.batch) {
+  if (!isSlugValid || !link || !link.batch) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
         <div className="text-center max-w-md">
@@ -7268,6 +7378,7 @@ export default function PublicLinkPage() {
                   <div
                     className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
                     style={{ backgroundImage: `url(${image.url})` }}
+                    aria-label="Abrir imagem em destaque"
                   />
                 </button>
               ))}
@@ -7496,6 +7607,19 @@ export default function PublicLinkPage() {
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm flex items-center justify-center p-4"
           onClick={() => setIsLightboxOpen(false)}
         >
+          {images.length > 1 && (
+            <button
+              className="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-white/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImageIndex((prev) => (prev - 1 + images.length) % images.length);
+              }}
+              aria-label="Imagem anterior"
+            >
+              <ChevronDown className="w-10 h-10 rotate-90" />
+            </button>
+          )}
+
           <button
             onClick={() => setIsLightboxOpen(false)}
             className="absolute top-4 right-4 text-white hover:text-white/70 transition-colors"
@@ -7510,9 +7634,23 @@ export default function PublicLinkPage() {
             <img
               src={images[selectedImageIndex]?.url}
               alt="Imagem ampliada"
+              loading="lazy"
               className="max-w-full max-h-[90vh] object-contain"
             />
           </div>
+
+          {images.length > 1 && (
+            <button
+              className="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-white/70 transition-colors"
+              onClick={(e) => {
+                e.stopPropagation();
+                setSelectedImageIndex((prev) => (prev + 1) % images.length);
+              }}
+              aria-label="Próxima imagem"
+            >
+              <ChevronDown className="w-10 h-10 -rotate-90" />
+            </button>
+          )}
 
           {/* Navigation */}
           {images.length > 1 && (
@@ -7533,7 +7671,179 @@ export default function PublicLinkPage() {
           )}
         </div>
       )}
+
+      {/* Footer */}
+      <footer className="py-8 bg-mineral border-t border-slate-200">
+        <div className="container mx-auto px-6 max-w-4xl">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 bg-obsidian rounded-sm" />
+              <span className="font-serif text-lg font-semibold text-obsidian">CAVA</span>
+            </div>
+
+            {/* Text */}
+            <p className="text-sm text-slate-500">
+              Powered by CAVA Stone Platform
+            </p>
+
+            {/* Links */}
+            <Link
+              href="/privacy"
+              className="text-sm text-slate-500 hover:text-obsidian transition-colors"
+            >
+              Política de Privacidade
+            </Link>
+          </div>
+        </div>
+      </footer>
     </>
+  );
+}
+```
+
+---
+
+## `.\app\(public)\privacy\page.tsx`:
+
+```
+import { ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
+
+export const metadata = {
+  title: 'Política de Privacidade | CAVA',
+  description: 'Política de privacidade da plataforma CAVA Stone',
+};
+
+export default function PrivacyPage() {
+  return (
+    <div className="min-h-screen bg-mineral">
+      {/* Header */}
+      <header className="border-b border-slate-200 bg-porcelain">
+        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center gap-4">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-slate-500 hover:text-obsidian transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+            <span className="text-sm">Voltar</span>
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-obsidian rounded-sm" />
+            <span className="font-serif text-xl font-semibold text-obsidian">CAVA</span>
+          </div>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-4xl mx-auto px-6 py-12">
+        <h1 className="font-serif text-4xl text-obsidian mb-8">
+          Política de Privacidade
+        </h1>
+
+        <div className="prose prose-slate max-w-none">
+          <p className="text-slate-600 mb-6">
+            Última atualização: {new Date().toLocaleDateString('pt-BR', { year: 'numeric', month: 'long', day: 'numeric' })}
+          </p>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              1. Informações que coletamos
+            </h2>
+            <p className="text-slate-600 mb-4">
+              Coletamos informações que você nos fornece diretamente, como:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li>Nome completo e informações de contato (e-mail, telefone)</li>
+              <li>Informações de empresa (CNPJ, razão social)</li>
+              <li>Dados de acesso e autenticação</li>
+              <li>Informações de pedidos e transações</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              2. Como usamos suas informações
+            </h2>
+            <p className="text-slate-600 mb-4">
+              Utilizamos as informações coletadas para:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li>Fornecer, manter e melhorar nossos serviços</li>
+              <li>Processar transações e enviar notificações relacionadas</li>
+              <li>Responder a suas solicitações e fornecer suporte</li>
+              <li>Enviar comunicações sobre produtos e serviços</li>
+              <li>Cumprir obrigações legais e regulatórias</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              3. Compartilhamento de informações
+            </h2>
+            <p className="text-slate-600 mb-4">
+              Não vendemos suas informações pessoais. Podemos compartilhar suas informações apenas nas seguintes circunstâncias:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li>Com sua autorização explícita</li>
+              <li>Para processar transações comerciais</li>
+              <li>Com prestadores de serviço que nos auxiliam</li>
+              <li>Para cumprir obrigações legais</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              4. Segurança dos dados
+            </h2>
+            <p className="text-slate-600">
+              Implementamos medidas de segurança técnicas e organizacionais adequadas para proteger suas informações pessoais contra acesso não autorizado, alteração, divulgação ou destruição. Isso inclui criptografia de dados em trânsito e em repouso, controles de acesso rigorosos e monitoramento contínuo de segurança.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              5. Seus direitos
+            </h2>
+            <p className="text-slate-600 mb-4">
+              De acordo com a LGPD, você tem o direito de:
+            </p>
+            <ul className="list-disc pl-6 text-slate-600 space-y-2">
+              <li>Acessar seus dados pessoais</li>
+              <li>Corrigir dados incompletos ou desatualizados</li>
+              <li>Solicitar a exclusão de seus dados</li>
+              <li>Revogar o consentimento para uso de dados</li>
+              <li>Solicitar a portabilidade dos dados</li>
+            </ul>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              6. Cookies e tecnologias similares
+            </h2>
+            <p className="text-slate-600">
+              Utilizamos cookies essenciais para o funcionamento da plataforma, incluindo cookies de autenticação e preferências de sessão. Não utilizamos cookies de rastreamento para publicidade.
+            </p>
+          </section>
+
+          <section className="mb-8">
+            <h2 className="font-serif text-2xl text-obsidian mb-4">
+              7. Contato
+            </h2>
+            <p className="text-slate-600">
+              Para exercer seus direitos ou esclarecer dúvidas sobre nossa política de privacidade, entre em contato através do e-mail: <a href="mailto:privacidade@cavastone.com" className="text-obsidian hover:underline">privacidade@cavastone.com</a>
+            </p>
+          </section>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t border-slate-200 bg-porcelain mt-12">
+        <div className="max-w-4xl mx-auto px-6 py-6 text-center text-sm text-slate-500">
+          © {new Date().getFullYear()} CAVA Stone. Todos os direitos reservados.
+        </div>
+      </footer>
+    </div>
   );
 }
 ```
@@ -7857,7 +8167,7 @@ export { default } from '@/app/(industry)/inventory/page';
 ```
 'use client';
 
-export { default } from '@/app/(industry)/leads/page'
+export { default } from '@/app/(industry)/admin/leads/page';
 ```
 
 ---
@@ -7867,7 +8177,7 @@ export { default } from '@/app/(industry)/leads/page'
 ```
 'use client';
 
-export { default } from '@/app/(industry)/links/new/page';
+export { default } from '@/app/(industry)/admin/links/new/page';
 ```
 
 ---
@@ -7877,7 +8187,78 @@ export { default } from '@/app/(industry)/links/new/page';
 ```
 'use client';
 
-export { default } from '@/app/(industry)/links/page';
+export { default } from '@/app/(industry)/admin/links/page';
+```
+
+---
+
+## `.\app\error.tsx`:
+
+```
+'use client';
+
+import { useEffect } from 'react';
+import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
+import Link from 'next/link';
+
+interface ErrorProps {
+  error: Error & { digest?: string };
+  reset: () => void;
+}
+
+export default function Error({ error, reset }: ErrorProps) {
+  useEffect(() => {
+    // Log error to monitoring service (Sentry, etc.)
+    console.error('Application error:', error);
+  }, [error]);
+
+  return (
+    <div className="min-h-screen bg-mineral flex items-center justify-center px-6">
+      <div className="max-w-md w-full text-center">
+        {/* Icon */}
+        <div className="mx-auto w-16 h-16 bg-rose-100 rounded-full flex items-center justify-center mb-6">
+          <AlertTriangle className="w-8 h-8 text-rose-600" />
+        </div>
+
+        {/* Title */}
+        <h1 className="font-serif text-3xl text-obsidian mb-3">
+          Algo deu errado
+        </h1>
+
+        {/* Description */}
+        <p className="text-slate-500 mb-8">
+          Desculpe, ocorreu um erro inesperado. Nossa equipe foi notificada e está trabalhando para resolver.
+        </p>
+
+        {/* Error digest (for debugging) */}
+        {error.digest && (
+          <p className="text-xs text-slate-400 mb-6 font-mono">
+            Código: {error.digest}
+          </p>
+        )}
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <button
+            onClick={reset}
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-obsidian text-white rounded-sm font-medium text-sm transition-all duration-200 hover:bg-obsidian-hover hover:scale-[1.02]"
+          >
+            <RotateCcw className="w-4 h-4" />
+            Tentar novamente
+          </button>
+          
+          <Link
+            href="/"
+            className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-slate-200 text-obsidian rounded-sm font-medium text-sm transition-all duration-200 hover:bg-slate-50"
+          >
+            <Home className="w-4 h-4" />
+            Voltar ao início
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
 ```
 
 ---
@@ -7888,35 +8269,52 @@ export { default } from '@/app/(industry)/links/page';
 ﻿@import "tailwindcss";
 
 :root {
-  /* Cores da Identidade CAVA */
+  /* Cores da Identidade CAVA - Premium Stone Platform */
   --color-obsidian: #121212;
   --color-obsidian-hover: #0F0F0F;
   --color-porcelain: #FFFFFF;
   --color-mineral: #F9F9FB;
   --color-off-white: #FAFAFA;
+  
+  /* Cores de status */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
 
   /* Variáveis de fontes */
-  --font-sans: var(--font-inter);
-  --font-serif: var(--font-playfair);
-  --font-mono: var(--font-jetbrains);
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 
   /* Background padrão */
   --background: var(--color-mineral);
   --foreground: var(--color-obsidian);
+  
+  /* Transições padrão */
+  --transition-fast: 150ms ease;
+  --transition-normal: 200ms ease;
+  --transition-slow: 300ms ease;
 }
 
 @theme inline {
-  /* Cores customizadas */
-  --color-obsidian: var(--color-obsidian);
-  --color-obsidian-hover: var(--color-obsidian-hover);
-  --color-porcelain: var(--color-porcelain);
-  --color-mineral: var(--color-mineral);
-  --color-off-white: var(--color-off-white);
+  /* Cores customizadas - valores diretos para Tailwind v4 */
+  --color-obsidian: #121212;
+  --color-obsidian-hover: #0F0F0F;
+  --color-porcelain: #FFFFFF;
+  --color-mineral: #F9F9FB;
+  --color-off-white: #FAFAFA;
+  
+  /* Cores de status */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
 
   /* Fontes */
-  --font-sans: var(--font-sans);
-  --font-serif: var(--font-serif);
-  --font-mono: var(--font-mono);
+  --font-sans: var(--font-inter), system-ui, -apple-system, sans-serif;
+  --font-serif: var(--font-playfair), Georgia, serif;
+  --font-mono: var(--font-mono), 'JetBrains Mono', ui-monospace, monospace;
 
   /* Letter spacing customizado */
   --letter-spacing-widest: 0.15em;
@@ -7924,12 +8322,19 @@ export { default } from '@/app/(industry)/links/page';
   /* Sombras premium */
   --shadow-premium: 0 4px 24px rgba(0, 0, 0, 0.08);
   --shadow-premium-lg: 0 8px 40px rgba(0, 0, 0, 0.12);
+  --shadow-premium-xl: 0 12px 48px rgba(0, 0, 0, 0.16);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), sans-serif;
+  font-family: var(--font-sans);
+  line-height: 1.6;
+}
+
+/* Tipografia Serif Premium */
+.font-serif {
+  font-family: var(--font-serif);
 }
 
 /* Utilitários customizados */
@@ -7941,8 +8346,155 @@ body {
   box-shadow: var(--shadow-premium-lg);
 }
 
+.shadow-premium-xl {
+  box-shadow: var(--shadow-premium-xl);
+}
+
 .tracking-widest {
   letter-spacing: var(--letter-spacing-widest);
+}
+
+/* Estados de foco acessíveis */
+*:focus-visible {
+  outline: 2px solid var(--color-obsidian);
+  outline-offset: 2px;
+}
+
+/* Scrollbar premium */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-mineral);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(18, 18, 18, 0.2);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(18, 18, 18, 0.4);
+}
+
+/* Animações suaves */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { 
+    opacity: 0; 
+    transform: translateY(10px); 
+  }
+  to { 
+    opacity: 1; 
+    transform: translateY(0); 
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease forwards;
+}
+
+/* Prevent layout shift on scrollbar - aplicar apenas onde necessário */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+```
+
+---
+
+## `.\app\loading.tsx`:
+
+```
+export default function Loading() {
+  return (
+    <div className="min-h-screen bg-mineral flex items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        {/* CAVA Logo Spinner */}
+        <div className="relative w-12 h-12">
+          <div className="absolute inset-0 border-2 border-slate-200 rounded-full" />
+          <div className="absolute inset-0 border-2 border-transparent border-t-obsidian rounded-full animate-spin" />
+        </div>
+        
+        {/* Brand text */}
+        <p className="text-xs uppercase tracking-[0.25em] text-slate-400 font-medium">
+          CAVA
+        </p>
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## `.\app\not-found.tsx`:
+
+```
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { Link2Off, ArrowLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+export default function NotFound() {
+  const router = useRouter();
+
+  return (
+    <div className="min-h-screen bg-mineral flex items-center justify-center p-6">
+      <div className="text-center max-w-md">
+        {/* Icon */}
+        <div className="w-24 h-24 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-8">
+          <Link2Off className="w-12 h-12 text-slate-400" strokeWidth={1.5} />
+        </div>
+
+        {/* Title */}
+        <h1 className="font-serif text-4xl text-obsidian mb-4">
+          Link não encontrado
+        </h1>
+
+        {/* Description */}
+        <p className="text-slate-600 mb-8 leading-relaxed">
+          Este link não existe ou pode ter expirado.
+          <br />
+          Verifique se o endereço está correto ou entre em contato com o vendedor.
+        </p>
+
+        {/* Actions */}
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <Button
+            variant="primary"
+            onClick={() => router.push('/')}
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Voltar ao Início
+          </Button>
+        </div>
+
+        {/* Footer */}
+        <div className="mt-16 pt-8 border-t border-slate-200">
+          <div className="flex items-center justify-center gap-2 mb-2">
+            <div className="w-6 h-6 bg-obsidian rounded-sm" />
+            <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
+          </div>
+          <p className="text-xs text-slate-400">
+            Plataforma de gestão e comercialização de pedras naturais
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 ```
 
@@ -7951,70 +8503,10 @@ body {
 ## `.\app\page.tsx`:
 
 ```
-import Image from "next/image";
+import { redirect } from 'next/navigation';
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+  redirect('/dashboard');
 }
 ```
 
@@ -8050,6 +8542,8 @@ export function EmptyState({
         'flex flex-col items-center justify-center min-h-[400px] py-12 px-6',
         className
       )}
+      role="status"
+      aria-label={title}
     >
       <Icon className="w-12 h-12 text-slate-300 mb-6" strokeWidth={1.5} />
       
@@ -8240,8 +8734,7 @@ export function ErrorFallback({
 'use client';
 
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, LogOut, User, ChevronRight } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Menu, LogOut, ChevronRight } from 'lucide-react';
 import { Dropdown, DropdownItem, DropdownSeparator } from '@/components/ui/dropdown';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
@@ -8283,7 +8776,7 @@ export function Header() {
   const router = useRouter();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
-  const { toggleSidebar, toggleMobileMenu } = useUIStore();
+  const { toggleSidebar } = useUIStore();
   const { success, error } = useToast();
 
   const breadcrumbs = getBreadcrumbs(pathname);
@@ -8294,7 +8787,7 @@ export function Header() {
       await logout();
       success('Logout realizado com sucesso');
       router.push('/login');
-    } catch (err) {
+    } catch {
       error('Erro ao fazer logout');
     }
   };
@@ -8367,12 +8860,7 @@ export function Header() {
                 {user.role === 'BROKER' && 'Broker'}
               </p>
             </div>
-            
-            <DropdownItem onClick={() => router.push('/profile')}>
-              <User className="w-4 h-4 mr-2" />
-              Meu Perfil
-            </DropdownItem>
-            
+
             <DropdownSeparator />
             
             <DropdownItem onClick={handleLogout}>
@@ -8545,6 +9033,17 @@ export function Pagination({
   const startItem = (currentPage - 1) * itemsPerPage + 1;
   const endItem = Math.min(currentPage * itemsPerPage, totalItems);
 
+  const handleKeyNavigation = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      handlePageChange(currentPage - 1);
+    }
+    if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      handlePageChange(currentPage + 1);
+    }
+  };
+
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
 
@@ -8595,7 +9094,12 @@ export function Pagination({
 
   if (variant === 'simple') {
     return (
-      <div className="flex items-center justify-center gap-2 py-4">
+      <div
+        className="flex items-center justify-center gap-2 py-4"
+        tabIndex={0}
+        onKeyDown={handleKeyNavigation}
+        aria-label={`Paginação de ${totalItems} itens`}
+      >
         <button
           onClick={() => handlePageChange(currentPage - 1)}
           disabled={currentPage === 1}
@@ -8632,7 +9136,12 @@ export function Pagination({
   }
 
   return (
-    <div className="flex items-center justify-between py-4 border-t border-slate-100">
+    <div
+      className="flex items-center justify-between py-4 border-t border-slate-100"
+      tabIndex={0}
+      onKeyDown={handleKeyNavigation}
+      aria-label={`Paginação de ${totalItems} itens`}
+    >
       {/* Items Info */}
       <div className="text-sm text-slate-500">
         Mostrando {startItem}-{endItem} de {totalItems} itens
@@ -8741,12 +9250,13 @@ interface MenuItem {
   children?: MenuItem[];
 }
 
-const menuItems: MenuItem[] = [
+// Menu items organized by role with proper route prefixes
+const industryMenuItems: MenuItem[] = [
   {
     label: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Catálogo',
@@ -8761,12 +9271,6 @@ const menuItems: MenuItem[] = [
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Estoque Compartilhado',
-    href: '/shared-inventory',
-    icon: PackageOpen,
-    roles: ['BROKER'],
-  },
-  {
     label: 'Vendas',
     href: '/sales',
     icon: Receipt,
@@ -8776,13 +9280,13 @@ const menuItems: MenuItem[] = [
     label: 'Links',
     href: '/links',
     icon: Link2,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Leads',
     href: '/leads',
     icon: Inbox,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
     label: 'Parceiros',
@@ -8798,6 +9302,33 @@ const menuItems: MenuItem[] = [
   },
 ];
 
+const brokerMenuItems: MenuItem[] = [
+  {
+    label: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Estoque Compartilhado',
+    href: '/shared-inventory',
+    icon: PackageOpen,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Links',
+    href: '/links',
+    icon: Link2,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'Leads',
+    href: '/leads',
+    icon: Inbox,
+    roles: ['BROKER'],
+  },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
   const user = useAuthStore((state) => state.user);
@@ -8805,14 +9336,34 @@ export function Sidebar() {
 
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
-    return menuItems.filter((item) => item.roles.includes(user.role));
+    
+    // Select menu items based on user role
+    if (user.role === 'ADMIN_INDUSTRIA') {
+      return industryMenuItems.filter((item) => item.roles.includes(user.role));
+    } else if (user.role === 'VENDEDOR_INTERNO') {
+      // Vendedores use the admin routes but with limited options
+      return industryMenuItems.filter((item) => item.roles.includes(user.role));
+    } else if (user.role === 'BROKER') {
+      return brokerMenuItems;
+    }
+    
+    return [];
   }, [user]);
 
   const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
+    // Check for exact match on dashboard routes
+    if (href.endsWith('/dashboard')) {
+      return pathname === href;
     }
     return pathname.startsWith(href);
+  };
+
+  const closeOnMobile = () => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.innerWidth < 1024;
+    if (isMobile && sidebarOpen) {
+      toggleSidebar();
+    }
   };
 
   if (!user) return null;
@@ -8877,6 +9428,7 @@ export function Sidebar() {
                 <li key={item.href}>
                   <Link
                     href={item.href}
+                    onClick={closeOnMobile}
                     className={cn(
                       'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
                       'text-sm font-medium',
@@ -8933,18 +9485,23 @@ import { type HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils/cn';
 import type { BatchStatus } from '@/lib/types';
 
+export type BadgeVariant = BatchStatus | 'success' | 'warning' | 'info' | 'default';
+
 export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
-  variant?: BatchStatus | 'default';
+  variant?: BadgeVariant;
 }
 
 const Badge = ({ className, variant = 'default', children, ...props }: BadgeProps) => {
   const baseStyles = 'inline-flex items-center px-3 py-1 rounded-full text-[10px] uppercase tracking-widest font-semibold';
 
-  const variants = {
+  const variants: Record<BadgeVariant, string> = {
     DISPONIVEL: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
     RESERVADO: 'bg-blue-50 text-blue-700 border border-blue-200',
     VENDIDO: 'bg-slate-100 text-slate-600 border border-slate-200',
     INATIVO: 'bg-rose-50 text-rose-600 border border-rose-200',
+    success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    warning: 'bg-amber-50 text-amber-700 border border-amber-200',
+    info: 'bg-blue-50 text-blue-700 border border-blue-200',
     default: 'bg-slate-100 text-slate-600 border border-slate-200',
   };
 
@@ -8955,6 +9512,8 @@ const Badge = ({ className, variant = 'default', children, ...props }: BadgeProp
         variants[variant],
         className
       )}
+      role="status"
+      aria-live="polite"
       {...props}
     >
       {children}
@@ -8987,7 +9546,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     const baseStyles = 'inline-flex items-center justify-center rounded-sm font-bold uppercase tracking-widest text-xs transition-all duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-obsidian/20 disabled:opacity-50 disabled:cursor-not-allowed';
 
     const variants = {
-      primary: 'bg-obsidian text-porcelain hover:shadow-premium active:scale-[0.98]',
+      primary: 'bg-obsidian text-porcelain hover:shadow-premium hover:scale-[1.02] active:scale-[0.98]',
       secondary: 'bg-porcelain border border-slate-200 text-slate-600 hover:border-obsidian hover:text-obsidian active:scale-[0.98]',
       destructive: 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 active:scale-[0.98]',
       ghost: 'bg-transparent text-slate-600 hover:bg-slate-50 active:bg-slate-100',
@@ -9046,7 +9605,7 @@ const Card = forwardRef<HTMLDivElement, CardProps>(
     const variants = {
       default: 'bg-porcelain border border-slate-100',
       flat: 'bg-mineral border-0',
-      elevated: 'bg-porcelain border border-slate-100 shadow-premium hover:shadow-premium-lg transition-shadow duration-200',
+      elevated: 'bg-porcelain border border-slate-100 shadow-premium hover:shadow-premium-lg hover:translate-y-[-2px] transition-all duration-200 overflow-hidden',
       glass: 'bg-white/95 backdrop-blur-md border border-white/20',
     };
 
@@ -9154,8 +9713,19 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         }
       };
 
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === 'Escape') {
+          setIsOpen(false);
+        }
+      };
+
       document.addEventListener('mousedown', handleClickOutside);
-      return () => document.removeEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleEscape);
+
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleEscape);
+      };
     }, []);
 
     return (
@@ -9216,6 +9786,39 @@ const DropdownSeparator = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivEleme
 DropdownSeparator.displayName = 'DropdownSeparator';
 
 export { Dropdown, DropdownItem, DropdownSeparator };
+```
+
+---
+
+## `.\components\ui\index.ts`:
+
+```
+// UI Components - CAVA Design System
+export { Button, type ButtonProps } from './button';
+export { Card, CardHeader, CardContent, CardTitle, CardDescription, CardFooter, type CardProps } from './card';
+export { Input, type InputProps } from './input';
+export { Label, type LabelProps } from './label';
+export { Modal, type ModalProps } from './modal';
+export { Select, type SelectProps } from './select';
+export { Separator, type SeparatorProps } from './separator';
+export { Skeleton, type SkeletonProps } from './skeleton';
+export { Table, TableHeader, TableBody, TableFooter, TableRow, TableHead, TableCell } from './table';
+export { Textarea, type TextareaProps } from './textarea';
+export { Badge, type BadgeProps } from './badge';
+export { Toggle, type ToggleProps } from './toggle';
+export { Dropdown, DropdownItem, type DropdownProps } from './dropdown';
+export { 
+  MaskedInput, 
+  PhoneInput, 
+  CPFInput, 
+  CNPJInput, 
+  CEPInput, 
+  DateInput,
+  CurrencyInput,
+  BatchCodeInput,
+  type MaskedInputProps 
+} from './masked-input';
+export { PhotoUpload, type MediaFile, type PhotoUploadProps } from './photo-upload';
 ```
 
 ---
@@ -9312,25 +9915,293 @@ export { Label };
 
 ---
 
+## `.\components\ui\masked-input.tsx`:
+
+```
+'use client';
+
+import { forwardRef, type InputHTMLAttributes, type ChangeEvent, type ReactNode } from 'react';
+import InputMask from 'react-input-mask';
+import { cn } from '@/lib/utils/cn';
+
+export interface MaskedInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+  mask: string;
+  maskChar?: string;
+  onChange?: (value: string, rawValue: string) => void;
+}
+
+const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
+  ({ className, label, error, helperText, mask, maskChar = '_', id, onChange, ...props }, ref) => {
+    const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+
+    const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
+      const value = e.target.value;
+      const rawValue = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+      onChange?.(value, rawValue);
+    };
+
+    const inputClassName = cn(
+      'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',
+      'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+      'disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed',
+      error
+        ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
+        : 'border-slate-200 bg-white focus:border-obsidian',
+      className
+    );
+
+    return (
+      <div className="w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className={cn(
+              'block uppercase tracking-widest text-[10px] font-semibold mb-2',
+              error ? 'text-rose-600' : 'text-slate-500'
+            )}
+          >
+            {label}
+          </label>
+        )}
+        <InputMask
+          mask={mask}
+          maskChar={maskChar}
+          onChange={handleChange}
+          {...props}
+        >
+          {((inputProps: InputHTMLAttributes<HTMLInputElement>): ReactNode => (
+            <input
+              {...inputProps}
+              ref={ref}
+              id={inputId}
+              className={inputClassName}
+            />
+          )) as unknown as undefined}
+        </InputMask>
+        {error && (
+          <p className="mt-1 text-xs text-rose-600">{error}</p>
+        )}
+        {helperText && !error && (
+          <p className="mt-1 text-xs text-slate-400">{helperText}</p>
+        )}
+      </div>
+    );
+  }
+);
+
+MaskedInput.displayName = 'MaskedInput';
+
+// Pre-configured mask components
+export const PhoneInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="(99) 99999-9999"
+      placeholder="(00) 00000-0000"
+      {...props}
+    />
+  )
+);
+
+PhoneInput.displayName = 'PhoneInput';
+
+export const CPFInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="999.999.999-99"
+      placeholder="000.000.000-00"
+      {...props}
+    />
+  )
+);
+
+CPFInput.displayName = 'CPFInput';
+
+export const CNPJInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="99.999.999/9999-99"
+      placeholder="00.000.000/0000-00"
+      {...props}
+    />
+  )
+);
+
+CNPJInput.displayName = 'CNPJInput';
+
+export const CEPInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="99999-999"
+      placeholder="00000-000"
+      {...props}
+    />
+  )
+);
+
+CEPInput.displayName = 'CEPInput';
+
+export const DateInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="99/99/9999"
+      placeholder="DD/MM/AAAA"
+      {...props}
+    />
+  )
+);
+
+DateInput.displayName = 'DateInput';
+
+// Currency Input Component - R$ #.##0,00
+export interface CurrencyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+  value?: number;
+  onChange?: (value: number) => void;
+}
+
+export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
+  ({ className, label, error, helperText, id, value, onChange, ...props }, ref) => {
+    const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+
+    const formatCurrency = (val: number): string => {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL',
+      }).format(val);
+    };
+
+    const parseCurrency = (val: string): number => {
+      const cleaned = val.replace(/[^\d]/g, '');
+      return parseFloat(cleaned) / 100 || 0;
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const inputValue = e.target.value;
+      const numericValue = parseCurrency(inputValue);
+      onChange?.(numericValue);
+    };
+
+    const displayValue = value !== undefined ? formatCurrency(value) : '';
+
+    return (
+      <div className="w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className={cn(
+              'block uppercase tracking-widest text-[10px] font-semibold mb-2',
+              error ? 'text-rose-600' : 'text-slate-500'
+            )}
+          >
+            {label}
+          </label>
+        )}
+        <input
+          ref={ref}
+          id={inputId}
+          type="text"
+          inputMode="numeric"
+          value={displayValue}
+          onChange={handleChange}
+          placeholder="R$ 0,00"
+          className={cn(
+            'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',
+            'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+            'disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed',
+            error
+              ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
+              : 'border-slate-200 bg-white focus:border-obsidian',
+            className
+          )}
+          {...props}
+        />
+        {error && (
+          <p className="mt-1 text-xs text-rose-600">{error}</p>
+        )}
+        {helperText && !error && (
+          <p className="mt-1 text-xs text-slate-400">{helperText}</p>
+        )}
+      </div>
+    );
+  }
+);
+
+CurrencyInput.displayName = 'CurrencyInput';
+
+// Batch Code Input - AAA-999999
+export const BatchCodeInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
+  (props, ref) => (
+    <MaskedInput
+      ref={ref}
+      mask="aaa-999999"
+      placeholder="AAA-000000"
+      style={{ textTransform: 'uppercase' }}
+      {...props}
+    />
+  )
+);
+
+BatchCodeInput.displayName = 'BatchCodeInput';
+
+export { MaskedInput };
+```
+
+---
+
 ## `.\components\ui\modal.tsx`:
 
 ```
-import { forwardRef, type HTMLAttributes, type ReactNode, useEffect } from 'react';
+import { forwardRef, type HTMLAttributes, type ReactNode, useEffect, useRef, useId, useContext, createContext } from 'react';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 export interface ModalProps extends HTMLAttributes<HTMLDivElement> {
   open: boolean;
   onClose: () => void;
+  'aria-labelledby'?: string;
+  'aria-describedby'?: string;
 }
 
+interface ModalContextValue {
+  labelId: string;
+  descriptionId: string;
+}
+
+const ModalContext = createContext<ModalContextValue | null>(null);
+
 const Modal = forwardRef<HTMLDivElement, ModalProps>(
-  ({ className, open, onClose, children, ...props }, ref) => {
+  ({ className, open, onClose, children, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
+    const modalRef = useRef<HTMLDivElement>(null);
+    const previousFocusRef = useRef<HTMLElement | null>(null);
+    const generatedId = useId();
+    const labelId = ariaLabelledBy || `modal-title-${generatedId}`;
+    const descriptionId = ariaDescribedBy || `modal-description-${generatedId}`;
+
     useEffect(() => {
       if (open) {
+        // Store previously focused element
+        previousFocusRef.current = document.activeElement as HTMLElement;
         document.body.style.overflow = 'hidden';
+        
+        // Focus the modal
+        setTimeout(() => {
+          modalRef.current?.focus();
+        }, 0);
       } else {
         document.body.style.overflow = 'unset';
+        
+        // Restore focus to previously focused element
+        previousFocusRef.current?.focus();
       }
 
       return () => {
@@ -9349,28 +10220,78 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
       return () => document.removeEventListener('keydown', handleEscape);
     }, [open, onClose]);
 
+    // Focus trap
+    useEffect(() => {
+      if (!open) return;
+
+      const modal = modalRef.current;
+      if (!modal) return;
+
+      const handleTabKey = (e: KeyboardEvent) => {
+        if (e.key !== 'Tab') return;
+
+        const focusableElements = modal.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey && document.activeElement === firstElement) {
+          e.preventDefault();
+          lastElement?.focus();
+        } else if (!e.shiftKey && document.activeElement === lastElement) {
+          e.preventDefault();
+          firstElement?.focus();
+        }
+      };
+
+      document.addEventListener('keydown', handleTabKey);
+      return () => document.removeEventListener('keydown', handleTabKey);
+    }, [open]);
+
     if (!open) return null;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
-          onClick={onClose}
-          aria-hidden="true"
-        />
-        <div
-          ref={ref}
-          className={cn(
-            'relative bg-porcelain rounded-xl shadow-premium-lg',
-            'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
-            'animate-in fade-in-0 zoom-in-95 duration-200',
-            className
-          )}
-          {...props}
+      <ModalContext.Provider value={{ labelId, descriptionId }}>
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="presentation"
         >
-          {children}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-200"
+            onClick={onClose}
+            aria-hidden="true"
+          />
+          <div
+            ref={(node) => {
+              // Handle both refs
+              (modalRef as React.MutableRefObject<HTMLDivElement | null>).current = node;
+              if (typeof ref === 'function') {
+                ref(node);
+              } else if (ref) {
+                ref.current = node;
+              }
+            }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby={labelId}
+            aria-describedby={descriptionId}
+            aria-live="assertive"
+            tabIndex={-1}
+            className={cn(
+              'relative bg-porcelain rounded-xl shadow-premium-lg',
+              'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
+              'animate-in fade-in-0 zoom-in-95 duration-200',
+              'focus:outline-none',
+              className
+            )}
+            {...props}
+          >
+            {children}
+          </div>
         </div>
-      </div>
+      </ModalContext.Provider>
     );
   }
 );
@@ -9390,25 +10311,33 @@ const ModalHeader = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
 ModalHeader.displayName = 'ModalHeader';
 
 const ModalTitle = forwardRef<HTMLHeadingElement, HTMLAttributes<HTMLHeadingElement>>(
-  ({ className, ...props }, ref) => (
-    <h2
-      ref={ref}
-      className={cn('font-serif text-3xl font-semibold', className)}
-      {...props}
-    />
-  )
+  ({ className, id, ...props }, ref) => {
+    const context = useContext(ModalContext);
+    return (
+      <h2
+        ref={ref}
+        id={id || context?.labelId}
+        className={cn('font-serif text-3xl font-semibold', className)}
+        {...props}
+      />
+    );
+  }
 );
 
 ModalTitle.displayName = 'ModalTitle';
 
 const ModalDescription = forwardRef<HTMLParagraphElement, HTMLAttributes<HTMLParagraphElement>>(
-  ({ className, ...props }, ref) => (
-    <p
-      ref={ref}
-      className={cn('mt-2 text-sm text-slate-600', className)}
-      {...props}
-    />
-  )
+  ({ className, id, ...props }, ref) => {
+    const context = useContext(ModalContext);
+    return (
+      <p
+        ref={ref}
+        id={id || context?.descriptionId}
+        className={cn('mt-2 text-sm text-slate-600', className)}
+        {...props}
+      />
+    );
+  }
 );
 
 ModalDescription.displayName = 'ModalDescription';
@@ -9472,6 +10401,391 @@ export {
   ModalFooter,
   ModalClose,
 };
+```
+
+---
+
+## `.\components\ui\photo-upload.tsx`:
+
+```
+'use client';
+
+import React, { useState, useCallback, useRef } from 'react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { Upload, X, GripVertical, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils/cn';
+
+export interface MediaFile {
+  id: string;
+  file?: File;
+  url: string;
+  isNew?: boolean;
+}
+
+export interface PhotoUploadProps {
+  value: MediaFile[];
+  onChange: (files: MediaFile[]) => void;
+  maxFiles?: number;
+  maxSizeInMB?: number;
+  maxTotalSizeInMB?: number;
+  acceptedTypes?: string[];
+  disabled?: boolean;
+  error?: string;
+  className?: string;
+}
+
+interface SortableImageProps {
+  media: MediaFile;
+  onRemove: (id: string) => void;
+  disabled?: boolean;
+  isFirst?: boolean;
+}
+
+function SortableImage({ media, onRemove, disabled, isFirst }: SortableImageProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: media.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative group rounded-lg overflow-hidden bg-mineral border border-obsidian/10',
+        'aspect-square',
+        isDragging && 'opacity-50 z-50',
+        isFirst && 'ring-2 ring-obsidian'
+      )}
+    >
+      {/* Image */}
+      <img
+        src={media.url}
+        alt="Preview"
+        className="w-full h-full object-cover"
+      />
+
+      {/* Overlay with controls */}
+      <div
+        className={cn(
+          'absolute inset-0 bg-obsidian/60 opacity-0 group-hover:opacity-100',
+          'transition-opacity flex items-center justify-center gap-2'
+        )}
+      >
+        {/* Drag handle */}
+        {!disabled && (
+          <button
+            type="button"
+            className="p-2 bg-porcelain rounded-lg cursor-grab active:cursor-grabbing"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical className="h-4 w-4 text-obsidian" />
+          </button>
+        )}
+
+        {/* Remove button */}
+        {!disabled && (
+          <button
+            type="button"
+            onClick={() => onRemove(media.id)}
+            className="p-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+
+      {/* First image badge */}
+      {isFirst && (
+        <div className="absolute top-2 left-2 px-2 py-1 bg-obsidian text-porcelain text-xs rounded">
+          Capa
+        </div>
+      )}
+
+      {/* New file indicator */}
+      {media.isNew && (
+        <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full" />
+      )}
+    </div>
+  );
+}
+
+export function PhotoUpload({
+  value = [],
+  onChange,
+  maxFiles = 10,
+  maxSizeInMB = 5,
+  maxTotalSizeInMB,
+  acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
+  disabled = false,
+  error,
+  className,
+}: PhotoUploadProps) {
+  const [dragActive, setDragActive] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const validateFile = useCallback(
+    (file: File): string | null => {
+      if (!acceptedTypes.includes(file.type)) {
+        return `Tipo não aceito: ${file.type}. Use: ${acceptedTypes.join(', ')}`;
+      }
+      if (file.size > maxSizeInMB * 1024 * 1024) {
+        return `Arquivo muito grande: ${(file.size / 1024 / 1024).toFixed(1)}MB. Máximo: ${maxSizeInMB}MB`;
+      }
+      return null;
+    },
+    [acceptedTypes, maxSizeInMB]
+  );
+
+  const processFiles = useCallback(
+    (files: FileList) => {
+      if (disabled) return;
+
+      setLocalError(null);
+      const currentCount = value.length;
+      const availableSlots = maxFiles - currentCount;
+
+      if (availableSlots <= 0) {
+        setLocalError(`Máximo de ${maxFiles} imagens atingido`);
+        return;
+      }
+
+      const totalSizeLimit = (maxTotalSizeInMB ?? maxFiles * maxSizeInMB) * 1024 * 1024;
+      const existingTotalSize = value.reduce((acc, media) => acc + (media.file?.size || 0), 0);
+
+      const newFiles: MediaFile[] = [];
+      const errors: string[] = [];
+
+      Array.from(files)
+        .slice(0, availableSlots)
+        .forEach((file) => {
+          const isDuplicate = value.some((m) => m.file?.name === file.name && m.file.size === file.size);
+          if (isDuplicate) {
+            errors.push(`${file.name}: já foi adicionado`);
+            return;
+          }
+
+          const validationError = validateFile(file);
+          if (validationError) {
+            errors.push(`${file.name}: ${validationError}`);
+          } else {
+            const projectedTotal = existingTotalSize + newFiles.reduce((acc, m) => acc + (m.file?.size || 0), 0) + file.size;
+            if (projectedTotal > totalSizeLimit) {
+              errors.push(`${file.name}: ultrapassa o limite total de ${(totalSizeLimit / 1024 / 1024).toFixed(0)}MB`);
+              return;
+            }
+
+            newFiles.push({
+              id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+              file,
+              url: URL.createObjectURL(file),
+              isNew: true,
+            });
+          }
+        });
+
+      if (errors.length > 0) {
+        setLocalError(errors.join('. '));
+      }
+
+      if (newFiles.length > 0) {
+        onChange([...value, ...newFiles]);
+      }
+    },
+    [value, onChange, maxFiles, disabled, validateFile]
+  );
+
+  const handleDrag = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === 'dragenter' || e.type === 'dragover') {
+      setDragActive(true);
+    } else if (e.type === 'dragleave') {
+      setDragActive(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setDragActive(false);
+
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processFiles(e.dataTransfer.files);
+      }
+    },
+    [processFiles]
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      if (e.target.files && e.target.files.length > 0) {
+        processFiles(e.target.files);
+      }
+      // Reset input to allow selecting the same file again
+      e.target.value = '';
+    },
+    [processFiles]
+  );
+
+  const handleRemove = useCallback(
+    (id: string) => {
+      const media = value.find((m) => m.id === id);
+      if (media?.isNew && media.url.startsWith('blob:')) {
+        URL.revokeObjectURL(media.url);
+      }
+      onChange(value.filter((m) => m.id !== id));
+    },
+    [value, onChange]
+  );
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+
+      if (over && active.id !== over.id) {
+        const oldIndex = value.findIndex((m) => m.id === active.id);
+        const newIndex = value.findIndex((m) => m.id === over.id);
+        onChange(arrayMove(value, oldIndex, newIndex));
+      }
+    },
+    [value, onChange]
+  );
+
+  const displayError = error || localError;
+
+  return (
+    <div className={cn('space-y-4', className)}>
+      {/* Drop zone */}
+      <div
+        onDragEnter={handleDrag}
+        onDragLeave={handleDrag}
+        onDragOver={handleDrag}
+        onDrop={handleDrop}
+        onClick={() => !disabled && inputRef.current?.click()}
+        className={cn(
+          'border-2 border-dashed rounded-lg p-8',
+          'flex flex-col items-center justify-center gap-3',
+          'cursor-pointer transition-colors',
+          dragActive
+            ? 'border-obsidian bg-mineral'
+            : 'border-obsidian/20 hover:border-obsidian/40',
+          disabled && 'opacity-50 cursor-not-allowed'
+        )}
+      >
+        <div
+          className={cn(
+            'w-12 h-12 rounded-full flex items-center justify-center',
+            'bg-mineral'
+          )}
+        >
+          <Upload className="h-6 w-6 text-obsidian/60" />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-medium text-obsidian">
+            Arraste imagens ou clique para selecionar
+          </p>
+          <p className="text-xs text-obsidian/60 mt-1">
+            PNG, JPG ou WebP • Máx. {maxSizeInMB}MB por arquivo • Até {maxFiles} imagens
+          </p>
+        </div>
+        <input
+          ref={inputRef}
+          type="file"
+          accept={acceptedTypes.join(',')}
+          multiple
+          onChange={handleChange}
+          disabled={disabled}
+          className="hidden"
+        />
+      </div>
+
+      {/* Error message */}
+      {displayError && (
+        <div className="flex items-center gap-2 text-red-600 text-sm">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{displayError}</span>
+        </div>
+      )}
+
+      {/* Image grid with drag and drop */}
+      {value.length > 0 && (
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={value.map((m) => m.id)}
+            strategy={rectSortingStrategy}
+          >
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+              {value.map((media, index) => (
+                <SortableImage
+                  key={media.id}
+                  media={media}
+                  onRemove={handleRemove}
+                  disabled={disabled}
+                  isFirst={index === 0}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {/* Empty state */}
+      {value.length === 0 && (
+        <div className="flex items-center justify-center gap-2 text-obsidian/40 py-4">
+          <ImageIcon className="h-5 w-5" />
+          <span className="text-sm">Nenhuma imagem adicionada</span>
+        </div>
+      )}
+
+      {/* Counter */}
+      {value.length > 0 && (
+        <p className="text-xs text-obsidian/60 text-right">
+          {value.length} de {maxFiles} imagens
+        </p>
+      )}
+    </div>
+  );
+}
 ```
 
 ---
@@ -9594,13 +10908,13 @@ export { Separator };
 import { type HTMLAttributes } from 'react';
 import { cn } from '@/lib/utils/cn';
 
-export interface SkeletonProps extends HTMLAttributes<HTMLDivElement> {}
+export type SkeletonProps = HTMLAttributes<HTMLDivElement>;
 
 const Skeleton = ({ className, ...props }: SkeletonProps) => {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-sm bg-slate-200/50',
+        'animate-pulse motion-reduce:animate-none rounded-sm bg-slate-200/50',
         className
       )}
       {...props}
@@ -9872,6 +11186,9 @@ const Toaster = ({ ...props }: ToasterProps) => {
           title: 'text-sm font-semibold',
           description: 'text-xs',
         },
+        // Durações padrão conforme documentação:
+        // success: 3s, error: 5s, warning: 4s, info: 3s
+        // O Sonner usa duration global, mas hooks podem sobrescrever
         duration: 3000,
       }}
       {...props}
@@ -9915,12 +11232,11 @@ const Toggle = forwardRef<HTMLInputElement, ToggleProps>(
             className
           )}
           onClick={() => {
-            const event = new Event('change', { bubbles: true });
-            Object.defineProperty(event, 'target', {
-              value: { checked: !props.checked },
-              writable: false,
-            });
-            props.onChange?.(event as any);
+            const syntheticEvent = {
+              target: { checked: !props.checked },
+              currentTarget: { checked: !props.checked },
+            } as React.ChangeEvent<HTMLInputElement>;
+            props.onChange?.(syntheticEvent);
           }}
           disabled={props.disabled}
         >
@@ -9991,34 +11307,73 @@ import type { ApiResponse, ErrorResponse, PaginatedResponse } from '@/lib/types/
 
 interface RequestConfig extends RequestInit {
   params?: Record<string, string | number | boolean | undefined>;
+  timeoutMs?: number;
+  skipAuthRetry?: boolean;
 }
+
+export class ApiError extends Error {
+  status?: number;
+  code?: string;
+
+  constructor(message: string, status?: number, code?: string) {
+    super(message);
+    this.status = status;
+    this.code = code;
+  }
+}
+
+type QueueEntry = {
+  resolve: () => void;
+  reject: (error: Error) => void;
+};
 
 class ApiClient {
   private baseURL: string;
-  private isRefreshing: boolean = false;
-  private failedQueue: Array<{
-    resolve: (value?: unknown) => void;
-    reject: (reason?: unknown) => void;
-  }> = [];
+  private defaultTimeout = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS) || 15000;
+  private isRefreshing = false;
+  private failedQueue: QueueEntry[] = [];
 
-  constructor(baseURL: string = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api') {
-    this.baseURL = baseURL;
+  constructor() {
+    this.baseURL =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_API_BASE ||
+      'http://localhost:3001/api';
   }
 
-  private processQueue(error: Error | null, token: string | null = null) {
-    this.failedQueue.forEach(prom => {
+  private processQueue(error: Error | null) {
+    this.failedQueue.forEach(({ resolve, reject }) => {
       if (error) {
-        prom.reject(error);
+        reject(error);
       } else {
-        prom.resolve(token);
+        resolve();
       }
     });
     this.failedQueue = [];
   }
 
+  private getCsrfToken(): string | null {
+    if (typeof document === 'undefined') return null;
+    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : null;
+  }
+
+  private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
+    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
+
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          url.searchParams.append(key, String(value));
+        }
+      });
+    }
+
+    return url.toString();
+  }
+
   private async refreshToken(): Promise<void> {
     if (this.isRefreshing) {
-      return new Promise((resolve, reject) => {
+      return new Promise<void>((resolve, reject) => {
         this.failedQueue.push({ resolve, reject });
       });
     }
@@ -10035,96 +11390,101 @@ class ApiClient {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to refresh token');
+        throw new ApiError('Failed to refresh token', response.status);
       }
 
       this.processQueue(null);
-      this.isRefreshing = false;
     } catch (error) {
       this.processQueue(error as Error);
-      this.isRefreshing = false;
-      
+
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
         if (!currentPath.startsWith('/login')) {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
         }
       }
-      
+
       throw error;
+    } finally {
+      this.isRefreshing = false;
     }
   }
 
-  private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
-    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
-    
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined && value !== null && value !== '') {
-          url.searchParams.append(key, String(value));
-        }
-      });
-    }
-    
-    return url.toString();
+  private withTimeout(timeoutMs: number) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    return { controller, timer };
   }
 
-  private async request<T>(
-    endpoint: string,
-    config: RequestConfig = {}
-  ): Promise<T> {
-    const { params, ...fetchConfig } = config;
+  private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
+    const { params, timeoutMs = this.defaultTimeout, skipAuthRetry, ...fetchConfig } = config;
     const url = this.buildURL(endpoint, params);
+    const csrfToken = this.getCsrfToken();
 
-    const defaultHeaders: HeadersInit = {
+    // Surface missing CSRF token early for state-changing requests
+    const method = (fetchConfig.method || 'GET').toUpperCase();
+    const isStateChanging = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+    if (isStateChanging && !csrfToken) {
+      throw new ApiError('CSRF token ausente. Recarregue a página para continuar.', 419);
+    }
+
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      ...fetchConfig.headers,
     };
 
-    const requestConfig: RequestInit = {
-      ...fetchConfig,
-      headers: {
-        ...defaultHeaders,
-        ...fetchConfig.headers,
-      },
-      credentials: 'include',
-    };
+    const { controller, timer } = this.withTimeout(timeoutMs);
+
+    const doFetch = () =>
+      fetch(url, {
+        ...fetchConfig,
+        headers,
+        credentials: 'include',
+        signal: controller.signal,
+      });
 
     try {
-      const response = await fetch(url, requestConfig);
+      let response = await doFetch();
 
-      if (response.status === 401) {
+      if (response.status === 401 && !skipAuthRetry) {
         await this.refreshToken();
-        
-        const retryResponse = await fetch(url, requestConfig);
-        
-        if (!retryResponse.ok) {
-          const errorData: ErrorResponse = await retryResponse.json();
-          throw new Error(errorData.error.message || 'Request failed');
-        }
-        
-        return retryResponse.json();
+        response = await doFetch();
       }
 
       if (!response.ok) {
-        const errorData: ErrorResponse = await response.json();
-        throw new Error(errorData.error.message || 'Request failed');
+        const contentType = response.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+        const errorData: ErrorResponse | undefined = isJson
+          ? await response.clone().json().catch(() => undefined)
+          : undefined;
+
+        throw new ApiError(
+          errorData?.error.message || 'Request failed',
+          response.status,
+          errorData?.error.code
+        );
       }
 
       const data: ApiResponse<T> = await response.json();
       return data.data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (error instanceof ApiError) {
         throw error;
       }
-      throw new Error('An unexpected error occurred');
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError('Request timed out', 408);
+      }
+
+      throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred');
+    } finally {
+      clearTimeout(timer);
     }
   }
 
   async get<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...config,
-      method: 'GET',
-    });
+    return this.request<T>(endpoint, { ...config, method: 'GET' });
   }
 
   async post<T>(endpoint: string, data?: unknown, config?: RequestConfig): Promise<T> {
@@ -10152,53 +11512,66 @@ class ApiClient {
   }
 
   async delete<T>(endpoint: string, config?: RequestConfig): Promise<T> {
-    return this.request<T>(endpoint, {
-      ...config,
-      method: 'DELETE',
-    });
+    return this.request<T>(endpoint, { ...config, method: 'DELETE' });
   }
 
-  async upload<T>(
-    endpoint: string,
-    formData: FormData,
-    config?: Omit<RequestConfig, 'body'>
-  ): Promise<T> {
-    const url = this.buildURL(endpoint, config?.params);
+  async upload<T>(endpoint: string, formData: FormData, config?: Omit<RequestConfig, 'body'>): Promise<T> {
+    const { params, timeoutMs = Math.max(this.defaultTimeout, 60000), ...fetchConfig } = config || {};
+    const url = this.buildURL(endpoint, params);
+    const csrfToken = this.getCsrfToken();
 
-    const requestConfig: RequestInit = {
-      method: 'POST',
-      body: formData,
-      credentials: 'include',
-      headers: config?.headers,
+    const headers: HeadersInit = {
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      ...fetchConfig.headers,
     };
 
+    const { controller, timer } = this.withTimeout(timeoutMs);
+
+    const doFetch = () =>
+      fetch(url, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+        headers,
+        signal: controller.signal,
+        ...fetchConfig,
+      });
+
     try {
-      const response = await fetch(url, requestConfig);
+      let response = await doFetch();
 
       if (response.status === 401) {
         await this.refreshToken();
-        const retryResponse = await fetch(url, requestConfig);
-        
-        if (!retryResponse.ok) {
-          const errorData: ErrorResponse = await retryResponse.json();
-          throw new Error(errorData.error.message || 'Upload failed');
-        }
-        
-        return retryResponse.json();
+        response = await doFetch();
       }
 
       if (!response.ok) {
-        const errorData: ErrorResponse = await response.json();
-        throw new Error(errorData.error.message || 'Upload failed');
+        const errorData: ErrorResponse | undefined = await response
+          .clone()
+          .json()
+          .catch(() => undefined);
+
+        throw new ApiError(
+          errorData?.error.message || 'Upload failed',
+          response.status,
+          errorData?.error.code
+        );
       }
 
       const data: ApiResponse<T> = await response.json();
       return data.data;
     } catch (error) {
-      if (error instanceof Error) {
+      if (error instanceof ApiError) {
         throw error;
       }
-      throw new Error('Upload failed');
+
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new ApiError('Upload timed out', 408);
+      }
+
+      throw new ApiError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      clearTimeout(timer);
     }
   }
 }
@@ -10210,12 +11583,1005 @@ export type { ApiResponse, ErrorResponse, PaginatedResponse };
 
 ---
 
+## `.\lib\api\mutations\index.ts`:
+
+```
+// Products
+export * from './useProductMutations';
+
+// Batches
+export * from './useBatchMutations';
+
+// Sales Links
+export * from './useSalesLinkMutations';
+
+// Leads
+export * from './useLeadMutations';
+
+// Users (Brokers & Sellers)
+export * from './useUserMutations';
+
+// Shared Inventory
+export * from './useSharedInventoryMutations';
+
+// Upload
+export * from './useUploadMutations';
+```
+
+---
+
+## `.\lib\api\mutations\useBatchMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { batchKeys } from '@/lib/api/queries/useBatches';
+import type { Batch } from '@/lib/types';
+import type { BatchInput, ReservationInput } from '@/lib/schemas/batch.schema';
+
+export function useCreateBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: BatchInput & { medias?: File[] }) => {
+      const response = await apiClient.post<Batch>('/batches', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.all });
+    },
+  });
+}
+
+export function useUpdateBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<BatchInput> }) => {
+      const response = await apiClient.put<Batch>(`/batches/${id}`, data);
+      return response;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.all });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    },
+  });
+}
+
+export function useUpdateBatchStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await apiClient.patch<Batch>(`/batches/${id}/status`, { status });
+      return response;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.all });
+      queryClient.invalidateQueries({ queryKey: batchKeys.detail(id) });
+    },
+  });
+}
+
+export function useReserveBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ReservationInput) => {
+      const response = await apiClient.post('/reservations', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: batchKeys.all });
+    },
+    // Optimistic update
+    onMutate: async (data) => {
+      await queryClient.cancelQueries({ queryKey: batchKeys.all });
+
+      const previousBatches = queryClient.getQueryData(batchKeys.lists());
+
+      queryClient.setQueriesData(
+        { queryKey: batchKeys.lists() },
+        (old: { batches: Batch[] } | undefined) => {
+          if (!old) return old;
+          return {
+            ...old,
+            batches: old.batches.map((batch: Batch) =>
+              batch.id === data.batchId
+                ? { ...batch, status: 'RESERVADO' as const }
+                : batch
+            ),
+          };
+        }
+      );
+
+      return { previousBatches };
+    },
+    onError: (_err, _data, context) => {
+      if (context?.previousBatches) {
+        queryClient.setQueriesData(
+          { queryKey: batchKeys.lists() },
+          context.previousBatches
+        );
+      }
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useLeadMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { leadKeys } from '@/lib/api/queries/useLeads';
+import type { Lead } from '@/lib/types';
+import type { LeadCaptureInput } from '@/lib/schemas/link.schema';
+
+export function useCreateLead() {
+  return useMutation({
+    mutationFn: async (data: LeadCaptureInput & { salesLinkId: string }) => {
+      const response = await apiClient.post<{ success: boolean }>(
+        '/public/leads/interest',
+        data
+      );
+      return response;
+    },
+  });
+}
+
+export function useUpdateLeadStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const response = await apiClient.patch<Lead>(`/leads/${id}/status`, { status });
+      return response;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: leadKeys.all });
+      queryClient.invalidateQueries({ queryKey: leadKeys.detail(id) });
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useProductMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { productKeys } from '@/lib/api/queries/useProducts';
+import type { Product } from '@/lib/types';
+import type { ProductInput } from '@/lib/schemas/product.schema';
+
+export function useCreateProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ProductInput & { medias?: File[] }) => {
+      const response = await apiClient.post<Product>('/products', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.all });
+    },
+  });
+}
+
+export function useUpdateProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<ProductInput> }) => {
+      const response = await apiClient.put<Product>(`/products/${id}`, data);
+      return response;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: productKeys.all });
+      queryClient.invalidateQueries({ queryKey: productKeys.detail(id) });
+    },
+  });
+}
+
+export function useDeleteProduct() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/products/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: productKeys.all });
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useSalesLinkMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { salesLinkKeys } from '@/lib/api/queries/useSalesLinks';
+import type { SalesLink } from '@/lib/types';
+import type { SalesLinkInput } from '@/lib/schemas/link.schema';
+
+interface CreateSalesLinkResponse {
+  id: string;
+  fullUrl: string;
+}
+
+export function useCreateSalesLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: SalesLinkInput) => {
+      const response = await apiClient.post<CreateSalesLinkResponse>('/sales-links', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: salesLinkKeys.all });
+    },
+  });
+}
+
+export function useUpdateSalesLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<SalesLinkInput> }) => {
+      const response = await apiClient.patch<SalesLink>(`/sales-links/${id}`, data);
+      return response;
+    },
+    onSuccess: (_, { id }) => {
+      queryClient.invalidateQueries({ queryKey: salesLinkKeys.all });
+      queryClient.invalidateQueries({ queryKey: salesLinkKeys.detail(id) });
+    },
+  });
+}
+
+export function useDeleteSalesLink() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/sales-links/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: salesLinkKeys.all });
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useSharedInventoryMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { sharedInventoryKeys } from '@/lib/api/queries/useSharedInventory';
+
+interface ShareBatchInput {
+  batchId: string;
+  brokerUserId: string;
+  negotiatedPrice?: number;
+}
+
+export function useShareBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: ShareBatchInput) => {
+      const response = await apiClient.post('/shared-inventory-batches', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sharedInventoryKeys.all });
+    },
+  });
+}
+
+export function useUnshareBatch() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      await apiClient.delete(`/shared-inventory-batches/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sharedInventoryKeys.all });
+    },
+  });
+}
+
+export function useUpdateSharedBatchPrice() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, price }: { id: string; price: number }) => {
+      const response = await apiClient.patch(`/broker/shared-inventory/${id}/price`, {
+        negotiatedPrice: price,
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sharedInventoryKeys.all });
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useUploadMutations.ts`:
+
+```
+import { useMutation } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+
+interface UploadResponse {
+  urls: string[];
+}
+
+export function useUploadProductMedias() {
+  return useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('medias', file);
+      });
+
+      const response = await apiClient.upload<UploadResponse>(
+        '/upload/product-medias',
+        formData
+      );
+      return response;
+    },
+  });
+}
+
+export function useUploadBatchMedias() {
+  return useMutation({
+    mutationFn: async (files: File[]) => {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append('medias', file);
+      });
+
+      const response = await apiClient.upload<UploadResponse>(
+        '/upload/batch-medias',
+        formData
+      );
+      return response;
+    },
+  });
+}
+
+export function useDeleteMedia() {
+  return useMutation({
+    mutationFn: async ({ type, id }: { type: 'product' | 'batch'; id: string }) => {
+      await apiClient.delete(`/${type}-medias/${id}`);
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\mutations\useUserMutations.ts`:
+
+```
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import { userKeys } from '@/lib/api/queries/useUsers';
+import type { User } from '@/lib/types';
+import type { InviteBrokerInput } from '@/lib/schemas/auth.schema';
+
+export function useInviteBroker() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: InviteBrokerInput) => {
+      const response = await apiClient.post<User>('/brokers/invite', data);
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.brokers() });
+    },
+  });
+}
+
+export function useCreateSeller() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: { name: string; email: string; phone?: string }) => {
+      const response = await apiClient.post<User>('/users', {
+        ...data,
+        role: 'VENDEDOR_INTERNO',
+      });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.sellers() });
+    },
+  });
+}
+
+export function useToggleUserStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const response = await apiClient.patch<User>(`/users/${id}/status`, { isActive });
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: userKeys.all });
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\index.ts`:
+
+```
+// Products
+export * from './useProducts';
+
+// Batches
+export * from './useBatches';
+
+// Dashboard
+export * from './useDashboard';
+
+// Leads
+export * from './useLeads';
+
+// Sales Links
+export * from './useSalesLinks';
+
+// Users (Brokers & Sellers)
+export * from './useUsers';
+
+// Sales History
+export * from './useSales';
+
+// Shared Inventory
+export * from './useSharedInventory';
+```
+
+---
+
+## `.\lib\api\queries\useBatches.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { Batch } from '@/lib/types';
+import type { BatchFilter } from '@/lib/schemas/batch.schema';
+
+interface BatchesResponse {
+  batches: Batch[];
+  total: number;
+  page: number;
+}
+
+export const batchKeys = {
+  all: ['batches'] as const,
+  lists: () => [...batchKeys.all, 'list'] as const,
+  list: (filters: Partial<BatchFilter>) => [...batchKeys.lists(), filters] as const,
+  details: () => [...batchKeys.all, 'detail'] as const,
+  detail: (id: string) => [...batchKeys.details(), id] as const,
+  status: (id: string) => [...batchKeys.all, 'status', id] as const,
+};
+
+const defaultFilters: BatchFilter = {
+  page: 1,
+  limit: 50,
+};
+
+export function useBatches(filters: Partial<BatchFilter> = {}) {
+  const mergedFilters = { ...defaultFilters, ...filters };
+  
+  return useQuery({
+    queryKey: batchKeys.list(mergedFilters),
+    queryFn: async () => {
+      const data = await apiClient.get<BatchesResponse>('/batches', {
+        params: mergedFilters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useBatch(id: string) {
+  return useQuery({
+    queryKey: batchKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<Batch>(`/batches/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useBatchStatus(id: string) {
+  return useQuery({
+    queryKey: batchKeys.status(id),
+    queryFn: async () => {
+      const data = await apiClient.get<Batch>(`/batches/${id}/status`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useDashboard.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { DashboardMetrics, Activity } from '@/lib/types';
+
+export const dashboardKeys = {
+  all: ['dashboard'] as const,
+  metrics: () => [...dashboardKeys.all, 'metrics'] as const,
+  activities: () => [...dashboardKeys.all, 'activities'] as const,
+  brokerMetrics: () => [...dashboardKeys.all, 'broker-metrics'] as const,
+};
+
+export function useDashboardMetrics() {
+  return useQuery({
+    queryKey: dashboardKeys.metrics(),
+    queryFn: async () => {
+      const data = await apiClient.get<DashboardMetrics>('/dashboard/metrics');
+      return data;
+    },
+  });
+}
+
+export function useRecentActivities() {
+  return useQuery({
+    queryKey: dashboardKeys.activities(),
+    queryFn: async () => {
+      const data = await apiClient.get<Activity[]>('/dashboard/recent-activities');
+      return data;
+    },
+  });
+}
+
+export function useBrokerDashboardMetrics() {
+  return useQuery({
+    queryKey: dashboardKeys.brokerMetrics(),
+    queryFn: async () => {
+      const data = await apiClient.get<DashboardMetrics>('/broker/dashboard/metrics');
+      return data;
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useLeads.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { Lead } from '@/lib/types';
+import type { LeadFilter } from '@/lib/schemas/lead.schema';
+
+interface LeadsResponse {
+  leads: Lead[];
+  total: number;
+  page: number;
+}
+
+export const leadKeys = {
+  all: ['leads'] as const,
+  lists: () => [...leadKeys.all, 'list'] as const,
+  list: (filters: Partial<LeadFilter>) => [...leadKeys.lists(), filters] as const,
+  details: () => [...leadKeys.all, 'detail'] as const,
+  detail: (id: string) => [...leadKeys.details(), id] as const,
+  interactions: (id: string) => [...leadKeys.all, 'interactions', id] as const,
+};
+
+const defaultFilters = {
+  page: 1,
+  limit: 25,
+};
+
+export function useLeads(filters: Partial<LeadFilter> = {}) {
+  const mergedFilters = { ...defaultFilters, ...filters };
+  
+  return useQuery({
+    queryKey: leadKeys.list(mergedFilters),
+    queryFn: async () => {
+      const data = await apiClient.get<LeadsResponse>('/leads', {
+        params: mergedFilters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useLead(id: string) {
+  return useQuery({
+    queryKey: leadKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<Lead>(`/leads/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useLeadInteractions(id: string) {
+  return useQuery({
+    queryKey: leadKeys.interactions(id),
+    queryFn: async () => {
+      const data = await apiClient.get<unknown[]>(`/leads/${id}/interactions`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useProducts.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { Product } from '@/lib/types';
+import type { ProductFilter } from '@/lib/schemas/product.schema';
+
+interface ProductsResponse {
+  products: Product[];
+  total: number;
+  page: number;
+}
+
+export const productKeys = {
+  all: ['products'] as const,
+  lists: () => [...productKeys.all, 'list'] as const,
+  list: (filters: Partial<ProductFilter>) => [...productKeys.lists(), filters] as const,
+  details: () => [...productKeys.all, 'detail'] as const,
+  detail: (id: string) => [...productKeys.details(), id] as const,
+};
+
+const defaultFilters = {
+  page: 1,
+  limit: 24,
+  includeInactive: false,
+};
+
+export function useProducts(filters: Partial<ProductFilter> = {}) {
+  const mergedFilters = { ...defaultFilters, ...filters };
+  
+  return useQuery({
+    queryKey: productKeys.list(mergedFilters),
+    queryFn: async () => {
+      const data = await apiClient.get<ProductsResponse>('/products', {
+        params: mergedFilters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useProduct(id: string) {
+  return useQuery({
+    queryKey: productKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<Product>(`/products/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useSales.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { Sale } from '@/lib/types';
+
+interface SalesResponse {
+  sales: Sale[];
+  total: number;
+  page: number;
+}
+
+interface SalesSummary {
+  totalSales: number;
+  totalCommissions: number;
+  averageTicket: number;
+}
+
+interface SalesFilter {
+  startDate?: string;
+  endDate?: string;
+  sellerId?: string;
+  page?: number;
+  limit?: number;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export const salesKeys = {
+  all: ['sales'] as const,
+  lists: () => [...salesKeys.all, 'list'] as const,
+  list: (filters: SalesFilter) => [...salesKeys.lists(), filters] as const,
+  details: () => [...salesKeys.all, 'detail'] as const,
+  detail: (id: string) => [...salesKeys.details(), id] as const,
+  summary: (filters?: Partial<SalesFilter>) => [...salesKeys.all, 'summary', filters] as const,
+};
+
+export function useSales(filters: SalesFilter = {}) {
+  return useQuery({
+    queryKey: salesKeys.list(filters),
+    queryFn: async () => {
+      const data = await apiClient.get<SalesResponse>('/sales-history', {
+        params: filters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useSale(id: string) {
+  return useQuery({
+    queryKey: salesKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<Sale>(`/sales-history/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function useSalesSummary(filters?: Partial<SalesFilter>) {
+  return useQuery({
+    queryKey: salesKeys.summary(filters),
+    queryFn: async () => {
+      const data = await apiClient.get<SalesSummary>('/sales-history/summary', {
+        params: filters,
+      });
+      return data;
+    },
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useSalesLinks.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { SalesLink } from '@/lib/types';
+import type { LinkFilter } from '@/lib/schemas/link.schema';
+
+interface SalesLinksResponse {
+  links: SalesLink[];
+  total: number;
+  page: number;
+}
+
+export const salesLinkKeys = {
+  all: ['sales-links'] as const,
+  lists: () => [...salesLinkKeys.all, 'list'] as const,
+  list: (filters: Partial<LinkFilter>) => [...salesLinkKeys.lists(), filters] as const,
+  details: () => [...salesLinkKeys.all, 'detail'] as const,
+  detail: (id: string) => [...salesLinkKeys.details(), id] as const,
+  public: (slug: string) => [...salesLinkKeys.all, 'public', slug] as const,
+  validateSlug: (slug: string) => [...salesLinkKeys.all, 'validate', slug] as const,
+};
+
+const defaultFilters = {
+  page: 1,
+  limit: 25,
+};
+
+export function useSalesLinks(filters: Partial<LinkFilter> = {}) {
+  const mergedFilters = { ...defaultFilters, ...filters };
+  
+  return useQuery({
+    queryKey: salesLinkKeys.list(mergedFilters),
+    queryFn: async () => {
+      const data = await apiClient.get<SalesLinksResponse>('/sales-links', {
+        params: mergedFilters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useSalesLink(id: string) {
+  return useQuery({
+    queryKey: salesLinkKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<SalesLink>(`/sales-links/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+
+export function usePublicLink(slug: string) {
+  return useQuery({
+    queryKey: salesLinkKeys.public(slug),
+    queryFn: async () => {
+      const data = await apiClient.get<SalesLink>(`/public/links/${slug}`);
+      return data;
+    },
+    enabled: !!slug,
+  });
+}
+
+export function useValidateSlug(slug: string) {
+  return useQuery({
+    queryKey: salesLinkKeys.validateSlug(slug),
+    queryFn: async () => {
+      const data = await apiClient.get<{ valid: boolean }>('/sales-links/validate-slug', {
+        params: { slug },
+      });
+      return data;
+    },
+    enabled: !!slug && slug.length >= 3,
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useSharedInventory.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { SharedInventoryBatch } from '@/lib/types';
+
+interface SharedInventoryFilter {
+  recent?: boolean;
+  limit?: number;
+  status?: string;
+  [key: string]: string | number | boolean | undefined;
+}
+
+export const sharedInventoryKeys = {
+  all: ['shared-inventory'] as const,
+  lists: () => [...sharedInventoryKeys.all, 'list'] as const,
+  list: (filters: SharedInventoryFilter) => [...sharedInventoryKeys.lists(), filters] as const,
+  byBroker: (brokerId: string) => [...sharedInventoryKeys.all, 'broker', brokerId] as const,
+};
+
+export function useSharedInventory(filters: SharedInventoryFilter = {}) {
+  return useQuery({
+    queryKey: sharedInventoryKeys.list(filters),
+    queryFn: async () => {
+      const data = await apiClient.get<SharedInventoryBatch[]>('/broker/shared-inventory', {
+        params: filters,
+      });
+      return data;
+    },
+  });
+}
+
+export function useBrokerSharedInventory(brokerId: string) {
+  return useQuery({
+    queryKey: sharedInventoryKeys.byBroker(brokerId),
+    queryFn: async () => {
+      const data = await apiClient.get<SharedInventoryBatch[]>(
+        `/brokers/${brokerId}/shared-inventory`
+      );
+      return data;
+    },
+    enabled: !!brokerId,
+  });
+}
+```
+
+---
+
+## `.\lib\api\queries\useUsers.ts`:
+
+```
+import { useQuery } from '@tanstack/react-query';
+import { apiClient } from '@/lib/api/client';
+import type { User, UserRole } from '@/lib/types';
+
+interface BrokerWithStats extends User {
+  sharedBatchesCount: number;
+}
+
+export const userKeys = {
+  all: ['users'] as const,
+  lists: () => [...userKeys.all, 'list'] as const,
+  list: (role?: UserRole) => [...userKeys.lists(), { role }] as const,
+  details: () => [...userKeys.all, 'detail'] as const,
+  detail: (id: string) => [...userKeys.details(), id] as const,
+  brokers: () => [...userKeys.all, 'brokers'] as const,
+  sellers: () => [...userKeys.all, 'sellers'] as const,
+};
+
+export function useUsers(role?: UserRole) {
+  return useQuery({
+    queryKey: userKeys.list(role),
+    queryFn: async () => {
+      const data = await apiClient.get<User[]>('/users', {
+        params: role ? { role } : undefined,
+      });
+      return data;
+    },
+  });
+}
+
+export function useBrokers() {
+  return useQuery({
+    queryKey: userKeys.brokers(),
+    queryFn: async () => {
+      const data = await apiClient.get<BrokerWithStats[]>('/brokers');
+      return data;
+    },
+  });
+}
+
+export function useSellers() {
+  return useQuery({
+    queryKey: userKeys.sellers(),
+    queryFn: async () => {
+      const data = await apiClient.get<User[]>('/users', {
+        params: { role: 'VENDEDOR_INTERNO' },
+      });
+      return data;
+    },
+  });
+}
+
+export function useUser(id: string) {
+  return useQuery({
+    queryKey: userKeys.detail(id),
+    queryFn: async () => {
+      const data = await apiClient.get<User>(`/users/${id}`);
+      return data;
+    },
+    enabled: !!id,
+  });
+}
+```
+
+---
+
 ## `.\lib\hooks\useAuth.ts`:
 
 ```
 import { useEffect } from 'react';
 import { useAuthStore } from '@/store/auth.store';
 import type { UserRole } from '@/lib/types';
+import { canRoleAccessRoute } from '@/lib/utils/routes';
 
 export function useAuth() {
   const {
@@ -10230,11 +12596,19 @@ export function useAuth() {
   } = useAuthStore();
 
   useEffect(() => {
+    let isMounted = true;
+
     if (!isAuthenticated && !isLoading) {
       refreshSession().catch(() => {
-        setUser(null);
+        if (isMounted) {
+          setUser(null);
+        }
       });
     }
+
+    return () => {
+      isMounted = false;
+    };
   }, [isAuthenticated, isLoading, refreshSession, setUser]);
 
   const checkPermission = (requiredRole: UserRole | UserRole[]): boolean => {
@@ -10255,20 +12629,7 @@ export function useAuth() {
 
   const canAccessRoute = (route: string): boolean => {
     if (!user) return false;
-
-    if (route.startsWith('/dashboard') || route.startsWith('/catalog') || route.startsWith('/inventory') || route.startsWith('/brokers') || route.startsWith('/sales') || route.startsWith('/team')) {
-      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO']);
-    }
-
-    if (route.startsWith('/shared-inventory')) {
-      return hasPermission('BROKER');
-    }
-
-    if (route.startsWith('/links') || route.startsWith('/leads')) {
-      return hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER']);
-    }
-
-    return true;
+    return canRoleAccessRoute(user.role, route);
   };
 
   const getDashboardRoute = (): string => {
@@ -10308,6 +12669,7 @@ export function useAuth() {
 
 ```
 import { toast as sonnerToast } from 'sonner';
+import { createElement } from 'react';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 
 interface ToastOptions {
@@ -10323,8 +12685,8 @@ export function useToast() {
   const success = (message: string, options?: ToastOptions) => {
     sonnerToast.success(message, {
       description: options?.description,
-      duration: options?.duration || 3000,
-      icon: CheckCircle,
+      duration: options?.duration || 3000, // 3 segundos conforme doc
+      icon: createElement(CheckCircle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -10332,8 +12694,8 @@ export function useToast() {
   const error = (message: string, options?: ToastOptions) => {
     sonnerToast.error(message, {
       description: options?.description,
-      duration: options?.duration || 5000,
-      icon: XCircle,
+      duration: options?.duration || 5000, // 5 segundos conforme doc
+      icon: createElement(XCircle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -10341,8 +12703,8 @@ export function useToast() {
   const warning = (message: string, options?: ToastOptions) => {
     sonnerToast.warning(message, {
       description: options?.description,
-      duration: options?.duration || 4000,
-      icon: AlertTriangle,
+      duration: options?.duration || 4000, // 4 segundos conforme doc
+      icon: createElement(AlertTriangle, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -10350,8 +12712,8 @@ export function useToast() {
   const info = (message: string, options?: ToastOptions) => {
     sonnerToast.info(message, {
       description: options?.description,
-      duration: options?.duration || 3000,
-      icon: Info,
+      duration: options?.duration || 3000, // 3 segundos conforme doc
+      icon: createElement(Info, { className: 'w-5 h-5' }),
       action: options?.action,
     });
   };
@@ -10395,6 +12757,141 @@ export const errorMessages: Record<string, string> = {
 
 export function getErrorMessage(code: string): string {
   return errorMessages[code] || errorMessages.GENERIC_ERROR;
+}
+```
+
+---
+
+## `.\lib\providers\QueryProvider.tsx`:
+
+```
+'use client';
+
+import { useState, type ReactNode } from 'react';
+import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
+import { toast } from 'sonner';
+import { ApiError } from '@/lib/api/client';
+
+interface QueryProviderProps {
+  children: ReactNode;
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof ApiError) {
+    if (error.code === 'BATCH_NOT_AVAILABLE') {
+      return 'Este lote não está mais disponível';
+    }
+
+    if (error.code === 'UNAUTHORIZED') {
+      return 'Você não tem permissão para esta ação';
+    }
+
+    if (error.code === 'VALIDATION_ERROR') {
+      return error.message || 'Verifique os campos e tente novamente';
+    }
+
+    return error.message || 'Algo deu errado. Tente novamente.';
+  }
+
+  if (error instanceof Error) {
+    // Fetch/network errors commonly surface as TypeError
+    if (error.name === 'TypeError') {
+      return 'Erro de conexão. Verifique sua internet.';
+    }
+    return error.message;
+  }
+
+  return 'Algo deu errado. Tente novamente.';
+}
+
+// Custom error handler for global error management
+const handleError = (error: unknown) => {
+  // Don't show toast for 401 errors (handled by auth interceptor)
+  if (error instanceof ApiError && error.status === 401) {
+    return;
+  }
+
+  // Don't show toast for 404 errors (usually handled by UI)
+  if (error instanceof ApiError && error.status === 404) {
+    return;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    console.error('Query error:', error);
+  }
+
+  const message = getErrorMessage(error);
+  
+  toast.error(message, {
+    duration: 5000,
+    position: 'top-right',
+  });
+};
+
+// Factory function to create QueryClient with proper configuration
+function makeQueryClient() {
+  return new QueryClient({
+    queryCache: new QueryCache({
+      onError: handleError,
+    }),
+    mutationCache: new MutationCache({
+      onError: handleError,
+    }),
+    defaultOptions: {
+      queries: {
+        // Data is considered fresh for 60 seconds to keep estoque/reservas atualizados
+        staleTime: 60 * 1000,
+        // Cache is garbage collected after 5 minutes
+        gcTime: 5 * 60 * 1000,
+        // Retry failed requests up to 3 times with exponential backoff
+        retry: (failureCount, error) => {
+          // Don't retry on 4xx errors (client errors)
+          if (error instanceof Error) {
+            const status = (error as Error & { status?: number }).status;
+            if (status && status >= 400 && status < 500) {
+              return false;
+            }
+          }
+          return failureCount < 3;
+        },
+        retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+        // Keep previous data while refetching
+        refetchOnWindowFocus: false,
+      },
+      mutations: {
+        // Retry failed mutations once
+        retry: 1,
+      },
+    },
+  });
+}
+
+// Singleton for server-side rendering
+let browserQueryClient: QueryClient | undefined;
+
+function getQueryClient() {
+  if (typeof window === 'undefined') {
+    // Server: always make a new query client
+    return makeQueryClient();
+  }
+  
+  // Browser: make a new query client if we don't already have one
+  if (!browserQueryClient) {
+    browserQueryClient = makeQueryClient();
+  }
+  
+  return browserQueryClient;
+}
+
+export function QueryProvider({ children }: QueryProviderProps) {
+  // Use a lazy initializer to ensure consistent client between server/client
+  const [queryClient] = useState(getQueryClient);
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      {children}
+    </QueryClientProvider>
+  );
 }
 ```
 
@@ -10512,24 +13009,23 @@ export const batchSchema = z.object({
     .regex(/^[A-Z0-9-]+$/, 'Código deve conter apenas letras maiúsculas, números e hífens')
     .transform((val) => val.toUpperCase()),
   height: z
-    .number({ invalid_type_error: 'Altura deve ser um número' })
+    .number({ message: 'Altura deve ser um número' })
     .positive('Altura deve ser maior que zero')
     .max(1000, 'Altura deve ser menor que 1000 cm'),
   width: z
-    .number({ invalid_type_error: 'Largura deve ser um número' })
+    .number({ message: 'Largura deve ser um número' })
     .positive('Largura deve ser maior que zero')
     .max(1000, 'Largura deve ser menor que 1000 cm'),
   thickness: z
-    .number({ invalid_type_error: 'Espessura deve ser um número' })
+    .number({ message: 'Espessura deve ser um número' })
     .positive('Espessura deve ser maior que zero')
     .max(100, 'Espessura deve ser menor que 100 cm'),
   quantitySlabs: z
-    .number({ invalid_type_error: 'Quantidade deve ser um número' })
+    .number({ message: 'Quantidade deve ser um número' })
     .int('Quantidade deve ser um número inteiro')
-    .positive('Quantidade deve ser maior que zero')
-    .default(1),
+    .positive('Quantidade deve ser maior que zero'),
   industryPrice: z
-    .number({ invalid_type_error: 'Preço deve ser um número' })
+    .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero'),
   originQuarry: z
     .string()
@@ -10537,8 +13033,7 @@ export const batchSchema = z.object({
     .optional(),
   entryDate: z
     .string()
-    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida')
-    .default(() => new Date().toISOString().split('T')[0]),
+    .refine((val) => !isNaN(Date.parse(val)), 'Data inválida'),
 });
 
 export const batchFilterSchema = z.object({
@@ -10581,7 +13076,7 @@ export const reservationSchema = z.object({
 
 export const updateBatchPriceSchema = z.object({
   negotiatedPrice: z
-    .number({ invalid_type_error: 'Preço deve ser um número' })
+    .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero')
     .optional(),
 });
@@ -10620,7 +13115,7 @@ export const leadFilterSchema = z.object({
 
 export const updateLeadStatusSchema = z.object({
   status: z.enum(leadStatuses, {
-    required_error: 'Status é obrigatório',
+    message: 'Status é obrigatório',
   }),
 });
 
@@ -10639,9 +13134,7 @@ export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO'] as
 
 export const salesLinkSchema = z
   .object({
-    linkType: z.enum(linkTypes, {
-      required_error: 'Tipo de link é obrigatório',
-    }),
+    linkType: z.enum(linkTypes),
     batchId: z.string().optional(),
     productId: z.string().optional(),
     title: z
@@ -10661,10 +13154,10 @@ export const salesLinkSchema = z
         'Slug deve conter apenas letras minúsculas, números e hífens'
       ),
     displayPrice: z
-      .number({ invalid_type_error: 'Preço deve ser um número' })
+      .number({ message: 'Preço deve ser um número' })
       .positive('Preço deve ser maior que zero')
       .optional(),
-    showPrice: z.boolean().default(true),
+    showPrice: z.boolean(),
     expiresAt: z
       .string()
       .refine((val) => !val || !isNaN(Date.parse(val)), 'Data inválida')
@@ -10673,7 +13166,7 @@ export const salesLinkSchema = z
         'Data de expiração deve ser futura'
       )
       .optional(),
-    isActive: z.boolean().default(true),
+    isActive: z.boolean(),
   })
   .refine(
     (data) => {
@@ -10722,7 +13215,7 @@ export const leadCaptureSchema = z.object({
     .string()
     .max(500, 'Mensagem deve ter no máximo 500 caracteres')
     .optional(),
-  marketingOptIn: z.boolean().default(false),
+  marketingOptIn: z.boolean(),
 });
 
 export const linkFilterSchema = z.object({
@@ -10785,16 +13278,16 @@ export const productSchema = z.object({
     .max(50, 'SKU deve ter no máximo 50 caracteres')
     .optional(),
   material: z.enum(materialTypes, {
-    required_error: 'Tipo de material é obrigatório',
+    message: 'Tipo de material é obrigatório',
   }),
   finish: z.enum(finishTypes, {
-    required_error: 'Acabamento é obrigatório',
+    message: 'Acabamento é obrigatório',
   }),
   description: z
     .string()
     .max(1000, 'Descrição deve ter no máximo 1000 caracteres')
     .optional(),
-  isPublic: z.boolean().default(true),
+  isPublic: z.boolean(),
 });
 
 export const productFilterSchema = z.object({
@@ -11057,217 +13550,34 @@ export interface Activity {
 ## `.\lib\utils\calculateArea.ts`:
 
 ```
-'use client';
-
-import { useMemo } from 'react';
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Layers, 
-  Users, 
-  Receipt, 
-  Link2, 
-  Inbox, 
-  UserPlus,
-  PackageOpen,
-  ChevronLeft,
-  ChevronRight
-} from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
-import { useAuthStore } from '@/store/auth.store';
-import { useUIStore } from '@/store/ui.store';
-import type { UserRole } from '@/lib/types';
-
-interface MenuItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  roles: UserRole[];
-  children?: MenuItem[];
+/**
+ * Calculate total area in square meters
+ * Formula: (height * width * quantity) / 10000
+ * 
+ * @param height - Height in centimeters
+ * @param width - Width in centimeters
+ * @param quantity - Number of slabs (default: 1)
+ * @returns Area in square meters
+ */
+export function calculateArea(
+  height: number,
+  width: number,
+  quantity: number = 1
+): number {
+  return (height * width * quantity) / 10000;
 }
 
-const menuItems: MenuItem[] = [
-  {
-    label: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
-  },
-  {
-    label: 'Catálogo',
-    href: '/catalog',
-    icon: Package,
-    roles: ['ADMIN_INDUSTRIA'],
-  },
-  {
-    label: 'Estoque',
-    href: '/inventory',
-    icon: Layers,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'Estoque Compartilhado',
-    href: '/shared-inventory',
-    icon: PackageOpen,
-    roles: ['BROKER'],
-  },
-  {
-    label: 'Vendas',
-    href: '/sales',
-    icon: Receipt,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'Links',
-    href: '/links',
-    icon: Link2,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
-  },
-  {
-    label: 'Leads',
-    href: '/leads',
-    icon: Inbox,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'],
-  },
-  {
-    label: 'Parceiros',
-    href: '/brokers',
-    icon: Users,
-    roles: ['ADMIN_INDUSTRIA'],
-  },
-  {
-    label: 'Equipe',
-    href: '/team',
-    icon: UserPlus,
-    roles: ['ADMIN_INDUSTRIA'],
-  },
-];
-
-export function Sidebar() {
-  const pathname = usePathname();
-  const user = useAuthStore((state) => state.user);
-  const { sidebarOpen, toggleSidebar } = useUIStore();
-
-  const filteredMenuItems = useMemo(() => {
-    if (!user) return [];
-    return menuItems.filter((item) => item.roles.includes(user.role));
-  }, [user]);
-
-  const isActive = (href: string) => {
-    if (href === '/dashboard') {
-      return pathname === '/dashboard';
-    }
-    return pathname.startsWith(href);
-  };
-
-  if (!user) return null;
-
-  return (
-    <>
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={toggleSidebar}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed top-0 left-0 z-50 h-screen bg-obsidian text-porcelain transition-all duration-300',
-          'flex flex-col',
-          sidebarOpen ? 'w-64' : 'w-0 lg:w-20',
-          'lg:relative lg:z-auto'
-        )}
-      >
-        {/* Logo & Toggle */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
-          <div
-            className={cn(
-              'flex items-center gap-3 transition-opacity duration-200',
-              !sidebarOpen && 'lg:opacity-0'
-            )}
-          >
-            <div className="w-8 h-8 bg-porcelain rounded-sm" />
-            {sidebarOpen && (
-              <span className="font-serif text-xl font-semibold">CAVA</span>
-            )}
-          </div>
-          
-          <button
-            onClick={toggleSidebar}
-            className={cn(
-              'p-2 rounded-sm hover:bg-white/10 transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-white/20',
-              !sidebarOpen && 'lg:mx-auto'
-            )}
-          >
-            {sidebarOpen ? (
-              <ChevronLeft className="w-5 h-5" />
-            ) : (
-              <ChevronRight className="w-5 h-5" />
-            )}
-          </button>
-        </div>
-
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-6">
-          <ul className="space-y-1 px-3">
-            {filteredMenuItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
-
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
-                      'text-sm font-medium',
-                      'focus:outline-none focus:ring-2 focus:ring-white/20',
-                      active
-                        ? 'bg-porcelain text-obsidian'
-                        : 'text-porcelain/80 hover:bg-white/10 hover:text-porcelain',
-                      !sidebarOpen && 'lg:justify-center'
-                    )}
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    {sidebarOpen && (
-                      <span className="truncate">{item.label}</span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
-        {/* User Info */}
-        {sidebarOpen && (
-          <div className="p-6 border-t border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center">
-                <span className="text-sm font-semibold">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.name}</p>
-                <p className="text-xs text-porcelain/60 truncate">
-                  {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
-                  {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
-                  {user.role === 'BROKER' && 'Broker'}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </aside>
-    </>
-  );
+/**
+ * Calculate area per slab in square meters
+ * 
+ * @param height - Height in centimeters
+ * @param width - Width in centimeters
+ * @returns Area per slab in square meters
+ */
+export function calculateAreaPerSlab(height: number, width: number): number {
+  const heightInMeters = height / 100;
+  const widthInMeters = width / 100;
+  return heightInMeters * widthInMeters;
 }
 ```
 
@@ -11290,10 +13600,16 @@ export function cn(...inputs: ClassValue[]) {
 
 ```
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
+  try {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  } catch (error) {
+    // Fallback para ambientes que não suportam o locale específico
+    const safeValue = Number.isFinite(value) ? value.toFixed(2) : '0.00';
+    return `R$ ${safeValue}`;
+  }
 }
 
 export function parseCurrency(value: string): number {
@@ -11573,123 +13889,188 @@ export function formatPhone(phone: string): string {
 ```
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { UserRole } from '@/lib/types';
+import { canRoleAccessRoute, getDashboardForRole, routesByRole } from '@/lib/utils/routes';
 
-const publicRoutes = ['/login', '/register'];
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico'];
+// Rotas de autenticação (públicas)
+const authRoutes = ['/login'];
 
-const roleRouteMap: Record<string, string[]> = {
-  ADMIN_INDUSTRIA: [
-    '/dashboard',
-    '/catalog',
-    '/inventory',
-    '/brokers',
-    '/sales',
-    '/team',
-    '/links',
-    '/leads',
-  ],
-  VENDEDOR_INTERNO: [
-    '/dashboard',
-    '/inventory',
-    '/sales',
-    '/links',
-    '/leads',
-  ],
-  BROKER: [
-    '/dashboard',
-    '/shared-inventory',
-    '/links',
-    '/leads',
-  ],
+// Prefixos de rotas públicas
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy'];
+
+// Prefixos reservados (rotas internas) derivados do mapa de permissões
+const reservedPrefixes = Array.from(
+  new Set(Object.values(routesByRole).flatMap((routes) => routes.map((route) => route.split('/')[1])).filter(Boolean))
+).map((segment) => `/${segment}`);
+
+// Rotas que requerem redirecionamento baseado em role
+const roleBasedRedirects: Record<string, Record<string, string>> = {
+  '/dashboard': {
+    ADMIN_INDUSTRIA: '/dashboard',
+    VENDEDOR_INTERNO: '/dashboard',
+    BROKER: '/dashboard',
+  },
+  '/inventory': {
+    ADMIN_INDUSTRIA: '/inventory',
+    VENDEDOR_INTERNO: '/inventory',
+    BROKER: '/shared-inventory', // Broker vê shared-inventory ao invés de inventory
+  },
 };
 
-const roleDashboards: Record<string, string> = {
-  ADMIN_INDUSTRIA: '/dashboard',
-  VENDEDOR_INTERNO: '/dashboard',
-  BROKER: '/dashboard',
-};
+const allowedRoles: UserRole[] = ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'];
+
+function isAuthRoute(pathname: string): boolean {
+  return authRoutes.includes(pathname);
+}
 
 function isPublicRoute(pathname: string): boolean {
-  if (publicRoutes.includes(pathname)) return true;
-  return publicPrefixes.some(prefix => pathname.startsWith(prefix));
+  if (isAuthRoute(pathname)) return true;
+  if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
+
+  // Rotas públicas de landing page: /[slug]
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length === 1) {
+    const top = `/${segments[0]}`;
+    const isReserved = [...reservedPrefixes, '/api'].some((p) => top === p || top.startsWith(`${p}/`));
+    if (!isReserved) return true;
+  }
+
+  return false;
 }
 
-function canAccessRoute(pathname: string, userRole: string): boolean {
-  const allowedRoutes = roleRouteMap[userRole];
-  if (!allowedRoutes) return false;
-
-  return allowedRoutes.some(route => pathname.startsWith(route));
+function getRedirectForRole(pathname: string, role: string): string | null {
+  // Verificar se há redirecionamento específico para esta rota/role
+  for (const [route, redirects] of Object.entries(roleBasedRedirects)) {
+    if (pathname === route || pathname.startsWith(`${route}/`)) {
+      const redirect = redirects[role];
+      if (redirect && redirect !== pathname) {
+        // Substituir a base da rota pelo redirecionamento
+        return pathname.replace(route, redirect);
+      }
+    }
+  }
+  return null;
 }
 
-function getDashboardForRole(role: string): string {
-  return roleDashboards[role] || '/login';
+function decodeJwt(token: string): { exp?: number; role?: string } | null {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = typeof atob === 'function'
+      ? atob(payload)
+      : typeof Buffer !== 'undefined'
+        ? Buffer.from(payload, 'base64').toString('utf8')
+        : '';
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJwt(token);
+  if (!payload?.exp) return true;
+  const nowSeconds = Math.floor(Date.now() / 1000);
+  // Add small clock skew tolerance to avoid false positives when client/server clocks diverge
+  const SKEW_SECONDS = 60;
+  return payload.exp <= nowSeconds + SKEW_SECONDS;
+}
+
+async function attemptRefresh(request: NextRequest, pathname: string) {
+  const refreshCookie = request.cookies.get('refresh_token');
+
+  if (!refreshCookie) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      // Encaminha apenas o refresh_token necessário para o endpoint de refresh
+      Cookie: `refresh_token=${encodeURIComponent(refreshCookie.value)}`,
+    },
+    credentials: 'include',
+  });
+
+  if (!refreshResponse.ok) {
+    const loginUrl = new URL('/login', request.url);
+    loginUrl.searchParams.set('callbackUrl', pathname);
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // Redirecionar de volta para aplicar os novos cookies
+  const redirectUrl = request.nextUrl.clone();
+  const response = NextResponse.redirect(redirectUrl);
+
+  const setCookieHeader = refreshResponse.headers.get('set-cookie');
+  if (setCookieHeader) {
+    response.headers.set('set-cookie', setCookieHeader);
+  }
+
+  return response;
 }
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  const accessToken = request.cookies.get('access_token')?.value;
+  const rawRole = request.cookies.get('user_role')?.value;
+  const userRole = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
+
+  // Rotas de auth são públicas, mas redireciona se já autenticado
+  if (isAuthRoute(pathname)) {
+    if (accessToken && userRole) {
+      const dashboardUrl = getDashboardForRole(userRole);
+      return NextResponse.redirect(new URL(dashboardUrl, request.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Rotas públicas - permitir acesso
   if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
-  const accessToken = request.cookies.get('access_token')?.value;
-  const userRole = request.cookies.get('user_role')?.value;
-
-  if (!accessToken) {
+  // Sem token ou token expirado - tentar refresh ou redirecionar para login
+  if (!accessToken || isTokenExpired(accessToken)) {
     try {
-      const refreshToken = request.cookies.get('refresh_token')?.value;
-      
-      if (!refreshToken) {
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('callbackUrl', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
-      const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Cookie': `refresh_token=${refreshToken}`,
-        },
-        credentials: 'include',
-      });
-
-      if (!refreshResponse.ok) {
-        const loginUrl = new URL('/login', request.url);
-        loginUrl.searchParams.set('callbackUrl', pathname);
-        return NextResponse.redirect(loginUrl);
-      }
-
-      const response = NextResponse.next();
-      
-      const setCookieHeader = refreshResponse.headers.get('set-cookie');
-      if (setCookieHeader) {
-        response.headers.set('set-cookie', setCookieHeader);
-      }
-
-      return response;
+      return await attemptRefresh(request, pathname);
     } catch (error) {
-      console.error('Token refresh error:', error);
+      if (process.env.NODE_ENV !== 'production') {
+        console.error('Token refresh error:', error);
+      }
       const loginUrl = new URL('/login', request.url);
       loginUrl.searchParams.set('callbackUrl', pathname);
       return NextResponse.redirect(loginUrl);
     }
   }
 
-  if (!userRole) {
+  // Sem role definida ou divergente do token - redirecionar para login
+  const tokenPayload = accessToken ? decodeJwt(accessToken) : null;
+  const tokenRole = tokenPayload?.role as UserRole | undefined;
+
+  // Always trust the role inside the signed token over the readable cookie to avoid tampering
+  const effectiveRole = tokenRole && allowedRoles.includes(tokenRole) ? tokenRole : userRole;
+
+  if (!effectiveRole || (tokenRole && tokenRole !== effectiveRole)) {
     const loginUrl = new URL('/login', request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  if (pathname === '/login' && accessToken) {
-    const dashboardUrl = getDashboardForRole(userRole);
-    return NextResponse.redirect(new URL(dashboardUrl, request.url));
+  // Verificar redirecionamento baseado em role (ex: broker acessando /inventory vai para /shared-inventory)
+  const redirect = getRedirectForRole(pathname, effectiveRole);
+  if (redirect) {
+    return NextResponse.redirect(new URL(redirect, request.url));
   }
 
-  if (!canAccessRoute(pathname, userRole)) {
-    const dashboardUrl = getDashboardForRole(userRole);
+  // Verificar permissão de acesso
+  if (!canRoleAccessRoute(effectiveRole, pathname)) {
+    // Sem permissão - redirecionar para dashboard
+    const dashboardUrl = effectiveRole ? getDashboardForRole(effectiveRole) : '/login';
     return NextResponse.redirect(new URL(dashboardUrl, request.url));
   }
 
@@ -11710,7 +14091,7 @@ export const config = {
 ```
 /// <reference types="next" />
 /// <reference types="next/image-types/global" />
-import "./.next/dev/types/routes.d.ts";
+import "./.next/types/routes.d.ts";
 
 // NOTE: This file should not be edited
 // see https://nextjs.org/docs/app/api-reference/config/typescript for more information.
@@ -11722,9 +14103,42 @@ import "./.next/dev/types/routes.d.ts";
 
 ```
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Desabilitar Turbopack para permitir route groups com mesmo path
+  // Route groups (industry), (broker), (seller) têm rotas com mesmo path
+  // que são diferenciadas pelo middleware baseado no role do usuário
+  experimental: {
+    // O Turbopack em Next.js 16 não suporta route groups com paths duplicados
+  },
+
+  turbopack: {
+    // Ensure the app root is this frontend folder even if there are lockfiles above it.
+    root: path.resolve(__dirname),
+  },
+
+  // Configuração de imagens para otimização com next/image
+  images: {
+    // Permitir imagens de qualquer domínio (para URLs dinâmicas do backend)
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3001',
+      },
+    ],
+    // Formatos de imagem otimizados
+    formats: ['image/avif', 'image/webp'],
+    // Tamanhos de dispositivo para responsive images
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    // Tamanhos para imagens com width fixo
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+  },
 };
 
 export default nextConfig;
@@ -11736,11 +14150,11 @@ export default nextConfig;
 
 ```
 {
-  "name": "frontend",
+  "name": "cava",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
@@ -11750,23 +14164,19 @@ export default nextConfig;
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@hookform/resolvers": "^5.2.2",
-    "@react-input/mask": "^2.0.4",
     "@tanstack/react-query": "^5.90.16",
     "clsx": "^2.1.1",
-    "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.562.0",
     "nanoid": "^5.1.6",
     "next": "16.1.1",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
-    "react-day-picker": "^9.13.0",
     "react-dom": "19.2.3",
     "react-hook-form": "^7.70.0",
     "react-input-mask": "^2.0.4",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.0",
-    "vaul": "^1.1.2",
     "zod": "^4.3.5",
     "zustand": "^5.0.9"
   },
@@ -11804,9 +14214,27 @@ export default config;
 
 ```
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User, UserRole } from '@/lib/types';
 import { apiClient } from '@/lib/api/client';
+
+const setReadableAuthCookies = (user: User | null) => {
+  if (typeof document === 'undefined') return;
+
+  const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
+  const base = `; Path=/; SameSite=Strict${secureFlag}`;
+
+  if (user?.role) {
+    document.cookie = `user_role=${encodeURIComponent(user.role)}${base}`;
+  } else {
+    document.cookie = `user_role=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
+  }
+
+  if (user?.industryId) {
+    document.cookie = `industry_id=${encodeURIComponent(user.industryId)}${base}`;
+  } else {
+    document.cookie = `industry_id=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
+  }
+};
 
 interface AuthState {
   user: User | null;
@@ -11821,111 +14249,175 @@ interface AuthState {
 }
 
 export const useAuthStore = create<AuthState>()(
-  persist(
-    (set, get) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: true,
+  (set, get) => ({
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
 
-      setUser: (user) => {
+    setUser: (user) => {
+      setReadableAuthCookies(user);
+      set({
+        user,
+        isAuthenticated: !!user,
+        isLoading: false,
+      });
+    },
+
+    login: async (email: string, password: string) => {
+      try {
+        set({ isLoading: true });
+
+        const response = await apiClient.post<{
+          user: User;
+          role: UserRole;
+        }>('/auth/login', { email, password }, { skipAuthRetry: true });
+
+        setReadableAuthCookies(response.user);
+
         set({
-          user,
-          isAuthenticated: !!user,
+          user: response.user,
+          isAuthenticated: true,
           isLoading: false,
         });
-      },
+      } catch (error) {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        throw error;
+      }
+    },
 
-      login: async (email: string, password: string) => {
-        try {
-          set({ isLoading: true });
+    logout: async () => {
+      try {
+        await apiClient.post('/auth/logout', undefined, { skipAuthRetry: true });
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
 
-          const response = await apiClient.post<{
-            user: User;
-            role: UserRole;
-          }>('/auth/login', { email, password });
-
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          throw error;
+        if (typeof window !== 'undefined') {
+          window.location.href = '/login';
         }
-      },
+      }
+    },
 
-      logout: async () => {
-        try {
-          await apiClient.post('/auth/logout');
-        } catch (error) {
-          console.error('Logout error:', error);
-        } finally {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
-        }
-      },
+    refreshSession: async () => {
+      try {
+        set({ isLoading: true });
 
-      refreshSession: async () => {
-        try {
-          set({ isLoading: true });
+        const response = await apiClient.post<{
+          user: User;
+        }>('/auth/refresh', undefined, { skipAuthRetry: true });
 
-          const response = await apiClient.post<{
-            user: User;
-          }>('/auth/refresh');
+        setReadableAuthCookies(response.user);
 
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false,
-          });
-        } catch (error) {
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-          });
-          throw error;
-        }
-      },
+        set({
+          user: response.user,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+      } catch (error) {
+        setReadableAuthCookies(null);
+        set({
+          user: null,
+          isAuthenticated: false,
+          isLoading: false,
+        });
+        throw error;
+      }
+    },
 
-      hasPermission: (requiredRole: UserRole | UserRole[]) => {
-        const { user } = get();
-        if (!user) return false;
+    hasPermission: (requiredRole: UserRole | UserRole[]) => {
+      const { user } = get();
+      if (!user) return false;
 
-        const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-        return roles.includes(user.role);
-      },
-    }),
-    {
-      name: 'cava-auth-storage',
-      storage: createJSONStorage(() => {
-        if (typeof window === 'undefined') {
-          return {
-            getItem: () => null,
-            setItem: () => {},
-            removeItem: () => {},
-          };
-        }
-        return window.localStorage;
-      }),
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
-    }
-  )
+      const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+      return roles.includes(user.role);
+    },
+  })
+);
+```
+
+---
+
+## `.\store\cart.store.ts`:
+
+```
+import { create } from 'zustand';
+import type { Batch } from '@/lib/types';
+
+interface CartItem {
+  batchId: string;
+  batch: Batch;
+  addedAt: string;
+}
+
+interface CartState {
+  items: CartItem[];
+  
+  // Actions
+  addItem: (batch: Batch) => void;
+  removeItem: (batchId: string) => void;
+  clearCart: () => void;
+  isInCart: (batchId: string) => boolean;
+  getItemCount: () => number;
+  getTotalValue: () => number;
+}
+
+export const useCartStore = create<CartState>()(
+  (set, get) => ({
+    items: [],
+
+    addItem: (batch: Batch) => {
+      const { items } = get();
+      const exists = items.some((item) => item.batchId === batch.id);
+
+      if (!exists) {
+        set({
+          items: [
+            ...items,
+            {
+              batchId: batch.id,
+              batch,
+              addedAt: new Date().toISOString(),
+            },
+          ],
+        });
+      }
+    },
+
+    removeItem: (batchId: string) => {
+      set({
+        items: get().items.filter((item) => item.batchId !== batchId),
+      });
+    },
+
+    clearCart: () => {
+      set({ items: [] });
+    },
+
+    isInCart: (batchId: string) => {
+      return get().items.some((item) => item.batchId === batchId);
+    },
+
+    getItemCount: () => {
+      return get().items.length;
+    },
+
+    getTotalValue: () => {
+      return get().items.reduce((total, item) => {
+        return total + (item.batch.industryPrice || 0);
+      }, 0);
+    },
+  })
 );
 ```
 
@@ -11969,6 +14461,43 @@ export const useUIStore = create<UIState>((set) => ({
   isPageLoading: false,
   setPageLoading: (loading) => set({ isPageLoading: loading }),
 }));
+```
+
+---
+
+## `.\tailwind.config.ts`:
+
+```
+import type { Config } from 'tailwindcss';
+
+const config: Config = {
+  content: [
+    './app/**/*.{ts,tsx}',
+    './components/**/*.{ts,tsx}',
+    './lib/**/*.{ts,tsx}',
+  ],
+  theme: {
+    extend: {
+      colors: {
+        porcelain: '#f6f4f2',
+        obsidian: '#0f1115',
+        mineral: '#ede9e6',
+        'off-white': '#FAFAFA',
+      },
+      fontFamily: {
+        sans: ['var(--font-inter)', 'sans-serif'],
+        serif: ['var(--font-playfair)', 'serif'],
+        mono: ['var(--font-mono)', 'monospace'],
+      },
+      boxShadow: {
+        'premium-lg': '0 25px 50px -12px rgba(15,17,21,0.35)',
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
 ```
 
 ---
@@ -12039,12 +14568,16 @@ export const useUIStore = create<UIState>((set) => ({
 - .\app\(industry)\sales\page.tsx
 - .\app\(industry)\team\page.tsx
 - .\app\(public)\[slug]\page.tsx
+- .\app\(public)\privacy\page.tsx
 - .\app\(seller)\dashboard\page.tsx
 - .\app\(seller)\inventory\page.tsx
 - .\app\(seller)\leads\page.tsx
 - .\app\(seller)\links\new\page.tsx
 - .\app\(seller)\links\page.tsx
+- .\app\error.tsx
 - .\app\globals.css
+- .\app\loading.tsx
+- .\app\not-found.tsx
 - .\app\page.tsx
 - .\components\shared\EmptyState.tsx
 - .\components\shared\ErrorBoundary.tsx
@@ -12056,9 +14589,12 @@ export const useUIStore = create<UIState>((set) => ({
 - .\components\ui\button.tsx
 - .\components\ui\card.tsx
 - .\components\ui\dropdown.tsx
+- .\components\ui\index.ts
 - .\components\ui\input.tsx
 - .\components\ui\label.tsx
+- .\components\ui\masked-input.tsx
 - .\components\ui\modal.tsx
+- .\components\ui\photo-upload.tsx
 - .\components\ui\select.tsx
 - .\components\ui\separator.tsx
 - .\components\ui\skeleton.tsx
@@ -12068,8 +14604,26 @@ export const useUIStore = create<UIState>((set) => ({
 - .\components\ui\toggle.tsx
 - .\eslint.config.mjs
 - .\lib\api\client.ts
+- .\lib\api\mutations\index.ts
+- .\lib\api\mutations\useBatchMutations.ts
+- .\lib\api\mutations\useLeadMutations.ts
+- .\lib\api\mutations\useProductMutations.ts
+- .\lib\api\mutations\useSalesLinkMutations.ts
+- .\lib\api\mutations\useSharedInventoryMutations.ts
+- .\lib\api\mutations\useUploadMutations.ts
+- .\lib\api\mutations\useUserMutations.ts
+- .\lib\api\queries\index.ts
+- .\lib\api\queries\useBatches.ts
+- .\lib\api\queries\useDashboard.ts
+- .\lib\api\queries\useLeads.ts
+- .\lib\api\queries\useProducts.ts
+- .\lib\api\queries\useSales.ts
+- .\lib\api\queries\useSalesLinks.ts
+- .\lib\api\queries\useSharedInventory.ts
+- .\lib\api\queries\useUsers.ts
 - .\lib\hooks\useAuth.ts
 - .\lib\hooks\useToast.ts
+- .\lib\providers\QueryProvider.tsx
 - .\lib\schemas\auth.schema.ts
 - .\lib\schemas\batch.schema.ts
 - .\lib\schemas\lead.schema.ts
@@ -12089,8 +14643,9 @@ export const useUIStore = create<UIState>((set) => ({
 - .\package.json
 - .\postcss.config.mjs
 - .\store\auth.store.ts
+- .\store\cart.store.ts
 - .\store\ui.store.ts
+- .\tailwind.config.ts
 - .\tsconfig.json
 
 ## Arquivos vazios:
-- .\lib\types\database.ts

@@ -33,6 +33,7 @@ export interface PhotoUploadProps {
   onChange: (files: MediaFile[]) => void;
   maxFiles?: number;
   maxSizeInMB?: number;
+  maxTotalSizeInMB?: number;
   acceptedTypes?: string[];
   disabled?: boolean;
   error?: string;
@@ -130,6 +131,7 @@ export function PhotoUpload({
   onChange,
   maxFiles = 10,
   maxSizeInMB = 5,
+  maxTotalSizeInMB,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
   disabled = false,
   error,
@@ -172,16 +174,31 @@ export function PhotoUpload({
         return;
       }
 
+      const totalSizeLimit = (maxTotalSizeInMB ?? maxFiles * maxSizeInMB) * 1024 * 1024;
+      const existingTotalSize = value.reduce((acc, media) => acc + (media.file?.size || 0), 0);
+
       const newFiles: MediaFile[] = [];
       const errors: string[] = [];
 
       Array.from(files)
         .slice(0, availableSlots)
         .forEach((file) => {
+          const isDuplicate = value.some((m) => m.file?.name === file.name && m.file.size === file.size);
+          if (isDuplicate) {
+            errors.push(`${file.name}: já foi adicionado`);
+            return;
+          }
+
           const validationError = validateFile(file);
           if (validationError) {
             errors.push(`${file.name}: ${validationError}`);
           } else {
+            const projectedTotal = existingTotalSize + newFiles.reduce((acc, m) => acc + (m.file?.size || 0), 0) + file.size;
+            if (projectedTotal > totalSizeLimit) {
+              errors.push(`${file.name}: ultrapassa o limite total de ${(totalSizeLimit / 1024 / 1024).toFixed(0)}MB`);
+              return;
+            }
+
             newFiles.push({
               id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
               file,

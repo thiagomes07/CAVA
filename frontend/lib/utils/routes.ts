@@ -1,3 +1,5 @@
+import type { UserRole } from '@/lib/types';
+
 /**
  * Rotas canônicas do sistema CAVA
  * Com a nova estrutura, todas as rotas já são canônicas (sem prefixos internos).
@@ -8,10 +10,12 @@ export function toCanonicalPath(pathname: string): string {
   return pathname;
 }
 
+type RoleRouteMap = Record<UserRole, string[]>;
+
 /**
- * Rotas disponíveis por role
+ * Rotas disponíveis por role (bases; rotas filhas são cobertas via prefixo)
  */
-export const routesByRole: Record<string, string[]> = {
+export const routesByRole: RoleRouteMap = {
   ADMIN_INDUSTRIA: [
     '/dashboard',
     '/catalog',
@@ -40,17 +44,22 @@ export const routesByRole: Record<string, string[]> = {
 /**
  * Verifica se uma role pode acessar uma rota
  */
-export function canRoleAccessRoute(role: string, pathname: string): boolean {
+export function canRoleAccessRoute(role: UserRole, pathname: string): boolean {
   const routes = routesByRole[role];
   if (!routes) return false;
   return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
 /**
- * Retorna a rota de dashboard para uma role
- * @param role - A role do usuário (reservado para uso futuro com dashboards específicos)
+ * Retorna a rota de dashboard para uma role (permite especializar futuramente)
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function getDashboardForRole(role: string): string {
-  return '/dashboard';
+export function getDashboardForRole(role: UserRole): string {
+  switch (role) {
+    case 'ADMIN_INDUSTRIA':
+    case 'VENDEDOR_INTERNO':
+    case 'BROKER':
+      return '/dashboard';
+    default:
+      return '/login';
+  }
 }

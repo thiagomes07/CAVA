@@ -8,6 +8,13 @@ interface UploadResponse {
 export function useUploadProductMedias() {
   return useMutation({
     mutationFn: async (files: File[]) => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      files.forEach((file) => {
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Formato não suportado: ${file.type}`);
+        }
+      });
+
       const formData = new FormData();
       files.forEach((file) => {
         formData.append('medias', file);
@@ -25,6 +32,13 @@ export function useUploadProductMedias() {
 export function useUploadBatchMedias() {
   return useMutation({
     mutationFn: async (files: File[]) => {
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+      files.forEach((file) => {
+        if (!allowedTypes.includes(file.type)) {
+          throw new Error(`Formato não suportado: ${file.type}`);
+        }
+      });
+
       const formData = new FormData();
       files.forEach((file) => {
         formData.append('medias', file);

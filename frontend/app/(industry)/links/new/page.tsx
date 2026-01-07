@@ -41,6 +41,8 @@ export default function CreateSalesLinkPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string>('');
   const [calculatedMargin, setCalculatedMargin] = useState<number>(0);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const [isSlugAvailable, setIsSlugAvailable] = useState(true);
 
   const {
     register,
@@ -68,6 +70,18 @@ export default function CreateSalesLinkPage() {
       fetchAvailableContent();
     }
   }, [currentStep, linkType]);
+
+  useEffect(() => {
+    const handle = setTimeout(async () => {
+      if (!slugToken) return;
+      setIsCheckingSlug(true);
+      const available = await validateSlug(slugToken);
+      setIsSlugAvailable(available);
+      setIsCheckingSlug(false);
+    }, 400);
+
+    return () => clearTimeout(handle);
+  }, [slugToken]);
 
   useEffect(() => {
     if (isBroker() && selectedBatch && displayPrice) {
@@ -411,6 +425,7 @@ export default function CreateSalesLinkPage() {
                                 <img
                                   src={batch.medias[0].url}
                                   alt={batch.batchCode}
+                                  loading="lazy"
                                   className="w-16 h-16 rounded-sm object-cover"
                                 />
                               )}
@@ -454,6 +469,7 @@ export default function CreateSalesLinkPage() {
                                 <img
                                   src={product.medias[0].url}
                                   alt={product.name}
+                                  loading="lazy"
                                   className="w-16 h-16 rounded-sm object-cover"
                                 />
                               )}
@@ -493,6 +509,7 @@ export default function CreateSalesLinkPage() {
                       <img
                         src={(selectedBatch?.medias?.[0] || selectedProduct?.medias?.[0])?.url}
                         alt="Preview"
+                        loading="lazy"
                         className="w-20 h-20 rounded-sm object-cover"
                       />
                     )}
@@ -641,6 +658,12 @@ export default function CreateSalesLinkPage() {
                     >
                       Gerar novo
                     </button>
+                    {!isSlugAvailable && (
+                      <span className="text-xs text-rose-600">Slug já em uso</span>
+                    )}
+                    {isCheckingSlug && (
+                      <span className="text-xs text-slate-500">Verificando...</span>
+                    )}
                   </div>
                 </div>
 

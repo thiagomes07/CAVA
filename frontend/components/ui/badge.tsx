@@ -29,6 +29,8 @@ const Badge = ({ className, variant = 'default', children, ...props }: BadgeProp
         variants[variant],
         className
       )}
+      role="status"
+      aria-live="polite"
       {...props}
     >
       {children}

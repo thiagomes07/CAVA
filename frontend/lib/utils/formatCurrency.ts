@@ -1,8 +1,14 @@
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
+  try {
+    return new Intl.NumberFormat('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+    }).format(value);
+  } catch (error) {
+    // Fallback para ambientes que não suportam o locale específico
+    const safeValue = Number.isFinite(value) ? value.toFixed(2) : '0.00';
+    return `R$ ${safeValue}`;
+  }
 }
 
 export function parseCurrency(value: string): number {

@@ -25,6 +25,8 @@ export function EmptyState({
         'flex flex-col items-center justify-center min-h-[400px] py-12 px-6',
         className
       )}
+      role="status"
+      aria-label={title}
     >
       <Icon className="w-12 h-12 text-slate-300 mb-6" strokeWidth={1.5} />
       

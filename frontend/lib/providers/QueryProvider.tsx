@@ -72,10 +72,10 @@ function makeQueryClient() {
     }),
     defaultOptions: {
       queries: {
-        // Data is considered fresh for 5 minutes
-        staleTime: 5 * 60 * 1000,
-        // Cache is garbage collected after 10 minutes
-        gcTime: 10 * 60 * 1000,
+        // Data is considered fresh for 60 seconds to keep estoque/reservas atualizados
+        staleTime: 60 * 1000,
+        // Cache is garbage collected after 5 minutes
+        gcTime: 5 * 60 * 1000,
         // Retry failed requests up to 3 times with exponential backoff
         retry: (failureCount, error) => {
           // Don't retry on 4xx errors (client errors)

@@ -23,6 +23,7 @@ export default function CatalogPage() {
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState<ProductFilter>({
     search: '',
     material: '',
@@ -30,6 +31,14 @@ export default function CatalogPage() {
     page: 1,
     limit: 24,
   });
+
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setFilters((prev) => ({ ...prev, search: searchInput, page: 1 }));
+    }, 300);
+
+    return () => clearTimeout(handle);
+  }, [searchInput]);
 
   useEffect(() => {
     fetchProducts();
@@ -84,10 +93,8 @@ export default function CatalogPage() {
             <div className="relative">
               <Input
                 placeholder="Buscar por nome ou SKU"
-                value={filters.search}
-                onChange={(e) =>
-                  setFilters({ ...filters, search: e.target.value, page: 1 })
-                }
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
               />
               <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
             </div>

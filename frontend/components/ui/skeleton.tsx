@@ -7,9 +7,12 @@ const Skeleton = ({ className, ...props }: SkeletonProps) => {
   return (
     <div
       className={cn(
-        'animate-pulse rounded-sm bg-slate-200/50',
+        'animate-pulse motion-reduce:animate-none rounded-sm bg-slate-200/50',
         className
       )}
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
       {...props}
     />
   );

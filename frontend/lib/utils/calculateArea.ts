@@ -12,7 +12,11 @@ export function calculateArea(
   width: number,
   quantity: number = 1
 ): number {
-  return (height * width * quantity) / 10000;
+  const area = (height * width * quantity) / 10000;
+  if (!Number.isFinite(area) || area <= 0) {
+    return 0;
+  }
+  return area;
 }
 
 /**
@@ -25,5 +29,9 @@ export function calculateArea(
 export function calculateAreaPerSlab(height: number, width: number): number {
   const heightInMeters = height / 100;
   const widthInMeters = width / 100;
-  return heightInMeters * widthInMeters;
+  const area = heightInMeters * widthInMeters;
+  if (!Number.isFinite(area) || area <= 0) {
+    return 0;
+  }
+  return area;
 }
