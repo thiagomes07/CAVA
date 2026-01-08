@@ -1,0 +1,73 @@
+-- =============================================
+-- Migration: 000002_create_enums
+-- Description: Cria tipos ENUM para garantir integridade dos dados
+-- =============================================
+
+-- ENUM: Roles de usuários
+CREATE TYPE user_role_type AS ENUM (
+    'ADMIN_INDUSTRIA',
+    'VENDEDOR_INTERNO',
+    'BROKER'
+);
+
+-- ENUM: Status de lotes
+CREATE TYPE batch_status_type AS ENUM (
+    'DISPONIVEL',
+    'RESERVADO',
+    'VENDIDO',
+    'INATIVO'
+);
+
+-- ENUM: Tipos de links de venda
+CREATE TYPE link_type_enum AS ENUM (
+    'LOTE_UNICO',
+    'PRODUTO_GERAL',
+    'CATALOGO_COMPLETO'
+);
+
+-- ENUM: Tipos de mídia
+CREATE TYPE media_type_enum AS ENUM (
+    'IMAGE',
+    'VIDEO'
+);
+
+-- ENUM: Tipos de interação de leads
+CREATE TYPE interaction_type_enum AS ENUM (
+    'INTERESSE_LOTE',
+    'INTERESSE_CATALOGO',
+    'DUVIDA_GERAL'
+);
+
+-- ENUM: Status de reservas
+CREATE TYPE reservation_status_type AS ENUM (
+    'ATIVA',
+    'CONFIRMADA_VENDA',
+    'EXPIRADA',
+    'CANCELADA'
+);
+
+-- ENUM: Tipos de acabamento
+CREATE TYPE finish_type_enum AS ENUM (
+    'POLIDO',
+    'LEVIGADO',
+    'BRUTO',
+    'APICOADO',
+    'FLAMEADO'
+);
+
+-- ENUM: Status de leads
+CREATE TYPE lead_status_type AS ENUM (
+    'NOVO',
+    'CONTATADO',
+    'RESOLVIDO'
+);
+
+-- Comentários descritivos
+COMMENT ON TYPE user_role_type IS 'Tipos de roles de usuários no sistema';
+COMMENT ON TYPE batch_status_type IS 'Status possíveis de um lote de estoque';
+COMMENT ON TYPE link_type_enum IS 'Tipos de links de venda públicos';
+COMMENT ON TYPE media_type_enum IS 'Tipos de mídia suportados';
+COMMENT ON TYPE interaction_type_enum IS 'Tipos de interação de leads';
+COMMENT ON TYPE reservation_status_type IS 'Status de reservas de lotes';
+COMMENT ON TYPE finish_type_enum IS 'Tipos de acabamento de produtos';
+COMMENT ON TYPE lead_status_type IS 'Status de acompanhamento de leads';
