@@ -2839,6 +2839,3460 @@ type UserService interface {
 
 ---
 
+### `.\internal\repository\batch_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/lib/pq"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type batchRepository struct {
+	db *DB
+}
+
+func NewBatchRepository(db *DB) *batchRepository {
+	return &batchRepository{db: db}
+}
+
+func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error {
+	query := `
+		INSERT INTO batches (
+			id, product_id, industry_id, batch_code, height, width, thickness,
+			quantity_slabs, industry_price, origin_quarry, entry_date, status
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING created_at, updated_at, net_area
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		batch.ID, batch.ProductID, batch.IndustryID, batch.BatchCode,
+		batch.Height, batch.Width, batch.Thickness, batch.QuantitySlabs,
+		batch.IndustryPrice, batch.OriginQuarry, batch.EntryDate, batch.Status,
+	).Scan(&batch.CreatedAt, &batch.UpdatedAt, &batch.TotalArea)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				return errors.BatchCodeExistsError(batch.BatchCode)
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE id = $1
+	`
+
+	batch := &entity.Batch{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&batch.ID, &batch.ProductID, &batch.IndustryID, &batch.BatchCode,
+		&batch.Height, &batch.Width, &batch.Thickness, &batch.QuantitySlabs,
+		&batch.TotalArea, &batch.IndustryPrice, &batch.OriginQuarry,
+		&batch.EntryDate, &batch.Status, &batch.IsActive,
+		&batch.CreatedAt, &batch.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Lote")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return batch, nil
+}
+
+func (r *batchRepository) FindByIDForUpdate(ctx context.Context, tx *sql.Tx, id string) (*entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE id = $1
+		FOR UPDATE
+	`
+
+	batch := &entity.Batch{}
+	err := tx.QueryRowContext(ctx, query, id).Scan(
+		&batch.ID, &batch.ProductID, &batch.IndustryID, &batch.BatchCode,
+		&batch.Height, &batch.Width, &batch.Thickness, &batch.QuantitySlabs,
+		&batch.TotalArea, &batch.IndustryPrice, &batch.OriginQuarry,
+		&batch.EntryDate, &batch.Status, &batch.IsActive,
+		&batch.CreatedAt, &batch.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Lote")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return batch, nil
+}
+
+func (r *batchRepository) FindByProductID(ctx context.Context, productID string) ([]entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE product_id = $1 AND is_active = TRUE
+		ORDER BY entry_date DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, productID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanBatches(rows)
+}
+
+func (r *batchRepository) FindByStatus(ctx context.Context, industryID string, status entity.BatchStatus) ([]entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE
+		ORDER BY entry_date DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID, status)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanBatches(rows)
+}
+
+func (r *batchRepository) FindAvailable(ctx context.Context, industryID string) ([]entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE industry_id = $1 AND status = 'DISPONIVEL' AND is_active = TRUE
+		ORDER BY entry_date DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanBatches(rows)
+}
+
+func (r *batchRepository) FindByCode(ctx context.Context, industryID, code string) ([]entity.Batch, error) {
+	query := `
+		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
+		       quantity_slabs, net_area, industry_price, origin_quarry, 
+		       entry_date, status, is_active, created_at, updated_at
+		FROM batches
+		WHERE industry_id = $1 AND batch_code ILIKE $2 AND is_active = TRUE
+		ORDER BY batch_code
+	`
+
+	search := "%" + code + "%"
+	rows, err := r.db.QueryContext(ctx, query, industryID, search)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanBatches(rows)
+}
+
+func (r *batchRepository) List(ctx context.Context, industryID string, filters entity.BatchFilters) ([]entity.Batch, int, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	query := psql.Select(
+		"id", "product_id", "industry_id", "batch_code", "height", "width",
+		"thickness", "quantity_slabs", "net_area", "industry_price",
+		"origin_quarry", "entry_date", "status", "is_active", "created_at", "updated_at",
+	).From("batches").
+		Where(sq.Eq{"industry_id": industryID, "is_active": true})
+
+	// Filtros
+	if filters.ProductID != nil {
+		query = query.Where(sq.Eq{"product_id": *filters.ProductID})
+	}
+	if filters.Status != nil {
+		query = query.Where(sq.Eq{"status": *filters.Status})
+	}
+	if filters.Code != nil && *filters.Code != "" {
+		query = query.Where("batch_code ILIKE ?", "%"+*filters.Code+"%")
+	}
+
+	// Contar total
+	countQuery := psql.Select("COUNT(*)").From("batches").
+		Where(sq.Eq{"industry_id": industryID, "is_active": true})
+
+	if filters.ProductID != nil {
+		countQuery = countQuery.Where(sq.Eq{"product_id": *filters.ProductID})
+	}
+	if filters.Status != nil {
+		countQuery = countQuery.Where(sq.Eq{"status": *filters.Status})
+	}
+	if filters.Code != nil && *filters.Code != "" {
+		countQuery = countQuery.Where("batch_code ILIKE ?", "%"+*filters.Code+"%")
+	}
+
+	countSQL, countArgs, _ := countQuery.ToSql()
+	var total int
+	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Paginação
+	offset := (filters.Page - 1) * filters.Limit
+	query = query.OrderBy("entry_date DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	batches, err := r.scanBatches(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return batches, total, nil
+}
+
+func (r *batchRepository) Update(ctx context.Context, batch *entity.Batch) error {
+	query := `
+		UPDATE batches
+		SET batch_code = $1, height = $2, width = $3, thickness = $4,
+		    quantity_slabs = $5, industry_price = $6, origin_quarry = $7,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $8
+		RETURNING updated_at, net_area
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		batch.BatchCode, batch.Height, batch.Width, batch.Thickness,
+		batch.QuantitySlabs, batch.IndustryPrice, batch.OriginQuarry, batch.ID,
+	).Scan(&batch.UpdatedAt, &batch.TotalArea)
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Lote")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *batchRepository) UpdateStatus(ctx context.Context, tx *sql.Tx, id string, status entity.BatchStatus) error {
+	query := `
+		UPDATE batches
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	var result sql.Result
+	var err error
+
+	if tx != nil {
+		result, err = tx.ExecContext(ctx, query, status, id)
+	} else {
+		result, err = r.db.ExecContext(ctx, query, status, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Lote")
+	}
+
+	return nil
+}
+
+func (r *batchRepository) CountByStatus(ctx context.Context, industryID string, status entity.BatchStatus) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM batches 
+		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, industryID, status).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
+func (r *batchRepository) ExistsByCode(ctx context.Context, industryID, code string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM batches 
+			WHERE industry_id = $1 AND batch_code = $2
+		)
+	`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, industryID, code).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *batchRepository) scanBatches(rows *sql.Rows) ([]entity.Batch, error) {
+	batches := []entity.Batch{}
+	for rows.Next() {
+		var b entity.Batch
+		if err := rows.Scan(
+			&b.ID, &b.ProductID, &b.IndustryID, &b.BatchCode,
+			&b.Height, &b.Width, &b.Thickness, &b.QuantitySlabs,
+			&b.TotalArea, &b.IndustryPrice, &b.OriginQuarry,
+			&b.EntryDate, &b.Status, &b.IsActive,
+			&b.CreatedAt, &b.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		batches = append(batches, b)
+	}
+	return batches, nil
+}
+```
+
+---
+
+### `.\internal\repository\db.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"time"
+
+	_ "github.com/lib/pq"
+	"go.uber.org/zap"
+)
+
+// DB encapsula a conexão com PostgreSQL
+type DB struct {
+	*sql.DB
+	logger *zap.Logger
+}
+
+// Config contém configurações de conexão
+type Config struct {
+	Host            string
+	Port            int
+	User            string
+	Password        string
+	Database        string
+	SSLMode         string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
+
+// NewDB cria uma nova conexão com PostgreSQL
+func NewDB(cfg *Config, logger *zap.Logger) (*DB, error) {
+	dsn := fmt.Sprintf(
+		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.Database, cfg.SSLMode,
+	)
+
+	db, err := sql.Open("postgres", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao abrir conexão: %w", err)
+	}
+
+	// Configurar pool
+	db.SetMaxOpenConns(cfg.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+
+	// Testar conexão
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("erro ao pingar banco: %w", err)
+	}
+
+	logger.Info("conexão com PostgreSQL estabelecida",
+		zap.String("host", cfg.Host),
+		zap.Int("port", cfg.Port),
+		zap.String("database", cfg.Database),
+	)
+
+	return &DB{DB: db, logger: logger}, nil
+}
+
+// Close fecha a conexão com o banco
+func (db *DB) Close() error {
+	db.logger.Info("fechando conexão com PostgreSQL")
+	return db.DB.Close()
+}
+
+// BeginTx inicia uma transação
+func (db *DB) BeginTx(ctx context.Context) (*sql.Tx, error) {
+	tx, err := db.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao iniciar transação: %w", err)
+	}
+	return tx, nil
+}
+
+// ExecuteInTx executa função dentro de transação com rollback automático em erro
+func (db *DB) ExecuteInTx(ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx)
+	if err != nil {
+		return err
+	}
+
+	defer func() {
+		if p := recover(); p != nil {
+			_ = tx.Rollback()
+			panic(p)
+		}
+	}()
+
+	if err := fn(tx); err != nil {
+		if rbErr := tx.Rollback(); rbErr != nil {
+			db.logger.Error("erro ao fazer rollback", zap.Error(rbErr))
+		}
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("erro ao commitar transação: %w", err)
+	}
+
+	return nil
+}
+
+// HealthCheck verifica saúde da conexão
+func (db *DB) HealthCheck(ctx context.Context) error {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	if err := db.PingContext(ctx); err != nil {
+		return fmt.Errorf("healthcheck falhou: %w", err)
+	}
+
+	return nil
+}
+```
+
+---
+
+### `.\internal\repository\industry_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/lib/pq"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type industryRepository struct {
+	db *DB
+}
+
+func NewIndustryRepository(db *DB) *industryRepository {
+	return &industryRepository{db: db}
+}
+
+func (r *industryRepository) Create(ctx context.Context, industry *entity.Industry) error {
+	query := `
+		INSERT INTO industries (id, name, cnpj, slug, contact_email, contact_phone, policy_terms)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		industry.ID, industry.Name, industry.CNPJ, industry.Slug,
+		industry.ContactEmail, industry.ContactPhone, industry.PolicyTerms,
+	).Scan(&industry.CreatedAt, &industry.UpdatedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				if pqErr.Constraint == "industries_cnpj_key" {
+					return errors.NewConflictError("CNPJ já cadastrado")
+				}
+				if pqErr.Constraint == "industries_slug_key" {
+					return errors.NewConflictError("Slug já em uso")
+				}
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.Industry, error) {
+	query := `
+		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
+		       policy_terms, created_at, updated_at
+		FROM industries
+		WHERE id = $1
+	`
+
+	industry := &entity.Industry{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
+		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.CreatedAt, &industry.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Indústria")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return industry, nil
+}
+
+func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*entity.Industry, error) {
+	query := `
+		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
+		       policy_terms, created_at, updated_at
+		FROM industries
+		WHERE slug = $1
+	`
+
+	industry := &entity.Industry{}
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(
+		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
+		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.CreatedAt, &industry.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Indústria")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return industry, nil
+}
+
+func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*entity.Industry, error) {
+	query := `
+		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
+		       policy_terms, created_at, updated_at
+		FROM industries
+		WHERE cnpj = $1
+	`
+
+	industry := &entity.Industry{}
+	err := r.db.QueryRowContext(ctx, query, cnpj).Scan(
+		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
+		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.CreatedAt, &industry.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Indústria")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return industry, nil
+}
+
+func (r *industryRepository) Update(ctx context.Context, industry *entity.Industry) error {
+	query := `
+		UPDATE industries
+		SET name = $1, contact_email = $2, contact_phone = $3, 
+		    policy_terms = $4, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $5
+		RETURNING updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		industry.Name, industry.ContactEmail, industry.ContactPhone,
+		industry.PolicyTerms, industry.ID,
+	).Scan(&industry.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Indústria")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *industryRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM industries WHERE slug = $1)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *industryRepository) ExistsByCNPJ(ctx context.Context, cnpj string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM industries WHERE cnpj = $1)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, cnpj).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error) {
+	query := `
+		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
+		       policy_terms, created_at, updated_at
+		FROM industries
+		ORDER BY name
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	industries := []entity.Industry{}
+	for rows.Next() {
+		var ind entity.Industry
+		if err := rows.Scan(
+			&ind.ID, &ind.Name, &ind.CNPJ, &ind.Slug,
+			&ind.ContactEmail, &ind.ContactPhone, &ind.PolicyTerms,
+			&ind.CreatedAt, &ind.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		industries = append(industries, ind)
+	}
+
+	return industries, nil
+}
+```
+
+---
+
+### `.\internal\repository\lead_interaction_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type leadInteractionRepository struct {
+	db *DB
+}
+
+func NewLeadInteractionRepository(db *DB) *leadInteractionRepository {
+	return &leadInteractionRepository{db: db}
+}
+
+func (r *leadInteractionRepository) Create(ctx context.Context, tx *sql.Tx, interaction *entity.LeadInteraction) error {
+	query := `
+		INSERT INTO lead_interactions (
+			id, lead_id, sales_link_id, target_batch_id, target_product_id,
+			message, interaction_type
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING created_at
+	`
+
+	var err error
+	if tx != nil {
+		err = tx.QueryRowContext(ctx, query,
+			interaction.ID, interaction.LeadID, interaction.SalesLinkID,
+			interaction.TargetBatchID, interaction.TargetProductID,
+			interaction.Message, interaction.InteractionType,
+		).Scan(&interaction.CreatedAt)
+	} else {
+		err = r.db.QueryRowContext(ctx, query,
+			interaction.ID, interaction.LeadID, interaction.SalesLinkID,
+			interaction.TargetBatchID, interaction.TargetProductID,
+			interaction.Message, interaction.InteractionType,
+		).Scan(&interaction.CreatedAt)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *leadInteractionRepository) FindByLeadID(ctx context.Context, leadID string) ([]entity.LeadInteraction, error) {
+	query := `
+		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		       message, interaction_type, created_at
+		FROM lead_interactions
+		WHERE lead_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, leadID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanInteractions(rows)
+}
+
+func (r *leadInteractionRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.LeadInteraction, error) {
+	query := `
+		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		       message, interaction_type, created_at
+		FROM lead_interactions
+		WHERE sales_link_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, salesLinkID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanInteractions(rows)
+}
+
+func (r *leadInteractionRepository) FindByID(ctx context.Context, id string) (*entity.LeadInteraction, error) {
+	query := `
+		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		       message, interaction_type, created_at
+		FROM lead_interactions
+		WHERE id = $1
+	`
+
+	interaction := &entity.LeadInteraction{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&interaction.ID, &interaction.LeadID, &interaction.SalesLinkID,
+		&interaction.TargetBatchID, &interaction.TargetProductID,
+		&interaction.Message, &interaction.InteractionType, &interaction.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Interação")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return interaction, nil
+}
+
+func (r *leadInteractionRepository) scanInteractions(rows *sql.Rows) ([]entity.LeadInteraction, error) {
+	interactions := []entity.LeadInteraction{}
+	for rows.Next() {
+		var i entity.LeadInteraction
+		if err := rows.Scan(
+			&i.ID, &i.LeadID, &i.SalesLinkID, &i.TargetBatchID,
+			&i.TargetProductID, &i.Message, &i.InteractionType, &i.CreatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		interactions = append(interactions, i)
+	}
+	return interactions, nil
+}
+```
+
+---
+
+### `.\internal\repository\lead_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type leadRepository struct {
+	db *DB
+}
+
+func NewLeadRepository(db *DB) *leadRepository {
+	return &leadRepository{db: db}
+}
+
+func (r *leadRepository) Create(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error {
+	query := `
+		INSERT INTO leads (
+			id, sales_link_id, name, contact, message, marketing_opt_in, status
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING created_at, updated_at, last_interaction
+	`
+
+	var err error
+	if tx != nil {
+		err = tx.QueryRowContext(ctx, query,
+			lead.ID, lead.SalesLinkID, lead.Name, lead.Contact,
+			lead.Message, lead.MarketingOptIn, lead.Status,
+		).Scan(&lead.CreatedAt, &lead.UpdatedAt, &lead.UpdatedAt)
+	} else {
+		err = r.db.QueryRowContext(ctx, query,
+			lead.ID, lead.SalesLinkID, lead.Name, lead.Contact,
+			lead.Message, lead.MarketingOptIn, lead.Status,
+		).Scan(&lead.CreatedAt, &lead.UpdatedAt, &lead.UpdatedAt)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *leadRepository) FindByID(ctx context.Context, id string) (*entity.Lead, error) {
+	query := `
+		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		       status, created_at, updated_at
+		FROM leads
+		WHERE id = $1
+	`
+
+	lead := &entity.Lead{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&lead.ID, &lead.SalesLinkID, &lead.Name, &lead.Contact,
+		&lead.Message, &lead.MarketingOptIn, &lead.Status,
+		&lead.CreatedAt, &lead.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Lead")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return lead, nil
+}
+
+func (r *leadRepository) FindByContact(ctx context.Context, contact string) (*entity.Lead, error) {
+	query := `
+		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		       status, created_at, updated_at
+		FROM leads
+		WHERE contact = $1
+		ORDER BY created_at DESC
+		LIMIT 1
+	`
+
+	lead := &entity.Lead{}
+	err := r.db.QueryRowContext(ctx, query, contact).Scan(
+		&lead.ID, &lead.SalesLinkID, &lead.Name, &lead.Contact,
+		&lead.Message, &lead.MarketingOptIn, &lead.Status,
+		&lead.CreatedAt, &lead.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Lead")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return lead, nil
+}
+
+func (r *leadRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Lead, error) {
+	query := `
+		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		       status, created_at, updated_at
+		FROM leads
+		WHERE sales_link_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, salesLinkID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanLeads(rows)
+}
+
+func (r *leadRepository) List(ctx context.Context, filters entity.LeadFilters) ([]entity.Lead, int, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	query := psql.Select(
+		"id", "sales_link_id", "name", "contact", "message",
+		"marketing_opt_in", "status", "created_at", "updated_at",
+	).From("leads")
+
+	if filters.LinkID != nil {
+		query = query.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+	}
+
+	if filters.Status != nil {
+		query = query.Where(sq.Eq{"status": *filters.Status})
+	}
+
+	if filters.OptIn != nil {
+		query = query.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+	}
+
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		query = query.Where(sq.Or{
+			sq.ILike{"name": search},
+			sq.ILike{"contact": search},
+		})
+	}
+
+	if filters.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
+		if err == nil {
+			query = query.Where(sq.GtOrEq{"created_at": startDate})
+		}
+	}
+
+	if filters.EndDate != nil {
+		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
+		if err == nil {
+			query = query.Where(sq.LtOrEq{"created_at": endDate})
+		}
+	}
+
+	// Count
+	countQuery := psql.Select("COUNT(*)").From("leads")
+	if filters.LinkID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+	}
+	if filters.Status != nil {
+		countQuery = countQuery.Where(sq.Eq{"status": *filters.Status})
+	}
+	if filters.OptIn != nil {
+		countQuery = countQuery.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+	}
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		countQuery = countQuery.Where(sq.Or{
+			sq.ILike{"name": search},
+			sq.ILike{"contact": search},
+		})
+	}
+	if filters.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
+		if err == nil {
+			countQuery = countQuery.Where(sq.GtOrEq{"created_at": startDate})
+		}
+	}
+	if filters.EndDate != nil {
+		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
+		if err == nil {
+			countQuery = countQuery.Where(sq.LtOrEq{"created_at": endDate})
+		}
+	}
+
+	countSQL, countArgs, _ := countQuery.ToSql()
+	var total int
+	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Pagination
+	offset := (filters.Page - 1) * filters.Limit
+	query = query.OrderBy("created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	leads, err := r.scanLeads(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return leads, total, nil
+}
+
+func (r *leadRepository) Update(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error {
+	query := `
+		UPDATE leads
+		SET name = $1, contact = $2, message = $3, marketing_opt_in = $4,
+		    status = $5, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $6
+		RETURNING updated_at
+	`
+
+	var err error
+	if tx != nil {
+		err = tx.QueryRowContext(ctx, query,
+			lead.Name, lead.Contact, lead.Message, lead.MarketingOptIn,
+			lead.Status, lead.ID,
+		).Scan(&lead.UpdatedAt)
+	} else {
+		err = r.db.QueryRowContext(ctx, query,
+			lead.Name, lead.Contact, lead.Message, lead.MarketingOptIn,
+			lead.Status, lead.ID,
+		).Scan(&lead.UpdatedAt)
+	}
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Lead")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *leadRepository) UpdateStatus(ctx context.Context, id string, status entity.LeadStatus) error {
+	query := `
+		UPDATE leads
+		SET status = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, status, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Lead")
+	}
+
+	return nil
+}
+
+func (r *leadRepository) UpdateLastInteraction(ctx context.Context, tx *sql.Tx, id string) error {
+	query := `
+		UPDATE leads
+		SET last_interaction = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+
+	var err error
+	if tx != nil {
+		_, err = tx.ExecContext(ctx, query, id)
+	} else {
+		_, err = r.db.ExecContext(ctx, query, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *leadRepository) CountByIndustry(ctx context.Context, industryID string) (int, error) {
+	query := `
+		SELECT COUNT(DISTINCT l.id)
+		FROM leads l
+		INNER JOIN sales_links sl ON l.sales_link_id = sl.id
+		WHERE sl.industry_id = $1
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, industryID).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
+func (r *leadRepository) scanLeads(rows *sql.Rows) ([]entity.Lead, error) {
+	leads := []entity.Lead{}
+	for rows.Next() {
+		var l entity.Lead
+		if err := rows.Scan(
+			&l.ID, &l.SalesLinkID, &l.Name, &l.Contact, &l.Message,
+			&l.MarketingOptIn, &l.Status, &l.CreatedAt, &l.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		leads = append(leads, l)
+	}
+	return leads, nil
+}
+```
+
+---
+
+### `.\internal\repository\media_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type mediaRepository struct {
+	db *DB
+}
+
+func NewMediaRepository(db *DB) *mediaRepository {
+	return &mediaRepository{db: db}
+}
+
+func (r *mediaRepository) CreateProductMedia(ctx context.Context, productID string, media *entity.CreateMediaInput) error {
+	query := `
+		INSERT INTO product_medias (id, product_id, url, display_order, is_cover)
+		VALUES (gen_random_uuid(), $1, $2, $3, $4)
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		productID, media.URL, media.DisplayOrder, media.IsCover,
+	)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *mediaRepository) CreateBatchMedia(ctx context.Context, batchID string, media *entity.CreateMediaInput) error {
+	query := `
+		INSERT INTO batch_medias (id, batch_id, url, display_order)
+		VALUES (gen_random_uuid(), $1, $2, $3)
+	`
+
+	_, err := r.db.ExecContext(ctx, query,
+		batchID, media.URL, media.DisplayOrder,
+	)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *mediaRepository) FindProductMedias(ctx context.Context, productID string) ([]entity.Media, error) {
+	query := `
+		SELECT id, url, display_order, is_cover, created_at
+		FROM product_medias
+		WHERE product_id = $1
+		ORDER BY display_order, created_at
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, productID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	medias := []entity.Media{}
+	for rows.Next() {
+		var m entity.Media
+		if err := rows.Scan(
+			&m.ID, &m.URL, &m.DisplayOrder, &m.IsCover, &m.CreatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		medias = append(medias, m)
+	}
+
+	return medias, nil
+}
+
+func (r *mediaRepository) FindBatchMedias(ctx context.Context, batchID string) ([]entity.Media, error) {
+	query := `
+		SELECT id, url, display_order, created_at
+		FROM batch_medias
+		WHERE batch_id = $1
+		ORDER BY display_order, created_at
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, batchID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	medias := []entity.Media{}
+	for rows.Next() {
+		var m entity.Media
+		m.IsCover = false // batch_medias não tem is_cover
+		if err := rows.Scan(
+			&m.ID, &m.URL, &m.DisplayOrder, &m.CreatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		medias = append(medias, m)
+	}
+
+	return medias, nil
+}
+
+func (r *mediaRepository) DeleteProductMedia(ctx context.Context, id string) error {
+	query := `DELETE FROM product_medias WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Mídia")
+	}
+
+	return nil
+}
+
+func (r *mediaRepository) DeleteBatchMedia(ctx context.Context, id string) error {
+	query := `DELETE FROM batch_medias WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Mídia")
+	}
+
+	return nil
+}
+
+func (r *mediaRepository) UpdateDisplayOrder(ctx context.Context, id string, order int) error {
+	query := `
+		UPDATE product_medias 
+		SET display_order = $1 
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, order, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		// Tentar batch_medias
+		query = `
+			UPDATE batch_medias 
+			SET display_order = $1 
+			WHERE id = $2
+		`
+		result, err = r.db.ExecContext(ctx, query, order, id)
+		if err != nil {
+			return errors.DatabaseError(err)
+		}
+
+		rows, err = result.RowsAffected()
+		if err != nil {
+			return errors.DatabaseError(err)
+		}
+
+		if rows == 0 {
+			return errors.NewNotFoundError("Mídia")
+		}
+	}
+
+	return nil
+}
+
+func (r *mediaRepository) SetCover(ctx context.Context, productID, mediaID string) error {
+	return r.db.ExecuteInTx(ctx, func(tx *sql.Tx) error {
+		// Remover flag is_cover de todas as mídias do produto
+		query1 := `
+			UPDATE product_medias 
+			SET is_cover = FALSE 
+			WHERE product_id = $1
+		`
+		if _, err := tx.ExecContext(ctx, query1, productID); err != nil {
+			return errors.DatabaseError(err)
+		}
+
+		// Setar nova capa
+		query2 := `
+			UPDATE product_medias 
+			SET is_cover = TRUE 
+			WHERE id = $1 AND product_id = $2
+		`
+		result, err := tx.ExecContext(ctx, query2, mediaID, productID)
+		if err != nil {
+			return errors.DatabaseError(err)
+		}
+
+		rows, err := result.RowsAffected()
+		if err != nil {
+			return errors.DatabaseError(err)
+		}
+
+		if rows == 0 {
+			return errors.NewNotFoundError("Mídia")
+		}
+
+		return nil
+	})
+}
+```
+
+---
+
+### `.\internal\repository\product_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type productRepository struct {
+	db *DB
+}
+
+func NewProductRepository(db *DB) *productRepository {
+	return &productRepository{db: db}
+}
+
+func (r *productRepository) Create(ctx context.Context, product *entity.Product) error {
+	query := `
+		INSERT INTO products (id, industry_id, name, sku_code, description, 
+		                      material_type, finish_type, is_public_catalog)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		product.ID, product.IndustryID, product.Name, product.SKU,
+		product.Description, product.Material, product.Finish, product.IsPublic,
+	).Scan(&product.CreatedAt, &product.UpdatedAt)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *productRepository) FindByID(ctx context.Context, id string) (*entity.Product, error) {
+	query := `
+		SELECT id, industry_id, name, sku_code, description, material_type, 
+		       finish_type, is_public_catalog, created_at, updated_at
+		FROM products
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	product := &entity.Product{IsActive: true}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&product.ID, &product.IndustryID, &product.Name, &product.SKU,
+		&product.Description, &product.Material, &product.Finish,
+		&product.IsPublic, &product.CreatedAt, &product.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Produto")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return product, nil
+}
+
+func (r *productRepository) FindByIndustryID(ctx context.Context, industryID string, filters entity.ProductFilters) ([]entity.Product, int, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	// Query principal
+	query := psql.Select(
+		"p.id", "p.industry_id", "p.name", "p.sku_code", "p.description",
+		"p.material_type", "p.finish_type", "p.is_public_catalog",
+		"p.created_at", "p.updated_at",
+		"COALESCE(COUNT(b.id), 0) as batch_count",
+	).From("products p").
+		LeftJoin("batches b ON p.id = b.product_id AND b.is_active = TRUE").
+		Where(sq.Eq{"p.industry_id": industryID}).
+		GroupBy("p.id")
+
+	// Filtro de ativo/inativo
+	if !filters.IncludeInactive {
+		query = query.Where("p.deleted_at IS NULL")
+	}
+
+	// Filtro de material
+	if filters.Material != nil {
+		query = query.Where(sq.Eq{"p.material_type": *filters.Material})
+	}
+
+	// Filtro de busca
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		query = query.Where("p.name ILIKE ?", search)
+	}
+
+	// Contar total
+	countQuery := psql.Select("COUNT(DISTINCT p.id)").
+		From("products p").
+		Where(sq.Eq{"p.industry_id": industryID})
+
+	if !filters.IncludeInactive {
+		countQuery = countQuery.Where("p.deleted_at IS NULL")
+	}
+	if filters.Material != nil {
+		countQuery = countQuery.Where(sq.Eq{"p.material_type": *filters.Material})
+	}
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		countQuery = countQuery.Where("p.name ILIKE ?", search)
+	}
+
+	countSQL, countArgs, _ := countQuery.ToSql()
+	var total int
+	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Paginação
+	offset := (filters.Page - 1) * filters.Limit
+	query = query.OrderBy("p.created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	products := []entity.Product{}
+	for rows.Next() {
+		var p entity.Product
+		var batchCount int
+		if err := rows.Scan(
+			&p.ID, &p.IndustryID, &p.Name, &p.SKU, &p.Description,
+			&p.Material, &p.Finish, &p.IsPublic,
+			&p.CreatedAt, &p.UpdatedAt, &batchCount,
+		); err != nil {
+			return nil, 0, errors.DatabaseError(err)
+		}
+		p.BatchCount = &batchCount
+		p.IsActive = true
+		products = append(products, p)
+	}
+
+	return products, total, nil
+}
+
+func (r *productRepository) Update(ctx context.Context, product *entity.Product) error {
+	query := `
+		UPDATE products
+		SET name = $1, sku_code = $2, description = $3, 
+		    material_type = $4, finish_type = $5, is_public_catalog = $6,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $7 AND deleted_at IS NULL
+		RETURNING updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		product.Name, product.SKU, product.Description,
+		product.Material, product.Finish, product.IsPublic, product.ID,
+	).Scan(&product.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Produto")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *productRepository) SoftDelete(ctx context.Context, id string) error {
+	query := `
+		UPDATE products
+		SET deleted_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Produto")
+	}
+
+	return nil
+}
+
+func (r *productRepository) CountBatchesByProductID(ctx context.Context, productID string) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM batches 
+		WHERE product_id = $1 AND is_active = TRUE
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, productID).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
+func (r *productRepository) ExistsBySKU(ctx context.Context, industryID, sku string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM products 
+			WHERE industry_id = $1 AND sku_code = $2 AND deleted_at IS NULL
+		)
+	`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, industryID, sku).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+```
+
+---
+
+### `.\internal\repository\reservation_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type reservationRepository struct {
+	db *DB
+}
+
+func NewReservationRepository(db *DB) *reservationRepository {
+	return &reservationRepository{db: db}
+}
+
+func (r *reservationRepository) Create(ctx context.Context, tx *sql.Tx, reservation *entity.Reservation) error {
+	query := `
+		INSERT INTO reservations (
+			id, batch_id, reserved_by_user_id, lead_id, status, notes, expires_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		RETURNING created_at
+	`
+
+	err := tx.QueryRowContext(ctx, query,
+		reservation.ID, reservation.BatchID, reservation.ReservedByUserID,
+		reservation.LeadID, reservation.Status, reservation.Notes,
+		reservation.ExpiresAt,
+	).Scan(&reservation.CreatedAt)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		       expires_at, created_at, is_active
+		FROM reservations
+		WHERE id = $1
+	`
+
+	res := &entity.Reservation{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&res.ID, &res.BatchID, &res.ReservedByUserID, &res.LeadID,
+		&res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Reserva")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return res, nil
+}
+
+func (r *reservationRepository) FindByBatchID(ctx context.Context, batchID string) ([]entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		       expires_at, created_at, is_active
+		FROM reservations
+		WHERE batch_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, batchID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservations(rows)
+}
+
+func (r *reservationRepository) FindActive(ctx context.Context, userID string) ([]entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		       expires_at, created_at, is_active
+		FROM reservations
+		WHERE reserved_by_user_id = $1 
+		  AND status = 'ATIVA'
+		  AND is_active = TRUE
+		  AND expires_at > CURRENT_TIMESTAMP
+		ORDER BY expires_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservations(rows)
+}
+
+func (r *reservationRepository) FindExpired(ctx context.Context) ([]entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		       expires_at, created_at, is_active
+		FROM reservations
+		WHERE status = 'ATIVA'
+		  AND expires_at < CURRENT_TIMESTAMP
+		ORDER BY expires_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservations(rows)
+}
+
+func (r *reservationRepository) Update(ctx context.Context, reservation *entity.Reservation) error {
+	query := `
+		UPDATE reservations
+		SET notes = $1, expires_at = $2, status = $3
+		WHERE id = $4
+	`
+
+	result, err := r.db.ExecContext(ctx, query,
+		reservation.Notes, reservation.ExpiresAt, reservation.Status, reservation.ID,
+	)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Reserva")
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) UpdateStatus(ctx context.Context, tx *sql.Tx, id string, status entity.ReservationStatus) error {
+	query := `
+		UPDATE reservations
+		SET status = $1
+		WHERE id = $2
+	`
+
+	var result sql.Result
+	var err error
+
+	if tx != nil {
+		result, err = tx.ExecContext(ctx, query, status, id)
+	} else {
+		result, err = r.db.ExecContext(ctx, query, status, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Reserva")
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) Cancel(ctx context.Context, tx *sql.Tx, id string) error {
+	query := `
+		UPDATE reservations
+		SET status = 'CANCELADA', is_active = FALSE
+		WHERE id = $1
+	`
+
+	var result sql.Result
+	var err error
+
+	if tx != nil {
+		result, err = tx.ExecContext(ctx, query, id)
+	} else {
+		result, err = r.db.ExecContext(ctx, query, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Reserva")
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) List(ctx context.Context, filters entity.ReservationFilters) ([]entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		       expires_at, created_at, is_active
+		FROM reservations
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	argCount := 1
+
+	if filters.BatchID != nil {
+		query += ` AND batch_id = $` + string(rune('0'+argCount))
+		args = append(args, *filters.BatchID)
+		argCount++
+	}
+
+	if filters.Status != nil {
+		query += ` AND status = $` + string(rune('0'+argCount))
+		args = append(args, *filters.Status)
+		argCount++
+	}
+
+	// Paginação
+	offset := (filters.Page - 1) * filters.Limit
+	query += ` ORDER BY created_at DESC`
+	query += ` LIMIT $` + string(rune('0'+argCount))
+	args = append(args, filters.Limit)
+	argCount++
+	query += ` OFFSET $` + string(rune('0'+argCount))
+	args = append(args, offset)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservations(rows)
+}
+
+func (r *reservationRepository) scanReservations(rows *sql.Rows) ([]entity.Reservation, error) {
+	reservations := []entity.Reservation{}
+	for rows.Next() {
+		var res entity.Reservation
+		if err := rows.Scan(
+			&res.ID, &res.BatchID, &res.ReservedByUserID, &res.LeadID,
+			&res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		reservations = append(reservations, res)
+	}
+	return reservations, nil
+}
+```
+
+---
+
+### `.\internal\repository\sales_history_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"time"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type salesHistoryRepository struct {
+	db *DB
+}
+
+func NewSalesHistoryRepository(db *DB) *salesHistoryRepository {
+	return &salesHistoryRepository{db: db}
+}
+
+func (r *salesHistoryRepository) Create(ctx context.Context, tx *sql.Tx, sale *entity.Sale) error {
+	query := `
+		INSERT INTO sales_history (
+			id, batch_id, sold_by_user_id, industry_id, lead_id,
+			customer_name, customer_contact, sale_price, broker_commission,
+			net_industry_value, invoice_url, notes, sold_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		RETURNING created_at
+	`
+
+	err := tx.QueryRowContext(ctx, query,
+		sale.ID, sale.BatchID, sale.SoldByUserID, sale.IndustryID, sale.LeadID,
+		sale.CustomerName, sale.CustomerContact, sale.SalePrice,
+		sale.BrokerCommission, sale.NetIndustryValue, sale.InvoiceURL,
+		sale.Notes, sale.SaleDate,
+	).Scan(&sale.CreatedAt)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *salesHistoryRepository) FindByID(ctx context.Context, id string) (*entity.Sale, error) {
+	query := `
+		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
+		       customer_name, customer_contact, sale_price, broker_commission,
+		       net_industry_value, invoice_url, notes, sold_at, created_at
+		FROM sales_history
+		WHERE id = $1
+	`
+
+	sale := &entity.Sale{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&sale.ID, &sale.BatchID, &sale.SoldByUserID, &sale.IndustryID, &sale.LeadID,
+		&sale.CustomerName, &sale.CustomerContact, &sale.SalePrice,
+		&sale.BrokerCommission, &sale.NetIndustryValue, &sale.InvoiceURL,
+		&sale.Notes, &sale.SaleDate, &sale.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Venda")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return sale, nil
+}
+
+func (r *salesHistoryRepository) FindBySellerID(ctx context.Context, sellerID string, filters entity.SaleFilters) ([]entity.Sale, int, error) {
+	return r.listWithFilters(ctx, &sellerID, nil, filters)
+}
+
+func (r *salesHistoryRepository) FindByIndustryID(ctx context.Context, industryID string, filters entity.SaleFilters) ([]entity.Sale, int, error) {
+	return r.listWithFilters(ctx, nil, &industryID, filters)
+}
+
+func (r *salesHistoryRepository) FindByBrokerID(ctx context.Context, brokerID string, limit int) ([]entity.Sale, error) {
+	query := `
+		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
+		       customer_name, customer_contact, sale_price, broker_commission,
+		       net_industry_value, invoice_url, notes, sold_at, created_at
+		FROM sales_history
+		WHERE sold_by_user_id = $1
+		ORDER BY sold_at DESC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, brokerID, limit)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanSales(rows)
+}
+
+func (r *salesHistoryRepository) FindByPeriod(ctx context.Context, industryID string, startDate, endDate time.Time) ([]entity.Sale, error) {
+	query := `
+		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
+		       customer_name, customer_contact, sale_price, broker_commission,
+		       net_industry_value, invoice_url, notes, sold_at, created_at
+		FROM sales_history
+		WHERE industry_id = $1 
+		  AND sold_at >= $2 
+		  AND sold_at <= $3
+		ORDER BY sold_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID, startDate, endDate)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanSales(rows)
+}
+
+func (r *salesHistoryRepository) List(ctx context.Context, filters entity.SaleFilters) ([]entity.Sale, int, error) {
+	return r.listWithFilters(ctx, nil, nil, filters)
+}
+
+func (r *salesHistoryRepository) listWithFilters(ctx context.Context, sellerID, industryID *string, filters entity.SaleFilters) ([]entity.Sale, int, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	query := psql.Select(
+		"id", "batch_id", "sold_by_user_id", "industry_id", "lead_id",
+		"customer_name", "customer_contact", "sale_price", "broker_commission",
+		"net_industry_value", "invoice_url", "notes", "sold_at", "created_at",
+	).From("sales_history")
+
+	if sellerID != nil {
+		query = query.Where(sq.Eq{"sold_by_user_id": *sellerID})
+	}
+
+	if industryID != nil {
+		query = query.Where(sq.Eq{"industry_id": *industryID})
+	}
+
+	if filters.SellerID != nil {
+		query = query.Where(sq.Eq{"sold_by_user_id": *filters.SellerID})
+	}
+
+	if filters.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
+		if err == nil {
+			query = query.Where(sq.GtOrEq{"sold_at": startDate})
+		}
+	}
+
+	if filters.EndDate != nil {
+		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
+		if err == nil {
+			query = query.Where(sq.LtOrEq{"sold_at": endDate})
+		}
+	}
+
+	// Count
+	countQuery := psql.Select("COUNT(*)").From("sales_history")
+	if sellerID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sold_by_user_id": *sellerID})
+	}
+	if industryID != nil {
+		countQuery = countQuery.Where(sq.Eq{"industry_id": *industryID})
+	}
+	if filters.SellerID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sold_by_user_id": *filters.SellerID})
+	}
+	if filters.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
+		if err == nil {
+			countQuery = countQuery.Where(sq.GtOrEq{"sold_at": startDate})
+		}
+	}
+	if filters.EndDate != nil {
+		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
+		if err == nil {
+			countQuery = countQuery.Where(sq.LtOrEq{"sold_at": endDate})
+		}
+	}
+
+	countSQL, countArgs, _ := countQuery.ToSql()
+	var total int
+	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Pagination
+	offset := (filters.Page - 1) * filters.Limit
+	query = query.OrderBy("sold_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	sales, err := r.scanSales(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return sales, total, nil
+}
+
+func (r *salesHistoryRepository) CalculateSummary(ctx context.Context, filters entity.SaleSummaryFilters) (*entity.SaleSummary, error) {
+	query := `
+		SELECT 
+			COALESCE(SUM(sale_price), 0) as total_sales,
+			COALESCE(SUM(broker_commission), 0) as total_commissions,
+			COALESCE(AVG(sale_price), 0) as average_ticket
+		FROM sales_history
+		WHERE 1=1
+	`
+	args := []interface{}{}
+	argCount := 1
+
+	if filters.StartDate != nil {
+		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
+		if err == nil {
+			query += ` AND sold_at >= $` + string(rune('0'+argCount))
+			args = append(args, startDate)
+			argCount++
+		}
+	}
+
+	if filters.EndDate != nil {
+		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
+		if err == nil {
+			query += ` AND sold_at <= $` + string(rune('0'+argCount))
+			args = append(args, endDate)
+			argCount++
+		}
+	}
+
+	summary := &entity.SaleSummary{}
+	err := r.db.QueryRowContext(ctx, query, args...).Scan(
+		&summary.TotalSales, &summary.TotalCommissions, &summary.AverageTicket,
+	)
+
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return summary, nil
+}
+
+func (r *salesHistoryRepository) SumMonthlySales(ctx context.Context, entityID string, month time.Time) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(sale_price), 0)
+		FROM sales_history
+		WHERE (industry_id = $1 OR sold_by_user_id = $1)
+		  AND sold_at >= $2
+		  AND sold_at < $3
+	`
+
+	startOfMonth := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
+
+	var total float64
+	err := r.db.QueryRowContext(ctx, query, entityID, startOfMonth, endOfMonth).Scan(&total)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return total, nil
+}
+
+func (r *salesHistoryRepository) SumMonthlyCommission(ctx context.Context, brokerID string, month time.Time) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(broker_commission), 0)
+		FROM sales_history
+		WHERE sold_by_user_id = $1
+		  AND sold_at >= $2
+		  AND sold_at < $3
+	`
+
+	startOfMonth := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
+
+	var total float64
+	err := r.db.QueryRowContext(ctx, query, brokerID, startOfMonth, endOfMonth).Scan(&total)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return total, nil
+}
+
+func (r *salesHistoryRepository) scanSales(rows *sql.Rows) ([]entity.Sale, error) {
+	sales := []entity.Sale{}
+	for rows.Next() {
+		var s entity.Sale
+		if err := rows.Scan(
+			&s.ID, &s.BatchID, &s.SoldByUserID, &s.IndustryID, &s.LeadID,
+			&s.CustomerName, &s.CustomerContact, &s.SalePrice,
+			&s.BrokerCommission, &s.NetIndustryValue, &s.InvoiceURL,
+			&s.Notes, &s.SaleDate, &s.CreatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		sales = append(sales, s)
+	}
+	return sales, nil
+}
+```
+
+---
+
+### `.\internal\repository\sales_link_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	sq "github.com/Masterminds/squirrel"
+	"github.com/lib/pq"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type salesLinkRepository struct {
+	db *DB
+}
+
+func NewSalesLinkRepository(db *DB) *salesLinkRepository {
+	return &salesLinkRepository{db: db}
+}
+
+func (r *salesLinkRepository) Create(ctx context.Context, link *entity.SalesLink) error {
+	query := `
+		INSERT INTO sales_links (
+			id, created_by_user_id, industry_id, batch_id, product_id,
+			link_type, slug_token, title, custom_message, display_price,
+			show_price, expires_at, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		link.ID, link.CreatedByUserID, link.IndustryID, link.BatchID,
+		link.ProductID, link.LinkType, link.SlugToken, link.Title,
+		link.CustomMessage, link.DisplayPrice, link.ShowPrice,
+		link.ExpiresAt, link.IsActive,
+	).Scan(&link.CreatedAt, &link.UpdatedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" {
+				return errors.SlugExistsError(link.SlugToken)
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *salesLinkRepository) FindByID(ctx context.Context, id string) (*entity.SalesLink, error) {
+	query := `
+		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
+		       link_type, slug_token, title, custom_message, display_price,
+		       show_price, views_count, expires_at, is_active, 
+		       created_at, updated_at
+		FROM sales_links
+		WHERE id = $1
+	`
+
+	link := &entity.SalesLink{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.BatchID,
+		&link.ProductID, &link.LinkType, &link.SlugToken, &link.Title,
+		&link.CustomMessage, &link.DisplayPrice, &link.ShowPrice,
+		&link.ViewsCount, &link.ExpiresAt, &link.IsActive,
+		&link.CreatedAt, &link.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Link de venda")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return link, nil
+}
+
+func (r *salesLinkRepository) FindBySlug(ctx context.Context, slug string) (*entity.SalesLink, error) {
+	query := `
+		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
+		       link_type, slug_token, title, custom_message, display_price,
+		       show_price, views_count, expires_at, is_active, 
+		       created_at, updated_at
+		FROM sales_links
+		WHERE slug_token = $1
+	`
+
+	link := &entity.SalesLink{}
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(
+		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.BatchID,
+		&link.ProductID, &link.LinkType, &link.SlugToken, &link.Title,
+		&link.CustomMessage, &link.DisplayPrice, &link.ShowPrice,
+		&link.ViewsCount, &link.ExpiresAt, &link.IsActive,
+		&link.CreatedAt, &link.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Link de venda")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return link, nil
+}
+
+func (r *salesLinkRepository) FindByCreatorID(ctx context.Context, userID string, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
+	return r.listWithFilters(ctx, &userID, filters)
+}
+
+func (r *salesLinkRepository) FindByType(ctx context.Context, linkType entity.LinkType) ([]entity.SalesLink, error) {
+	query := `
+		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
+		       link_type, slug_token, title, custom_message, display_price,
+		       show_price, views_count, expires_at, is_active, 
+		       created_at, updated_at
+		FROM sales_links
+		WHERE link_type = $1 AND is_active = TRUE
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, linkType)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanLinks(rows)
+}
+
+func (r *salesLinkRepository) List(ctx context.Context, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
+	return r.listWithFilters(ctx, nil, filters)
+}
+
+func (r *salesLinkRepository) listWithFilters(ctx context.Context, userID *string, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+
+	query := psql.Select(
+		"id", "created_by_user_id", "industry_id", "batch_id", "product_id",
+		"link_type", "slug_token", "title", "custom_message", "display_price",
+		"show_price", "views_count", "expires_at", "is_active",
+		"created_at", "updated_at",
+	).From("sales_links")
+
+	if userID != nil {
+		query = query.Where(sq.Eq{"created_by_user_id": *userID})
+	}
+
+	if filters.Type != nil {
+		query = query.Where(sq.Eq{"link_type": *filters.Type})
+	}
+
+	if filters.Status != nil {
+		if *filters.Status == "ATIVO" {
+			query = query.Where(sq.Eq{"is_active": true})
+			query = query.Where(sq.Or{
+				sq.Eq{"expires_at": nil},
+				sq.Gt{"expires_at": sq.Expr("CURRENT_TIMESTAMP")},
+			})
+		} else if *filters.Status == "EXPIRADO" {
+			query = query.Where(sq.Lt{"expires_at": sq.Expr("CURRENT_TIMESTAMP")})
+		}
+	}
+
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		query = query.Where(sq.Or{
+			sq.ILike{"title": search},
+			sq.ILike{"slug_token": search},
+		})
+	}
+
+	// Count
+	countQuery := psql.Select("COUNT(*)").From("sales_links")
+	if userID != nil {
+		countQuery = countQuery.Where(sq.Eq{"created_by_user_id": *userID})
+	}
+	if filters.Type != nil {
+		countQuery = countQuery.Where(sq.Eq{"link_type": *filters.Type})
+	}
+	if filters.Status != nil {
+		if *filters.Status == "ATIVO" {
+			countQuery = countQuery.Where(sq.Eq{"is_active": true})
+		}
+	}
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		countQuery = countQuery.Where(sq.Or{
+			sq.ILike{"title": search},
+			sq.ILike{"slug_token": search},
+		})
+	}
+
+	countSQL, countArgs, _ := countQuery.ToSql()
+	var total int
+	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Pagination
+	offset := (filters.Page - 1) * filters.Limit
+	query = query.OrderBy("created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+
+	sql, args, err := query.ToSql()
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	links, err := r.scanLinks(rows)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return links, total, nil
+}
+
+func (r *salesLinkRepository) Update(ctx context.Context, link *entity.SalesLink) error {
+	query := `
+		UPDATE sales_links
+		SET title = $1, custom_message = $2, display_price = $3,
+		    show_price = $4, expires_at = $5, is_active = $6,
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = $7
+		RETURNING updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		link.Title, link.CustomMessage, link.DisplayPrice,
+		link.ShowPrice, link.ExpiresAt, link.IsActive, link.ID,
+	).Scan(&link.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Link de venda")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *salesLinkRepository) SoftDelete(ctx context.Context, id string) error {
+	query := `
+		UPDATE sales_links
+		SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Link de venda")
+	}
+
+	return nil
+}
+
+func (r *salesLinkRepository) ExistsBySlug(ctx context.Context, slug string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM sales_links WHERE slug_token = $1)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *salesLinkRepository) IncrementViews(ctx context.Context, id string) error {
+	query := `
+		UPDATE sales_links
+		SET views_count = views_count + 1
+		WHERE id = $1
+	`
+
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *salesLinkRepository) CountActive(ctx context.Context, userID string) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM sales_links 
+		WHERE created_by_user_id = $1 
+		  AND is_active = TRUE
+		  AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP)
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, userID).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
+func (r *salesLinkRepository) scanLinks(rows *sql.Rows) ([]entity.SalesLink, error) {
+	links := []entity.SalesLink{}
+	for rows.Next() {
+		var l entity.SalesLink
+		if err := rows.Scan(
+			&l.ID, &l.CreatedByUserID, &l.IndustryID, &l.BatchID, &l.ProductID,
+			&l.LinkType, &l.SlugToken, &l.Title, &l.CustomMessage,
+			&l.DisplayPrice, &l.ShowPrice, &l.ViewsCount, &l.ExpiresAt,
+			&l.IsActive, &l.CreatedAt, &l.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		links = append(links, l)
+	}
+	return links, nil
+}
+```
+
+---
+
+### `.\internal\repository\shared_inventory_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+
+	"github.com/lib/pq"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type sharedInventoryRepository struct {
+	db *DB
+}
+
+func NewSharedInventoryRepository(db *DB) *sharedInventoryRepository {
+	return &sharedInventoryRepository{db: db}
+}
+
+func (r *sharedInventoryRepository) CreateSharedBatch(ctx context.Context, shared *entity.SharedInventoryBatch) error {
+	query := `
+		INSERT INTO shared_inventory_batches (
+			id, batch_id, broker_user_id, industry_owner_id, negotiated_price
+		) VALUES ($1, $2, $3, $4, $5)
+		RETURNING shared_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		shared.ID, shared.BatchID, shared.BrokerUserID,
+		shared.IndustryOwnerID, shared.NegotiatedPrice,
+	).Scan(&shared.SharedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				return errors.NewConflictError("Lote já compartilhado com este broker")
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) FindByBrokerID(ctx context.Context, brokerID string, filters entity.SharedInventoryFilters) ([]entity.SharedInventoryBatch, error) {
+	query := `
+		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		       negotiated_price, shared_at, is_active
+		FROM shared_inventory_batches
+		WHERE broker_user_id = $1 AND is_active = TRUE
+	`
+	args := []interface{}{brokerID}
+
+	if filters.Status != "" {
+		query += ` AND EXISTS (
+			SELECT 1 FROM batches 
+			WHERE batches.id = shared_inventory_batches.batch_id 
+			AND batches.status = $2
+		)`
+		args = append(args, filters.Status)
+	}
+
+	if filters.Recent {
+		query += ` ORDER BY shared_at DESC`
+	} else {
+		query += ` ORDER BY shared_at DESC`
+	}
+
+	if filters.Limit > 0 {
+		query += ` LIMIT $` + string(rune(len(args)+1))
+		args = append(args, filters.Limit)
+	}
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanSharedBatches(rows)
+}
+
+func (r *sharedInventoryRepository) FindByBatchID(ctx context.Context, batchID string) ([]entity.SharedInventoryBatch, error) {
+	query := `
+		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		       negotiated_price, shared_at, is_active
+		FROM shared_inventory_batches
+		WHERE batch_id = $1 AND is_active = TRUE
+		ORDER BY shared_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, batchID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanSharedBatches(rows)
+}
+
+func (r *sharedInventoryRepository) FindByID(ctx context.Context, id string) (*entity.SharedInventoryBatch, error) {
+	query := `
+		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		       negotiated_price, shared_at, is_active
+		FROM shared_inventory_batches
+		WHERE id = $1
+	`
+
+	shared := &entity.SharedInventoryBatch{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&shared.ID, &shared.BatchID, &shared.BrokerUserID,
+		&shared.IndustryOwnerID, &shared.NegotiatedPrice,
+		&shared.SharedAt, &shared.IsActive,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Compartilhamento")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return shared, nil
+}
+
+func (r *sharedInventoryRepository) ExistsForBroker(ctx context.Context, batchID, brokerID string) (bool, error) {
+	query := `
+		SELECT EXISTS(
+			SELECT 1 FROM shared_inventory_batches 
+			WHERE batch_id = $1 AND broker_user_id = $2 AND is_active = TRUE
+		)
+	`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, batchID, brokerID).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *sharedInventoryRepository) UpdateNegotiatedPrice(ctx context.Context, id string, price *float64) error {
+	query := `
+		UPDATE shared_inventory_batches
+		SET negotiated_price = $1
+		WHERE id = $2 AND is_active = TRUE
+	`
+
+	result, err := r.db.ExecContext(ctx, query, price, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Compartilhamento")
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM shared_inventory_batches WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Compartilhamento")
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) CountSharedBatches(ctx context.Context, brokerID string, status entity.BatchStatus) (int, error) {
+	query := `
+		SELECT COUNT(DISTINCT sib.id)
+		FROM shared_inventory_batches sib
+		INNER JOIN batches b ON sib.batch_id = b.id
+		WHERE sib.broker_user_id = $1 
+		  AND sib.is_active = TRUE
+		  AND b.status = $2
+		  AND b.is_active = TRUE
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, brokerID, status).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
+func (r *sharedInventoryRepository) CreateCatalogPermission(ctx context.Context, permission *entity.SharedCatalogPermission) error {
+	query := `
+		INSERT INTO shared_catalog_permissions (
+			id, industry_id, broker_user_id, can_show_prices
+		) VALUES ($1, $2, $3, $4)
+		RETURNING granted_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		permission.ID, permission.IndustryID,
+		permission.BrokerUserID, permission.CanShowPrices,
+	).Scan(&permission.GrantedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" {
+				return errors.NewConflictError("Permissão já existe para este broker")
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) FindCatalogPermissionByBroker(ctx context.Context, industryID, brokerID string) (*entity.SharedCatalogPermission, error) {
+	query := `
+		SELECT id, industry_id, broker_user_id, can_show_prices, 
+		       granted_at, is_active
+		FROM shared_catalog_permissions
+		WHERE industry_id = $1 AND broker_user_id = $2
+	`
+
+	perm := &entity.SharedCatalogPermission{}
+	err := r.db.QueryRowContext(ctx, query, industryID, brokerID).Scan(
+		&perm.ID, &perm.IndustryID, &perm.BrokerUserID,
+		&perm.CanShowPrices, &perm.GrantedAt, &perm.IsActive,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Permissão")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return perm, nil
+}
+
+func (r *sharedInventoryRepository) UpdateCatalogPermission(ctx context.Context, permission *entity.SharedCatalogPermission) error {
+	query := `
+		UPDATE shared_catalog_permissions
+		SET can_show_prices = $1, is_active = $2
+		WHERE id = $3
+	`
+
+	result, err := r.db.ExecContext(ctx, query,
+		permission.CanShowPrices, permission.IsActive, permission.ID,
+	)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Permissão")
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) DeleteCatalogPermission(ctx context.Context, id string) error {
+	query := `DELETE FROM shared_catalog_permissions WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Permissão")
+	}
+
+	return nil
+}
+
+func (r *sharedInventoryRepository) scanSharedBatches(rows *sql.Rows) ([]entity.SharedInventoryBatch, error) {
+	shared := []entity.SharedInventoryBatch{}
+	for rows.Next() {
+		var s entity.SharedInventoryBatch
+		if err := rows.Scan(
+			&s.ID, &s.BatchID, &s.BrokerUserID, &s.IndustryOwnerID,
+			&s.NegotiatedPrice, &s.SharedAt, &s.IsActive,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		shared = append(shared, s)
+	}
+	return shared, nil
+}
+```
+
+---
+
+### `.\internal\repository\user_repository.go`
+
+```go
+package repository
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+
+	"github.com/lib/pq"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
+)
+
+type userRepository struct {
+	db *DB
+}
+
+// NewUserRepository cria novo repositório de usuários
+func NewUserRepository(db *DB) *userRepository {
+	return &userRepository{db: db}
+}
+
+func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
+	query := `
+		INSERT INTO users (id, industry_id, name, email, password_hash, phone, role, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		RETURNING created_at, updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		user.ID, user.IndustryID, user.Name, user.Email,
+		user.Password, user.Phone, user.Role, user.IsActive,
+	).Scan(&user.CreatedAt, &user.UpdatedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				return errors.EmailExistsError(user.Email)
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, password_hash, phone, role, 
+		       is_active, created_at, updated_at
+		FROM users
+		WHERE id = $1
+	`
+
+	user := &entity.User{}
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&user.ID, &user.IndustryID, &user.Name, &user.Email,
+		&user.Password, &user.Phone, &user.Role,
+		&user.IsActive, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Usuário")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return user, nil
+}
+
+func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, password_hash, phone, role, 
+		       is_active, created_at, updated_at
+		FROM users
+		WHERE email = $1
+	`
+
+	user := &entity.User{}
+	err := r.db.QueryRowContext(ctx, query, email).Scan(
+		&user.ID, &user.IndustryID, &user.Name, &user.Email,
+		&user.Password, &user.Phone, &user.Role,
+		&user.IsActive, &user.CreatedAt, &user.UpdatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Usuário")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return user, nil
+}
+
+func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string) ([]entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, phone, role, 
+		       is_active, created_at, updated_at
+		FROM users
+		WHERE industry_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	users := []entity.User{}
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(
+			&u.ID, &u.IndustryID, &u.Name, &u.Email,
+			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) ([]entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, phone, role, 
+		       is_active, created_at, updated_at
+		FROM users
+		WHERE role = $1 AND is_active = TRUE
+		ORDER BY name
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, role)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	users := []entity.User{}
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(
+			&u.ID, &u.IndustryID, &u.Name, &u.Email,
+			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]entity.BrokerWithStats, error) {
+	query := `
+		SELECT 
+			u.id, u.name, u.email, u.phone, u.role, 
+			u.is_active, u.created_at, u.updated_at,
+			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
+		FROM users u
+		LEFT JOIN shared_inventory_batches sib 
+			ON u.id = sib.broker_user_id 
+			AND sib.industry_owner_id = $1
+			AND sib.is_active = TRUE
+		WHERE u.role = 'BROKER'
+		GROUP BY u.id
+		ORDER BY u.name
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	brokers := []entity.BrokerWithStats{}
+	for rows.Next() {
+		var b entity.BrokerWithStats
+		if err := rows.Scan(
+			&b.ID, &b.Name, &b.Email, &b.Phone, &b.Role,
+			&b.IsActive, &b.CreatedAt, &b.UpdatedAt,
+			&b.SharedBatchesCount,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		brokers = append(brokers, b)
+	}
+
+	return brokers, nil
+}
+
+func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
+	query := `
+		UPDATE users
+		SET name = $1, phone = $2, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $3
+		RETURNING updated_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		user.Name, user.Phone, user.ID,
+	).Scan(&user.UpdatedAt)
+
+	if err == sql.ErrNoRows {
+		return errors.NewNotFoundError("Usuário")
+	}
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *userRepository) UpdateStatus(ctx context.Context, id string, isActive bool) error {
+	query := `
+		UPDATE users
+		SET is_active = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, isActive, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Usuário")
+	}
+
+	return nil
+}
+
+func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, email).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, phone, role, 
+		       is_active, created_at, updated_at
+		FROM users
+		WHERE 1=1
+	`
+	args := []interface{}{}
+
+	if role != nil {
+		query += ` AND role = $1`
+		args = append(args, *role)
+	}
+
+	query += ` ORDER BY name`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	users := []entity.User{}
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(
+			&u.ID, &u.IndustryID, &u.Name, &u.Email,
+			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+```
+
+---
+
+### `.\internal\storage\s3_adapter.go`
+
+```go
+package storage
+
+import (
+	"context"
+	"fmt"
+	"io"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"github.com/minio/minio-go/v7"
+	"github.com/minio/minio-go/v7/pkg/credentials"
+	"go.uber.org/zap"
+)
+
+// S3Adapter implementa o storage service usando MinIO/S3
+type S3Adapter struct {
+	client    *minio.Client
+	bucket    string
+	publicURL string
+	logger    *zap.Logger
+}
+
+// Config contém configurações para S3/MinIO
+type Config struct {
+	Endpoint   string
+	AccessKey  string
+	SecretKey  string
+	BucketName string
+	Region     string
+	UseSSL     bool
+	PublicURL  string
+}
+
+// NewS3Adapter cria novo adapter S3/MinIO
+func NewS3Adapter(cfg *Config, logger *zap.Logger) (*S3Adapter, error) {
+	// Inicializar cliente MinIO (compatível com S3)
+	client, err := minio.New(cfg.Endpoint, &minio.Options{
+		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Secure: cfg.UseSSL,
+		Region: cfg.Region,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("erro ao criar cliente MinIO: %w", err)
+	}
+
+	adapter := &S3Adapter{
+		client:    client,
+		bucket:    cfg.BucketName,
+		publicURL: cfg.PublicURL,
+		logger:    logger,
+	}
+
+	// Verificar se bucket existe
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	exists, err := client.BucketExists(ctx, cfg.BucketName)
+	if err != nil {
+		return nil, fmt.Errorf("erro ao verificar bucket: %w", err)
+	}
+
+	if !exists {
+		logger.Warn("bucket não existe, criando...", zap.String("bucket", cfg.BucketName))
+		if err := client.MakeBucket(ctx, cfg.BucketName, minio.MakeBucketOptions{Region: cfg.Region}); err != nil {
+			return nil, fmt.Errorf("erro ao criar bucket: %w", err)
+		}
+		logger.Info("bucket criado com sucesso", zap.String("bucket", cfg.BucketName))
+	}
+
+	logger.Info("S3 adapter inicializado",
+		zap.String("endpoint", cfg.Endpoint),
+		zap.String("bucket", cfg.BucketName),
+		zap.Bool("ssl", cfg.UseSSL),
+	)
+
+	return adapter, nil
+}
+
+// UploadFile faz upload de arquivo para S3/MinIO
+func (s *S3Adapter) UploadFile(ctx context.Context, bucket, key string, reader io.Reader, contentType string, size int64) (string, error) {
+	// Usar bucket configurado se não especificado
+	if bucket == "" {
+		bucket = s.bucket
+	}
+
+	// Upload do arquivo
+	_, err := s.client.PutObject(ctx, bucket, key, reader, size, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
+	if err != nil {
+		s.logger.Error("erro ao fazer upload",
+			zap.Error(err),
+			zap.String("bucket", bucket),
+			zap.String("key", key),
+		)
+		return "", fmt.Errorf("erro ao fazer upload: %w", err)
+	}
+
+	// Gerar URL pública
+	url := s.generatePublicURL(key)
+
+	s.logger.Info("arquivo enviado com sucesso",
+		zap.String("bucket", bucket),
+		zap.String("key", key),
+		zap.String("url", url),
+	)
+
+	return url, nil
+}
+
+// UploadProductMedia faz upload de mídia de produto
+func (s *S3Adapter) UploadProductMedia(ctx context.Context, productID string, reader io.Reader, filename, contentType string, size int64) (string, error) {
+	// Gerar key: products/{productID}/{timestamp}_{filename}
+	ext := filepath.Ext(filename)
+	timestamp := time.Now().Unix()
+	sanitized := sanitizeFilename(strings.TrimSuffix(filename, ext))
+	key := fmt.Sprintf("products/%s/%d_%s%s", productID, timestamp, sanitized, ext)
+
+	return s.UploadFile(ctx, s.bucket, key, reader, contentType, size)
+}
+
+// UploadBatchMedia faz upload de mídia de lote
+func (s *S3Adapter) UploadBatchMedia(ctx context.Context, batchID string, reader io.Reader, filename, contentType string, size int64) (string, error) {
+	// Gerar key: batches/{batchID}/{timestamp}_{filename}
+	ext := filepath.Ext(filename)
+	timestamp := time.Now().Unix()
+	sanitized := sanitizeFilename(strings.TrimSuffix(filename, ext))
+	key := fmt.Sprintf("batches/%s/%d_%s%s", batchID, timestamp, sanitized, ext)
+
+	return s.UploadFile(ctx, s.bucket, key, reader, contentType, size)
+}
+
+// DeleteFile deleta arquivo do storage
+func (s *S3Adapter) DeleteFile(ctx context.Context, bucket, key string) error {
+	if bucket == "" {
+		bucket = s.bucket
+	}
+
+	err := s.client.RemoveObject(ctx, bucket, key, minio.RemoveObjectOptions{})
+	if err != nil {
+		s.logger.Error("erro ao deletar arquivo",
+			zap.Error(err),
+			zap.String("bucket", bucket),
+			zap.String("key", key),
+		)
+		return fmt.Errorf("erro ao deletar arquivo: %w", err)
+	}
+
+	s.logger.Info("arquivo deletado",
+		zap.String("bucket", bucket),
+		zap.String("key", key),
+	)
+
+	return nil
+}
+
+// FileExists verifica se arquivo existe
+func (s *S3Adapter) FileExists(ctx context.Context, bucket, key string) (bool, error) {
+	if bucket == "" {
+		bucket = s.bucket
+	}
+
+	_, err := s.client.StatObject(ctx, bucket, key, minio.StatObjectOptions{})
+	if err != nil {
+		errResponse := minio.ToErrorResponse(err)
+		if errResponse.Code == "NoSuchKey" {
+			return false, nil
+		}
+		return false, fmt.Errorf("erro ao verificar arquivo: %w", err)
+	}
+
+	return true, nil
+}
+
+// GeneratePresignedURL gera URL pre-assinada (para downloads privados)
+func (s *S3Adapter) GeneratePresignedURL(ctx context.Context, bucket, key string, expiration int) (string, error) {
+	if bucket == "" {
+		bucket = s.bucket
+	}
+
+	url, err := s.client.PresignedGetObject(ctx, bucket, key, time.Duration(expiration)*time.Second, nil)
+	if err != nil {
+		s.logger.Error("erro ao gerar URL presigned",
+			zap.Error(err),
+			zap.String("bucket", bucket),
+			zap.String("key", key),
+		)
+		return "", fmt.Errorf("erro ao gerar URL presigned: %w", err)
+	}
+
+	return url.String(), nil
+}
+
+// ExtractKeyFromURL extrai a key do storage a partir da URL
+func (s *S3Adapter) ExtractKeyFromURL(url string) (string, error) {
+	// Remove o public URL base
+	if s.publicURL != "" && strings.HasPrefix(url, s.publicURL) {
+		key := strings.TrimPrefix(url, s.publicURL)
+		key = strings.TrimPrefix(key, "/")
+		return key, nil
+	}
+
+	// Tentar extrair da URL do MinIO/S3
+	// Formato típico: http://endpoint/bucket/key
+	parts := strings.Split(url, "/")
+	if len(parts) >= 2 {
+		// Assumir que bucket é a primeira parte e key é o resto
+		key := strings.Join(parts[len(parts)-2:], "/")
+		return key, nil
+	}
+
+	return "", fmt.Errorf("não foi possível extrair key da URL: %s", url)
+}
+
+// ValidateFileType valida tipo de arquivo
+func (s *S3Adapter) ValidateFileType(contentType string, allowedTypes []string) bool {
+	for _, allowed := range allowedTypes {
+		if contentType == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// ValidateFileSize valida tamanho do arquivo
+func (s *S3Adapter) ValidateFileSize(size int64, maxSize int64) bool {
+	return size > 0 && size <= maxSize
+}
+
+// generatePublicURL gera URL pública para o arquivo
+func (s *S3Adapter) generatePublicURL(key string) string {
+	if s.publicURL != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimRight(s.publicURL, "/"), key)
+	}
+	// Fallback para URL do MinIO
+	return fmt.Sprintf("%s/%s/%s", s.client.EndpointURL(), s.bucket, key)
+}
+
+// sanitizeFilename remove caracteres inválidos do nome do arquivo
+func sanitizeFilename(filename string) string {
+	// Remover espaços e caracteres especiais
+	replacer := strings.NewReplacer(
+		" ", "-",
+		"_", "-",
+		"(", "",
+		")", "",
+		"[", "",
+		"]", "",
+		"{", "",
+		"}", "",
+		"'", "",
+		"\"", "",
+	)
+	sanitized := replacer.Replace(filename)
+
+	// Converter para lowercase
+	sanitized = strings.ToLower(sanitized)
+
+	// Remover múltiplos hífens consecutivos
+	for strings.Contains(sanitized, "--") {
+		sanitized = strings.ReplaceAll(sanitized, "--", "-")
+	}
+
+	// Remover hífens no início e fim
+	sanitized = strings.Trim(sanitized, "-")
+
+	return sanitized
+}
+```
+
+---
+
 ### `.\migrations\000001_create_extensions.down.sql`
 
 ```go
@@ -5233,6 +8687,19 @@ func validateSlug(fl validator.FieldLevel) bool {
 - .\internal\domain\service\shared_inventory_service.go
 - .\internal\domain\service\storage_service.go
 - .\internal\domain\service\user_service.go
+- .\internal\repository\batch_repository.go
+- .\internal\repository\db.go
+- .\internal\repository\industry_repository.go
+- .\internal\repository\lead_interaction_repository.go
+- .\internal\repository\lead_repository.go
+- .\internal\repository\media_repository.go
+- .\internal\repository\product_repository.go
+- .\internal\repository\reservation_repository.go
+- .\internal\repository\sales_history_repository.go
+- .\internal\repository\sales_link_repository.go
+- .\internal\repository\shared_inventory_repository.go
+- .\internal\repository\user_repository.go
+- .\internal\storage\s3_adapter.go
 - .\migrations\000001_create_extensions.down.sql
 - .\migrations\000001_create_extensions.up.sql
 - .\migrations\000002_create_enums.down.sql
@@ -5285,18 +8752,6 @@ func validateSlug(fl validator.FieldLevel) bool {
 - .\internal\middleware\rbac.go
 - .\internal\middleware\recovery.go
 - .\internal\middleware\request_id.go
-- .\internal\repository\batch_repository.go
-- .\internal\repository\db.go
-- .\internal\repository\industry_repository.go
-- .\internal\repository\lead_interaction_repository.go
-- .\internal\repository\lead_repository.go
-- .\internal\repository\media_repository.go
-- .\internal\repository\product_repository.go
-- .\internal\repository\reservation_repository.go
-- .\internal\repository\sales_history_repository.go
-- .\internal\repository\sales_link_repository.go
-- .\internal\repository\shared_inventory_repository.go
-- .\internal\repository\user_repository.go
 - .\internal\service\auth_service.go
 - .\internal\service\batch_service.go
 - .\internal\service\dashboard_service.go
@@ -5308,4 +8763,3 @@ func validateSlug(fl validator.FieldLevel) bool {
 - .\internal\service\shared_inventory_service.go
 - .\internal\service\storage_service.go
 - .\internal\service\user_service.go
-- .\internal\storage\s3_adapter.go
