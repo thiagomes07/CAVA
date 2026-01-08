@@ -12,12 +12,12 @@ import (
 )
 
 type dashboardService struct {
-	batchRepo   repository.BatchRepository
-	salesRepo   repository.SalesHistoryRepository
-	linkRepo    repository.SalesLinkRepository
-	leadRepo    repository.LeadRepository
-	sharedRepo  repository.SharedInventoryRepository
-	logger      *zap.Logger
+	batchRepo  repository.BatchRepository
+	salesRepo  repository.SalesHistoryRepository
+	linkRepo   repository.SalesLinkRepository
+	leadRepo   repository.LeadRepository
+	sharedRepo repository.SharedInventoryRepository
+	logger     *zap.Logger
 }
 
 func NewDashboardService(
@@ -239,7 +239,7 @@ func (s *dashboardService) GetRecentActivities(ctx context.Context, industryID s
 		Page:  1,
 		Limit: 5,
 	}
-	salesResult, err := s.salesRepo.FindByIndustryID(ctx, industryID, salesFilters)
+	salesResult, _, err := s.salesRepo.FindByIndustryID(ctx, industryID, salesFilters)
 	if err != nil {
 		s.logger.Error("erro ao buscar vendas recentes", zap.Error(err))
 	} else {

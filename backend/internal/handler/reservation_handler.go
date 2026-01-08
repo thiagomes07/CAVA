@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/internal/middleware"
@@ -83,4 +84,99 @@ func (h *ReservationHandler) Create(w http.ResponseWriter, r *http.Request) {
 	)
 
 	response.Created(w, reservation)
+}
+
+// ConfirmSale godoc
+// @Summary Confirma venda de uma reserva
+// @Description Confirma venda (cria SalesHistory, atualiza status do lote para VENDIDO)
+// @Tags reservations
+// @Accept json
+// @Produce json
+// @Param id path string true "ID da reserva"
+// @Param body body entity.ConfirmSaleInput true "Dados da venda"
+// @Success 200 {object} entity.Sale
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/reservations/{id}/confirm-sale [post]
+func (h *ReservationHandler) ConfirmSale(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID da reserva é obrigatório", nil)
+		return
+	}
+
+	var input entity.ConfirmSaleInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Obter userID do contexto
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	// Confirmar venda
+	sale, err := h.reservationService.ConfirmSale(r.Context(), id, userID, input)
+	if err != nil {
+		h.logger.Error("erro ao confirmar venda",
+			zap.String("reservationId", id),
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("venda confirmada",
+		zap.String("saleId", sale.ID),
+		zap.String("reservationId", id),
+		zap.String("userId", userID),
+	)
+
+	response.OK(w, sale)
+}
+
+// Cancel godoc
+// @Summary Cancela uma reserva
+// @Description Cancela reserva (volta status do lote para DISPONIVEL)
+// @Tags reservations
+// @Produce json
+// @Param id path string true "ID da reserva"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/reservations/{id} [delete]
+func (h *ReservationHandler) Cancel(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID da reserva é obrigatório", nil)
+		return
+	}
+
+	// Cancelar reserva
+	if err := h.reservationService.Cancel(r.Context(), id); err != nil {
+		h.logger.Error("erro ao cancelar reserva",
+			zap.String("reservationId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("reserva cancelada",
+		zap.String("reservationId", id),
+	)
+
+	response.OK(w, map[string]bool{"success": true})
 }

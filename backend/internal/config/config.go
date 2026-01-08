@@ -1,4 +1,4 @@
-﻿package config
+package config
 
 import (
 	"fmt"
@@ -22,12 +22,12 @@ type Config struct {
 
 // AppConfig contém configurações gerais da aplicação
 type AppConfig struct {
-	Env                string
-	LogLevel           string
-	LogFormat          string
-	MigrationsPath     string
-	AutoMigrate        bool
-	PublicLinkBaseURL  string
+	Env               string
+	LogLevel          string
+	LogFormat         string
+	MigrationsPath    string
+	AutoMigrate       bool
+	PublicLinkBaseURL string
 }
 
 // DatabaseConfig contém configurações do banco de dados
@@ -57,24 +57,23 @@ type StorageConfig struct {
 
 // AuthConfig contém configurações de autenticação
 type AuthConfig struct {
-	JWTSecret              string
-	JWTAccessTokenDuration time.Duration
+	JWTSecret               string
+	JWTAccessTokenDuration  time.Duration
 	JWTRefreshTokenDuration time.Duration
-	PasswordPepper         string
-	CSRFSecret             string
-	CookieSecure           bool
-	CookieDomain           string
-	BcryptCost             int
+	PasswordPepper          string
+	CSRFSecret              string
+	CookieSecure            bool
+	CookieDomain            string
 }
 
 // ServerConfig contém configurações do servidor HTTP
 type ServerConfig struct {
-	Host                    string
-	Port                    int
-	FrontendURL             string
-	AllowedOrigins          []string
-	RateLimitAuthRPM        int
-	RateLimitPublicRPM      int
+	Host                      string
+	Port                      int
+	FrontendURL               string
+	AllowedOrigins            []string
+	RateLimitAuthRPM          int
+	RateLimitPublicRPM        int
 	RateLimitAuthenticatedRPM int
 }
 
@@ -145,6 +144,21 @@ func (c *Config) Validate() error {
 	}
 	if len(c.Auth.JWTSecret) < 32 {
 		return fmt.Errorf("JWT_SECRET deve ter pelo menos 32 caracteres")
+	}
+	if c.Auth.PasswordPepper == "" {
+		return fmt.Errorf("PASSWORD_PEPPER é obrigatório")
+	}
+	if len(c.Auth.PasswordPepper) < 16 {
+		return fmt.Errorf("PASSWORD_PEPPER deve ter pelo menos 16 caracteres")
+	}
+	if c.Auth.CSRFSecret == "" {
+		return fmt.Errorf("CSRF_SECRET é obrigatório")
+	}
+	if len(c.Auth.CSRFSecret) < 32 {
+		return fmt.Errorf("CSRF_SECRET deve ter pelo menos 32 caracteres")
+	}
+	if c.Auth.CookieDomain == "" {
+		return fmt.Errorf("COOKIE_DOMAIN é obrigatório")
 	}
 
 	// Server
@@ -221,15 +235,17 @@ func loadStorageConfig() StorageConfig {
 
 // loadAuthConfig carrega configurações de autenticação
 func loadAuthConfig() AuthConfig {
+	appEnv := getEnv("APP_ENV", "development")
+	defaultSecure := appEnv == "production"
+
 	return AuthConfig{
-		JWTSecret:              getEnv("JWT_SECRET", ""),
-		JWTAccessTokenDuration: getEnvAsDuration("JWT_ACCESS_TOKEN_DURATION", 15*time.Minute),
+		JWTSecret:               getEnv("JWT_SECRET", ""),
+		JWTAccessTokenDuration:  getEnvAsDuration("JWT_ACCESS_TOKEN_DURATION", 15*time.Minute),
 		JWTRefreshTokenDuration: getEnvAsDuration("JWT_REFRESH_TOKEN_DURATION", 168*time.Hour), // 7 dias
-		PasswordPepper:         getEnv("PASSWORD_PEPPER", ""),
-		CSRFSecret:             getEnv("CSRF_SECRET", ""),
-		CookieSecure:           getEnvAsBool("COOKIE_SECURE", false),
-		CookieDomain:           getEnv("COOKIE_DOMAIN", "localhost"),
-		BcryptCost:             getEnvAsInt("BCRYPT_COST", 12),
+		PasswordPepper:          getEnv("PASSWORD_PEPPER", ""),
+		CSRFSecret:              getEnv("CSRF_SECRET", ""),
+		CookieSecure:            getEnvAsBool("COOKIE_SECURE", defaultSecure),
+		CookieDomain:            getEnv("COOKIE_DOMAIN", "localhost"),
 	}
 }
 

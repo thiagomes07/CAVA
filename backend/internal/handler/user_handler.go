@@ -98,16 +98,16 @@ func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 
 // Create godoc
 // @Summary Cria um novo usuário (vendedor interno)
-// @Description Cria um novo usuário vendedor interno
+// @Description Cria um novo usuário vendedor interno com senha temporária gerada automaticamente
 // @Tags users
 // @Accept json
 // @Produce json
-// @Param body body entity.CreateUserInput true "Dados do usuário"
+// @Param body body entity.CreateSellerInput true "Dados do vendedor"
 // @Success 201 {object} entity.User
 // @Failure 400 {object} response.ErrorResponse
 // @Router /api/users [post]
 func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
-	var input entity.CreateUserInput
+	var input entity.CreateSellerInput
 
 	// Parse JSON body
 	if err := response.ParseJSON(r, &input); err != nil {
@@ -115,14 +115,8 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Apenas vendedor interno pode ser criado por esta rota
+	// Forçar role como VENDEDOR_INTERNO (única opção permitida)
 	input.Role = entity.RoleVendedorInterno
-
-	// Obter industryID do contexto
-	industryID := middleware.GetIndustryID(r.Context())
-	if industryID != "" {
-		input.IndustryID = &industryID
-	}
 
 	// Validar input
 	if err := h.validator.Validate(input); err != nil {
@@ -130,19 +124,27 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Criar usuário
-	user, err := h.userService.Create(r.Context(), input)
+	// Obter industryID do contexto
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	// Criar vendedor com senha temporária
+	user, err := h.userService.CreateSeller(r.Context(), industryID, input)
 	if err != nil {
-		h.logger.Error("erro ao criar usuário",
+		h.logger.Error("erro ao criar vendedor interno",
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
 		return
 	}
 
-	h.logger.Info("usuário criado",
+	h.logger.Info("vendedor interno criado",
 		zap.String("userId", user.ID),
 		zap.String("email", user.Email),
+		zap.String("industryId", industryID),
 	)
 
 	response.Created(w, user)

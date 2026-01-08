@@ -27,24 +27,24 @@ type Claims struct {
 
 // TokenManager gerencia operações com JWT
 type TokenManager struct {
-	secret                  []byte
-	accessTokenDuration     time.Duration
-	refreshTokenDuration    time.Duration
+	secret               []byte
+	accessTokenDuration  time.Duration
+	refreshTokenDuration time.Duration
 }
 
 // NewTokenManager cria um novo TokenManager
 func NewTokenManager(secret string, accessDuration, refreshDuration time.Duration) *TokenManager {
 	return &TokenManager{
-		secret:                  []byte(secret),
-		accessTokenDuration:     accessDuration,
-		refreshTokenDuration:    refreshDuration,
+		secret:               []byte(secret),
+		accessTokenDuration:  accessDuration,
+		refreshTokenDuration: refreshDuration,
 	}
 }
 
 // GenerateAccessToken gera um access token JWT
 func (tm *TokenManager) GenerateAccessToken(userID, role string, industryID *string) (string, error) {
 	now := time.Now()
-	
+
 	claims := &Claims{
 		UserID:     userID,
 		Role:       role,
@@ -61,29 +61,7 @@ func (tm *TokenManager) GenerateAccessToken(userID, role string, industryID *str
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	
-	return token.SignedString(tm.secret)
-}
 
-// GenerateRefreshToken gera um refresh token JWT
-func (tm *TokenManager) GenerateRefreshToken(userID string) (string, error) {
-	now := time.Now()
-	
-	claims := &Claims{
-		UserID: userID,
-		Type:   string(RefreshToken),
-		RegisteredClaims: jwt.RegisteredClaims{
-			ID:        uuid.New().String(),
-			IssuedAt:  jwt.NewNumericDate(now),
-			ExpiresAt: jwt.NewNumericDate(now.Add(tm.refreshTokenDuration)),
-			NotBefore: jwt.NewNumericDate(now),
-			Issuer:    "cava-api",
-			Subject:   userID,
-		},
-	}
-
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	
 	return token.SignedString(tm.secret)
 }
 
@@ -91,7 +69,7 @@ func (tm *TokenManager) GenerateRefreshToken(userID string) (string, error) {
 func (tm *TokenManager) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(token *jwt.Token) (interface{}, error) {
 		// Verificar método de assinatura
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+		if token.Method != jwt.SigningMethodHS256 {
 			return nil, fmt.Errorf("método de assinatura inválido: %v", token.Header["alg"])
 		}
 		return tm.secret, nil
@@ -135,6 +113,41 @@ func (tm *TokenManager) ValidateRefreshToken(tokenString string) (*Claims, error
 	}
 
 	return claims, nil
+}
+
+// GenerateRefreshToken gera um refresh token JWT contendo as mesmas claims de identificação
+// exigidas pela especificação (userId, role, industryId).
+func (tm *TokenManager) GenerateRefreshToken(userID, role string, industryID *string) (string, error) {
+	now := time.Now()
+
+	claims := &Claims{
+		UserID:     userID,
+		Role:       role,
+		IndustryID: industryID,
+		Type:       string(RefreshToken),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        uuid.New().String(),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ExpiresAt: jwt.NewNumericDate(now.Add(tm.refreshTokenDuration)),
+			NotBefore: jwt.NewNumericDate(now),
+			Issuer:    "cava-api",
+			Subject:   userID,
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+
+	return token.SignedString(tm.secret)
+}
+
+// AccessTTL retorna a duração configurada para access tokens.
+func (tm *TokenManager) AccessTTL() time.Duration {
+	return tm.accessTokenDuration
+}
+
+// RefreshTTL retorna a duração configurada para refresh tokens.
+func (tm *TokenManager) RefreshTTL() time.Duration {
+	return tm.refreshTokenDuration
 }
 
 // ExtractClaims extrai os claims de um token sem validar assinatura (útil para debugging)

@@ -35,12 +35,12 @@ var batchCodeRegex = regexp.MustCompile(`^[A-Z]{3}-\d{6}$`)
 func NewBatchCode(code string) (BatchCode, error) {
 	// Converter para uppercase
 	code = strings.ToUpper(strings.TrimSpace(code))
-	
+
 	// Validar formato
 	if !batchCodeRegex.MatchString(code) {
 		return "", fmt.Errorf("código de lote inválido. Formato esperado: AAA-999999")
 	}
-	
+
 	return BatchCode(code), nil
 }
 
@@ -51,24 +51,24 @@ func (b BatchCode) String() string {
 
 // Batch representa um lote físico de estoque
 type Batch struct {
-	ID            string       `json:"id"`
-	ProductID     string       `json:"productId"`
-	IndustryID    string       `json:"industryId"`
-	BatchCode     string       `json:"batchCode"`
-	Height        float64      `json:"height"`        // cm
-	Width         float64      `json:"width"`         // cm
-	Thickness     float64      `json:"thickness"`     // cm
-	QuantitySlabs int          `json:"quantitySlabs"` // quantidade de chapas
-	TotalArea     float64      `json:"totalArea"`     // m² (calculado)
-	IndustryPrice float64      `json:"industryPrice"` // preço base da indústria
-	OriginQuarry  *string      `json:"originQuarry,omitempty"`
-	EntryDate     time.Time    `json:"entryDate"`
-	Status        BatchStatus  `json:"status"`
-	IsActive      bool         `json:"isActive"`
-	Medias        []Media      `json:"medias,omitempty"`
-	Product       *Product     `json:"product,omitempty"` // Populated quando necessário
-	CreatedAt     time.Time    `json:"createdAt"`
-	UpdatedAt     time.Time    `json:"updatedAt"`
+	ID            string      `json:"id"`
+	ProductID     string      `json:"productId"`
+	IndustryID    string      `json:"industryId"`
+	BatchCode     string      `json:"batchCode"`
+	Height        float64     `json:"height"`        // cm
+	Width         float64     `json:"width"`         // cm
+	Thickness     float64     `json:"thickness"`     // cm
+	QuantitySlabs int         `json:"quantitySlabs"` // quantidade de chapas
+	TotalArea     float64     `json:"totalArea"`     // m² (calculado)
+	IndustryPrice float64     `json:"industryPrice"` // preço base da indústria
+	OriginQuarry  *string     `json:"originQuarry,omitempty"`
+	EntryDate     time.Time   `json:"entryDate"`
+	Status        BatchStatus `json:"status"`
+	IsActive      bool        `json:"isActive"`
+	Medias        []Media     `json:"medias,omitempty"`
+	Product       *Product    `json:"product,omitempty"` // Populated quando necessário
+	CreatedAt     time.Time   `json:"createdAt"`
+	UpdatedAt     time.Time   `json:"updatedAt"`
 }
 
 // CalculateTotalArea calcula a área total do lote
@@ -86,7 +86,7 @@ func (b *Batch) IsAvailable() bool {
 // CreateBatchInput representa os dados para criar um lote
 type CreateBatchInput struct {
 	ProductID     string  `json:"productId" validate:"required,uuid"`
-	BatchCode     string  `json:"batchCode" validate:"required,min=10,max=10"` // AAA-999999
+	BatchCode     string  `json:"batchCode" validate:"required,batchcode"` // AAA-999999
 	Height        float64 `json:"height" validate:"required,gt=0,lte=1000"`
 	Width         float64 `json:"width" validate:"required,gt=0,lte=1000"`
 	Thickness     float64 `json:"thickness" validate:"required,gt=0,lte=100"`
@@ -98,7 +98,7 @@ type CreateBatchInput struct {
 
 // UpdateBatchInput representa os dados para atualizar um lote
 type UpdateBatchInput struct {
-	BatchCode     *string  `json:"batchCode,omitempty" validate:"omitempty,min=10,max=10"`
+	BatchCode     *string  `json:"batchCode,omitempty" validate:"omitempty,batchcode"`
 	Height        *float64 `json:"height,omitempty" validate:"omitempty,gt=0,lte=1000"`
 	Width         *float64 `json:"width,omitempty" validate:"omitempty,gt=0,lte=1000"`
 	Thickness     *float64 `json:"thickness,omitempty" validate:"omitempty,gt=0,lte=100"`

@@ -3,7 +3,6 @@ package repository
 import (
 	"context"
 	"database/sql"
-	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"

@@ -1,15 +1,15 @@
 package handler
 
 import (
-	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	chiCors "github.com/go-chi/cors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	appMiddleware "github.com/thiagomes07/CAVA/backend/internal/middleware"
-	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"github.com/thiagomes07/CAVA/backend/pkg/validator"
 	"go.uber.org/zap"
 )
@@ -28,16 +28,19 @@ type Handler struct {
 	SharedInventory *SharedInventoryHandler
 	Upload          *UploadHandler
 	Public          *PublicHandler
+	Health          *HealthHandler
 }
 
 // Config contém as configurações para os handlers
 type Config struct {
-	Logger         *zap.Logger
-	Validator      *validator.Validator
-	AllowedOrigins []string
-	CookieDomain   string
-	CookieSecure   bool
-	CSRFSecret     string
+	Logger          *zap.Logger
+	Validator       *validator.Validator
+	AllowedOrigins  []string
+	CookieDomain    string
+	CookieSecure    bool
+	CSRFSecret      string
+	AccessTokenTTL  time.Duration
+	RefreshTokenTTL time.Duration
 }
 
 // Services agrupa todos os serviços necessários
@@ -53,12 +56,13 @@ type Services struct {
 	SalesHistory    service.SalesHistoryService
 	SharedInventory service.SharedInventoryService
 	Storage         service.StorageService
+	MediaRepo       repository.MediaRepository
 }
 
 // NewHandler cria uma nova instância de Handler com todos os handlers
-func NewHandler(cfg Config, services Services) *Handler {
+func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Handler {
 	return &Handler{
-		Auth:            NewAuthHandler(services.Auth, cfg.Validator, cfg.Logger, cfg.CookieDomain, cfg.CookieSecure),
+		Auth:            NewAuthHandler(services.Auth, cfg.Validator, cfg.Logger, cfg.CookieDomain, cfg.CookieSecure, cfg.AccessTokenTTL, cfg.RefreshTokenTTL),
 		User:            NewUserHandler(services.User, cfg.Validator, cfg.Logger),
 		Product:         NewProductHandler(services.Product, cfg.Validator, cfg.Logger),
 		Batch:           NewBatchHandler(services.Batch, cfg.Validator, cfg.Logger),
@@ -68,8 +72,9 @@ func NewHandler(cfg Config, services Services) *Handler {
 		Lead:            NewLeadHandler(services.Lead, cfg.Validator, cfg.Logger),
 		SalesHistory:    NewSalesHistoryHandler(services.SalesHistory, cfg.Validator, cfg.Logger),
 		SharedInventory: NewSharedInventoryHandler(services.SharedInventory, cfg.Validator, cfg.Logger),
-		Upload:          NewUploadHandler(services.Storage, cfg.Logger),
+		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
 		Public:          NewPublicHandler(services.SalesLink, services.Lead, cfg.Validator, cfg.Logger),
+		Health:          healthHandler,
 	}
 }
 
@@ -88,11 +93,10 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 	r := chi.NewRouter()
 
 	// Middlewares globais
+	r.Use(appMiddleware.NewRecoveryMiddleware(cfg.Logger).Recover)
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(appMiddleware.NewLoggerMiddleware(cfg.Logger).Log)
-	r.Use(appMiddleware.NewRecoveryMiddleware(cfg.Logger).Recover)
-	r.Use(m.CSRF.SetCSRFCookie)
 
 	// CORS
 	r.Use(chiCors.Handler(chiCors.Options{
@@ -104,10 +108,10 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		MaxAge:           300,
 	}))
 
+	r.Use(m.CSRF.SetCSRFCookie)
+
 	// Health check (público)
-	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		response.OK(w, map[string]string{"status": "ok"})
-	})
+	r.Get("/health", h.Health.Check)
 
 	// API Routes
 	r.Route("/api", func(r chi.Router) {
@@ -140,8 +144,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		// ============================================
 		r.Group(func(r chi.Router) {
 			r.Use(m.Auth.Authenticate)
-			r.Use(m.CSRF.ValidateCSRF)
 			r.Use(m.RateApi.Limit)
+			r.Use(m.CSRF.ValidateCSRF)
 
 			// ----------------------------------------
 			// DASHBOARD
@@ -184,6 +188,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// ----------------------------------------
 			r.Route("/reservations", func(r chi.Router) {
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Post("/", h.Reservation.Create)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Post("/{id}/confirm-sale", h.Reservation.ConfirmSale)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Delete("/{id}", h.Reservation.Cancel)
 			})
 
 			// ----------------------------------------
@@ -237,10 +243,10 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// LEADS
 			// ----------------------------------------
 			r.Route("/leads", func(r chi.Router) {
-				r.With(m.RBAC.RequireAnyAuthenticated).Get("/", h.Lead.List)
-				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.Lead.GetByID)
-				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}/interactions", h.Lead.GetInteractions)
-				r.With(m.RBAC.RequireAnyAuthenticated).Patch("/{id}/status", h.Lead.UpdateStatus)
+				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Lead.List)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Lead.GetByID)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Lead.GetInteractions)
+				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Lead.UpdateStatus)
 			})
 
 			// ----------------------------------------
@@ -248,8 +254,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// ----------------------------------------
 			r.Route("/sales-history", func(r chi.Router) {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.SalesHistory.List)
-				r.With(m.RBAC.RequireAnyAuthenticated).Get("/summary", h.SalesHistory.GetSummary)
-				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.SalesHistory.GetByID)
+				r.With(m.RBAC.RequireIndustryUser).Get("/summary", h.SalesHistory.GetSummary)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.SalesHistory.GetByID)
 			})
 
 			// Broker sales

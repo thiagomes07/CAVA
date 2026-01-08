@@ -67,6 +67,8 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 		// Obter limiter para este identificador
 		limiter := rl.getLimiter(identifier)
 
+		resetAt := time.Now().Truncate(time.Minute).Add(time.Minute)
+
 		// Verificar se permite requisição
 		if !limiter.Allow() {
 			rl.logger.Warn("rate limit exceeded",
@@ -77,16 +79,17 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 			// Headers de rate limit
 			w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", rl.burst))
 			w.Header().Set("X-RateLimit-Remaining", "0")
-			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", time.Now().Add(time.Minute).Unix()))
+			w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", resetAt.Unix()))
 
 			response.TooManyRequests(w)
 			return
 		}
 
 		// Headers de rate limit
-		tokens := int(limiter.Tokens())
+		remaining := int(limiter.Tokens())
 		w.Header().Set("X-RateLimit-Limit", fmt.Sprintf("%d", rl.burst))
-		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", tokens))
+		w.Header().Set("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
+		w.Header().Set("X-RateLimit-Reset", fmt.Sprintf("%d", resetAt.Unix()))
 
 		next.ServeHTTP(w, r)
 	})
@@ -120,7 +123,7 @@ func (rl *RateLimiter) Cleanup(maxAge time.Duration) {
 	// Remover limiters que não foram usados recentemente
 	// Nota: golang.org/x/time/rate.Limiter não expõe última vez usado
 	// Para implementação completa, usar estrutura custom com timestamp
-	
+
 	rl.logger.Debug("rate limiter cleanup executed",
 		zap.Int("limiters_count", len(rl.limiters)),
 	)

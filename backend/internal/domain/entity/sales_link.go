@@ -8,9 +8,9 @@ import (
 type LinkType string
 
 const (
-	LinkTypeLoteUnico         LinkType = "LOTE_UNICO"
-	LinkTypeProdutoGeral      LinkType = "PRODUTO_GERAL"
-	LinkTypeCatalogoCompleto  LinkType = "CATALOGO_COMPLETO"
+	LinkTypeLoteUnico        LinkType = "LOTE_UNICO"
+	LinkTypeProdutoGeral     LinkType = "PRODUTO_GERAL"
+	LinkTypeCatalogoCompleto LinkType = "CATALOGO_COMPLETO"
 )
 
 // IsValid verifica se o tipo de link é válido
@@ -24,26 +24,26 @@ func (l LinkType) IsValid() bool {
 
 // SalesLink representa um link de venda público
 type SalesLink struct {
-	ID            string    `json:"id"`
-	CreatedByUserID string  `json:"createdByUserId"`
-	IndustryID    string    `json:"industryId"`
-	BatchID       *string   `json:"batchId,omitempty"`
-	ProductID     *string   `json:"productId,omitempty"`
-	LinkType      LinkType  `json:"linkType"`
-	SlugToken     string    `json:"slugToken"`
-	Title         *string   `json:"title,omitempty"`
-	CustomMessage *string   `json:"customMessage,omitempty"`
-	DisplayPrice  *float64  `json:"displayPrice,omitempty"`
-	ShowPrice     bool      `json:"showPrice"`
-	ViewsCount    int       `json:"viewsCount"`
-	ExpiresAt     *time.Time `json:"expiresAt,omitempty"`
-	IsActive      bool      `json:"isActive"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-	FullURL       *string   `json:"fullUrl,omitempty"` // Gerada pelo service
-	Batch         *Batch    `json:"batch,omitempty"`   // Populated quando necessário
-	Product       *Product  `json:"product,omitempty"` // Populated quando necessário
-	CreatedBy     *User     `json:"createdBy,omitempty"` // Populated quando necessário
+	ID              string     `json:"id"`
+	CreatedByUserID string     `json:"createdByUserId"`
+	IndustryID      string     `json:"industryId"`
+	BatchID         *string    `json:"batchId,omitempty"`
+	ProductID       *string    `json:"productId,omitempty"`
+	LinkType        LinkType   `json:"linkType"`
+	SlugToken       string     `json:"slugToken"`
+	Title           *string    `json:"title,omitempty"`
+	CustomMessage   *string    `json:"customMessage,omitempty"`
+	DisplayPrice    *float64   `json:"displayPrice,omitempty"`
+	ShowPrice       bool       `json:"showPrice"`
+	ViewsCount      int        `json:"viewsCount"`
+	ExpiresAt       *time.Time `json:"expiresAt,omitempty"`
+	IsActive        bool       `json:"isActive"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+	FullURL         *string    `json:"fullUrl,omitempty"`   // Gerada pelo service
+	Batch           *Batch     `json:"batch,omitempty"`     // Populated quando necessário
+	Product         *Product   `json:"product,omitempty"`   // Populated quando necessário
+	CreatedBy       *User      `json:"createdBy,omitempty"` // Populated quando necessário
 }
 
 // IsExpired verifica se o link está expirado
@@ -61,7 +61,7 @@ type CreateSalesLinkInput struct {
 	ProductID     *string  `json:"productId,omitempty" validate:"omitempty,uuid"`
 	Title         *string  `json:"title,omitempty" validate:"omitempty,max=100"`
 	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
-	SlugToken     string   `json:"slugToken" validate:"required,min=3,max=50"`
+	SlugToken     string   `json:"slugToken" validate:"required,min=3,max=50,slug"`
 	DisplayPrice  *float64 `json:"displayPrice,omitempty" validate:"omitempty,gt=0"`
 	ShowPrice     bool     `json:"showPrice"`
 	ExpiresAt     *string  `json:"expiresAt,omitempty"` // ISO date

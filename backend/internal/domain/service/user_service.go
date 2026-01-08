@@ -2,13 +2,17 @@ package service
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
 // UserService define o contrato para operações com usuários
 type UserService interface {
-	// Create cria um novo usuário com validações de negócio
+	// Create cria um novo usuário com validações de negócio (senha fornecida manualmente)
 	Create(ctx context.Context, input entity.CreateUserInput) (*entity.User, error)
+
+	// CreateSeller cria um vendedor interno com senha temporária gerada automaticamente
+	CreateSeller(ctx context.Context, industryID string, input entity.CreateSellerInput) (*entity.User, error)
 
 	// GetByID busca usuário por ID
 	GetByID(ctx context.Context, id string) (*entity.User, error)

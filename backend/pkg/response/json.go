@@ -3,6 +3,7 @@ package response
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	appErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 )
@@ -15,8 +16,8 @@ type SuccessResponse struct {
 
 // ErrorResponse representa uma resposta de erro
 type ErrorResponse struct {
-	Success bool                   `json:"success"`
-	Error   ErrorDetail            `json:"error"`
+	Success bool        `json:"success"`
+	Error   ErrorDetail `json:"error"`
 }
 
 // ErrorDetail contém os detalhes do erro
@@ -30,7 +31,7 @@ type ErrorDetail struct {
 func JSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	
+
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		// Se falhar ao encodar, logar erro mas não fazer nada
 		// (já foi escrito o status code)
@@ -124,7 +125,7 @@ func Conflict(w http.ResponseWriter, message string, details map[string]interfac
 
 // TooManyRequests envia uma resposta de rate limit excedido (429)
 func TooManyRequests(w http.ResponseWriter) {
-	Error(w, http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED", 
+	Error(w, http.StatusTooManyRequests, "RATE_LIMIT_EXCEEDED",
 		"Limite de requisições excedido. Tente novamente mais tarde", nil)
 }
 
@@ -132,12 +133,12 @@ func TooManyRequests(w http.ResponseWriter) {
 func InternalServerError(w http.ResponseWriter, err error) {
 	// Em produção, não expor detalhes do erro interno
 	message := "Erro interno do servidor"
-	
+
 	// Em desenvolvimento, pode incluir o erro (opcional)
 	// if isDevelopment {
 	// 	message = err.Error()
 	// }
-	
+
 	Error(w, http.StatusInternalServerError, "INTERNAL_ERROR", message, nil)
 }
 
@@ -151,14 +152,14 @@ func ParseJSON(r *http.Request, v interface{}) error {
 	if r.Body == nil {
 		return appErrors.ValidationError("corpo da requisição vazio")
 	}
-	
+
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields() // Não permitir campos desconhecidos
-	
+
 	if err := decoder.Decode(v); err != nil {
 		return appErrors.ValidationError("JSON inválido")
 	}
-	
+
 	return nil
 }
 
@@ -169,7 +170,7 @@ func SetJSONContentType(w http.ResponseWriter) {
 
 // SetCacheControl define headers de cache
 func SetCacheControl(w http.ResponseWriter, maxAge int) {
-	w.Header().Set("Cache-Control", "public, max-age="+string(rune(maxAge)))
+	w.Header().Set("Cache-Control", "public, max-age="+strconv.Itoa(maxAge))
 }
 
 // SetNoCacheControl define headers para não fazer cache

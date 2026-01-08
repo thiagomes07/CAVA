@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -73,14 +75,17 @@ func (h *PublicHandler) GetLinkBySlug(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Incrementar contador de visualizações (async, não bloquear resposta)
-	go func() {
-		if err := h.salesLinkService.IncrementViews(r.Context(), link.ID); err != nil {
+	// Usar contexto independente porque o contexto da request será cancelado
+	go func(linkID string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := h.salesLinkService.IncrementViews(ctx, linkID); err != nil {
 			h.logger.Error("erro ao incrementar views",
-				zap.String("linkId", link.ID),
+				zap.String("linkId", linkID),
 				zap.Error(err),
 			)
 		}
-	}()
+	}(link.ID)
 
 	h.logger.Debug("link público acessado",
 		zap.String("slug", slug),

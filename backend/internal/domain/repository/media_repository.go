@@ -2,11 +2,18 @@ package repository
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
 // MediaRepository define o contrato para operações com mídias
 type MediaRepository interface {
+	// FindProductMediaByID busca mídia de produto por ID
+	FindProductMediaByID(ctx context.Context, id string) (*entity.ProductMedia, error)
+
+	// FindBatchMediaByID busca mídia de lote por ID
+	FindBatchMediaByID(ctx context.Context, id string) (*entity.BatchMedia, error)
+
 	// CreateProductMedia cria uma nova mídia de produto
 	CreateProductMedia(ctx context.Context, productID string, media *entity.CreateMediaInput) error
 

@@ -228,6 +228,20 @@ func (s *S3Adapter) ValidateFileSize(size int64, maxSize int64) bool {
 	return size > 0 && size <= maxSize
 }
 
+// HealthCheck verifica saúde da conexão com o storage
+func (s *S3Adapter) HealthCheck(ctx context.Context) error {
+	// Verificar se conseguimos listar buckets (operação leve)
+	_, err := s.client.BucketExists(ctx, s.bucket)
+	if err != nil {
+		s.logger.Error("health check falhou",
+			zap.Error(err),
+			zap.String("bucket", s.bucket),
+		)
+		return fmt.Errorf("storage health check failed: %w", err)
+	}
+	return nil
+}
+
 // generatePublicURL gera URL pública para o arquivo
 func (s *S3Adapter) generatePublicURL(key string) string {
 	if s.publicURL != "" {

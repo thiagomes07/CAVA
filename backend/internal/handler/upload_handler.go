@@ -2,9 +2,12 @@ package handler
 
 import (
 	"net/http"
+	"path/filepath"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"go.uber.org/zap"
@@ -13,16 +16,25 @@ import (
 // UploadHandler gerencia uploads de mídia
 type UploadHandler struct {
 	storageService service.StorageService
+	productService service.ProductService
+	batchService   service.BatchService
+	mediaRepo      repository.MediaRepository
 	logger         *zap.Logger
 }
 
 // NewUploadHandler cria uma nova instância de UploadHandler
 func NewUploadHandler(
 	storageService service.StorageService,
+	productService service.ProductService,
+	batchService service.BatchService,
+	mediaRepo repository.MediaRepository,
 	logger *zap.Logger,
 ) *UploadHandler {
 	return &UploadHandler{
 		storageService: storageService,
+		productService: productService,
+		batchService:   batchService,
+		mediaRepo:      mediaRepo,
 		logger:         logger,
 	}
 }
@@ -36,6 +48,34 @@ var allowedContentTypes = []string{
 	"image/jpeg",
 	"image/png",
 	"image/webp",
+}
+
+var allowedExtensions = []string{
+	".jpg",
+	".jpeg",
+	".png",
+	".webp",
+}
+
+// isAllowedExtension verifica se a extensão do arquivo é permitida
+func isAllowedExtension(filename string) bool {
+	ext := strings.ToLower(filepath.Ext(filename))
+	for _, allowed := range allowedExtensions {
+		if ext == allowed {
+			return true
+		}
+	}
+	return false
+}
+
+// sanitizeFilename remove caracteres perigosos do nome do arquivo para prevenir path traversal
+func sanitizeUploadFilename(filename string) string {
+	// Remove path separators e caracteres perigosos
+	filename = filepath.Base(filename)
+	filename = strings.ReplaceAll(filename, "..", "")
+	filename = strings.ReplaceAll(filename, "/", "")
+	filename = strings.ReplaceAll(filename, "\\", "")
+	return filename
 }
 
 // UploadProductMedias godoc
@@ -84,6 +124,15 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 	// Processar cada arquivo
 	var urls []string
 	for _, fileHeader := range files {
+		// Sanitizar nome do arquivo para prevenir path traversal
+		safeFilename := sanitizeUploadFilename(fileHeader.Filename)
+
+		// Validar extensão do arquivo (não confiar apenas no Content-Type)
+		if !isAllowedExtension(safeFilename) {
+			response.BadRequest(w, "Extensão de arquivo inválida. Use .jpg, .jpeg, .png ou .webp", nil)
+			return
+		}
+
 		// Validar tamanho
 		if fileHeader.Size > maxUploadSize {
 			response.BadRequest(w, "Arquivo muito grande. Máximo 5MB por arquivo", nil)
@@ -94,7 +143,7 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 		file, err := fileHeader.Open()
 		if err != nil {
 			h.logger.Error("erro ao abrir arquivo",
-				zap.String("filename", fileHeader.Filename),
+				zap.String("filename", safeFilename),
 				zap.Error(err),
 			)
 			response.BadRequest(w, "Erro ao processar arquivo", nil)
@@ -102,7 +151,7 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 		}
 		defer file.Close()
 
-		// Validar tipo do arquivo
+		// Validar tipo do arquivo (Content-Type)
 		contentType := fileHeader.Header.Get("Content-Type")
 		if !h.storageService.ValidateFileType(contentType, allowedContentTypes) {
 			response.BadRequest(w, "Formato inválido. Use JPEG, PNG ou WebP", nil)
@@ -114,7 +163,7 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 			r.Context(),
 			productID,
 			file,
-			fileHeader.Filename,
+			safeFilename,
 			contentType,
 			fileHeader.Size,
 		)
@@ -184,6 +233,15 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 	// Processar cada arquivo
 	var urls []string
 	for _, fileHeader := range files {
+		// Sanitizar nome do arquivo para prevenir path traversal
+		safeFilename := sanitizeUploadFilename(fileHeader.Filename)
+
+		// Validar extensão do arquivo (não confiar apenas no Content-Type)
+		if !isAllowedExtension(safeFilename) {
+			response.BadRequest(w, "Extensão de arquivo inválida. Use .jpg, .jpeg, .png ou .webp", nil)
+			return
+		}
+
 		// Validar tamanho
 		if fileHeader.Size > maxUploadSize {
 			response.BadRequest(w, "Arquivo muito grande. Máximo 5MB por arquivo", nil)
@@ -194,7 +252,7 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 		file, err := fileHeader.Open()
 		if err != nil {
 			h.logger.Error("erro ao abrir arquivo",
-				zap.String("filename", fileHeader.Filename),
+				zap.String("filename", safeFilename),
 				zap.Error(err),
 			)
 			response.BadRequest(w, "Erro ao processar arquivo", nil)
@@ -202,7 +260,7 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 		}
 		defer file.Close()
 
-		// Validar tipo do arquivo
+		// Validar tipo do arquivo (Content-Type)
 		contentType := fileHeader.Header.Get("Content-Type")
 		if !h.storageService.ValidateFileType(contentType, allowedContentTypes) {
 			response.BadRequest(w, "Formato inválido. Use JPEG, PNG ou WebP", nil)
@@ -214,7 +272,7 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 			r.Context(),
 			batchID,
 			file,
-			fileHeader.Filename,
+			safeFilename,
 			contentType,
 			fileHeader.Size,
 		)
@@ -254,11 +312,52 @@ func (h *UploadHandler) DeleteProductMedia(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Por enquanto, apenas retornar sucesso
-	// A implementação real precisaria buscar a mídia no banco,
-	// extrair a key e deletar do storage
+	ctx := r.Context()
+
+	// Buscar mídia no banco para obter URL
+	media, err := h.mediaRepo.FindProductMediaByID(ctx, id)
+	if err != nil {
+		h.logger.Error("erro ao buscar mídia de produto",
+			zap.String("mediaId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	// Extrair key do storage a partir da URL
+	key, err := h.storageService.ExtractKeyFromURL(media.URL)
+	if err != nil {
+		h.logger.Error("erro ao extrair key da URL",
+			zap.String("url", media.URL),
+			zap.Error(err),
+		)
+		response.InternalServerError(w, err)
+		return
+	}
+
+	// Deletar arquivo do storage (S3/MinIO)
+	if err := h.storageService.DeleteFile(ctx, "", key); err != nil {
+		h.logger.Error("erro ao deletar arquivo do storage",
+			zap.String("key", key),
+			zap.Error(err),
+		)
+		// Continua para deletar do banco mesmo se falhar no storage
+	}
+
+	// Deletar registro do banco de dados
+	if err := h.mediaRepo.DeleteProductMedia(ctx, id); err != nil {
+		h.logger.Error("erro ao deletar mídia do banco",
+			zap.String("mediaId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
 	h.logger.Info("mídia de produto removida",
 		zap.String("mediaId", id),
+		zap.String("productId", media.ProductID),
 	)
 
 	response.OK(w, map[string]bool{"success": true})
@@ -280,11 +379,52 @@ func (h *UploadHandler) DeleteBatchMedia(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	// Por enquanto, apenas retornar sucesso
-	// A implementação real precisaria buscar a mídia no banco,
-	// extrair a key e deletar do storage
+	ctx := r.Context()
+
+	// Buscar mídia no banco para obter URL
+	media, err := h.mediaRepo.FindBatchMediaByID(ctx, id)
+	if err != nil {
+		h.logger.Error("erro ao buscar mídia de lote",
+			zap.String("mediaId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	// Extrair key do storage a partir da URL
+	key, err := h.storageService.ExtractKeyFromURL(media.URL)
+	if err != nil {
+		h.logger.Error("erro ao extrair key da URL",
+			zap.String("url", media.URL),
+			zap.Error(err),
+		)
+		response.InternalServerError(w, err)
+		return
+	}
+
+	// Deletar arquivo do storage (S3/MinIO)
+	if err := h.storageService.DeleteFile(ctx, "", key); err != nil {
+		h.logger.Error("erro ao deletar arquivo do storage",
+			zap.String("key", key),
+			zap.Error(err),
+		)
+		// Continua para deletar do banco mesmo se falhar no storage
+	}
+
+	// Deletar registro do banco de dados
+	if err := h.mediaRepo.DeleteBatchMedia(ctx, id); err != nil {
+		h.logger.Error("erro ao deletar mídia do banco",
+			zap.String("mediaId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
 	h.logger.Info("mídia de lote removida",
 		zap.String("mediaId", id),
+		zap.String("batchId", media.BatchID),
 	)
 
 	response.OK(w, map[string]bool{"success": true})

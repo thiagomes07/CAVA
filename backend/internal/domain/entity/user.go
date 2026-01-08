@@ -8,9 +8,9 @@ import (
 type UserRole string
 
 const (
-	RoleAdminIndustria   UserRole = "ADMIN_INDUSTRIA"
-	RoleVendedorInterno  UserRole = "VENDEDOR_INTERNO"
-	RoleBroker           UserRole = "BROKER"
+	RoleAdminIndustria  UserRole = "ADMIN_INDUSTRIA"
+	RoleVendedorInterno UserRole = "VENDEDOR_INTERNO"
+	RoleBroker          UserRole = "BROKER"
 )
 
 // IsValid verifica se o role é válido
@@ -36,7 +36,7 @@ type User struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
-// CreateUserInput representa os dados para criar um usuário
+// CreateUserInput representa os dados para criar um usuário (com senha manual)
 type CreateUserInput struct {
 	IndustryID *string  `json:"industryId,omitempty" validate:"omitempty,uuid"`
 	Name       string   `json:"name" validate:"required,min=2,max=255"`
@@ -44,6 +44,14 @@ type CreateUserInput struct {
 	Password   string   `json:"password" validate:"required,min=8"`
 	Phone      *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
 	Role       UserRole `json:"role" validate:"required,oneof=ADMIN_INDUSTRIA VENDEDOR_INTERNO BROKER"`
+}
+
+// CreateSellerInput representa os dados para criar um vendedor interno (senha gerada automaticamente)
+type CreateSellerInput struct {
+	Name  string   `json:"name" validate:"required,min=2,max=255"`
+	Email string   `json:"email" validate:"required,email"`
+	Phone *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Role  UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO"`
 }
 
 // UpdateUserInput representa os dados para atualizar um usuário
@@ -96,10 +104,13 @@ type ChangePasswordInput struct {
 
 // UserSession representa uma sessão de usuário (refresh token)
 type UserSession struct {
-	ID           string    `json:"id"`
-	UserID       string    `json:"userId"`
-	RefreshToken string    `json:"-"` // Nunca serializar token
-	ExpiresAt    time.Time `json:"expiresAt"`
-	CreatedAt    time.Time `json:"createdAt"`
-	IsActive     bool      `json:"isActive"`
+	ID               string    `json:"id"`
+	UserID           string    `json:"userId"`
+	RefreshTokenHash string    `json:"-"` // Nunca serializar hash do token
+	ExpiresAt        time.Time `json:"expiresAt"`
+	IsActive         bool      `json:"isActive"`
+	CreatedAt        time.Time `json:"createdAt"`
+	LastUsedAt       time.Time `json:"lastUsedAt"`
+	UserAgent        *string   `json:"userAgent,omitempty"`
+	IPAddress        *string   `json:"ipAddress,omitempty"`
 }

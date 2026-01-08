@@ -18,6 +18,8 @@ type AuthHandler struct {
 	logger       *zap.Logger
 	cookieDomain string
 	cookieSecure bool
+	accessTTL    time.Duration
+	refreshTTL   time.Duration
 }
 
 // NewAuthHandler cria uma nova instância de AuthHandler
@@ -27,6 +29,8 @@ func NewAuthHandler(
 	logger *zap.Logger,
 	cookieDomain string,
 	cookieSecure bool,
+	accessTTL time.Duration,
+	refreshTTL time.Duration,
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:  authService,
@@ -34,6 +38,8 @@ func NewAuthHandler(
 		logger:       logger,
 		cookieDomain: cookieDomain,
 		cookieSecure: cookieSecure,
+		accessTTL:    accessTTL,
+		refreshTTL:   refreshTTL,
 	}
 }
 
@@ -165,7 +171,8 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Value:    accessToken,
 		Path:     "/",
 		Domain:   h.cookieDomain,
-		MaxAge:   900, // 15 minutos
+		MaxAge:   int(h.accessTTL.Seconds()),
+		Expires:  time.Now().Add(h.accessTTL),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
@@ -175,9 +182,10 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
-		Path:     "/api/auth",
+		Path:     "/",
 		Domain:   h.cookieDomain,
-		MaxAge:   604800, // 7 dias
+		MaxAge:   int(h.refreshTTL.Seconds()),
+		Expires:  time.Now().Add(h.refreshTTL),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
@@ -203,7 +211,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    "",
-		Path:     "/api/auth",
+		Path:     "/",
 		Domain:   h.cookieDomain,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),

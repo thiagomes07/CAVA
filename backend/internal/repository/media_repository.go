@@ -16,6 +16,48 @@ func NewMediaRepository(db *DB) *mediaRepository {
 	return &mediaRepository{db: db}
 }
 
+func (r *mediaRepository) FindProductMediaByID(ctx context.Context, id string) (*entity.ProductMedia, error) {
+	query := `
+		SELECT id, product_id, url, display_order, is_cover, created_at
+		FROM product_medias
+		WHERE id = $1
+	`
+
+	var m entity.ProductMedia
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&m.ID, &m.ProductID, &m.URL, &m.DisplayOrder, &m.IsCover, &m.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.NewNotFoundError("Mídia de produto")
+		}
+		return nil, errors.DatabaseError(err)
+	}
+
+	return &m, nil
+}
+
+func (r *mediaRepository) FindBatchMediaByID(ctx context.Context, id string) (*entity.BatchMedia, error) {
+	query := `
+		SELECT id, batch_id, url, display_order, created_at
+		FROM batch_medias
+		WHERE id = $1
+	`
+
+	var m entity.BatchMedia
+	err := r.db.QueryRowContext(ctx, query, id).Scan(
+		&m.ID, &m.BatchID, &m.URL, &m.DisplayOrder, &m.CreatedAt,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.NewNotFoundError("Mídia de lote")
+		}
+		return nil, errors.DatabaseError(err)
+	}
+
+	return &m, nil
+}
+
 func (r *mediaRepository) CreateProductMedia(ctx context.Context, productID string, media *entity.CreateMediaInput) error {
 	query := `
 		INSERT INTO product_medias (id, product_id, url, display_order, is_cover)

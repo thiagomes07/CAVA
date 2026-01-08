@@ -2,6 +2,9 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/hex"
 	"time"
 
 	"github.com/google/uuid"
@@ -15,19 +18,25 @@ import (
 
 type authService struct {
 	userRepo     repository.UserRepository
+	sessionRepo  repository.SessionRepository
 	tokenManager *jwt.TokenManager
 	hasher       *password.Hasher
 	logger       *zap.Logger
 }
 
+const maxActiveSessions = 5
+
+// NewAuthService cria uma nova instância do AuthService
 func NewAuthService(
 	userRepo repository.UserRepository,
+	sessionRepo repository.SessionRepository,
 	tokenManager *jwt.TokenManager,
 	hasher *password.Hasher,
 	logger *zap.Logger,
 ) *authService {
 	return &authService{
 		userRepo:     userRepo,
+		sessionRepo:  sessionRepo,
 		tokenManager: tokenManager,
 		hasher:       hasher,
 		logger:       logger,
@@ -120,10 +129,31 @@ func (s *authService) Login(ctx context.Context, input entity.LoginInput) (*enti
 		return nil, "", "", domainErrors.InternalError(err)
 	}
 
-	refreshToken, err := s.tokenManager.GenerateRefreshToken(user.ID)
+	refreshToken, err := s.tokenManager.GenerateRefreshToken(user.ID, string(user.Role), user.IndustryID)
 	if err != nil {
 		s.logger.Error("erro ao gerar refresh token", zap.Error(err))
 		return nil, "", "", domainErrors.InternalError(err)
+	}
+
+	// Armazenar sessão no banco (refresh token rotation)
+	if s.sessionRepo != nil {
+		session := &entity.UserSession{
+			ID:               uuid.New().String(),
+			UserID:           user.ID,
+			RefreshTokenHash: s.hashToken(refreshToken),
+			ExpiresAt:        time.Now().Add(s.tokenManager.RefreshTTL()),
+			IsActive:         true,
+		}
+
+		if err := s.sessionRepo.Create(ctx, session); err != nil {
+			s.logger.Error("erro ao criar sessão", zap.Error(err))
+			// Continuar mesmo se falhar - token JWT ainda é válido
+		}
+
+		// Limitar quantidade de sessões ativas (device limit)
+		if err := s.sessionRepo.EnforceSessionLimit(ctx, user.ID, maxActiveSessions); err != nil {
+			s.logger.Warn("erro ao aplicar limite de sessões ativas", zap.Error(err))
+		}
 	}
 
 	// Limpar senha antes de retornar
@@ -144,27 +174,48 @@ func (s *authService) Login(ctx context.Context, input entity.LoginInput) (*enti
 }
 
 func (s *authService) Logout(ctx context.Context, refreshToken string) error {
-	// Validar refresh token
-	_, err := s.tokenManager.ValidateRefreshToken(refreshToken)
-	if err != nil {
-		// Token inválido, mas logout é idempotente
-		s.logger.Debug("tentativa de logout com token inválido", zap.Error(err))
-		return nil
+	// Invalidar sessão no banco
+	if s.sessionRepo != nil && refreshToken != "" {
+		tokenHash := s.hashToken(refreshToken)
+		if err := s.sessionRepo.InvalidateByTokenHash(ctx, tokenHash); err != nil {
+			s.logger.Debug("erro ao invalidar sessão (ignorado)", zap.Error(err))
+		}
 	}
-
-	// Nota: Invalidação de token seria feita aqui se tivéssemos blacklist/whitelist
-	// Por enquanto, a invalidação é feita no client-side (remoção dos cookies)
 
 	s.logger.Info("logout realizado com sucesso")
 	return nil
 }
 
 func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*entity.User, string, string, error) {
-	// Validar refresh token
+	// Validar refresh token JWT
 	claims, err := s.tokenManager.ValidateRefreshToken(refreshToken)
 	if err != nil {
-		s.logger.Warn("tentativa de refresh com token inválido", zap.Error(err))
+		s.logger.Warn("tentativa de refresh com token JWT inválido", zap.Error(err))
 		return nil, "", "", domainErrors.NewUnauthorizedError("Refresh token inválido ou expirado")
+	}
+
+	// Verificar sessão no banco (se disponível)
+	if s.sessionRepo != nil {
+		tokenHash := s.hashToken(refreshToken)
+		session, err := s.sessionRepo.FindByTokenHash(ctx, tokenHash)
+		if err != nil {
+			s.logger.Warn("sessão não encontrada no banco",
+				zap.String("userId", claims.UserID),
+				zap.Error(err),
+			)
+			return nil, "", "", domainErrors.NewUnauthorizedError("Sessão inválida ou expirada")
+		}
+
+		// Verificar se sessão expirou
+		if time.Now().After(session.ExpiresAt) {
+			s.logger.Warn("sessão expirada", zap.String("sessionId", session.ID))
+			return nil, "", "", domainErrors.NewUnauthorizedError("Sessão expirada")
+		}
+
+		// Invalidar sessão antiga (rotation)
+		if err := s.sessionRepo.Invalidate(ctx, session.ID); err != nil {
+			s.logger.Error("erro ao invalidar sessão antiga", zap.Error(err))
+		}
 	}
 
 	// Buscar usuário
@@ -187,10 +238,30 @@ func (s *authService) RefreshToken(ctx context.Context, refreshToken string) (*e
 		return nil, "", "", domainErrors.InternalError(err)
 	}
 
-	newRefreshToken, err := s.tokenManager.GenerateRefreshToken(user.ID)
+	newRefreshToken, err := s.tokenManager.GenerateRefreshToken(user.ID, string(user.Role), user.IndustryID)
 	if err != nil {
 		s.logger.Error("erro ao gerar novo refresh token", zap.Error(err))
 		return nil, "", "", domainErrors.InternalError(err)
+	}
+
+	// Criar nova sessão
+	if s.sessionRepo != nil {
+		session := &entity.UserSession{
+			ID:               uuid.New().String(),
+			UserID:           user.ID,
+			RefreshTokenHash: s.hashToken(newRefreshToken),
+			ExpiresAt:        time.Now().Add(s.tokenManager.RefreshTTL()),
+			IsActive:         true,
+		}
+
+		if err := s.sessionRepo.Create(ctx, session); err != nil {
+			s.logger.Error("erro ao criar nova sessão", zap.Error(err))
+		}
+
+		// Garantir limite de sessões ativas por usuário
+		if err := s.sessionRepo.EnforceSessionLimit(ctx, user.ID, maxActiveSessions); err != nil {
+			s.logger.Warn("erro ao aplicar limite de sessões ativas", zap.Error(err))
+		}
 	}
 
 	// Limpar senha antes de retornar
@@ -251,13 +322,22 @@ func (s *authService) ValidateToken(ctx context.Context, token string) (string, 
 }
 
 func (s *authService) GenerateTemporaryPassword() string {
-	// Gerar senha temporária com 12 caracteres
+	// Gerar senha temporária com 12 caracteres usando crypto/rand
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%"
 	const length = 12
 
 	b := make([]byte, length)
-	for i := range b {
-		b[i] = charset[i%len(charset)]
+	charsetLen := len(charset)
+
+	// Gerar bytes aleatórios seguros
+	randomBytes := make([]byte, length)
+	if _, err := rand.Read(randomBytes); err != nil {
+		// Fallback para UUID se crypto/rand falhar (extremamente raro)
+		return uuid.New().String()[:length]
+	}
+
+	for i := 0; i < length; i++ {
+		b[i] = charset[int(randomBytes[i])%charsetLen]
 	}
 
 	return string(b)
@@ -277,4 +357,10 @@ func (s *authService) VerifyPassword(password, hash string) error {
 		return domainErrors.NewUnauthorizedError("Senha incorreta")
 	}
 	return nil
+}
+
+// hashToken gera hash SHA-256 do token para armazenamento seguro
+func (s *authService) hashToken(token string) string {
+	hash := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(hash[:])
 }

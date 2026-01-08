@@ -12,6 +12,7 @@ import (
 
 	"github.com/thiagomes07/CAVA/backend/internal/config"
 	domainRepo "github.com/thiagomes07/CAVA/backend/internal/domain/repository"
+	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/internal/handler"
 	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/internal/repository"
@@ -134,24 +135,39 @@ func main() {
 	logger.Info("middlewares inicializados")
 
 	// ============================================
-	// 9. INICIALIZAR HANDLERS E ROUTER
+	// 9. INICIALIZAR HEALTH HANDLER
+	// ============================================
+	healthHandler := handler.NewHealthHandler(repos.DB, s3Adapter)
+
+	// ============================================
+	// 10. INICIALIZAR HANDLERS E ROUTER
 	// ============================================
 	handlerConfig := handler.Config{
-		Logger:         logger,
-		Validator:      v,
-		AllowedOrigins: cfg.Server.AllowedOrigins,
-		CookieDomain:   cfg.Auth.CookieDomain,
-		CookieSecure:   cfg.Auth.CookieSecure,
-		CSRFSecret:     cfg.Auth.CSRFSecret,
+		Logger:          logger,
+		Validator:       v,
+		AllowedOrigins:  cfg.Server.AllowedOrigins,
+		CookieDomain:    cfg.Auth.CookieDomain,
+		CookieSecure:    cfg.Auth.CookieSecure,
+		CSRFSecret:      cfg.Auth.CSRFSecret,
+		AccessTokenTTL:  tokenManager.AccessTTL(),
+		RefreshTokenTTL: tokenManager.RefreshTTL(),
 	}
 
-	h := handler.NewHandler(handlerConfig, services)
+	h := handler.NewHandler(handlerConfig, services, healthHandler)
 	router := handler.SetupRouter(h, middlewares, handlerConfig)
 
 	logger.Info("router configurado")
 
 	// ============================================
-	// 10. CONFIGURAR E INICIAR SERVIDOR HTTP
+	// 10.1 INICIAR JOB DE EXPIRAÇÃO DE RESERVAS
+	// ============================================
+	reservationExpirationCtx, cancelExpiration := context.WithCancel(context.Background())
+	go startReservationExpirationJob(reservationExpirationCtx, services.Reservation, logger)
+
+	logger.Info("job de expiração de reservas iniciado")
+
+	// ============================================
+	// 11. CONFIGURAR E INICIAR SERVIDOR HTTP
 	// ============================================
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
 	server := &http.Server{
@@ -175,7 +191,7 @@ func main() {
 	}()
 
 	// ============================================
-	// 11. GRACEFUL SHUTDOWN
+	// 12. GRACEFUL SHUTDOWN
 	// ============================================
 	shutdown := make(chan os.Signal, 1)
 	signal.Notify(shutdown, os.Interrupt, syscall.SIGTERM)
@@ -190,6 +206,9 @@ func main() {
 		logger.Info("iniciando graceful shutdown",
 			zap.String("signal", sig.String()),
 		)
+
+		// Cancelar job de expiração de reservas
+		cancelExpiration()
 
 		// Contexto com timeout para shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -240,6 +259,7 @@ func initLogger() *zap.Logger {
 // Repositories agrupa todos os repositories
 type Repositories struct {
 	User            domainRepo.UserRepository
+	Session         domainRepo.SessionRepository
 	Product         domainRepo.ProductRepository
 	Batch           domainRepo.BatchRepository
 	Media           domainRepo.MediaRepository
@@ -257,6 +277,7 @@ type Repositories struct {
 func initRepositories(db *repository.DB) Repositories {
 	return Repositories{
 		User:            repository.NewUserRepository(db),
+		Session:         repository.NewSessionRepository(db),
 		Product:         repository.NewProductRepository(db),
 		Batch:           repository.NewBatchRepository(db),
 		Media:           repository.NewMediaRepository(db),
@@ -283,6 +304,7 @@ func initServices(
 	// Auth Service
 	authService := service.NewAuthService(
 		repos.User,
+		repos.Session,
 		tokenManager,
 		hasher,
 		logger,
@@ -384,6 +406,7 @@ func initServices(
 		SalesHistory:    salesHistoryService,
 		SharedInventory: sharedInventoryService,
 		Storage:         storageService,
+		MediaRepo:       repos.Media,
 	}
 }
 
@@ -435,4 +458,30 @@ func (a *dbExecutorAdapter) ExecuteInTx(ctx context.Context, fn func(tx interfac
 	return a.db.ExecuteInTx(ctx, func(tx *sql.Tx) error {
 		return fn(tx)
 	})
+}
+
+// startReservationExpirationJob executa periodicamente a expiração de reservas vencidas
+func startReservationExpirationJob(ctx context.Context, reservationService domainService.ReservationService, logger *zap.Logger) {
+	ticker := time.NewTicker(1 * time.Hour) // Executar a cada hora
+	defer ticker.Stop()
+
+	logger.Info("job de expiração de reservas configurado para executar a cada 1 hora")
+
+	for {
+		select {
+		case <-ctx.Done():
+			logger.Info("job de expiração de reservas encerrado")
+			return
+		case <-ticker.C:
+			logger.Info("executando job de expiração de reservas")
+			count, err := reservationService.ExpireReservations(ctx)
+			if err != nil {
+				logger.Error("erro ao executar job de expiração", zap.Error(err))
+			} else {
+				logger.Info("job de expiração de reservas concluído",
+					zap.Int("expiredCount", count),
+				)
+			}
+		}
+	}
 }

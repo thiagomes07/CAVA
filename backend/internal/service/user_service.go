@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -84,6 +85,69 @@ func (s *userService) Create(ctx context.Context, input entity.CreateUserInput) 
 		zap.String("userId", user.ID),
 		zap.String("email", user.Email),
 		zap.String("role", string(user.Role)),
+	)
+
+	return user, nil
+}
+
+func (s *userService) CreateSeller(ctx context.Context, industryID string, input entity.CreateSellerInput) (*entity.User, error) {
+	// Validar role (deve ser apenas VENDEDOR_INTERNO)
+	if input.Role != entity.RoleVendedorInterno {
+		return nil, domainErrors.ValidationError("Apenas VENDEDOR_INTERNO pode ser criado por esta rota")
+	}
+
+	// Verificar se email já existe
+	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
+	if err != nil {
+		s.logger.Error("erro ao verificar email existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if exists {
+		return nil, domainErrors.EmailExistsError(input.Email)
+	}
+
+	// Gerar senha temporária
+	temporaryPassword := s.generateTemporaryPassword()
+
+	// Hash da senha temporária
+	hashedPassword, err := s.hasher.Hash(temporaryPassword)
+	if err != nil {
+		s.logger.Error("erro ao fazer hash da senha temporária", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+
+	// Criar usuário vendedor
+	user := &entity.User{
+		ID:         uuid.New().String(),
+		IndustryID: &industryID,
+		Name:       input.Name,
+		Email:      input.Email,
+		Password:   hashedPassword,
+		Phone:      input.Phone,
+		Role:       entity.RoleVendedorInterno,
+		IsActive:   true,
+		CreatedAt:  time.Now(),
+		UpdatedAt:  time.Now(),
+	}
+
+	if err := s.userRepo.Create(ctx, user); err != nil {
+		s.logger.Error("erro ao criar vendedor interno", zap.Error(err))
+		return nil, err
+	}
+
+	// Limpar senha antes de retornar
+	user.Password = ""
+
+	s.logger.Info("vendedor interno criado com sucesso",
+		zap.String("userId", user.ID),
+		zap.String("email", user.Email),
+		zap.String("industryId", industryID),
+	)
+
+	// Nota: Aqui seria enviado email com a senha temporária
+	s.logger.Warn("senha temporária gerada para vendedor (deve ser enviada por email)",
+		zap.String("userId", user.ID),
+		zap.String("temporaryPassword", temporaryPassword),
 	)
 
 	return user, nil
@@ -277,14 +341,27 @@ func (s *userService) generateTemporaryPassword() string {
 
 	password := make([]byte, length)
 
-	// Garantir pelo menos 1 de cada tipo
-	password[0] = uppercase[0] // Pelo menos 1 maiúscula
-	password[1] = numbers[0]   // Pelo menos 1 número
+	// Gerar bytes aleatórios
+	randomBytes := make([]byte, length)
+	_, _ = rand.Read(randomBytes)
 
-	// Preencher o resto com mix de caracteres
+	// Garantir pelo menos 1 maiúscula no índice 0
+	password[0] = uppercase[int(randomBytes[0])%len(uppercase)]
+	// Garantir pelo menos 1 número no índice 1
+	password[1] = numbers[int(randomBytes[1])%len(numbers)]
+	// Garantir pelo menos 1 minúscula no índice 2
+	password[2] = lowercase[int(randomBytes[2])%len(lowercase)]
+
+	// Preencher o resto com mix aleatório de caracteres
 	charset := uppercase + lowercase + numbers + special
-	for i := 2; i < length; i++ {
-		password[i] = charset[i%len(charset)]
+	for i := 3; i < length; i++ {
+		password[i] = charset[int(randomBytes[i])%len(charset)]
+	}
+
+	// Embaralhar senha para não ter padrão previsível
+	for i := length - 1; i > 0; i-- {
+		j := int(randomBytes[i]) % (i + 1)
+		password[i], password[j] = password[j], password[i]
 	}
 
 	return string(password)
