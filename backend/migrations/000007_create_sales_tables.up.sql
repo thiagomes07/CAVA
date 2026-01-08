@@ -37,8 +37,9 @@ CREATE INDEX idx_sales_links_industry ON sales_links(industry_id);
 CREATE INDEX idx_sales_links_type ON sales_links(link_type);
 CREATE INDEX idx_sales_links_batch ON sales_links(batch_id) WHERE batch_id IS NOT NULL;
 CREATE INDEX idx_sales_links_product ON sales_links(product_id) WHERE product_id IS NOT NULL;
-CREATE INDEX idx_sales_links_active_not_expired ON sales_links(is_active, expires_at) 
-    WHERE is_active = TRUE AND (expires_at IS NULL OR expires_at > CURRENT_TIMESTAMP);
+-- Índice parcial para links ativos (sem comparação com CURRENT_TIMESTAMP que não é IMMUTABLE)
+CREATE INDEX idx_sales_links_active ON sales_links(is_active, expires_at) 
+    WHERE is_active = TRUE;
 
 -- Comentários
 COMMENT ON TABLE sales_links IS 'Links públicos de venda (landing pages)';

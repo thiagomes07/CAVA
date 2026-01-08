@@ -17,6 +17,8 @@ import { useAuth } from '@/lib/hooks/useAuth';
 import { salesLinkSchema, type SalesLinkInput } from '@/lib/schemas/link.schema';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatArea } from '@/lib/utils/formatDimensions';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { nanoid } from 'nanoid';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Batch, Product, LinkType } from '@/lib/types';
@@ -430,11 +432,17 @@ export default function CreateSalesLinkPage() {
                                 />
                               )}
                               <div className="flex-1">
-                                <p className="font-mono text-sm font-semibold text-obsidian">
-                                  {batch.batchCode}
+                                <p 
+                                  className="font-mono text-sm font-semibold text-obsidian"
+                                  title={batch.batchCode}
+                                >
+                                  {truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                                 </p>
-                                <p className="text-sm text-slate-600">
-                                  {batch.product?.name}
+                                <p 
+                                  className="text-sm text-slate-600"
+                                  title={batch.product?.name}
+                                >
+                                  {truncateText(batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                                 </p>
                                 <p className="text-xs text-slate-500">
                                   {formatArea(batch.totalArea)} •{' '}
@@ -474,11 +482,17 @@ export default function CreateSalesLinkPage() {
                                 />
                               )}
                               <div className="flex-1">
-                                <p className="font-semibold text-obsidian">
-                                  {product.name}
+                                <p 
+                                  className="font-semibold text-obsidian"
+                                  title={product.name}
+                                >
+                                  {truncateText(product.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                                 </p>
-                                <p className="text-sm text-slate-600">
-                                  {product.material} • {product.finish}
+                                <p 
+                                  className="text-sm text-slate-600"
+                                  title={`${product.material} • ${product.finish}`}
+                                >
+                                  {truncateText(`${product.material} • ${product.finish}`, TRUNCATION_LIMITS.MATERIAL_NAME)}
                                 </p>
                                 {product.sku && (
                                   <p className="text-xs text-slate-500 font-mono">
@@ -514,13 +528,19 @@ export default function CreateSalesLinkPage() {
                       />
                     )}
                     <div>
-                      <p className="font-semibold text-obsidian">
-                        {selectedBatch?.batchCode || selectedProduct?.name}
+                      <p 
+                        className="font-semibold text-obsidian"
+                        title={selectedBatch?.batchCode || selectedProduct?.name}
+                      >
+                        {truncateText(selectedBatch?.batchCode || selectedProduct?.name, TRUNCATION_LIMITS.CARD_TITLE)}
                       </p>
                       {selectedBatch && (
                         <>
-                          <p className="text-sm text-slate-600">
-                            {selectedBatch.product?.name}
+                          <p 
+                            className="text-sm text-slate-600"
+                            title={selectedBatch.product?.name}
+                          >
+                            {truncateText(selectedBatch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                           </p>
                           <p className="text-sm text-slate-500">
                             {formatArea(selectedBatch.totalArea)}

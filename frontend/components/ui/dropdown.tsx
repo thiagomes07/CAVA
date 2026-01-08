@@ -38,7 +38,7 @@ const Dropdown = forwardRef<HTMLDivElement, DropdownProps>(
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="inline-flex items-center justify-between w-full"
+          className="inline-flex items-center justify-between w-full cursor-pointer"
         >
           {trigger}
         </button>
@@ -67,7 +67,7 @@ const DropdownItem = forwardRef<HTMLButtonElement, HTMLAttributes<HTMLButtonElem
       ref={ref}
       type="button"
       className={cn(
-        'w-full px-4 py-2 text-left text-sm transition-colors duration-150',
+        'w-full px-4 py-2 text-left text-sm transition-colors duration-150 flex items-center gap-2 cursor-pointer',
         'hover:bg-slate-50 focus:bg-slate-50 focus:outline-none',
         className
       )}

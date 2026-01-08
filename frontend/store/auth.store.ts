@@ -52,6 +52,9 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ isLoading: true });
 
+        // Garantir que temos o CSRF token antes de fazer login
+        await apiClient.ensureCsrfToken();
+
         const response = await apiClient.post<{
           user: User;
           role: UserRole;

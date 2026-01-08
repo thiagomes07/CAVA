@@ -42,3 +42,6 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+repo_dump.md
+go_repo_dump.md

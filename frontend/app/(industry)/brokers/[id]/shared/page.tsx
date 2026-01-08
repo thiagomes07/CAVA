@@ -25,6 +25,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User, Batch, SharedInventoryBatch } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -177,7 +179,7 @@ export default function BrokerSharedInventoryPage() {
                 </h1>
               </div>
               <p className="text-sm text-slate-500">
-                Gerenciar compartilhamentos com <strong>{broker.name}</strong>
+                Gerenciar compartilhamentos com <strong title={broker.name}>{truncateText(broker.name, TRUNCATION_LIMITS.USER_NAME)}</strong>
               </p>
             </div>
           </div>
@@ -229,13 +231,19 @@ export default function BrokerSharedInventoryPage() {
                       {sharedBatches.map((shared) => (
                         <TableRow key={shared.id}>
                           <TableCell>
-                            <span className="font-mono text-sm text-obsidian">
-                              {shared.batch.batchCode}
+                            <span 
+                              className="font-mono text-sm text-obsidian"
+                              title={shared.batch.batchCode}
+                            >
+                              {truncateText(shared.batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                             </span>
                           </TableCell>
                           <TableCell>
-                            <span className="text-slate-600">
-                              {shared.batch.product?.name || '-'}
+                            <span 
+                              className="text-slate-600"
+                              title={shared.batch.product?.name}
+                            >
+                              {truncateText(shared.batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME) || '-'}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -364,11 +372,17 @@ export default function BrokerSharedInventoryPage() {
                           />
                         )}
                         <div className="flex-1">
-                          <p className="font-mono text-sm font-semibold text-obsidian">
-                            {batch.batchCode}
+                          <p 
+                            className="font-mono text-sm font-semibold text-obsidian"
+                            title={batch.batchCode}
+                          >
+                            {truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                           </p>
-                          <p className="text-sm text-slate-600">
-                            {batch.product?.name}
+                          <p 
+                            className="text-sm text-slate-600"
+                            title={batch.product?.name}
+                          >
+                            {truncateText(batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                           </p>
                           <p className="text-xs text-slate-500">
                             {formatArea(batch.totalArea)} •{' '}
@@ -396,11 +410,17 @@ export default function BrokerSharedInventoryPage() {
                       />
                     )}
                     <div>
-                      <p className="font-mono font-semibold text-obsidian">
-                        {selectedBatch.batchCode}
+                      <p 
+                        className="font-mono font-semibold text-obsidian"
+                        title={selectedBatch.batchCode}
+                      >
+                        {truncateText(selectedBatch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                       </p>
-                      <p className="text-sm text-slate-600">
-                        {selectedBatch.product?.name}
+                      <p 
+                        className="text-sm text-slate-600"
+                        title={selectedBatch.product?.name}
+                      >
+                        {truncateText(selectedBatch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                       </p>
                       <p className="text-sm font-mono text-slate-500">
                         {formatDimensions(

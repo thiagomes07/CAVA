@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 
 	"github.com/lib/pq"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -67,7 +68,7 @@ func (r *sharedInventoryRepository) FindByBrokerID(ctx context.Context, brokerID
 	}
 
 	if filters.Limit > 0 {
-		query += ` LIMIT $` + string(rune(len(args)+1))
+		query += ` LIMIT $` + strconv.Itoa(len(args)+1)
 		args = append(args, filters.Limit)
 	}
 

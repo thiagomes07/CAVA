@@ -1,7 +1,7 @@
 # =============================================
 # STAGE 1: Build
 # =============================================
-FROM golang:1.22-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 # Instalar dependências de build
 RUN apk add --no-cache git ca-certificates tzdata
@@ -15,8 +15,9 @@ RUN go mod download && go mod verify
 # Copiar código fonte
 COPY . .
 
-# Build do binário otimizado
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+# Rodar go mod tidy e build do binário otimizado
+RUN go mod tidy && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
     -ldflags="-w -s -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')" \
     -a -installsuffix cgo \
     -o /app/bin/api \

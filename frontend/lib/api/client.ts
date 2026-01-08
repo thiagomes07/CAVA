@@ -52,6 +52,20 @@ class ApiClient {
     return match ? decodeURIComponent(match[1]) : null;
   }
 
+  /**
+   * Garante que o CSRF token existe fazendo uma requisição GET ao backend.
+   * Deve ser chamado antes de operações de autenticação (login).
+   */
+  async ensureCsrfToken(): Promise<void> {
+    if (this.getCsrfToken()) return;
+    
+    // Fazer uma requisição GET para obter o cookie CSRF
+    await fetch(`${this.baseURL.replace('/api', '')}/health`, {
+      method: 'GET',
+      credentials: 'include',
+    });
+  }
+
   private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
     const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
 
@@ -76,11 +90,13 @@ class ApiClient {
     this.isRefreshing = true;
 
     try {
+      const csrfToken = this.getCsrfToken();
       const response = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         },
       });
 

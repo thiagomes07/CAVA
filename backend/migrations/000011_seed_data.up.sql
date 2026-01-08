@@ -26,42 +26,39 @@ BEGIN
 
     -- Inserir usuário Admin Demo
     -- Senha: Admin@123
-    -- Hash gerado com Argon2id
     INSERT INTO users (id, industry_id, name, email, password_hash, phone, role, is_active)
     VALUES (
         '00000000-0000-0000-0000-000000000011',
         '00000000-0000-0000-0000-000000000001',
         'Admin Demo',
         'admin@pedrasdemo.com',
-        '$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQxMjM0NTY$hash_placeholder',
+        '$argon2id$v=19$m=65536,t=3,p=2$e+PgXVFIINHjqXqPrEsBFA$syHXXvw5BxxkPEBrOB2xNMWWeLc4A29oZtNXb8NHsPI', -- Senha: Admin@123
         '11988888888',
         'ADMIN_INDUSTRIA',
         TRUE
     );
 
     -- Inserir usuário Vendedor Demo
-    -- Senha: Vendedor@123
     INSERT INTO users (id, industry_id, name, email, password_hash, phone, role, is_active)
     VALUES (
         '00000000-0000-0000-0000-000000000012',
         '00000000-0000-0000-0000-000000000001',
         'Vendedor Demo',
         'vendedor@pedrasdemo.com',
-        '$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQxMjM0NTY$hash_placeholder',
+        '$argon2id$v=19$m=65536,t=3,p=2$gUsuG6MQC32Trsmdfb1mXQ$r38pHnSF6SKd00DWJVUhIO8h/AiqZyUZRYBcTJGtTn0', -- Senha: Vendedor@123
         '11977777777',
         'VENDEDOR_INTERNO',
         TRUE
     );
 
     -- Inserir usuário Broker Demo
-    -- Senha: Broker@123
     INSERT INTO users (id, industry_id, name, email, password_hash, phone, role, is_active)
     VALUES (
         '00000000-0000-0000-0000-000000000013',
         NULL, -- Broker freelancer
         'Broker Demo',
         'broker@example.com',
-        '$argon2id$v=19$m=65536,t=3,p=2$c29tZXNhbHQxMjM0NTY$hash_placeholder',
+        '$argon2id$v=19$m=65536,t=3,p=2$KlwgNJFk/DQaGxZEQyK6Vg$6xpp0oWKpuoxJ2NPCT+VoATVplB16v7+a0cT1qxYRbI', -- Senha: Broker@123
         '11966666666',
         'BROKER',
         TRUE

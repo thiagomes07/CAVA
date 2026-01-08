@@ -58,8 +58,10 @@ export default function LoginPage() {
       const callbackUrl = searchParams.get('callbackUrl');
       const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
       router.push(redirectTo);
-    } catch {
-      error('Email ou senha incorretos');
+    } catch (err) {
+      console.error('Login error:', err);
+      const message = err instanceof Error ? err.message : 'Email ou senha incorretos';
+      error(message);
     } finally {
       setIsLoading(false);
     }

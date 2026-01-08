@@ -15,6 +15,8 @@ import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose }
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Lead, SalesLink } from '@/lib/types';
 import type { LeadFilter } from '@/lib/schemas/lead.schema';
 import { leadStatuses } from '@/lib/schemas/lead.schema';
@@ -175,60 +177,69 @@ export default function LeadsManagementPage() {
       {/* Filters */}
       <div className="px-8 py-6">
         <div className="bg-porcelain rounded-sm border border-slate-100 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="relative">
+          <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-4">
+            <div className="relative w-full md:w-auto md:min-w-[240px]">
               <Input
-                placeholder="Nome ou Contato"
+                placeholder="Nome ou contato"
                 value={filters.search}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFilters({ ...filters, search: e.target.value, page: 1 })
                 }
+                className="pr-10"
               />
-              <Search className="absolute right-3 top-3 w-5 h-5 text-slate-400 pointer-events-none" />
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 pointer-events-none" />
             </div>
 
-            <Select
-              value={filters.linkId}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setFilters({ ...filters, linkId: e.target.value, page: 1 })
-              }
-            >
-              <option value="">Todos os Links</option>
-              {salesLinks.map((link) => (
-                <option key={link.id} value={link.id}>
-                  {link.title || link.slugToken}
-                </option>
-              ))}
-            </Select>
+            <div className="w-full md:w-auto md:min-w-[200px]">
+              <Select
+                value={filters.linkId}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setFilters({ ...filters, linkId: e.target.value, page: 1 })
+                }
+              >
+                <option value="">Todos os Links</option>
+                {salesLinks.map((link) => (
+                  <option key={link.id} value={link.id} title={link.title || link.slugToken}>
+                    {truncateText(link.title || link.slugToken, TRUNCATION_LIMITS.SELECT_OPTION)}
+                  </option>
+                ))}
+              </Select>
+            </div>
 
-            <Select
-              value={filters.status}
-              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                setFilters({ ...filters, status: e.target.value as '' | 'NOVO' | 'CONTATADO' | 'RESOLVIDO', page: 1 })
-              }
-            >
-              <option value="">Todos os Status</option>
-              <option value="NOVO">Novo</option>
-              <option value="CONTATADO">Contatado</option>
-              <option value="RESOLVIDO">Resolvido</option>
-            </Select>
+            <div className="w-full md:w-auto md:min-w-[180px]">
+              <Select
+                value={filters.status}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                  setFilters({ ...filters, status: e.target.value as '' | 'NOVO' | 'CONTATADO' | 'RESOLVIDO', page: 1 })
+                }
+              >
+                <option value="">Todos os Status</option>
+                <option value="NOVO">Novo</option>
+                <option value="CONTATADO">Contatado</option>
+                <option value="RESOLVIDO">Resolvido</option>
+              </Select>
+            </div>
 
-            <Input
-              type="date"
-              label="Data Início"
-              value={filters.startDate}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                setFilters({ ...filters, startDate: e.target.value, page: 1 })
-              }
-            />
+            <div className="w-full md:w-auto md:min-w-[170px]">
+              <Input
+                type="date"
+                value={filters.startDate}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                  setFilters({ ...filters, startDate: e.target.value, page: 1 })
+                }
+              />
+            </div>
 
-            <Button
-              variant="secondary"
-              onClick={handleClearFilters}
-              disabled={!hasFilters}
-            >
-              Limpar Filtros
-            </Button>
+            <div className="w-full md:w-auto md:ml-auto">
+              <Button
+                variant="secondary"
+                onClick={handleClearFilters}
+                disabled={!hasFilters}
+                className="w-full md:w-auto h-[48px] px-6"
+              >
+                Limpar Filtros
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -283,8 +294,11 @@ export default function LeadsManagementPage() {
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
-                            <span className="font-medium text-obsidian">
-                              {lead.name}
+                            <span 
+                              className="font-medium text-obsidian"
+                              title={lead.name}
+                            >
+                              {truncateText(lead.name, TRUNCATION_LIMITS.USER_NAME_SHORT)}
                             </span>
                           </div>
                         </TableCell>
@@ -295,19 +309,23 @@ export default function LeadsManagementPage() {
                               handleCopyContact(lead.contact);
                             }}
                             className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
+                            title={lead.contact}
                           >
                             {isEmail ? (
                               <Mail className="w-4 h-4" />
                             ) : (
                               <Phone className="w-4 h-4" />
                             )}
-                            <span>{lead.contact}</span>
+                            <span>{truncateText(lead.contact, TRUNCATION_LIMITS.CONTACT)}</span>
                           </button>
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="text-sm text-slate-600">
-                              {lead.salesLink?.title || lead.salesLink?.slugToken || '-'}
+                            <p 
+                              className="text-sm text-slate-600"
+                              title={lead.salesLink?.title || lead.salesLink?.slugToken}
+                            >
+                              {truncateText(lead.salesLink?.title || lead.salesLink?.slugToken, TRUNCATION_LIMITS.LINK_TITLE) || '-'}
                             </p>
                             {lead.salesLink && (
                               <Badge
@@ -320,10 +338,16 @@ export default function LeadsManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-slate-600">
-                            {lead.salesLink?.batch?.product?.name ||
-                              lead.salesLink?.product?.name ||
-                              'Catálogo'}
+                          <span 
+                            className="text-sm text-slate-600"
+                            title={lead.salesLink?.batch?.product?.name || lead.salesLink?.product?.name || 'Catálogo'}
+                          >
+                            {truncateText(
+                              lead.salesLink?.batch?.product?.name ||
+                                lead.salesLink?.product?.name ||
+                                'Catálogo',
+                              TRUNCATION_LIMITS.PRODUCT_NAME_SHORT
+                            )}
                           </span>
                         </TableCell>
                         <TableCell>

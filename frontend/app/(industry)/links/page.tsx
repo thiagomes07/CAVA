@@ -16,6 +16,8 @@ import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { SalesLink, LinkType } from '@/lib/types';
 import type { LinkFilter } from '@/lib/schemas/link.schema';
 import { linkTypes } from '@/lib/schemas/link.schema';
@@ -261,14 +263,21 @@ export default function LinksManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p className="font-medium text-obsidian mb-1">
-                              {link.title || link.batch?.product?.name || link.product?.name || 'Link sem título'}
+                            <p 
+                              className="font-medium text-obsidian mb-1"
+                              title={link.title || link.batch?.product?.name || link.product?.name || 'Link sem título'}
+                            >
+                              {truncateText(
+                                link.title || link.batch?.product?.name || link.product?.name || 'Link sem título',
+                                TRUNCATION_LIMITS.LINK_TITLE
+                              )}
                             </p>
                             <button
                               onClick={() => window.open(`/${link.slugToken}`, '_blank')}
                               className="text-xs text-blue-600 hover:underline font-mono"
+                              title={`/${link.slugToken}`}
                             >
-                              /{link.slugToken}
+                              /{truncateText(link.slugToken, TRUNCATION_LIMITS.SLUG)}
                             </button>
                           </div>
                         </TableCell>
@@ -367,8 +376,11 @@ export default function LinksManagementPage() {
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">
                   Título
                 </p>
-                <p className="text-lg font-semibold text-obsidian">
-                  {selectedLink.title || 'Sem título'}
+                <p 
+                  className="text-lg font-semibold text-obsidian"
+                  title={selectedLink.title || 'Sem título'}
+                >
+                  {truncateText(selectedLink.title || 'Sem título', TRUNCATION_LIMITS.MODAL_TITLE)}
                 </p>
               </div>
 

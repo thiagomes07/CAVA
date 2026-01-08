@@ -6,13 +6,14 @@ import { PackageOpen, Link2, Inbox, TrendingUp, Plus, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
-import { LoadingState } from '@/components/shared/LoadingState';
+import { LoadingState, LoadingSpinner } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatArea } from '@/lib/utils/formatDimensions';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { SharedInventoryBatch, Sale } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -23,7 +24,7 @@ interface BrokerMetrics {
   monthlyCommission: number;
 }
 
-export default function BrokerDashboardPage() {
+export function BrokerDashboard() {
   const router = useRouter();
   const { error } = useToast();
 
@@ -33,12 +34,19 @@ export default function BrokerDashboardPage() {
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
   const [isLoadingSales, setIsLoadingSales] = useState(true);
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    
     fetchMetrics();
     fetchRecentBatches();
     fetchRecentSales();
-  }, []);
+  }, [isMounted]);
 
   const fetchMetrics = async () => {
     try {
@@ -46,7 +54,14 @@ export default function BrokerDashboardPage() {
       const data = await apiClient.get<BrokerMetrics>('/broker/dashboard/metrics');
       setMetrics(data);
     } catch (err) {
-      error('Erro ao carregar métricas');
+      console.error('Erro ao carregar métricas:', err);
+      // Usar valores default em vez de mostrar erro
+      setMetrics({
+        availableBatches: 0,
+        activeLinks: 0,
+        leadsCount: 0,
+        monthlyCommission: 0,
+      });
     } finally {
       setIsLoadingMetrics(false);
     }
@@ -59,9 +74,10 @@ export default function BrokerDashboardPage() {
         '/broker/shared-inventory',
         { params: { recent: true, limit: 5 } }
       );
-      setRecentBatches(data);
+      setRecentBatches(Array.isArray(data) ? data : []);
     } catch (err) {
-      error('Erro ao carregar lotes recentes');
+      console.error('Erro ao carregar lotes:', err);
+      setRecentBatches([]);
     } finally {
       setIsLoadingBatches(false);
     }
@@ -73,13 +89,23 @@ export default function BrokerDashboardPage() {
       const data = await apiClient.get<Sale[]>('/broker/sales', {
         params: { limit: 10 },
       });
-      setRecentSales(data);
+      setRecentSales(Array.isArray(data) ? data : []);
     } catch (err) {
-      error('Erro ao carregar vendas');
+      console.error('Erro ao carregar vendas:', err);
+      setRecentSales([]);
     } finally {
       setIsLoadingSales(false);
     }
   };
+
+  // Wait for client-side hydration
+  if (!isMounted) {
+    return (
+      <div className="min-h-screen bg-mineral flex items-center justify-center">
+        <LoadingSpinner className="w-12 h-12" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -227,11 +253,17 @@ export default function BrokerDashboardPage() {
                     />
                   )}
                   <div className="flex-1">
-                    <p className="font-mono text-sm font-semibold text-obsidian">
-                      {shared.batch.batchCode}
+                    <p 
+                      className="font-mono text-sm font-semibold text-obsidian"
+                      title={shared.batch.batchCode}
+                    >
+                      {truncateText(shared.batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                     </p>
-                    <p className="text-sm text-slate-600">
-                      {shared.batch.product?.name}
+                    <p 
+                      className="text-sm text-slate-600"
+                      title={shared.batch.product?.name}
+                    >
+                      {truncateText(shared.batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                     </p>
                     <p className="text-xs text-slate-500">
                       {formatArea(shared.batch.totalArea)} •{' '}
@@ -285,12 +317,20 @@ export default function BrokerDashboardPage() {
                   {recentSales.map((sale) => (
                     <TableRow key={sale.id}>
                       <TableCell>
-                        <span className="font-mono text-sm text-obsidian">
-                          {sale.batch?.batchCode || '-'}
+                        <span 
+                          className="font-mono text-sm text-obsidian"
+                          title={sale.batch?.batchCode}
+                        >
+                          {truncateText(sale.batch?.batchCode, TRUNCATION_LIMITS.BATCH_CODE) || '-'}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-slate-600">{sale.customerName}</span>
+                        <span 
+                          className="text-slate-600"
+                          title={sale.customerName}
+                        >
+                          {truncateText(sale.customerName, TRUNCATION_LIMITS.CUSTOMER_NAME)}
+                        </span>
                       </TableCell>
                       <TableCell>
                         <span className="font-serif text-obsidian">

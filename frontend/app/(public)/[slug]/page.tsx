@@ -24,6 +24,8 @@ import { leadCaptureSchema, type LeadCaptureInput } from '@/lib/schemas/link.sch
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { cn } from '@/lib/utils/cn';
 import type { SalesLink } from '@/lib/types';
 
@@ -236,8 +238,11 @@ export default function PublicLinkPage() {
       {link.customMessage && (
         <section className="py-16 bg-mineral">
           <div className="container mx-auto px-6 max-w-3xl text-center">
-            <p className="text-lg text-slate-600 leading-relaxed">
-              {sanitizeText(link.customMessage)}
+            <p 
+              className="text-lg text-slate-600 leading-relaxed"
+              title={link.customMessage}
+            >
+              {truncateText(sanitizeText(link.customMessage), TRUNCATION_LIMITS.CUSTOM_MESSAGE)}
             </p>
           </div>
         </section>
@@ -340,7 +345,12 @@ export default function PublicLinkPage() {
                     <MapPin className="w-5 h-5 text-slate-400" />
                     <div>
                       <p className="text-sm text-slate-500">Pedreira</p>
-                      <p className="text-lg text-obsidian">{batch.originQuarry}</p>
+                      <p 
+                        className="text-lg text-obsidian"
+                        title={batch.originQuarry}
+                      >
+                        {truncateText(batch.originQuarry, TRUNCATION_LIMITS.QUARRY_NAME)}
+                      </p>
                     </div>
                   </div>
                 )}
@@ -372,8 +382,11 @@ export default function PublicLinkPage() {
               <h3 className="uppercase tracking-widest text-xs font-semibold text-slate-500 mb-4">
                 Sobre o Material
               </h3>
-              <p className="text-slate-600 leading-relaxed">
-                {sanitizeText(product.description)}
+              <p 
+                className="text-slate-600 leading-relaxed"
+                title={product.description}
+              >
+                {truncateText(sanitizeText(product.description), TRUNCATION_LIMITS.CUSTOM_MESSAGE)}
               </p>
             </div>
           )}

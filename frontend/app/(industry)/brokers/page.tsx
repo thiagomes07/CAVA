@@ -24,6 +24,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { inviteBrokerSchema, type InviteBrokerInput } from '@/lib/schemas/auth.schema';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatPhone } from '@/lib/utils/validators';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -150,7 +152,12 @@ export default function BrokersManagementPage() {
                   <TableRow key={broker.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-obsidian">{broker.name}</p>
+                        <p 
+                          className="font-medium text-obsidian"
+                          title={broker.name}
+                        >
+                          {truncateText(broker.name, TRUNCATION_LIMITS.USER_NAME)}
+                        </p>
                         <p className="text-xs text-slate-500">
                           Desde {formatDate(broker.createdAt, 'MMM yyyy')}
                         </p>
@@ -159,8 +166,11 @@ export default function BrokersManagementPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm text-slate-600">
-                          {broker.email}
+                        <span 
+                          className="text-sm text-slate-600"
+                          title={broker.email}
+                        >
+                          {truncateText(broker.email, TRUNCATION_LIMITS.EMAIL)}
                         </span>
                       </div>
                     </TableCell>

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"net/url"
 	"path/filepath"
 	"strings"
 	"time"
@@ -34,10 +35,21 @@ type Config struct {
 
 // NewS3Adapter cria novo adapter S3/MinIO
 func NewS3Adapter(cfg *Config, logger *zap.Logger) (*S3Adapter, error) {
+	// Parsear endpoint para extrair host:port (remover http:// ou https://)
+	endpoint := cfg.Endpoint
+	useSSL := cfg.UseSSL
+
+	if parsedURL, err := url.Parse(cfg.Endpoint); err == nil && parsedURL.Host != "" {
+		endpoint = parsedURL.Host
+		if parsedURL.Scheme == "https" {
+			useSSL = true
+		}
+	}
+
 	// Inicializar cliente MinIO (compatível com S3)
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
+	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: cfg.UseSSL,
+		Secure: useSSL,
 		Region: cfg.Region,
 	})
 	if err != nil {

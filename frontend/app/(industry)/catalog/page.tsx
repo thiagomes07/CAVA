@@ -12,6 +12,8 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Product } from '@/lib/types';
 import type { ProductFilter } from '@/lib/schemas/product.schema';
 import { materialTypes } from '@/lib/schemas/product.schema';
@@ -230,18 +232,33 @@ function ProductCard({ product, onView, onEdit }: ProductCardProps) {
       {/* Footer */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-2">
-          <h3 className="font-serif text-xl text-obsidian">{product.name}</h3>
+          <h3 
+            className="font-serif text-xl text-obsidian"
+            title={product.name}
+          >
+            {truncateText(product.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
+          </h3>
           <Badge variant={product.isActive ? 'DISPONIVEL' : 'INATIVO'}>
             {product.isActive ? 'Ativo' : 'Inativo'}
           </Badge>
         </div>
 
         {product.sku && (
-          <p className="font-mono text-xs text-slate-400 mb-3">{product.sku}</p>
+          <p 
+            className="font-mono text-xs text-slate-400 mb-3"
+            title={product.sku}
+          >
+            {truncateText(product.sku, TRUNCATION_LIMITS.SKU)}
+          </p>
         )}
 
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">{product.material}</span>
+          <span 
+            className="text-slate-600"
+            title={product.material}
+          >
+            {truncateText(product.material, TRUNCATION_LIMITS.MATERIAL_NAME)}
+          </span>
           <span className="text-slate-500">
             {product.batchCount || 0} lote{product.batchCount !== 1 ? 's' : ''}
           </span>

@@ -18,6 +18,8 @@ import { batchSchema, type BatchInput } from '@/lib/schemas/batch.schema';
 import { batchStatuses } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Batch, Product, Media, BatchStatus } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -291,8 +293,8 @@ export default function EditBatchPage() {
                 disabled={isSubmitting}
               >
                 {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} {product.sku && `(${product.sku})`}
+                  <option key={product.id} value={product.id} title={`${product.name}${product.sku ? ` (${product.sku})` : ''}`}>
+                    {truncateText(product.name, TRUNCATION_LIMITS.SELECT_OPTION)} {product.sku && `(${truncateText(product.sku, TRUNCATION_LIMITS.SKU)})`}
                   </option>
                 ))}
               </Select>
@@ -307,11 +309,17 @@ export default function EditBatchPage() {
                     />
                   )}
                   <div>
-                    <p className="font-semibold text-obsidian">
-                      {selectedProduct.name}
+                    <p 
+                      className="font-semibold text-obsidian"
+                      title={selectedProduct.name}
+                    >
+                      {truncateText(selectedProduct.name, TRUNCATION_LIMITS.PRODUCT_NAME)}
                     </p>
-                    <p className="text-sm text-slate-500">
-                      {selectedProduct.material} • {selectedProduct.finish}
+                    <p 
+                      className="text-sm text-slate-500"
+                      title={`${selectedProduct.material} • ${selectedProduct.finish}`}
+                    >
+                      {truncateText(`${selectedProduct.material} • ${selectedProduct.finish}`, TRUNCATION_LIMITS.MATERIAL_NAME)}
                     </p>
                   </div>
                 </div>
@@ -513,7 +521,7 @@ export default function EditBatchPage() {
         <ModalContent>
           <p className="text-slate-600">
             Tem certeza que deseja arquivar o lote{' '}
-            <strong className="font-mono">&quot;{batch.batchCode}&quot;</strong>?
+            <strong className="font-mono" title={batch.batchCode}>&quot;{truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}&quot;</strong>?
           </p>
           <p className="text-amber-600 text-sm mt-4">
             O lote será marcado como inativo e não aparecerá mais nas listagens.

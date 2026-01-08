@@ -2,36 +2,39 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { Menu } from 'lucide-react';
 import { Sidebar } from '@/components/shared/Sidebar';
-import { Header } from '@/components/shared/Header';
+import { BackButton } from '@/components/shared/BackButton';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
 import { useAuth } from '@/lib/hooks/useAuth';
+import { useUIStore } from '@/store/ui.store';
 import { LoadingSpinner } from '@/components/shared/LoadingState';
+import { cn } from '@/lib/utils/cn';
 
 export default function IndustryLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { user, isLoading, hasPermission } = useAuth();
+  const { user, isLoading } = useAuth();
   const router = useRouter();
+  const { toggleSidebar } = useUIStore();
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push('/login');
-      return;
     }
-
-    if (!isLoading && user && !hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'])) {
-      router.push('/dashboard');
-    }
-  }, [user, isLoading, hasPermission, router]);
+  }, [user, isLoading, router]);
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <div className="min-h-screen bg-mineral flex items-center justify-center">
+        <LoadingSpinner className="w-12 h-12" />
+      </div>
+    );
   }
 
-  if (!user || !hasPermission(['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'])) {
+  if (!user) {
     return null;
   }
 
@@ -41,7 +44,23 @@ export default function IndustryLayout({
         <Sidebar />
         
         <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
+          {/* Back Button & Mobile Menu */}
+          <div className="flex items-center gap-2 px-6 pt-4">
+            {/* Mobile Menu Toggle */}
+            <button
+              onClick={toggleSidebar}
+              className={cn(
+                'p-2 rounded-sm hover:bg-slate-100 transition-colors lg:hidden',
+                'focus:outline-none focus:ring-2 focus:ring-obsidian/20'
+              )}
+              aria-label="Abrir menu"
+            >
+              <Menu className="w-5 h-5 text-slate-600" />
+            </button>
+
+            {/* Back Button */}
+            <BackButton />
+          </div>
           
           <main className="flex-1 overflow-y-auto">
             <div className="container mx-auto px-6 py-8">

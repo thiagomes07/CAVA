@@ -34,8 +34,9 @@ CREATE INDEX idx_batches_entry_date_desc ON batches(industry_id, entry_date DESC
 CREATE INDEX idx_leads_created_desc ON leads(sales_link_id, created_at DESC);
 
 -- Índices parciais para queries específicas
-CREATE INDEX idx_reservations_expired ON reservations(expires_at) 
-    WHERE status = 'ATIVA' AND expires_at < CURRENT_TIMESTAMP;
+-- Índice para encontrar reservas expiradas (checagem feita em runtime)
+CREATE INDEX idx_reservations_expired ON reservations(expires_at, status) 
+    WHERE status = 'ATIVA';
 
 CREATE INDEX idx_sales_links_public_active ON sales_links(slug_token, is_active) 
     WHERE is_active = TRUE;

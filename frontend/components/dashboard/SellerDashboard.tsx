@@ -6,16 +6,17 @@ import { Layers, Link2, Inbox, TrendingUp, Plus, Eye, Receipt } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { DashboardMetrics, Activity } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
-export default function SellerDashboardPage() {
+export function SellerDashboard() {
   const router = useRouter();
   const { error } = useToast();
 
@@ -189,18 +190,27 @@ export default function SellerDashboardPage() {
                   {activities.map((activity) => (
                     <TableRow key={activity.id}>
                       <TableCell>
-                        <span className="font-mono text-sm text-obsidian">
-                          {activity.batchCode}
+                        <span 
+                          className="font-mono text-sm text-obsidian"
+                          title={activity.batchCode}
+                        >
+                          {truncateText(activity.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-slate-600">
-                          {activity.productName}
+                        <span 
+                          className="text-slate-600"
+                          title={activity.productName}
+                        >
+                          {truncateText(activity.productName, TRUNCATION_LIMITS.PRODUCT_NAME)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-slate-600">
-                          {activity.sellerName}
+                        <span 
+                          className="text-slate-600"
+                          title={activity.sellerName}
+                        >
+                          {truncateText(activity.sellerName, TRUNCATION_LIMITS.SELLER_NAME)}
                         </span>
                       </TableCell>
                       <TableCell>

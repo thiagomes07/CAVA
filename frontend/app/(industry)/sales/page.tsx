@@ -15,6 +15,8 @@ import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Sale } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
@@ -214,8 +216,8 @@ export default function SalesHistoryPage() {
             >
               <option value="">Todos os Vendedores</option>
               {sellers.map((seller) => (
-                <option key={seller.id} value={seller.id}>
-                  {seller.name}
+                <option key={seller.id} value={seller.id} title={seller.name}>
+                  {truncateText(seller.name, TRUNCATION_LIMITS.SELECT_OPTION)}
                 </option>
               ))}
             </Select>
@@ -293,16 +295,27 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-mono text-sm text-slate-600">
-                            {sale.batch?.batchCode || '-'}
+                          <span 
+                            className="font-mono text-sm text-slate-600"
+                            title={sale.batch?.batchCode}
+                          >
+                            {truncateText(sale.batch?.batchCode, TRUNCATION_LIMITS.BATCH_CODE) || '-'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-slate-600">{sale.customerName}</span>
+                          <span 
+                            className="text-slate-600"
+                            title={sale.customerName}
+                          >
+                            {truncateText(sale.customerName, TRUNCATION_LIMITS.CUSTOMER_NAME)}
+                          </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-slate-600">
-                            {sale.soldBy?.name || '-'}
+                          <span 
+                            className="text-slate-600"
+                            title={sale.soldBy?.name}
+                          >
+                            {truncateText(sale.soldBy?.name, TRUNCATION_LIMITS.SELLER_NAME) || '-'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -352,16 +365,22 @@ export default function SalesHistoryPage() {
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                     Produto
                                   </p>
-                                  <p className="text-sm font-medium text-obsidian">
-                                    {sale.batch?.product?.name || '-'}
+                                  <p 
+                                    className="text-sm font-medium text-obsidian"
+                                    title={sale.batch?.product?.name}
+                                  >
+                                    {truncateText(sale.batch?.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME) || '-'}
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                     Contato Cliente
                                   </p>
-                                  <p className="text-sm text-slate-600">
-                                    {sale.customerContact}
+                                  <p 
+                                    className="text-sm text-slate-600"
+                                    title={sale.customerContact}
+                                  >
+                                    {truncateText(sale.customerContact, TRUNCATION_LIMITS.CONTACT)}
                                   </p>
                                 </div>
                                 {sale.notes && (
@@ -369,7 +388,12 @@ export default function SalesHistoryPage() {
                                     <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                       Observações
                                     </p>
-                                    <p className="text-sm text-slate-600">{sale.notes}</p>
+                                    <p 
+                                      className="text-sm text-slate-600"
+                                      title={sale.notes}
+                                    >
+                                      {truncateText(sale.notes, TRUNCATION_LIMITS.NOTES)}
+                                    </p>
                                   </div>
                                 )}
                               </div>

@@ -129,7 +129,7 @@ interface Activity {
 ## Products (Catalog)
 
 ### `GET /api/products`
-**Auth**: Required (ADMIN_INDUSTRIA)  
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO)  
 **Query Params**:
 ```typescript
 {
@@ -170,7 +170,7 @@ interface Product {
 ---
 
 ### `GET /api/products/:id`
-**Auth**: Required (ADMIN_INDUSTRIA)  
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO)  
 **Response**:
 ```typescript
 Product
@@ -389,7 +389,7 @@ Updates batch status to RESERVADO.
 ## Users & Brokers
 
 ### `GET /api/users`
-**Auth**: Required (ADMIN_INDUSTRIA)  
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO)  
 **Query Params**:
 ```typescript
 {

@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { 
   LayoutDashboard, 
   Package, 
@@ -14,11 +14,16 @@ import {
   UserPlus,
   PackageOpen,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  LogOut,
+  ChevronUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
+import { useToast } from '@/lib/hooks/useToast';
 import type { UserRole } from '@/lib/types';
 
 interface MenuItem {
@@ -110,8 +115,47 @@ const brokerMenuItems: MenuItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
   const user = useAuthStore((state) => state.user);
+  const logout = useAuthStore((state) => state.logout);
   const { sidebarOpen, toggleSidebar } = useUIStore();
+  const { success, error: showError } = useToast();
+  
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const userMenuRef = useRef<HTMLDivElement>(null);
+
+  // Handle click outside to close user menu
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target as Node)) {
+        setUserMenuOpen(false);
+      }
+    };
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      success('Logout realizado com sucesso');
+      router.push('/login');
+    } catch {
+      showError('Erro ao fazer logout');
+    }
+  };
 
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
@@ -167,11 +211,16 @@ export function Sidebar() {
         )}
       >
         {/* Logo & Toggle */}
-        <div className="flex items-center justify-between p-6 border-b border-white/10">
+        <div
+          className={cn(
+            'flex items-center border-b border-white/10 transition-all duration-200',
+            sidebarOpen ? 'justify-between p-6' : 'justify-center p-4'
+          )}
+        >
           <div
             className={cn(
-              'flex items-center gap-3 transition-opacity duration-200',
-              !sidebarOpen && 'lg:opacity-0'
+              'flex items-center gap-3 transition-all duration-200',
+              sidebarOpen ? 'opacity-100' : 'lg:w-0 lg:opacity-0 lg:overflow-hidden'
             )}
           >
             <div className="w-8 h-8 bg-porcelain rounded-sm" />
@@ -229,24 +278,91 @@ export function Sidebar() {
           </ul>
         </nav>
 
-        {/* User Info */}
-        {sidebarOpen && (
-          <div className="p-6 border-t border-white/10">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center">
+        {/* User Info with Dropdown */}
+        <div className="p-6 border-t border-white/10" ref={userMenuRef}>
+          <div className="relative">
+            {/* User Menu Dropdown */}
+            {userMenuOpen && sidebarOpen && (
+              <div 
+                className={cn(
+                  'absolute bottom-full left-0 right-0 mb-2 rounded-sm',
+                  'bg-white shadow-premium-lg border border-slate-200',
+                  'animate-in fade-in-0 slide-in-from-bottom-2 duration-150',
+                  'py-1'
+                )}
+              >
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className={cn(
+                    'w-full px-4 py-3 text-left text-sm transition-colors duration-150',
+                    'flex items-center gap-3 cursor-pointer',
+                    'text-slate-700 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none'
+                  )}
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sair
+                </button>
+              </div>
+            )}
+
+            {/* User Info Button */}
+            <button
+              type="button"
+              onClick={() => sidebarOpen && setUserMenuOpen(!userMenuOpen)}
+              className={cn(
+                'w-full flex items-center gap-3 rounded-sm transition-colors duration-200',
+                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                sidebarOpen ? 'p-2 -m-2' : 'justify-center',
+                userMenuOpen && 'bg-white/10'
+              )}
+              aria-expanded={userMenuOpen}
+              aria-haspopup="true"
+            >
+              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center shrink-0">
                 <span className="text-sm font-semibold">
                   {user.name.charAt(0).toUpperCase()}
                 </span>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.name}</p>
-                <p className="text-xs text-porcelain/60 truncate">
-                  {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
-                  {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
-                  {user.role === 'BROKER' && 'Broker'}
-                </p>
-              </div>
-            </div>
+              {sidebarOpen && (
+                <>
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-sm font-medium truncate" title={user.name}>
+                      {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
+                    </p>
+                    <p className="text-xs text-porcelain/60 truncate">
+                      {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
+                      {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
+                      {user.role === 'BROKER' && 'Broker'}
+                    </p>
+                  </div>
+                  <ChevronUp 
+                    className={cn(
+                      'w-4 h-4 text-porcelain/60 transition-transform duration-200',
+                      userMenuOpen && 'rotate-180'
+                    )} 
+                  />
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Collapsed Sidebar - Logout Button */}
+        {!sidebarOpen && (
+          <div className="hidden lg:block p-3 border-t border-white/10">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className={cn(
+                'w-full p-3 rounded-sm transition-colors duration-200',
+                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                'flex items-center justify-center'
+              )}
+              title="Sair"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         )}
       </aside>

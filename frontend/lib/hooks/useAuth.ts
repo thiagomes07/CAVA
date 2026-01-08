@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/auth.store';
 import type { UserRole } from '@/lib/types';
 import { canRoleAccessRoute } from '@/lib/utils/routes';
 
 export function useAuth() {
+  const router = useRouter();
   const {
     user,
     isAuthenticated,
@@ -15,10 +17,14 @@ export function useAuth() {
     hasPermission,
   } = useAuthStore();
 
+  const hasAttemptedRefresh = useRef(false);
+
   useEffect(() => {
     let isMounted = true;
 
-    if (!isAuthenticated && !isLoading) {
+    // Only attempt refresh once per mount when loading
+    if (isLoading && !hasAttemptedRefresh.current) {
+      hasAttemptedRefresh.current = true;
       refreshSession().catch(() => {
         if (isMounted) {
           setUser(null);
@@ -29,7 +35,7 @@ export function useAuth() {
     return () => {
       isMounted = false;
     };
-  }, [isAuthenticated, isLoading, refreshSession, setUser]);
+  }, [isLoading, refreshSession, setUser]);
 
   const checkPermission = (requiredRole: UserRole | UserRole[]): boolean => {
     return hasPermission(requiredRole);

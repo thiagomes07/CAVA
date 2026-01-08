@@ -110,8 +110,9 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 	r.Use(m.CSRF.SetCSRFCookie)
 
-	// Health check (público)
+	// Health check (público) - GET e HEAD para healthchecks Docker
 	r.Get("/health", h.Health.Check)
+	r.Head("/health", h.Health.Check)
 
 	// API Routes
 	r.Route("/api", func(r chi.Router) {
@@ -164,9 +165,11 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// PRODUCTS
 			// ----------------------------------------
 			r.Route("/products", func(r chi.Router) {
-				r.With(m.RBAC.RequireAdmin).Get("/", h.Product.List)
+				// Leitura permitida para VENDEDOR_INTERNO (necessário para filtros de inventário)
+				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Product.List)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Product.GetByID)
+				// Escrita restrita a ADMIN
 				r.With(m.RBAC.RequireAdmin).Post("/", h.Product.Create)
-				r.With(m.RBAC.RequireAdmin).Get("/{id}", h.Product.GetByID)
 				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.Product.Update)
 				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.Product.Delete)
 			})
@@ -196,7 +199,9 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// USERS
 			// ----------------------------------------
 			r.Route("/users", func(r chi.Router) {
-				r.With(m.RBAC.RequireAdmin).Get("/", h.User.List)
+				// Leitura permitida para VENDEDOR_INTERNO (necessário para filtro de vendedores)
+				r.With(m.RBAC.RequireIndustryUser).Get("/", h.User.List)
+				// Demais operações restritas a ADMIN
 				r.With(m.RBAC.RequireAdmin).Post("/", h.User.Create)
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.User.GetByID)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.User.UpdateStatus)

@@ -16,6 +16,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Batch, Product, BatchStatus } from '@/lib/types';
 import type { BatchFilter } from '@/lib/schemas/batch.schema';
 import { batchStatuses } from '@/lib/schemas/batch.schema';
@@ -131,8 +133,8 @@ export default function InventoryPage() {
             >
               <option value="">Todos os Produtos</option>
               {products.map((product) => (
-                <option key={product.id} value={product.id}>
-                  {product.name}
+                <option key={product.id} value={product.id} title={product.name}>
+                  {truncateText(product.name, TRUNCATION_LIMITS.SELECT_OPTION)}
                 </option>
               ))}
             </Select>
@@ -242,13 +244,17 @@ export default function InventoryPage() {
                         <button
                           onClick={() => router.push(`/inventory/${batch.id}`)}
                           className="font-mono text-sm text-obsidian hover:underline"
+                          title={batch.batchCode}
                         >
-                          {batch.batchCode}
+                          {truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                         </button>
                       </TableCell>
                       <TableCell>
-                        <span className="text-slate-600">
-                          {batch.product?.name || '-'}
+                        <span 
+                          className="text-slate-600"
+                          title={batch.product?.name}
+                        >
+                          {truncateText(batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME) || '-'}
                         </span>
                       </TableCell>
                       <TableCell>

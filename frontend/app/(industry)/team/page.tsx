@@ -22,6 +22,8 @@ import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatPhone } from '@/lib/utils/validators';
+import { truncateText } from '@/lib/utils/truncateText';
+import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User } from '@/lib/types';
 import { z } from 'zod';
 import { cn } from '@/lib/utils/cn';
@@ -165,7 +167,12 @@ export default function TeamManagementPage() {
                   <TableRow key={seller.id}>
                     <TableCell>
                       <div>
-                        <p className="font-medium text-obsidian">{seller.name}</p>
+                        <p 
+                          className="font-medium text-obsidian"
+                          title={seller.name}
+                        >
+                          {truncateText(seller.name, TRUNCATION_LIMITS.SELLER_NAME)}
+                        </p>
                         <p className="text-xs text-slate-500">
                           Desde {formatDate(seller.createdAt, 'MMM yyyy')}
                         </p>
@@ -174,8 +181,11 @@ export default function TeamManagementPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm text-slate-600">
-                          {seller.email}
+                        <span 
+                          className="text-sm text-slate-600"
+                          title={seller.email}
+                        >
+                          {truncateText(seller.email, TRUNCATION_LIMITS.EMAIL)}
                         </span>
                       </div>
                     </TableCell>

@@ -1,6 +1,6 @@
 module github.com/thiagomes07/CAVA/backend
 
-go 1.25.1
+go 1.24
 
 require (
 	github.com/Masterminds/squirrel v1.5.4 // indirect
