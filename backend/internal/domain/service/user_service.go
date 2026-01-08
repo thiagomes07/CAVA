@@ -1,0 +1,33 @@
+package service
+
+import (
+	"context"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+)
+
+// UserService define o contrato para operações com usuários
+type UserService interface {
+	// Create cria um novo usuário com validações de negócio
+	Create(ctx context.Context, input entity.CreateUserInput) (*entity.User, error)
+
+	// GetByID busca usuário por ID
+	GetByID(ctx context.Context, id string) (*entity.User, error)
+
+	// GetByEmail busca usuário por email
+	GetByEmail(ctx context.Context, email string) (*entity.User, error)
+
+	// List lista usuários com filtros
+	List(ctx context.Context, role *entity.UserRole) ([]entity.User, error)
+
+	// Update atualiza dados do usuário
+	Update(ctx context.Context, id string, input entity.UpdateUserInput) (*entity.User, error)
+
+	// UpdateStatus atualiza status ativo/inativo
+	UpdateStatus(ctx context.Context, id string, isActive bool) (*entity.User, error)
+
+	// InviteBroker convida um broker (cria usuário, gera senha temporária, envia email)
+	InviteBroker(ctx context.Context, industryID string, input entity.InviteBrokerInput) (*entity.User, error)
+
+	// GetBrokers lista brokers com estatísticas
+	GetBrokers(ctx context.Context, industryID string) ([]entity.BrokerWithStats, error)
+}

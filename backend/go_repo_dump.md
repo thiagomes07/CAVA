@@ -5,34 +5,7 @@
 ### `.\cmd\api\main.go`
 
 ```go
-﻿package main
-
-import (
-    "log"
-    "os"
-    "os/signal"
-    "syscall"
-)
-
-func main() {
-    log.Println(" CAVA Backend iniciando...")
-    
-    // TODO: Implementar bootstrap completo
-    // 1. Carregar configurações
-    // 2. Conectar ao banco
-    // 3. Conectar ao storage
-    // 4. Inicializar router
-    // 5. Registrar middlewares
-    // 6. Registrar rotas
-    // 7. Iniciar servidor
-    
-    // Graceful shutdown
-    quit := make(chan os.Signal, 1)
-    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-    <-quit
-    
-    log.Println(" CAVA Backend encerrando...")
-}
+﻿
 ```
 
 ---
@@ -40,7 +13,7 @@ func main() {
 ### `.\docker-compose.yml`
 
 ```go
-version: '3.8'
+version: '3.9'
 
 networks:
   cava-network:
@@ -73,6 +46,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # =============================================
   # MINIO (S3-Compatible Storage)
@@ -93,10 +67,11 @@ services:
     networks:
       - cava-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "mc", "ready", "local"]
       interval: 30s
-      timeout: 10s
+      timeout: 20s
       retries: 3
+      start_period: 20s
 
   # =============================================
   # MINIO INIT (Criar bucket automaticamente)
@@ -109,9 +84,12 @@ services:
         condition: service_healthy
     entrypoint: >
       /bin/sh -c "
+      echo 'Aguardando MinIO estar pronto...';
+      sleep 5;
       mc alias set minio http://minio:9000 minio_access_key minio_secret_key;
       mc mb --ignore-existing minio/cava-media;
       mc anonymous set download minio/cava-media;
+      echo 'Bucket cava-media criado e configurado com sucesso!';
       exit 0;
       "
     networks:
@@ -141,7 +119,7 @@ services:
     networks:
       - cava-network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -156,34 +134,40 @@ services:
 # =============================================
 # STAGE 1: Build
 # =============================================
-FROM golang:1.21-alpine AS builder
+FROM golang:1.22-alpine AS builder
 
 # Instalar dependências de build
 RUN apk add --no-cache git ca-certificates tzdata
 
 WORKDIR /app
 
-# Copiar go.mod e go.sum primeiro (cache de dependências)
+# Copiar go.mod e go.sum primeiro (melhor cache de dependências)
 COPY go.mod go.sum ./
-RUN go mod download
+RUN go mod download && go mod verify
 
 # Copiar código fonte
 COPY . .
 
-# Build do binário
+# Build do binário otimizado
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s" \
+    -ldflags="-w -s -X main.version=$(git describe --tags --always --dirty 2>/dev/null || echo 'dev')" \
+    -a -installsuffix cgo \
     -o /app/bin/api \
-    ./cmd/api
+    ./cmd/api/main.go
 
 # =============================================
 # STAGE 2: Runtime
 # =============================================
-FROM alpine:latest
+FROM alpine:3.19
 
-# Instalar certificados SSL e timezone data
-RUN apk --no-cache add ca-certificates tzdata curl
+# Instalar dependências runtime
+RUN apk --no-cache add \
+    ca-certificates \
+    tzdata \
+    wget \
+    && update-ca-certificates
 
+# Criar diretório da aplicação
 WORKDIR /app
 
 # Copiar binário do stage de build
@@ -192,22 +176,31 @@ COPY --from=builder /app/bin/api ./api
 # Copiar migrations
 COPY --from=builder /app/migrations ./migrations
 
-# Criar usuário não-root
+# Copiar arquivo .env.example como referência (não usar em produção)
+COPY --from=builder /app/.env.example ./
+
+# Criar usuário não-root para segurança
 RUN addgroup -g 1000 appuser && \
     adduser -D -u 1000 -G appuser appuser && \
     chown -R appuser:appuser /app
 
+# Mudar para usuário não-root
 USER appuser
 
-# Expor porta
+# Expor porta da aplicação
 EXPOSE 3001
 
-# Health check endpoint
+# Health check endpoint (wget é mais leve que curl)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3001/health || exit 1
+  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1
+
+# Labels para metadata
+LABEL maintainer="CAVA Team"
+LABEL version="1.0"
+LABEL description="CAVA Backend - Sistema B2B de gestão de estoque de rochas ornamentais"
 
 # Executar aplicação
-CMD ["./api"]
+ENTRYPOINT ["./api"]
 ```
 
 ---
@@ -408,210 +401,7 @@ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
 ### `.\internal\config\config.go`
 
 ```go
-﻿package config
-
-import (
-    "fmt"
-    "os"
-    "strconv"
-    "time"
-
-    "github.com/joho/godotenv"
-)
-
-type Config struct {
-    Database  DatabaseConfig
-    Storage   StorageConfig
-    Auth      AuthConfig
-    App       AppConfig
-    SMTP      SMTPConfig
-}
-
-type DatabaseConfig struct {
-    Host            string
-    Port            int
-    User            string
-    Password        string
-    Name            string
-    SSLMode         string
-    MaxOpenConns    int
-    MaxIdleConns    int
-    ConnMaxLifetime time.Duration
-}
-
-type StorageConfig struct {
-    Type          string
-    Endpoint      string
-    AccessKey     string
-    SecretKey     string
-    BucketName    string
-    Region        string
-    UseSSL        bool
-    PublicURL     string
-}
-
-type AuthConfig struct {
-    JWTSecret              string
-    AccessTokenDuration    time.Duration
-    RefreshTokenDuration   time.Duration
-    PasswordPepper         string
-    CSRFSecret            string
-    CookieSecure          bool
-    CookieDomain          string
-    BcryptCost            int
-}
-
-type AppConfig struct {
-    Env                        string
-    Host                       string
-    Port                       int
-    FrontendURL               string
-    PublicLinkBaseURL         string
-    AllowedOrigins            []string
-    RateLimitAuthRPM          int
-    RateLimitPublicRPM        int
-    RateLimitAuthenticatedRPM int
-    LogLevel                  string
-    LogFormat                 string
-    MigrationsPath            string
-    AutoMigrate               bool
-}
-
-type SMTPConfig struct {
-    Host     string
-    Port     int
-    User     string
-    Password string
-    From     string
-}
-
-func Load() (*Config, error) {
-    // Carregar .env se existir
-    _ = godotenv.Load()
-
-    cfg := &Config{
-        Database: DatabaseConfig{
-            Host:            getEnv("DB_HOST", "localhost"),
-            Port:            getEnvAsInt("DB_PORT", 5432),
-            User:            getEnv("DB_USER", "cava_user"),
-            Password:        getEnv("DB_PASSWORD", ""),
-            Name:            getEnv("DB_NAME", "cava_db"),
-            SSLMode:         getEnv("DB_SSL_MODE", "disable"),
-            MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),
-            MaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),
-            ConnMaxLifetime: getEnvAsDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),
-        },
-        Storage: StorageConfig{
-            Type:       getEnv("STORAGE_TYPE", "minio"),
-            Endpoint:   getEnv("STORAGE_ENDPOINT", "http://localhost:9000"),
-            AccessKey:  getEnv("STORAGE_ACCESS_KEY", ""),
-            SecretKey:  getEnv("STORAGE_SECRET_KEY", ""),
-            BucketName: getEnv("STORAGE_BUCKET_NAME", "cava-media"),
-            Region:     getEnv("STORAGE_REGION", "us-east-1"),
-            UseSSL:     getEnvAsBool("STORAGE_USE_SSL", false),
-            PublicURL:  getEnv("STORAGE_PUBLIC_URL", ""),
-        },
-        Auth: AuthConfig{
-            JWTSecret:            getEnv("JWT_SECRET", ""),
-            AccessTokenDuration:  getEnvAsDuration("JWT_ACCESS_TOKEN_DURATION", 15*time.Minute),
-            RefreshTokenDuration: getEnvAsDuration("JWT_REFRESH_TOKEN_DURATION", 168*time.Hour),
-            PasswordPepper:       getEnv("PASSWORD_PEPPER", ""),
-            CSRFSecret:          getEnv("CSRF_SECRET", ""),
-            CookieSecure:        getEnvAsBool("COOKIE_SECURE", false),
-            CookieDomain:        getEnv("COOKIE_DOMAIN", "localhost"),
-            BcryptCost:          getEnvAsInt("BCRYPT_COST", 12),
-        },
-        App: AppConfig{
-            Env:                        getEnv("APP_ENV", "development"),
-            Host:                       getEnv("APP_HOST", "0.0.0.0"),
-            Port:                       getEnvAsInt("APP_PORT", 3001),
-            FrontendURL:               getEnv("FRONTEND_URL", "http://localhost:3000"),
-            PublicLinkBaseURL:         getEnv("PUBLIC_LINK_BASE_URL", "http://localhost:3000"),
-            AllowedOrigins:            getEnvAsSlice("ALLOWED_ORIGINS", []string{"http://localhost:3000"}),
-            RateLimitAuthRPM:          getEnvAsInt("RATE_LIMIT_AUTH_RPM", 5),
-            RateLimitPublicRPM:        getEnvAsInt("RATE_LIMIT_PUBLIC_RPM", 30),
-            RateLimitAuthenticatedRPM: getEnvAsInt("RATE_LIMIT_AUTHENTICATED_RPM", 100),
-            LogLevel:                  getEnv("LOG_LEVEL", "info"),
-            LogFormat:                 getEnv("LOG_FORMAT", "json"),
-            MigrationsPath:            getEnv("MIGRATIONS_PATH", "file://migrations"),
-            AutoMigrate:               getEnvAsBool("AUTO_MIGRATE", true),
-        },
-        SMTP: SMTPConfig{
-            Host:     getEnv("SMTP_HOST", ""),
-            Port:     getEnvAsInt("SMTP_PORT", 587),
-            User:     getEnv("SMTP_USER", ""),
-            Password: getEnv("SMTP_PASSWORD", ""),
-            From:     getEnv("EMAIL_FROM", ""),
-        },
-    }
-
-    if err := cfg.Validate(); err != nil {
-        return nil, err
-    }
-
-    return cfg, nil
-}
-
-func (c *Config) Validate() error {
-    if c.Database.Password == "" {
-        return fmt.Errorf("DB_PASSWORD é obrigatório")
-    }
-    if c.Auth.JWTSecret == "" {
-        return fmt.Errorf("JWT_SECRET é obrigatório")
-    }
-    if c.Auth.PasswordPepper == "" {
-        return fmt.Errorf("PASSWORD_PEPPER é obrigatório")
-    }
-    if c.Storage.AccessKey == "" {
-        return fmt.Errorf("STORAGE_ACCESS_KEY é obrigatório")
-    }
-    if c.Storage.SecretKey == "" {
-        return fmt.Errorf("STORAGE_SECRET_KEY é obrigatório")
-    }
-    return nil
-}
-
-// Helpers para parsing de env vars
-func getEnv(key, defaultValue string) string {
-    if value := os.Getenv(key); value != "" {
-        return value
-    }
-    return defaultValue
-}
-
-func getEnvAsInt(key string, defaultValue int) int {
-    if value := os.Getenv(key); value != "" {
-        if intVal, err := strconv.Atoi(value); err == nil {
-            return intVal
-        }
-    }
-    return defaultValue
-}
-
-func getEnvAsBool(key string, defaultValue bool) bool {
-    if value := os.Getenv(key); value != "" {
-        if boolVal, err := strconv.ParseBool(value); err == nil {
-            return boolVal
-        }
-    }
-    return defaultValue
-}
-
-func getEnvAsDuration(key string, defaultValue time.Duration) time.Duration {
-    if value := os.Getenv(key); value != "" {
-        if duration, err := time.ParseDuration(value); err == nil {
-            return duration
-        }
-    }
-    return defaultValue
-}
-
-func getEnvAsSlice(key string, defaultValue []string) []string {
-    if value := os.Getenv(key); value != "" {
-        return strings.Split(value, ",")
-    }
-    return defaultValue
-}
+﻿
 ```
 
 ---
@@ -619,74 +409,7 @@ func getEnvAsSlice(key string, defaultValue []string) []string {
 ### `.\internal\domain\errors\errors.go`
 
 ```go
-﻿package errors
-
-import "fmt"
-
-type AppError struct {
-    Code    string
-    Message string
-    Details map[string]interface{}
-    Err     error
-}
-
-func (e *AppError) Error() string {
-    if e.Err != nil {
-        return fmt.Sprintf("%s: %v", e.Message, e.Err)
-    }
-    return e.Message
-}
-
-func NewNotFoundError(message string) *AppError {
-    return &AppError{
-        Code:    "NOT_FOUND",
-        Message: message,
-    }
-}
-
-func NewValidationError(message string, details map[string]interface{}) *AppError {
-    return &AppError{
-        Code:    "VALIDATION_ERROR",
-        Message: message,
-        Details: details,
-    }
-}
-
-func NewConflictError(message string) *AppError {
-    return &AppError{
-        Code:    "CONFLICT",
-        Message: message,
-    }
-}
-
-func NewUnauthorizedError(message string) *AppError {
-    return &AppError{
-        Code:    "UNAUTHORIZED",
-        Message: message,
-    }
-}
-
-func NewForbiddenError(message string) *AppError {
-    return &AppError{
-        Code:    "FORBIDDEN",
-        Message: message,
-    }
-}
-
-func NewInternalError(message string, err error) *AppError {
-    return &AppError{
-        Code:    "INTERNAL_ERROR",
-        Message: message,
-        Err:     err,
-    }
-}
-
-func NewBatchNotAvailableError() *AppError {
-    return &AppError{
-        Code:    "BATCH_NOT_AVAILABLE",
-        Message: "Lote não disponível para reserva",
-    }
-}
+﻿
 ```
 
 ---
