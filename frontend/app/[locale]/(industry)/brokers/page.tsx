@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -36,6 +37,9 @@ interface BrokerWithStats extends User {
 export default function BrokersManagementPage() {
   const router = useRouter();
   const { success, error } = useToast();
+  const t = useTranslations('brokers');
+  const tCommon = useTranslations('common');
+  const tTeam = useTranslations('team');
 
   const [brokers, setBrokers] = useState<BrokerWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -61,7 +65,7 @@ export default function BrokersManagementPage() {
       const data = await apiClient.get<BrokerWithStats[]>('/brokers');
       setBrokers(data);
     } catch (err) {
-      error('Erro ao carregar brokers');
+      error(t('loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -73,12 +77,12 @@ export default function BrokersManagementPage() {
 
       await apiClient.post('/brokers/invite', data);
 
-      success(`Convite enviado para ${data.email}`);
+      success(t('inviteSent', { email: data.email }));
       setShowInviteModal(false);
       reset();
       fetchBrokers();
     } catch (err) {
-      error('Erro ao convidar broker');
+      error(t('inviteError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -91,11 +95,11 @@ export default function BrokersManagementPage() {
       });
 
       success(
-        currentStatus ? 'Broker desativado com sucesso' : 'Broker ativado com sucesso'
+        currentStatus ? t('brokerDeactivated') : t('brokerActivated')
       );
       fetchBrokers();
     } catch (err) {
-      error('Erro ao alterar status do broker');
+      error(t('brokerStatusError'));
     }
   };
 
@@ -108,15 +112,15 @@ export default function BrokersManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Parceiros (Brokers)
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Gerencie seus parceiros comerciais
+              {t('subtitle')}
             </p>
           </div>
           <Button variant="primary" onClick={() => setShowInviteModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            CONVIDAR BROKER
+            {t('inviteBroker')}
           </Button>
         </div>
       </div>
@@ -128,9 +132,9 @@ export default function BrokersManagementPage() {
         ) : isEmpty ? (
           <EmptyState
             icon={Plus}
-            title="Nenhum parceiro cadastrado"
-            description="Convide brokers para expandir sua rede de vendas"
-            actionLabel="+ Convidar Broker"
+            title={t('noBrokers')}
+            description={t('noBrokersDescription')}
+            actionLabel={t('inviteBrokerButton')}
             onAction={() => setShowInviteModal(true)}
           />
         ) : (
@@ -138,13 +142,13 @@ export default function BrokersManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telefone</TableHead>
+                  <TableHead>{tCommon('name')}</TableHead>
+                  <TableHead>{tCommon('email')}</TableHead>
+                  <TableHead>{tCommon('phone')}</TableHead>
                   <TableHead>WhatsApp</TableHead>
-                  <TableHead>Lotes Compartilhados</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead>{t('sharedBatches')}</TableHead>
+                  <TableHead>{tCommon('status')}</TableHead>
+                  <TableHead>{tCommon('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -159,7 +163,7 @@ export default function BrokersManagementPage() {
                           {truncateText(broker.name, TRUNCATION_LIMITS.USER_NAME)}
                         </p>
                         <p className="text-xs text-slate-500">
-                          Desde {formatDate(broker.createdAt, 'MMM yyyy')}
+                          {tTeam('since', { date: formatDate(broker.createdAt, 'MMM yyyy') })}
                         </p>
                       </div>
                     </TableCell>
@@ -195,7 +199,7 @@ export default function BrokersManagementPage() {
                           className="inline-flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 transition-colors"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          Abrir
+                          {tCommon('seeDetails')}
                         </a>
                       ) : (
                         <span className="text-slate-400">-</span>
@@ -214,7 +218,7 @@ export default function BrokersManagementPage() {
                     </TableCell>
                     <TableCell>
                       <Badge variant={broker.isActive ? 'DISPONIVEL' : 'INATIVO'}>
-                        {broker.isActive ? 'Ativo' : 'Inativo'}
+                        {broker.isActive ? tCommon('active') : tCommon('inactive')}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -222,7 +226,7 @@ export default function BrokersManagementPage() {
                         <button
                           onClick={() => router.push(`/brokers/${broker.id}/shared`)}
                           className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                          title="Ver compartilhamentos"
+                          title={t('manageBatches')}
                         >
                           <Eye className="w-4 h-4 text-slate-600" />
                         </button>
@@ -235,7 +239,7 @@ export default function BrokersManagementPage() {
                               ? 'hover:bg-rose-50 text-rose-600'
                               : 'hover:bg-emerald-50 text-emerald-600'
                           )}
-                          title={broker.isActive ? 'Desativar' : 'Ativar'}
+                          title={broker.isActive ? tTeam('deactivate') : tTeam('activate')}
                         >
                           <UserX className="w-4 h-4" />
                         </button>
@@ -253,7 +257,7 @@ export default function BrokersManagementPage() {
       <Modal open={showInviteModal} onClose={() => setShowInviteModal(false)}>
         <ModalClose onClose={() => setShowInviteModal(false)} />
         <ModalHeader>
-          <ModalTitle>Convidar Broker</ModalTitle>
+          <ModalTitle>{t('inviteBrokerTitle')}</ModalTitle>
         </ModalHeader>
 
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -261,7 +265,7 @@ export default function BrokersManagementPage() {
             <div className="space-y-6">
               <Input
                 {...register('name')}
-                label="Nome Completo"
+                label={tTeam('fullName')}
                 placeholder="Maria Santos"
                 error={errors.name?.message}
                 disabled={isSubmitting}
@@ -270,16 +274,16 @@ export default function BrokersManagementPage() {
               <Input
                 {...register('email')}
                 type="email"
-                label="Email"
+                label={tCommon('email')}
                 placeholder="maria@exemplo.com"
-                helperText="Um convite de acesso será enviado para este email"
+                helperText={t('emailHelperText')}
                 error={errors.email?.message}
                 disabled={isSubmitting}
               />
 
               <Input
                 {...register('phone')}
-                label="Telefone (Opcional)"
+                label={tTeam('phoneOptional')}
                 placeholder="(11) 98765-4321"
                 error={errors.phone?.message}
                 disabled={isSubmitting}
@@ -287,9 +291,9 @@ export default function BrokersManagementPage() {
 
               <Input
                 {...register('whatsapp')}
-                label="WhatsApp (Opcional)"
+                label={t('whatsappOptional')}
                 placeholder="(11) 98765-4321"
-                helperText="Para facilitar a comunicação"
+                helperText={t('whatsappHelperText')}
                 error={errors.whatsapp?.message}
                 disabled={isSubmitting}
               />
@@ -303,10 +307,10 @@ export default function BrokersManagementPage() {
               onClick={() => setShowInviteModal(false)}
               disabled={isSubmitting}
             >
-              Cancelar
+              {tCommon('cancel')}
             </Button>
             <Button type="submit" variant="primary" loading={isSubmitting}>
-              ENVIAR CONVITE
+              {t('sendInvite')}
             </Button>
           </ModalFooter>
         </form>

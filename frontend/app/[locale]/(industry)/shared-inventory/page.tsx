@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { PackageOpen, RefreshCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -17,6 +18,8 @@ import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 
 export default function SharedInventoryPage() {
   const router = useRouter();
+  const t = useTranslations('sharedInventory');
+  const tInventory = useTranslations('inventory');
 
   const filters = useMemo(() => ({ limit: 200 }), []);
   const { data, isLoading, isError, refetch, isFetching } = useSharedInventory(filters);
@@ -30,8 +33,8 @@ export default function SharedInventoryPage() {
       <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="font-serif text-3xl text-obsidian mb-2">Estoque Compartilhado</h1>
-            <p className="text-sm text-slate-500">Lotes compartilhados com você pela indústria</p>
+            <h1 className="font-serif text-3xl text-obsidian mb-2">{t('title')}</h1>
+            <p className="text-sm text-slate-500">{t('subtitle')}</p>
           </div>
           <Button
             variant="secondary"
@@ -39,7 +42,7 @@ export default function SharedInventoryPage() {
             loading={isFetching}
           >
             <RefreshCcw className="w-4 h-4 mr-2" />
-            Atualizar
+            {t('refresh')}
           </Button>
         </div>
       </div>
@@ -51,30 +54,30 @@ export default function SharedInventoryPage() {
         ) : isError ? (
           <EmptyState
             icon={PackageOpen}
-            title="Não foi possível carregar"
-            description="Ocorreu um erro ao buscar o estoque compartilhado."
-            actionLabel="Tentar novamente"
+            title={t('loadError')}
+            description={t('loadErrorDescription')}
+            actionLabel={t('tryAgain')}
             onAction={refetch}
           />
         ) : isEmpty ? (
           <EmptyState
             icon={PackageOpen}
-            title="Nenhum lote compartilhado"
-            description="Quando a indústria compartilhar lotes com você, eles aparecerão aqui."
+            title={t('noBatches')}
+            description={t('noBatchesDescription')}
           />
         ) : (
           <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Foto</TableHead>
-                  <TableHead>Código</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead>Dimensões</TableHead>
-                  <TableHead>Área Total</TableHead>
-                  <TableHead>Preço</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Compartilhado em</TableHead>
+                  <TableHead>{tInventory('photo')}</TableHead>
+                  <TableHead>{tInventory('code')}</TableHead>
+                  <TableHead>{tInventory('product')}</TableHead>
+                  <TableHead>{tInventory('dimensions')}</TableHead>
+                  <TableHead>{tInventory('totalArea')}</TableHead>
+                  <TableHead>{tInventory('price')}</TableHead>
+                  <TableHead>{tInventory('status')}</TableHead>
+                  <TableHead>{t('sharedAt')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -94,7 +97,7 @@ export default function SharedInventoryPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                              Sem foto
+                              {tInventory('noPhoto')}
                             </div>
                           )}
                         </div>

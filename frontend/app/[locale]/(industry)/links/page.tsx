@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Plus, Search, Copy, Edit2, Archive, Eye, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,9 @@ import { cn } from '@/lib/utils/cn';
 export default function LinksManagementPage() {
   const router = useRouter();
   const { success, error } = useToast();
+  const t = useTranslations('links');
+  const tCommon = useTranslations('common');
+  const tErrors = useTranslations('errors');
 
   const [links, setLinks] = useState<SalesLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +61,7 @@ export default function LinksManagementPage() {
       setLinks(data.links);
       setTotalItems(data.total);
     } catch (err) {
-      error('Erro ao carregar links');
+      error(t('loadError'));
       setLinks([]);
     } finally {
       setIsLoading(false);
@@ -68,19 +72,19 @@ export default function LinksManagementPage() {
     try {
       const fullUrl = `${window.location.origin}/${link.slugToken}`;
       await navigator.clipboard.writeText(fullUrl);
-      success('Link copiado!');
+      success(t('linkCopied'));
     } catch (err) {
-      error('Erro ao copiar link');
+      error(tErrors('copyLink'));
     }
   };
 
   const handleArchiveLink = async (linkId: string) => {
     try {
       await apiClient.patch(`/sales-links/${linkId}`, { isActive: false });
-      success('Link arquivado com sucesso');
+      success(t('linkArchived'));
       fetchLinks();
     } catch (err) {
-      error('Erro ao arquivar link');
+      error(tErrors('archiveLink'));
     }
   };
 
@@ -104,9 +108,9 @@ export default function LinksManagementPage() {
 
   const getLinkTypeBadge = (type: LinkType) => {
     const variants = {
-      LOTE_UNICO: { label: 'Lote', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      PRODUTO_GERAL: { label: 'Produto', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      CATALOGO_COMPLETO: { label: 'Catálogo', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      LOTE_UNICO: { label: t('typeSingleBatch'), color: 'bg-blue-50 text-blue-700 border-blue-200' },
+      PRODUTO_GERAL: { label: t('typeProduct'), color: 'bg-purple-50 text-purple-700 border-purple-200' },
+      CATALOGO_COMPLETO: { label: t('typeCatalog'), color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
     };
     const variant = variants[type];
     return (
@@ -117,9 +121,9 @@ export default function LinksManagementPage() {
   };
 
   const getLinkStatus = (link: SalesLink) => {
-    if (!link.isActive) return { label: 'Arquivado', variant: 'INATIVO' as const };
-    if (link.expiresAt && new Date(link.expiresAt) < new Date()) return { label: 'Expirado', variant: 'INATIVO' as const };
-    return { label: 'Ativo', variant: 'DISPONIVEL' as const };
+    if (!link.isActive) return { label: t('statusArchived'), variant: 'INATIVO' as const };
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) return { label: t('statusExpired'), variant: 'INATIVO' as const };
+    return { label: t('statusActive'), variant: 'DISPONIVEL' as const };
   };
 
   return (
@@ -129,10 +133,10 @@ export default function LinksManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Meus Links de Venda
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Gerencie links compartilháveis com clientes
+              {t('subtitle')}
             </p>
           </div>
           <Button
@@ -140,7 +144,7 @@ export default function LinksManagementPage() {
             onClick={() => router.push('/links/new')}
           >
             <Plus className="w-4 h-4 mr-2" />
-            NOVO LINK
+            {t('newLink')}
           </Button>
         </div>
       </div>
@@ -159,10 +163,10 @@ export default function LinksManagementPage() {
                 })
               }
             >
-              <option value="">Todos os Tipos</option>
-              <option value="LOTE_UNICO">Lote Único</option>
-              <option value="PRODUTO_GERAL">Produto Geral</option>
-              <option value="CATALOGO_COMPLETO">Catálogo Completo</option>
+              <option value="">{t('allTypes')}</option>
+              <option value="LOTE_UNICO">{t('typeSingleBatch')}</option>
+              <option value="PRODUTO_GERAL">{t('typeProduct')}</option>
+              <option value="CATALOGO_COMPLETO">{t('typeCatalog')}</option>
             </Select>
 
             <Select
@@ -175,14 +179,14 @@ export default function LinksManagementPage() {
                 })
               }
             >
-              <option value="">Todos os Status</option>
-              <option value="ATIVO">Ativos</option>
-              <option value="EXPIRADO">Expirados</option>
+              <option value="">{t('allStatuses')}</option>
+              <option value="ATIVO">{t('statusActive')}</option>
+              <option value="EXPIRADO">{t('statusExpired')}</option>
             </Select>
 
             <div className="relative">
               <Input
-                placeholder="Buscar por título ou slug"
+                placeholder={t('searchPlaceholder')}
                 value={filters.search}
                 onChange={(e) =>
                   setFilters({ ...filters, search: e.target.value, page: 1 })
@@ -196,7 +200,7 @@ export default function LinksManagementPage() {
               onClick={handleClearFilters}
               disabled={!hasFilters}
             >
-              Limpar Filtros
+              {tCommon('clearFilters')}
             </Button>
           </div>
         </div>
@@ -211,15 +215,15 @@ export default function LinksManagementPage() {
             icon={hasFilters ? Search : Plus}
             title={
               hasFilters
-                ? 'Nenhum link encontrado'
-                : 'Nenhum link criado ainda'
+                ? t('noResults')
+                : t('emptyTitle')
             }
             description={
               hasFilters
-                ? 'Tente ajustar os filtros de busca'
-                : 'Crie links personalizados para compartilhar com seus clientes'
+                ? t('adjustFilters')
+                : t('emptyDescription')
             }
-            actionLabel={hasFilters ? 'Limpar Filtros' : '+ Novo Link'}
+            actionLabel={hasFilters ? tCommon('clearFilters') : t('newLink')}
             onAction={hasFilters ? handleClearFilters : () => router.push('/links/new')}
           />
         ) : (
@@ -228,15 +232,15 @@ export default function LinksManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Preview</TableHead>
-                    <TableHead>Título/Slug</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Preço</TableHead>
-                    <TableHead>Visualizações</TableHead>
-                    <TableHead>Leads</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Criado em</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>{t('preview')}</TableHead>
+                    <TableHead>{t('titleSlug')}</TableHead>
+                    <TableHead>{t('type')}</TableHead>
+                    <TableHead>{t('price')}</TableHead>
+                    <TableHead>{t('views')}</TableHead>
+                    <TableHead>{t('leads')}</TableHead>
+                    <TableHead>{t('status')}</TableHead>
+                    <TableHead>{t('createdAt')}</TableHead>
+                    <TableHead>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -265,10 +269,10 @@ export default function LinksManagementPage() {
                           <div>
                             <p 
                               className="font-medium text-obsidian mb-1"
-                              title={link.title || link.batch?.product?.name || link.product?.name || 'Link sem título'}
+                              title={link.title || link.batch?.product?.name || link.product?.name || t('untitledLink')}
                             >
                               {truncateText(
-                                link.title || link.batch?.product?.name || link.product?.name || 'Link sem título',
+                                link.title || link.batch?.product?.name || link.product?.name || t('untitledLink'),
                                 TRUNCATION_LIMITS.LINK_TITLE
                               )}
                             </p>
@@ -290,7 +294,7 @@ export default function LinksManagementPage() {
                               {formatCurrency(link.displayPrice)}
                             </span>
                           ) : (
-                            <span className="text-slate-400 text-sm">Sob consulta</span>
+                            <span className="text-slate-400 text-sm">{t('onRequest')}</span>
                           )}
                         </TableCell>
                         <TableCell>
@@ -324,14 +328,14 @@ export default function LinksManagementPage() {
                             <button
                               onClick={() => handleCopyLink(link)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                              title="Copiar link"
+                              title={t('copyLink')}
                             >
                               <Copy className="w-4 h-4 text-slate-600" />
                             </button>
                             <button
                               onClick={() => router.push(`/links/${link.id}`)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                              title="Editar"
+                              title={t('edit')}
                             >
                               <Edit2 className="w-4 h-4 text-slate-600" />
                             </button>
@@ -339,7 +343,7 @@ export default function LinksManagementPage() {
                               <button
                                 onClick={() => handleArchiveLink(link.id)}
                                 className="p-2 hover:bg-rose-50 rounded-sm transition-colors"
-                                title="Arquivar"
+                                title={t('archive')}
                               >
                                 <Archive className="w-4 h-4 text-rose-600" />
                               </button>
@@ -367,27 +371,27 @@ export default function LinksManagementPage() {
       {/* Stats Modal */}
       <Modal open={showStatsModal} onClose={() => setShowStatsModal(false)}>
         <ModalHeader>
-          <ModalTitle>Estatísticas do Link</ModalTitle>
+          <ModalTitle>{t('linkStats')}</ModalTitle>
         </ModalHeader>
         <ModalContent>
           {selectedLink && (
             <div className="space-y-6">
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">
-                  Título
+                  {t('titleLabel')}
                 </p>
                 <p 
                   className="text-lg font-semibold text-obsidian"
-                  title={selectedLink.title || 'Sem título'}
+                  title={selectedLink.title || t('untitledLink')}
                 >
-                  {truncateText(selectedLink.title || 'Sem título', TRUNCATION_LIMITS.MODAL_TITLE)}
+                  {truncateText(selectedLink.title || t('untitledLink'), TRUNCATION_LIMITS.MODAL_TITLE)}
                 </p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="p-4 bg-blue-50 rounded-sm">
                   <p className="text-xs uppercase tracking-widest text-blue-600 mb-1">
-                    Visualizações
+                    {t('views')}
                   </p>
                   <p className="text-3xl font-mono font-bold text-blue-700">
                     {selectedLink.viewsCount || 0}
@@ -395,7 +399,7 @@ export default function LinksManagementPage() {
                 </div>
                 <div className="p-4 bg-emerald-50 rounded-sm">
                   <p className="text-xs uppercase tracking-widest text-emerald-600 mb-1">
-                    Leads Capturados
+                    {t('capturedLeads')}
                   </p>
                   <p className="text-3xl font-mono font-bold text-emerald-700">
                     0
@@ -405,7 +409,7 @@ export default function LinksManagementPage() {
 
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-2">
-                  Link Público
+                  {t('publicLink')}
                 </p>
                 <div className="flex items-center gap-2">
                   <Input
@@ -430,7 +434,7 @@ export default function LinksManagementPage() {
             variant="secondary"
             onClick={() => setShowStatsModal(false)}
           >
-            Fechar
+            {tCommon('close')}
           </Button>
         </ModalFooter>
       </Modal>

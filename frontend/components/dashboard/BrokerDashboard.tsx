@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { PackageOpen, Link2, Inbox, TrendingUp, Plus, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,8 @@ interface BrokerMetrics {
 export function BrokerDashboard() {
   const router = useRouter();
   const { error } = useToast();
+  const t = useTranslations('dashboard');
+  const tSales = useTranslations('sales');
 
   const [metrics, setMetrics] = useState<BrokerMetrics | null>(null);
   const [recentBatches, setRecentBatches] = useState<SharedInventoryBatch[]>([]);
@@ -54,8 +57,8 @@ export function BrokerDashboard() {
       const data = await apiClient.get<BrokerMetrics>('/broker/dashboard/metrics');
       setMetrics(data);
     } catch (err) {
-      console.error('Erro ao carregar métricas:', err);
-      // Usar valores default em vez de mostrar erro
+      console.error('Error loading metrics:', err);
+      // Use default values instead of showing error
       setMetrics({
         availableBatches: 0,
         activeLinks: 0,
@@ -76,7 +79,7 @@ export function BrokerDashboard() {
       );
       setRecentBatches(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Erro ao carregar lotes:', err);
+      console.error('Error loading batches:', err);
       setRecentBatches([]);
     } finally {
       setIsLoadingBatches(false);
@@ -91,7 +94,7 @@ export function BrokerDashboard() {
       });
       setRecentSales(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('Erro ao carregar vendas:', err);
+      console.error('Error loading sales:', err);
       setRecentSales([]);
     } finally {
       setIsLoadingSales(false);
@@ -112,9 +115,9 @@ export function BrokerDashboard() {
       {/* Header */}
       <div className="bg-obsidian text-porcelain px-8 py-12">
         <div className="max-w-7xl mx-auto">
-          <h1 className="font-serif text-4xl mb-2">Painel de Controle</h1>
+          <h1 className="font-serif text-4xl mb-2">{t('title')}</h1>
           <p className="text-porcelain/60 text-lg">
-            Visão geral das suas oportunidades
+            {t('subtitleBroker')}
           </p>
         </div>
       </div>
@@ -133,30 +136,30 @@ export function BrokerDashboard() {
             <>
               <MetricCard
                 icon={PackageOpen}
-                title="Lotes Disponíveis"
+                title={t('availableBatches')}
                 value={metrics?.availableBatches || 0}
-                subtitle="PARA MIM"
+                subtitle={t('forMe')}
                 color="emerald"
               />
               <MetricCard
                 icon={Link2}
-                title="Links Ativos"
+                title={t('activeLinks')}
                 value={metrics?.activeLinks || 0}
-                subtitle="GERADOS"
+                subtitle={t('generated')}
                 color="blue"
               />
               <MetricCard
                 icon={Inbox}
-                title="Leads Capturados"
+                title={t('capturedLeads')}
                 value={metrics?.leadsCount || 0}
-                subtitle="TOTAL"
+                subtitle={t('total')}
                 color="purple"
               />
               <MetricCard
                 icon={TrendingUp}
-                title="Comissão do Mês"
+                title={t('monthlyCommission')}
                 value={formatCurrency(metrics?.monthlyCommission || 0)}
-                subtitle="FATURAMENTO"
+                subtitle={t('revenue')}
                 color="amber"
               />
             </>
@@ -166,7 +169,7 @@ export function BrokerDashboard() {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-obsidian mb-4">
-            Ações Rápidas
+            {t('quickActions')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
@@ -176,9 +179,9 @@ export function BrokerDashboard() {
             >
               <Eye className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Ver Estoque</p>
+                <p className="font-semibold">{t('viewStock')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Lotes compartilhados comigo
+                  {t('sharedWithMe')}
                 </p>
               </div>
             </Button>
@@ -190,9 +193,9 @@ export function BrokerDashboard() {
             >
               <Plus className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Criar Link</p>
+                <p className="font-semibold">{t('createLink')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Gerar link de venda
+                  {t('generateSaleLink')}
                 </p>
               </div>
             </Button>
@@ -204,9 +207,9 @@ export function BrokerDashboard() {
             >
               <Inbox className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Ver Leads</p>
+                <p className="font-semibold">{t('viewLeads')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Gerenciar interessados
+                  {t('manageInterested')}
                 </p>
               </div>
             </Button>
@@ -217,14 +220,14 @@ export function BrokerDashboard() {
         <Card className="mb-8">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-obsidian">
-              Novos Lotes Compartilhados
+              {t('newSharedBatches')}
             </h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/shared-inventory')}
             >
-              Ver tudo
+              {t('viewAll')}
             </Button>
           </div>
 
@@ -234,7 +237,7 @@ export function BrokerDashboard() {
             <div className="text-center py-12">
               <PackageOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
               <p className="text-slate-400">
-                Nenhum lote compartilhado recentemente
+                {t('noRecentShared')}
               </p>
             </div>
           ) : (
@@ -278,7 +281,7 @@ export function BrokerDashboard() {
                       router.push('/links/new');
                     }}
                   >
-                    Criar Link
+                    {t('createLink')}
                   </Button>
                 </div>
               ))}
@@ -290,7 +293,7 @@ export function BrokerDashboard() {
         <Card>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-obsidian">
-              Minhas Vendas Recentes
+              {t('myRecentSales')}
             </h2>
           </div>
 
@@ -299,18 +302,18 @@ export function BrokerDashboard() {
           ) : recentSales.length === 0 ? (
             <div className="text-center py-12">
               <TrendingUp className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-400">Nenhuma venda registrada ainda</p>
+              <p className="text-slate-400">{t('noSalesYet')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Lote</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Valor Vendido</TableHead>
-                    <TableHead>Minha Comissão</TableHead>
-                    <TableHead>Data</TableHead>
+                    <TableHead>{tSales('batch')}</TableHead>
+                    <TableHead>{t('customer')}</TableHead>
+                    <TableHead>{t('soldValue')}</TableHead>
+                    <TableHead>{t('myCommission')}</TableHead>
+                    <TableHead>{tSales('date')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>

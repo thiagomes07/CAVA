@@ -1,44 +1,13 @@
 'use client';
 
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Link2Off, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
-// Fallback not-found page for non-locale routes
-// Uses browser language detection for basic i18n
-function getTexts() {
-  const lang = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : 'pt';
-  
-  const texts: Record<string, { title: string; description: string; checkAddress: string; home: string; platform: string }> = {
-    pt: {
-      title: 'Link não encontrado',
-      description: 'Este link não existe ou pode ter expirado.',
-      checkAddress: 'Verifique se o endereço está correto ou entre em contato com o vendedor.',
-      home: 'Voltar ao Início',
-      platform: 'Plataforma de gestão e comercialização de pedras ornamentais',
-    },
-    en: {
-      title: 'Link not found',
-      description: 'This link does not exist or may have expired.',
-      checkAddress: 'Check if the address is correct or contact the seller.',
-      home: 'Back to Home',
-      platform: 'Ornamental stone management and sales platform',
-    },
-    es: {
-      title: 'Enlace no encontrado',
-      description: 'Este enlace no existe o puede haber expirado.',
-      checkAddress: 'Verifique si la dirección es correcta o contacte al vendedor.',
-      home: 'Volver al Inicio',
-      platform: 'Plataforma de gestión y comercialización de piedras ornamentales',
-    },
-  };
-  
-  return texts[lang] || texts.pt;
-}
-
 export default function NotFound() {
   const router = useRouter();
-  const t = getTexts();
+  const t = useTranslations('errors');
 
   return (
     <div className="min-h-screen bg-mineral flex items-center justify-center p-6">
@@ -50,14 +19,14 @@ export default function NotFound() {
 
         {/* Title */}
         <h1 className="font-serif text-4xl text-obsidian mb-4">
-          {t.title}
+          {t('notFound')}
         </h1>
 
         {/* Description */}
         <p className="text-slate-600 mb-8 leading-relaxed">
-          {t.description}
+          {t('notFoundDescription')}
           <br />
-          {t.checkAddress}
+          {t('checkAddress')}
         </p>
 
         {/* Actions */}
@@ -67,7 +36,7 @@ export default function NotFound() {
             onClick={() => router.push('/')}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            {t.home}
+            {t('backToHome')}
           </Button>
         </div>
 
@@ -78,7 +47,7 @@ export default function NotFound() {
             <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
           </div>
           <p className="text-xs text-slate-400">
-            {t.platform}
+            {t('notFoundDescription')}
           </p>
         </div>
       </div>

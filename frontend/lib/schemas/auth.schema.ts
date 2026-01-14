@@ -1,5 +1,99 @@
 import { z } from 'zod';
 
+// Type for translation function
+type TranslationFunction = (key: string, values?: Record<string, string | number>) => string;
+
+// Factory function to create login schema with translations
+export function createLoginSchema(t: TranslationFunction) {
+  return z.object({
+    email: z
+      .string()
+      .min(1, t('required', { field: t('email') }))
+      .email(t('email')),
+    password: z
+      .string()
+      .min(1, t('required', { field: t('password') }))
+      .min(8, t('minLength', { field: t('password'), min: 8 })),
+  });
+}
+
+// Factory function to create register schema with translations
+export function createRegisterSchema(t: TranslationFunction) {
+  return z.object({
+    name: z
+      .string()
+      .min(1, t('required', { field: t('name') }))
+      .min(2, t('minLength', { field: t('name'), min: 2 })),
+    email: z
+      .string()
+      .min(1, t('required', { field: t('email') }))
+      .email(t('email')),
+    password: z
+      .string()
+      .min(1, t('required', { field: t('password') }))
+      .min(8, t('minLength', { field: t('password'), min: 8 }))
+      .regex(/[A-Z]/, t('passwordUppercase'))
+      .regex(/[0-9]/, t('passwordNumber')),
+    confirmPassword: z.string().min(1, t('required', { field: t('confirmPassword') })),
+    phone: z
+      .string()
+      .optional()
+      .refine(
+        (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+        t('phone')
+      ),
+  }).refine((data) => data.password === data.confirmPassword, {
+    message: t('passwordMismatch'),
+    path: ['confirmPassword'],
+  });
+}
+
+// Factory function to create invite broker schema with translations
+export function createInviteBrokerSchema(t: TranslationFunction) {
+  return z.object({
+    name: z
+      .string()
+      .min(1, t('required', { field: t('name') }))
+      .min(2, t('minLength', { field: t('name'), min: 2 })),
+    email: z
+      .string()
+      .min(1, t('required', { field: t('email') }))
+      .email(t('email')),
+    phone: z
+      .string()
+      .optional()
+      .refine(
+        (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+        t('phone')
+      ),
+    whatsapp: z
+      .string()
+      .optional()
+      .refine(
+        (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+        t('whatsapp')
+      ),
+  });
+}
+
+// Factory function to create change password schema with translations
+export function createChangePasswordSchema(t: TranslationFunction) {
+  return z.object({
+    currentPassword: z.string().min(1, t('required', { field: t('currentPassword') })),
+    newPassword: z
+      .string()
+      .min(1, t('required', { field: t('newPassword') }))
+      .min(8, t('minLength', { field: t('newPassword'), min: 8 }))
+      .regex(/[A-Z]/, t('passwordUppercase'))
+      .regex(/[0-9]/, t('passwordNumber')),
+    confirmNewPassword: z.string().min(1, t('required', { field: t('confirmPassword') })),
+  }).refine((data) => data.newPassword === data.confirmNewPassword, {
+    message: t('passwordMismatch'),
+    path: ['confirmNewPassword'],
+  });
+}
+
+// Static schemas for backward compatibility (Portuguese)
 export const loginSchema = z.object({
   email: z
     .string()
@@ -78,6 +172,7 @@ export const changePasswordSchema = z.object({
   path: ['confirmNewPassword'],
 });
 
+// Types
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type InviteBrokerInput = z.infer<typeof inviteBrokerSchema>;

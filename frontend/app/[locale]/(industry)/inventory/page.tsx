@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Plus, Search, Edit2, Eye, Archive } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,8 @@ export default function InventoryPage() {
   const searchParams = useSearchParams();
   const { error } = useToast();
   const { hasPermission } = useAuth();
+  const t = useTranslations('inventory');
+  const tCommon = useTranslations('common');
 
   const [batches, setBatches] = useState<Batch[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -59,7 +62,7 @@ export default function InventoryPage() {
       });
       setProducts(data.products);
     } catch (err) {
-      error('Erro ao carregar produtos');
+      error(t('productsError'));
     }
   };
 
@@ -75,7 +78,7 @@ export default function InventoryPage() {
       setBatches(data.batches);
       setTotalItems(data.total);
     } catch (err) {
-      error('Erro ao carregar estoque');
+      error(t('loadError'));
       setBatches([]);
     } finally {
       setIsLoading(false);
@@ -103,10 +106,10 @@ export default function InventoryPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Estoque de Lotes
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Gerencie todos os lotes físicos disponíveis
+              {t('subtitle')}
             </p>
           </div>
           {canEdit && (
@@ -115,7 +118,7 @@ export default function InventoryPage() {
               onClick={() => router.push('/inventory/new')}
             >
               <Plus className="w-4 h-4 mr-2" />
-              NOVO LOTE
+              {t('newBatch')}
             </Button>
           )}
         </div>
@@ -131,7 +134,7 @@ export default function InventoryPage() {
                 setFilters({ ...filters, productId: e.target.value, page: 1 })
               }
             >
-              <option value="">Todos os Produtos</option>
+              <option value="">{t('allProducts')}</option>
               {products.map((product) => (
                 <option key={product.id} value={product.id} title={product.name}>
                   {truncateText(product.name, TRUNCATION_LIMITS.SELECT_OPTION)}
@@ -149,7 +152,7 @@ export default function InventoryPage() {
                 })
               }
             >
-              <option value="">Todos os Status</option>
+              <option value="">{t('allStatuses')}</option>
               {batchStatuses.map((status) => (
                 <option key={status} value={status}>
                   {status}
@@ -159,7 +162,7 @@ export default function InventoryPage() {
 
             <div className="relative">
               <Input
-                placeholder="Código do Lote"
+                placeholder={t('batchCodePlaceholder')}
                 value={filters.code}
                 onChange={(e) =>
                   setFilters({ ...filters, code: e.target.value, page: 1 })
@@ -173,7 +176,7 @@ export default function InventoryPage() {
               onClick={handleClearFilters}
               disabled={!hasFilters}
             >
-              Limpar Filtros
+              {tCommon('clearFilters')}
             </Button>
           </div>
         </div>
@@ -188,15 +191,15 @@ export default function InventoryPage() {
             icon={hasFilters ? Search : Plus}
             title={
               hasFilters
-                ? 'Nenhum lote encontrado'
-                : 'Estoque vazio'
+                ? t('noResults')
+                : t('emptyTitle')
             }
             description={
               hasFilters
-                ? 'Tente ajustar os filtros de busca'
-                : 'Cadastre seu primeiro lote para começar a vender'
+                ? t('adjustFilters')
+                : t('emptyDescription')
             }
-            actionLabel={hasFilters ? 'Limpar Filtros' : canEdit ? '+ Novo Lote' : undefined}
+            actionLabel={hasFilters ? tCommon('clearFilters') : canEdit ? t('newBatch') : undefined}
             onAction={
               hasFilters
                 ? handleClearFilters
@@ -211,14 +214,14 @@ export default function InventoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Foto</TableHead>
-                    <TableHead>Código</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Dimensões</TableHead>
-                    <TableHead>Área Total</TableHead>
-                    <TableHead>Preço</TableHead>
-                    <TableHead>Status</TableHead>
-                    {canEdit && <TableHead>Ações</TableHead>}
+                    <TableHead>{t('photo')}</TableHead>
+                    <TableHead>{t('code')}</TableHead>
+                    <TableHead>{t('product')}</TableHead>
+                    <TableHead>{t('dimensions')}</TableHead>
+                    <TableHead>{t('totalArea')}</TableHead>
+                    <TableHead>{t('price')}</TableHead>
+                    <TableHead>{t('status')}</TableHead>
+                    {canEdit && <TableHead>{t('actions')}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -235,7 +238,7 @@ export default function InventoryPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs">
-                              Sem foto
+                              {t('noPhoto')}
                             </div>
                           )}
                         </div>
@@ -285,14 +288,14 @@ export default function InventoryPage() {
                             <button
                               onClick={() => router.push(`/inventory/${batch.id}`)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                              title="Editar"
+                              title={t('edit')}
                             >
                               <Edit2 className="w-4 h-4 text-slate-600" />
                             </button>
                             <button
                               onClick={() => router.push(`/inventory/${batch.id}`)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                              title="Ver detalhes"
+                              title={t('viewDetails')}
                             >
                               <Eye className="w-4 h-4 text-slate-600" />
                             </button>

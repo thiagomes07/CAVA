@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Plus, Search, Eye, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +23,8 @@ import { cn } from '@/lib/utils/cn';
 export default function CatalogPage() {
   const router = useRouter();
   const { error } = useToast();
+  const t = useTranslations('catalog');
+  const tCommon = useTranslations('common');
 
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,8 +58,8 @@ export default function CatalogPage() {
       );
       setProducts(data.products);
     } catch (err) {
-      error('Erro ao carregar produtos');
-      setProducts([]);
+      error(t('loadError'));
+      setProducts([]); 
     } finally {
       setIsLoading(false);
     }
@@ -72,10 +75,10 @@ export default function CatalogPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Catálogo
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Gerencie seus produtos e tipos de pedra
+              {t('subtitle')}
             </p>
           </div>
           <Button
@@ -83,7 +86,7 @@ export default function CatalogPage() {
             onClick={() => router.push('/catalog/new')}
           >
             <Plus className="w-4 h-4 mr-2" />
-            NOVO PRODUTO
+            {t('newProduct')}
           </Button>
         </div>
       </div>
@@ -94,7 +97,7 @@ export default function CatalogPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Input
-                placeholder="Buscar por nome ou SKU"
+                placeholder={t('searchPlaceholder')}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -111,7 +114,7 @@ export default function CatalogPage() {
                 })
               }
             >
-              <option value="">Todos os Materiais</option>
+              <option value="">{t('allMaterials')}</option>
               {materialTypes.map((material) => (
                 <option key={material} value={material}>
                   {material}
@@ -129,7 +132,7 @@ export default function CatalogPage() {
                     page: 1,
                   })
                 }
-                label="Mostrar Inativos"
+                label={t('showInactive')}
               />
             </div>
           </div>
@@ -145,15 +148,15 @@ export default function CatalogPage() {
             icon={hasFilters ? Search : Plus}
             title={
               hasFilters
-                ? `Nenhum resultado para "${filters.search}"`
-                : 'Nenhum produto cadastrado'
+                ? t('noResults', { search: filters.search || '' })
+                : t('emptyTitle')
             }
             description={
               hasFilters
-                ? 'Tente ajustar os filtros de busca'
-                : 'Comece adicionando seu primeiro produto ao catálogo'
+                ? t('adjustFilters')
+                : t('emptyDescription')
             }
-            actionLabel={hasFilters ? 'Limpar Filtros' : '+ Novo Produto'}
+            actionLabel={hasFilters ? tCommon('clearFilters') : t('newProduct')}
             onAction={() => {
               if (hasFilters) {
                 setFilters({
@@ -176,6 +179,14 @@ export default function CatalogPage() {
                 product={product}
                 onView={() => router.push(`/admin/inventory?productId=${product.id}`)}
                 onEdit={() => router.push(`/admin/catalog/${product.id}`)}
+                translations={{
+                  noPhoto: t('noPhoto'),
+                  edit: t('edit'),
+                  viewBatches: t('viewBatches'),
+                  active: t('active'),
+                  inactive: t('inactive'),
+                  batches: (count: number) => `${count} ${count === 1 ? t('batch') : t('batchesPlural')}`
+                }}
               />
             ))}
           </div>
@@ -189,9 +200,17 @@ interface ProductCardProps {
   product: Product;
   onView: () => void;
   onEdit: () => void;
+  translations: {
+    noPhoto: string;
+    edit: string;
+    viewBatches: string;
+    active: string;
+    inactive: string;
+    batches: (count: number) => string;
+  };
 }
 
-function ProductCard({ product, onView, onEdit }: ProductCardProps) {
+function ProductCard({ product, onView, onEdit, translations }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const coverImage = product.medias?.find((m) => m.isCover) || product.medias?.[0];
 
@@ -210,7 +229,7 @@ function ProductCard({ product, onView, onEdit }: ProductCardProps) {
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-slate-400 text-sm">Sem foto</span>
+            <span className="text-slate-400 text-sm">{translations.noPhoto}</span>
           </div>
         )}
 
@@ -219,11 +238,11 @@ function ProductCard({ product, onView, onEdit }: ProductCardProps) {
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center gap-3 animate-in fade-in-0 duration-200">
             <Button variant="secondary" size="sm" onClick={onEdit}>
               <Edit2 className="w-4 h-4 mr-2" />
-              Editar
+              {translations.edit}
             </Button>
             <Button variant="secondary" size="sm" onClick={onView}>
               <Eye className="w-4 h-4 mr-2" />
-              Ver Lotes
+              {translations.viewBatches}
             </Button>
           </div>
         )}
@@ -239,7 +258,7 @@ function ProductCard({ product, onView, onEdit }: ProductCardProps) {
             {truncateText(product.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
           </h3>
           <Badge variant={product.isActive ? 'DISPONIVEL' : 'INATIVO'}>
-            {product.isActive ? 'Ativo' : 'Inativo'}
+            {product.isActive ? translations.active : translations.inactive}
           </Badge>
         </div>
 
@@ -260,7 +279,7 @@ function ProductCard({ product, onView, onEdit }: ProductCardProps) {
             {truncateText(product.material, TRUNCATION_LIMITS.MATERIAL_NAME)}
           </span>
           <span className="text-slate-500">
-            {product.batchCount || 0} lote{product.batchCount !== 1 ? 's' : ''}
+            {translations.batches(product.batchCount || 0)}
           </span>
         </div>
       </div>

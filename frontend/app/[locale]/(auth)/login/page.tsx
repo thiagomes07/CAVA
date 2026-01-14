@@ -4,9 +4,11 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { useAuthStore } from '@/store/auth.store';
 import { useToast } from '@/lib/hooks/useToast';
 import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
@@ -27,6 +29,7 @@ export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { getDashboardRoute } = useAuth();
+  const t = useTranslations('auth');
 
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +55,7 @@ export default function LoginPage() {
       const user = useAuthStore.getState().user;
       const userName = user?.name?.split(' ')[0] || 'usuário';
       
-      success(`Bem-vindo de volta, ${userName}!`);
+      success(t('welcomeBack', { name: userName }));
 
       // Use callback URL if provided, otherwise use role-based dashboard
       const callbackUrl = searchParams.get('callbackUrl');
@@ -60,7 +63,7 @@ export default function LoginPage() {
       router.push(redirectTo);
     } catch (err) {
       console.error('Login error:', err);
-      const message = err instanceof Error ? err.message : 'Email ou senha incorretos';
+      const message = err instanceof Error ? err.message : t('invalidCredentials');
       error(message);
     } finally {
       setIsLoading(false);
@@ -70,7 +73,12 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12 bg-mineral">
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-8 md:p-12 bg-mineral relative">
+        {/* Language Switcher */}
+        <div className="absolute top-6 right-6">
+          <LanguageSwitcher variant="dropdown" />
+        </div>
+
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="flex items-center gap-3 mb-12">
@@ -81,10 +89,10 @@ export default function LoginPage() {
           {/* Title */}
           <div className="mb-8">
             <h1 className="font-serif text-4xl text-obsidian mb-2">
-              Acesse sua conta
+              {t('accessAccount')}
             </h1>
             <p className="text-slate-500">
-              Entre com suas credenciais para continuar
+              {t('enterCredentials')}
             </p>
           </div>
 
@@ -95,7 +103,7 @@ export default function LoginPage() {
               <Input
                 {...register('email')}
                 type="email"
-                placeholder="seu@email.com"
+                placeholder={t('emailPlaceholder')}
                 error={errors.email?.message}
                 disabled={isLoading}
                 className="pl-12"
@@ -108,7 +116,7 @@ export default function LoginPage() {
               <Input
                 {...register('password')}
                 type={showPassword ? 'text' : 'password'}
-                placeholder="Sua senha"
+                placeholder={t('passwordPlaceholder')}
                 error={errors.password?.message}
                 disabled={isLoading}
                 className="pl-12 pr-12"
@@ -133,7 +141,7 @@ export default function LoginPage() {
                 type="button"
                 className="text-sm text-slate-500 hover:text-obsidian transition-colors"
               >
-                Esqueci minha senha
+                {t('forgotPassword')}
               </button>
             </div>
 
@@ -145,13 +153,13 @@ export default function LoginPage() {
               loading={isLoading}
               className="w-full"
             >
-              ENTRAR
+              {t('login')}
             </Button>
           </form>
 
           {/* Footer */}
           <p className="text-xs text-slate-400 text-center mt-8">
-            Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade
+            {t('termsNotice')}
           </p>
         </div>
       </div>
@@ -168,10 +176,10 @@ export default function LoginPage() {
         <div className="relative z-10 flex items-center justify-center w-full p-12 text-center">
           <div className="max-w-lg">
             <h2 className="font-serif text-5xl text-porcelain mb-6 leading-tight">
-              Transforme pedras em obras de arte
+              {t('heroTitle')}
             </h2>
             <p className="text-lg text-porcelain/80 leading-relaxed">
-              A plataforma completa para gestão de pedras ornamentais
+              {t('heroSubtitle')}
             </p>
           </div>
         </div>

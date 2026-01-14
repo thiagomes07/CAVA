@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Package, TrendingUp, Clock, Plus, Eye, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,6 +20,9 @@ import { cn } from '@/lib/utils/cn';
 export function IndustryDashboard() {
   const router = useRouter();
   const { error } = useToast();
+  const t = useTranslations('dashboard');
+  const tActivities = useTranslations('activities');
+  const tSales = useTranslations('sales');
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
@@ -36,7 +40,7 @@ export function IndustryDashboard() {
       const data = await apiClient.get<DashboardMetrics>('/dashboard/metrics');
       setMetrics(data);
     } catch (err) {
-      error('Erro ao carregar métricas');
+      error(t('metricsError'));
     } finally {
       setIsLoadingMetrics(false);
     }
@@ -48,7 +52,7 @@ export function IndustryDashboard() {
       const data = await apiClient.get<Activity[]>('/dashboard/recent-activities');
       setActivities(data);
     } catch (err) {
-      error('Erro ao carregar atividades');
+      error(t('activitiesError'));
     } finally {
       setIsLoadingActivities(false);
     }
@@ -59,9 +63,9 @@ export function IndustryDashboard() {
       {/* Header */}
       <div className="bg-obsidian text-porcelain px-8 py-12">
         <div className="max-w-7xl mx-auto">
-          <h1 className="font-serif text-4xl mb-2">Painel de Controle</h1>
+          <h1 className="font-serif text-4xl mb-2">{t('title')}</h1>
           <p className="text-porcelain/60 text-lg">
-            Visão geral do seu negócio
+            {t('subtitle')}
           </p>
         </div>
       </div>
@@ -79,23 +83,23 @@ export function IndustryDashboard() {
             <>
               <MetricCard
                 icon={Package}
-                title="Estoque Disponível"
+                title={t('availableStock')}
                 value={metrics?.availableBatches || 0}
-                subtitle="LOTES ATIVOS"
+                subtitle={t('activeBatches')}
                 color="emerald"
               />
               <MetricCard
                 icon={TrendingUp}
-                title="Vendas no Mês"
+                title={t('monthlySales')}
                 value={formatCurrency(metrics?.monthlySales || 0)}
-                subtitle="FATURAMENTO MENSAL"
+                subtitle={t('monthlyRevenue')}
                 color="blue"
               />
               <MetricCard
                 icon={Clock}
-                title="Lotes Reservados"
+                title={t('reservedBatches')}
                 value={metrics?.reservedBatches || 0}
-                subtitle="AGUARDANDO CONFIRMAÇÃO"
+                subtitle={t('awaitingConfirmation')}
                 color="amber"
               />
             </>
@@ -105,7 +109,7 @@ export function IndustryDashboard() {
         {/* Quick Actions */}
         <div className="mb-8">
           <h2 className="text-lg font-semibold text-obsidian mb-4">
-            Ações Rápidas
+            {t('quickActions')}
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
@@ -115,9 +119,9 @@ export function IndustryDashboard() {
             >
               <Plus className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Cadastrar Lote</p>
+                <p className="font-semibold">{t('registerBatch')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Adicionar novo lote ao estoque
+                  {t('addNewBatch')}
                 </p>
               </div>
             </Button>
@@ -129,9 +133,9 @@ export function IndustryDashboard() {
             >
               <Eye className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Ver Estoque</p>
+                <p className="font-semibold">{t('viewStock')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Consultar lotes disponíveis
+                  {t('checkAvailableBatches')}
                 </p>
               </div>
             </Button>
@@ -143,9 +147,9 @@ export function IndustryDashboard() {
             >
               <Receipt className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">Histórico de Vendas</p>
+                <p className="font-semibold">{t('salesHistory')}</p>
                 <p className="text-xs text-slate-500 font-normal">
-                  Ver todas as vendas
+                  {t('viewAllSales')}
                 </p>
               </div>
             </Button>
@@ -156,14 +160,14 @@ export function IndustryDashboard() {
         <Card>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-semibold text-obsidian">
-              Últimas Movimentações
+              {t('recentMovements')}
             </h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={() => router.push('/sales')}
             >
-              Ver tudo
+              {t('viewAll')}
             </Button>
           </div>
 
@@ -172,18 +176,18 @@ export function IndustryDashboard() {
           ) : activities.length === 0 ? (
             <div className="text-center py-12">
               <Clock className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-              <p className="text-slate-400">Nenhuma movimentação recente</p>
+              <p className="text-slate-400">{t('noRecentMovements')}</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Lote</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead>Ação</TableHead>
-                    <TableHead>Data</TableHead>
+                    <TableHead>{tSales('batch')}</TableHead>
+                    <TableHead>{tSales('product')}</TableHead>
+                    <TableHead>{tSales('seller')}</TableHead>
+                    <TableHead>{tSales('actions')}</TableHead>
+                    <TableHead>{tSales('date')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -214,7 +218,7 @@ export function IndustryDashboard() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <ActivityBadge action={activity.action} />
+                        <ActivityBadge action={activity.action} t={tActivities} />
                       </TableCell>
                       <TableCell>
                         <span className="text-sm text-slate-500">
@@ -282,12 +286,12 @@ function MetricCardSkeleton() {
   );
 }
 
-function ActivityBadge({ action }: { action: Activity['action'] }) {
-  const variants: Record<Activity['action'], { label: string; color: string }> = {
-    RESERVADO: { label: 'Reservado', color: 'bg-blue-50 text-blue-700 border-blue-200' },
-    VENDIDO: { label: 'Vendido', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    COMPARTILHADO: { label: 'Compartilhado', color: 'bg-purple-50 text-purple-700 border-purple-200' },
-    CRIADO: { label: 'Criado', color: 'bg-slate-50 text-slate-700 border-slate-200' },
+function ActivityBadge({ action, t }: { action: Activity['action']; t: (key: string) => string }) {
+  const variants: Record<Activity['action'], { labelKey: string; color: string }> = {
+    RESERVADO: { labelKey: 'reserved', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    VENDIDO: { labelKey: 'sold', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+    COMPARTILHADO: { labelKey: 'shared', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+    CRIADO: { labelKey: 'created', color: 'bg-slate-50 text-slate-700 border-slate-200' },
   };
 
   const variant = variants[action];
@@ -299,7 +303,7 @@ function ActivityBadge({ action }: { action: Activity['action'] }) {
         variant.color
       )}
     >
-      {variant.label}
+      {t(variant.labelKey)}
     </span>
   );
 }

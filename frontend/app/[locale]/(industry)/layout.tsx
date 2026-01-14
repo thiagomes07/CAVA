@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Menu } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Sidebar } from '@/components/shared/Sidebar';
 import { BackButton } from '@/components/shared/BackButton';
 import { ErrorBoundary } from '@/components/shared/ErrorBoundary';
@@ -19,6 +20,7 @@ export default function IndustryLayout({
   const { user, isLoading } = useAuth();
   const router = useRouter();
   const { toggleSidebar } = useUIStore();
+  const t = useTranslations('navigation');
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -53,7 +55,7 @@ export default function IndustryLayout({
                 'p-2 rounded-sm hover:bg-slate-100 transition-colors lg:hidden',
                 'focus:outline-none focus:ring-2 focus:ring-obsidian/20'
               )}
-              aria-label="Abrir menu"
+              aria-label={t('openMenu')}
             >
               <Menu className="w-5 h-5 text-slate-600" />
             </button>

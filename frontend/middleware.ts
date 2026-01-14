@@ -1,7 +1,9 @@
+import createMiddleware from 'next-intl/middleware';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { UserRole } from '@/lib/types';
 import { canRoleAccessRoute, getDashboardForRole, routesByRole } from '@/lib/utils/routes';
+import { routing, locales, defaultLocale, type Locale } from '@/i18n/routing';
 
 // Rotas de autenticação (públicas)
 const authRoutes = ['/login'];
@@ -24,11 +26,43 @@ const roleBasedRedirects: Record<string, Record<string, string>> = {
   '/inventory': {
     ADMIN_INDUSTRIA: '/inventory',
     VENDEDOR_INTERNO: '/inventory',
-    BROKER: '/shared-inventory', // Broker vê shared-inventory ao invés de inventory
+    BROKER: '/shared-inventory',
   },
 };
 
 const allowedRoles: UserRole[] = ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'];
+
+// Create the next-intl middleware
+const intlMiddleware = createMiddleware(routing);
+
+// Cookie name for user's language preference
+const LOCALE_COOKIE = 'NEXT_LOCALE';
+
+function getLocaleFromPath(pathname: string): Locale | null {
+  const segments = pathname.split('/').filter(Boolean);
+  if (segments.length > 0 && locales.includes(segments[0] as Locale)) {
+    return segments[0] as Locale;
+  }
+  return null;
+}
+
+function stripLocaleFromPath(pathname: string): string {
+  const locale = getLocaleFromPath(pathname);
+  if (locale) {
+    const segments = pathname.split('/').filter(Boolean);
+    segments.shift(); // Remove locale
+    return '/' + segments.join('/') || '/';
+  }
+  return pathname;
+}
+
+function addLocaleToPath(pathname: string, locale: Locale): string {
+  // Don't add locale prefix for default locale with 'as-needed' strategy
+  if (locale === defaultLocale) {
+    return pathname;
+  }
+  return `/${locale}${pathname === '/' ? '' : pathname}`;
+}
 
 function isAuthRoute(pathname: string): boolean {
   return authRoutes.includes(pathname);
@@ -50,12 +84,10 @@ function isPublicRoute(pathname: string): boolean {
 }
 
 function getRedirectForRole(pathname: string, role: string): string | null {
-  // Verificar se há redirecionamento específico para esta rota/role
   for (const [route, redirects] of Object.entries(roleBasedRedirects)) {
     if (pathname === route || pathname.startsWith(`${route}/`)) {
       const redirect = redirects[role];
       if (redirect && redirect !== pathname) {
-        // Substituir a base da rota pelo redirecionamento
         return pathname.replace(route, redirect);
       }
     }
@@ -81,16 +113,15 @@ function isTokenExpired(token: string): boolean {
   const payload = decodeJwt(token);
   if (!payload?.exp) return true;
   const nowSeconds = Math.floor(Date.now() / 1000);
-  // Keep skew minimal to avoid accepting expired tokens
   const SKEW_SECONDS = 5;
   return payload.exp <= nowSeconds + SKEW_SECONDS;
 }
 
-async function attemptRefresh(request: NextRequest, pathname: string) {
+async function attemptRefresh(request: NextRequest, pathname: string, locale: Locale) {
   const refreshCookie = request.cookies.get('refresh_token');
 
   if (!refreshCookie) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL(addLocaleToPath('/login', locale), request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
@@ -100,19 +131,17 @@ async function attemptRefresh(request: NextRequest, pathname: string) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      // Encaminha apenas o refresh_token necessário para o endpoint de refresh
       Cookie: `refresh_token=${encodeURIComponent(refreshCookie.value)}`,
     },
     credentials: 'include',
   });
 
   if (!refreshResponse.ok) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL(addLocaleToPath('/login', locale), request.url);
     loginUrl.searchParams.set('callbackUrl', pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Redirecionar de volta para aplicar os novos cookies
   const redirectUrl = request.nextUrl.clone();
   const response = NextResponse.redirect(redirectUrl);
 
@@ -124,68 +153,125 @@ async function attemptRefresh(request: NextRequest, pathname: string) {
   return response;
 }
 
+function getPreferredLocale(request: NextRequest): Locale {
+  // 1. Check cookie first (user's explicit choice)
+  const localeCookie = request.cookies.get(LOCALE_COOKIE)?.value;
+  if (localeCookie && locales.includes(localeCookie as Locale)) {
+    return localeCookie as Locale;
+  }
+
+  // 2. Check Accept-Language header
+  const acceptLanguage = request.headers.get('Accept-Language');
+  if (acceptLanguage) {
+    const languages = acceptLanguage.split(',').map((lang) => {
+      const [code, priority] = lang.trim().split(';q=');
+      return {
+        code: code.split('-')[0].toLowerCase(),
+        priority: priority ? parseFloat(priority) : 1,
+      };
+    });
+
+    languages.sort((a, b) => b.priority - a.priority);
+
+    for (const { code } of languages) {
+      if (code === 'pt') return 'pt';
+      if (code === 'en') return 'en';
+      if (code === 'es') return 'es';
+    }
+  }
+
+  // 3. Default to Portuguese
+  return defaultLocale;
+}
+
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Skip static files and API routes
+  if (
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.') ||
+    pathname.startsWith('/favicon.ico')
+  ) {
+    return NextResponse.next();
+  }
+
+  // Extract locale from path or determine from headers/cookie
+  const pathLocale = getLocaleFromPath(pathname);
+  const preferredLocale = getPreferredLocale(request);
+  const currentLocale = pathLocale || preferredLocale;
+  
+  // Get the pathname without locale
+  const pathnameWithoutLocale = stripLocaleFromPath(pathname);
+
+  // Handle i18n first - let next-intl handle locale routing
+  const intlResponse = intlMiddleware(request);
+  
+  // If next-intl wants to redirect (e.g., to add locale prefix), follow that
+  if (intlResponse.status === 307 || intlResponse.status === 308) {
+    return intlResponse;
+  }
 
   const accessToken = request.cookies.get('access_token')?.value;
   const rawRole = request.cookies.get('user_role')?.value;
   const userRole = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
 
-  // Rotas de auth são públicas, mas redireciona se já autenticado
-  if (isAuthRoute(pathname)) {
+  // Auth routes are public, but redirect if already authenticated
+  if (isAuthRoute(pathnameWithoutLocale)) {
     if (accessToken && userRole) {
       const dashboardUrl = getDashboardForRole(userRole);
-      return NextResponse.redirect(new URL(dashboardUrl, request.url));
+      const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
+      return NextResponse.redirect(redirectUrl);
     }
-    return NextResponse.next();
+    return intlResponse;
   }
 
-  // Rotas públicas - permitir acesso
-  if (isPublicRoute(pathname)) {
-    return NextResponse.next();
+  // Public routes - allow access
+  if (isPublicRoute(pathnameWithoutLocale)) {
+    return intlResponse;
   }
 
-  // Sem token ou token expirado - tentar refresh ou redirecionar para login
+  // No token or expired token - try refresh or redirect to login
   if (!accessToken || isTokenExpired(accessToken)) {
     try {
-      return await attemptRefresh(request, pathname);
+      return await attemptRefresh(request, pathnameWithoutLocale, currentLocale);
     } catch (error) {
       if (process.env.NODE_ENV !== 'production') {
         console.error('Token refresh error:', error);
       }
-      const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
+      const loginUrl = new URL(addLocaleToPath('/login', currentLocale), request.url);
+      loginUrl.searchParams.set('callbackUrl', pathnameWithoutLocale);
       return NextResponse.redirect(loginUrl);
     }
   }
 
-  // Sem role definida ou divergente do token - redirecionar para login
+  // Verify role from token
   const tokenPayload = accessToken ? decodeJwt(accessToken) : null;
   const tokenRole = tokenPayload?.role as UserRole | undefined;
-
-  // Always trust the role inside the signed token over the readable cookie to avoid tampering
   const effectiveRole = tokenRole && allowedRoles.includes(tokenRole) ? tokenRole : userRole;
 
   if (!effectiveRole || (tokenRole && tokenRole !== effectiveRole)) {
-    const loginUrl = new URL('/login', request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    const loginUrl = new URL(addLocaleToPath('/login', currentLocale), request.url);
+    loginUrl.searchParams.set('callbackUrl', pathnameWithoutLocale);
     return NextResponse.redirect(loginUrl);
   }
 
-  // Verificar redirecionamento baseado em role (ex: broker acessando /inventory vai para /shared-inventory)
-  const redirect = getRedirectForRole(pathname, effectiveRole);
+  // Check role-based redirects
+  const redirect = getRedirectForRole(pathnameWithoutLocale, effectiveRole);
   if (redirect) {
-    return NextResponse.redirect(new URL(redirect, request.url));
+    const redirectUrl = new URL(addLocaleToPath(redirect, currentLocale), request.url);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  // Verificar permissão de acesso
-  if (!canRoleAccessRoute(effectiveRole, pathname)) {
-    // Sem permissão - redirecionar para dashboard
+  // Check access permission
+  if (!canRoleAccessRoute(effectiveRole, pathnameWithoutLocale)) {
     const dashboardUrl = effectiveRole ? getDashboardForRole(effectiveRole) : '/login';
-    return NextResponse.redirect(new URL(dashboardUrl, request.url));
+    const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
+    return NextResponse.redirect(redirectUrl);
   }
 
-  return NextResponse.next();
+  return intlResponse;
 }
 
 export const config = {

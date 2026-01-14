@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,8 @@ export default function LeadsManagementPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error } = useToast();
+  const t = useTranslations('leads');
+  const tCommon = useTranslations('common');
 
   const [leads, setLeads] = useState<Lead[]>([]);
   const [salesLinks, setSalesLinks] = useState<SalesLink[]>([]);
@@ -61,7 +64,7 @@ export default function LeadsManagementPage() {
       });
       setSalesLinks(data.links);
     } catch (err) {
-      console.error('Erro ao carregar links:', err);
+      console.error('Error loading links:', err);
     }
   };
 
@@ -77,7 +80,7 @@ export default function LeadsManagementPage() {
       setLeads(data.leads);
       setTotalItems(data.total);
     } catch (err) {
-      error('Erro ao carregar leads');
+      error(t('loadError'));
       setLeads([]);
     } finally {
       setIsLoading(false);
@@ -92,14 +95,14 @@ export default function LeadsManagementPage() {
         status: newStatus,
       });
 
-      success('Status atualizado com sucesso');
+      success(t('statusUpdated'));
       fetchLeads();
       
       if (selectedLead?.id === leadId) {
         setSelectedLead({ ...selectedLead, status: newStatus });
       }
     } catch (err) {
-      error('Erro ao atualizar status');
+      error(t('statusError'));
     } finally {
       setIsUpdatingStatus(false);
     }
@@ -112,10 +115,10 @@ export default function LeadsManagementPage() {
 
   const handleExport = async () => {
     try {
-      success('Exportação iniciada. O download começará em breve.');
+      success(t('exportStarted'));
       // Implementar lógica de exportação CSV
     } catch (err) {
-      error('Erro ao exportar leads');
+      error(t('exportError'));
     }
   };
 
@@ -136,9 +139,9 @@ export default function LeadsManagementPage() {
   const handleCopyContact = async (contact: string) => {
     try {
       await navigator.clipboard.writeText(contact);
-      success('Contato copiado!');
+      success(t('contactCopied'));
     } catch (err) {
-      error('Erro ao copiar contato');
+      error(t('copyError'));
     }
   };
 
@@ -161,15 +164,15 @@ export default function LeadsManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Meus Leads
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Visualize e gerencie leads capturados via links
+              {t('subtitle')}
             </p>
           </div>
           <Button variant="secondary" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Exportar CSV
+            {t('exportCsv')}
           </Button>
         </div>
       </div>
@@ -180,7 +183,7 @@ export default function LeadsManagementPage() {
           <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:gap-4">
             <div className="relative w-full md:w-auto md:min-w-[240px]">
               <Input
-                placeholder="Nome ou contato"
+                placeholder={t('searchPlaceholder')}
                 value={filters.search}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                   setFilters({ ...filters, search: e.target.value, page: 1 })
@@ -197,7 +200,7 @@ export default function LeadsManagementPage() {
                   setFilters({ ...filters, linkId: e.target.value, page: 1 })
                 }
               >
-                <option value="">Todos os Links</option>
+                <option value="">{t('allLinks')}</option>
                 {salesLinks.map((link) => (
                   <option key={link.id} value={link.id} title={link.title || link.slugToken}>
                     {truncateText(link.title || link.slugToken, TRUNCATION_LIMITS.SELECT_OPTION)}
@@ -213,10 +216,10 @@ export default function LeadsManagementPage() {
                   setFilters({ ...filters, status: e.target.value as '' | 'NOVO' | 'CONTATADO' | 'RESOLVIDO', page: 1 })
                 }
               >
-                <option value="">Todos os Status</option>
-                <option value="NOVO">Novo</option>
-                <option value="CONTATADO">Contatado</option>
-                <option value="RESOLVIDO">Resolvido</option>
+                <option value="">{t('allStatuses')}</option>
+                <option value="NOVO">{t('statusNew')}</option>
+                <option value="CONTATADO">{t('statusContacted')}</option>
+                <option value="RESOLVIDO">{t('statusResolved')}</option>
               </Select>
             </div>
 
@@ -237,7 +240,7 @@ export default function LeadsManagementPage() {
                 disabled={!hasFilters}
                 className="w-full md:w-auto h-[48px] px-6"
               >
-                Limpar Filtros
+                {tCommon('clearFilters')}
               </Button>
             </div>
           </div>
@@ -253,15 +256,15 @@ export default function LeadsManagementPage() {
             icon={hasFilters ? Search : Inbox}
             title={
               hasFilters
-                ? 'Nenhum lead encontrado'
-                : 'Nenhum lead capturado ainda'
+                ? t('noResults')
+                : t('emptyTitle')
             }
             description={
               hasFilters
-                ? 'Tente ajustar os filtros de busca'
-                : 'Quando clientes demonstrarem interesse, eles aparecerão aqui'
+                ? t('adjustFilters')
+                : t('emptyDescription')
             }
-            actionLabel={hasFilters ? 'Limpar Filtros' : undefined}
+            actionLabel={hasFilters ? tCommon('clearFilters') : undefined}
             onAction={hasFilters ? handleClearFilters : undefined}
           />
         ) : (
@@ -270,15 +273,15 @@ export default function LeadsManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Contato</TableHead>
-                    <TableHead>Origem</TableHead>
-                    <TableHead>Produto Interessado</TableHead>
-                    <TableHead>Mensagem</TableHead>
-                    <TableHead>Opt-in</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>{t('name')}</TableHead>
+                    <TableHead>{t('contact')}</TableHead>
+                    <TableHead>{t('origin')}</TableHead>
+                    <TableHead>{t('interestedProduct')}</TableHead>
+                    <TableHead>{t('message')}</TableHead>
+                    <TableHead>{t('optIn')}</TableHead>
+                    <TableHead>{t('status')}</TableHead>
+                    <TableHead>{t('date')}</TableHead>
+                    <TableHead>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -360,7 +363,7 @@ export default function LeadsManagementPage() {
                               className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                             >
                               <MessageSquare className="w-4 h-4" />
-                              Ver mensagem
+                              {t('viewMessage')}
                             </button>
                           ) : (
                             <span className="text-slate-400">-</span>
@@ -381,9 +384,9 @@ export default function LeadsManagementPage() {
                               disabled={isUpdatingStatus}
                               className="text-xs"
                             >
-                              <option value="NOVO">Novo</option>
-                              <option value="CONTATADO">Contatado</option>
-                              <option value="RESOLVIDO">Resolvido</option>
+                              <option value="NOVO">{t('statusNew')}</option>
+                              <option value="CONTATADO">{t('statusContacted')}</option>
+                              <option value="RESOLVIDO">{t('statusResolved')}</option>
                             </Select>
                           </div>
                         </TableCell>
@@ -401,7 +404,7 @@ export default function LeadsManagementPage() {
                               handleViewDetails(lead);
                             }}
                           >
-                            Ver Detalhes
+                            {t('viewDetails')}
                           </Button>
                         </TableCell>
                       </TableRow>
@@ -426,7 +429,7 @@ export default function LeadsManagementPage() {
       <Modal open={showDetailModal} onClose={() => setShowDetailModal(false)}>
         <ModalClose onClose={() => setShowDetailModal(false)} />
         <ModalHeader>
-          <ModalTitle>Detalhes do Lead</ModalTitle>
+          <ModalTitle>{t('leadDetails')}</ModalTitle>
         </ModalHeader>
         <ModalContent>
           {selectedLead && (
@@ -434,13 +437,13 @@ export default function LeadsManagementPage() {
               {/* Contact Info */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  Informações de Contato
+                  {t('contactInfo')}
                 </p>
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
                     <User className="w-5 h-5 text-slate-400" />
                     <div>
-                      <p className="text-sm text-slate-500">Nome</p>
+                      <p className="text-sm text-slate-500">{t('name')}</p>
                       <p className="font-medium text-obsidian">{selectedLead.name}</p>
                     </div>
                   </div>
@@ -451,7 +454,7 @@ export default function LeadsManagementPage() {
                       <Phone className="w-5 h-5 text-slate-400" />
                     )}
                     <div>
-                      <p className="text-sm text-slate-500">Contato</p>
+                      <p className="text-sm text-slate-500">{t('contact')}</p>
                       <div className="flex items-center gap-2">
                         <p className="font-medium text-obsidian">{selectedLead.contact}</p>
                         <button
@@ -470,7 +473,7 @@ export default function LeadsManagementPage() {
               {selectedLead.message && (
                 <div>
                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                    Mensagem
+                    {t('message')}
                   </p>
                   <div className="p-4 bg-slate-50 rounded-sm">
                     <p className="text-sm text-slate-700 whitespace-pre-wrap">
@@ -483,24 +486,24 @@ export default function LeadsManagementPage() {
               {/* Origin */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  Origem do Lead
+                  {t('leadOrigin')}
                 </p>
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
                   <p className="text-sm font-semibold text-blue-900 mb-1">
-                    {selectedLead.salesLink?.title || 'Link sem título'}
+                    {selectedLead.salesLink?.title || t('untitledLink')}
                   </p>
                   <p className="text-xs text-blue-700 mb-2">
                     /{selectedLead.salesLink?.slugToken}
                   </p>
                   {selectedLead.salesLink?.batch && (
                     <p className="text-sm text-blue-800">
-                      Lote: {selectedLead.salesLink.batch.batchCode} •{' '}
+                      {t('batch')}: {selectedLead.salesLink.batch.batchCode} •{' '}
                       {selectedLead.salesLink.batch.product?.name}
                     </p>
                   )}
                   {selectedLead.salesLink?.product && (
                     <p className="text-sm text-blue-800">
-                      Produto: {selectedLead.salesLink.product.name}
+                      {t('productLabel')}: {selectedLead.salesLink.product.name}
                     </p>
                   )}
                 </div>
@@ -512,14 +515,14 @@ export default function LeadsManagementPage() {
                   <>
                     <Check className="w-5 h-5 text-emerald-600" />
                     <p className="text-sm text-slate-600">
-                      Aceitou receber comunicações de marketing
+                      {t('optInAccepted')}
                     </p>
                   </>
                 ) : (
                   <>
                     <X className="w-5 h-5 text-slate-400" />
                     <p className="text-sm text-slate-600">
-                      Não aceitou comunicações de marketing
+                      {t('optInDeclined')}
                     </p>
                   </>
                 )}
@@ -528,23 +531,23 @@ export default function LeadsManagementPage() {
               {/* Status */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  Status do Lead
+                  {t('leadStatus')}
                 </p>
                 <Select
                   value={selectedLead.status}
                   onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(selectedLead.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
                   disabled={isUpdatingStatus}
                 >
-                  <option value="NOVO">Novo</option>
-                  <option value="CONTATADO">Contatado</option>
-                  <option value="RESOLVIDO">Resolvido</option>
+                  <option value="NOVO">{t('statusNew')}</option>
+                  <option value="CONTATADO">{t('statusContacted')}</option>
+                  <option value="RESOLVIDO">{t('statusResolved')}</option>
                 </Select>
               </div>
 
               {/* Metadata */}
               <div className="pt-4 border-t border-slate-200">
                 <p className="text-xs text-slate-500">
-                  Lead capturado em {formatDate(selectedLead.createdAt, 'dd/MM/yyyy HH:mm')}
+                  {t('leadCapturedAt', { date: formatDate(selectedLead.createdAt, 'dd/MM/yyyy HH:mm') })}
                 </p>
               </div>
             </div>
@@ -555,7 +558,7 @@ export default function LeadsManagementPage() {
             variant="secondary"
             onClick={() => setShowDetailModal(false)}
           >
-            Fechar
+            {tCommon('close')}
           </Button>
         </ModalFooter>
       </Modal>

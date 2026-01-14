@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { Download, FileText, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +39,8 @@ interface SalesSummary {
 export default function SalesHistoryPage() {
   const router = useRouter();
   const { error, success } = useToast();
+  const t = useTranslations('sales');
+  const tCommon = useTranslations('common');
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
@@ -73,7 +76,7 @@ export default function SalesHistoryPage() {
       );
       setSellers(data);
     } catch (err) {
-      error('Erro ao carregar vendedores');
+      error(t('sellersError'));
     }
   };
 
@@ -89,7 +92,7 @@ export default function SalesHistoryPage() {
       setSales(data.sales);
       setTotalItems(data.total);
     } catch (err) {
-      error('Erro ao carregar vendas');
+      error(t('loadError'));
       setSales([]);
     } finally {
       setIsLoading(false);
@@ -113,10 +116,10 @@ export default function SalesHistoryPage() {
 
   const handleExport = async () => {
     try {
-      success('Exportação iniciada. O download começará em breve.');
+      success(t('exportStarted'));
       // Implementar lógica de exportação
     } catch (err) {
-      error('Erro ao exportar relatório');
+      error(t('exportError'));
     }
   };
 
@@ -129,15 +132,15 @@ export default function SalesHistoryPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Histórico de Vendas
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Consulte todas as vendas realizadas
+              {t('subtitle')}
             </p>
           </div>
           <Button variant="secondary" onClick={handleExport}>
             <Download className="w-4 h-4 mr-2" />
-            Exportar Relatório
+            {t('exportReport')}
           </Button>
         </div>
       </div>
@@ -149,7 +152,7 @@ export default function SalesHistoryPage() {
             <Card>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
-                  Total Vendido
+                  {t('totalSold')}
                 </p>
                 <Receipt className="w-5 h-5 text-emerald-600" />
               </div>
@@ -161,7 +164,7 @@ export default function SalesHistoryPage() {
             <Card>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
-                  Comissões Pagas
+                  {t('commissionsPaid')}
                 </p>
                 <Receipt className="w-5 h-5 text-blue-600" />
               </div>
@@ -173,7 +176,7 @@ export default function SalesHistoryPage() {
             <Card>
               <div className="flex items-center justify-between mb-2">
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
-                  Ticket Médio
+                  {t('averageTicket')}
                 </p>
                 <Receipt className="w-5 h-5 text-amber-600" />
               </div>
@@ -191,7 +194,7 @@ export default function SalesHistoryPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <Input
               type="date"
-              label="Data Início"
+              label={t('startDate')}
               value={filters.startDate}
               onChange={(e) =>
                 setFilters({ ...filters, startDate: e.target.value, page: 1 })
@@ -200,7 +203,7 @@ export default function SalesHistoryPage() {
 
             <Input
               type="date"
-              label="Data Fim"
+              label={t('endDate')}
               value={filters.endDate}
               onChange={(e) =>
                 setFilters({ ...filters, endDate: e.target.value, page: 1 })
@@ -208,13 +211,13 @@ export default function SalesHistoryPage() {
             />
 
             <Select
-              label="Vendedor"
+              label={t('seller')}
               value={filters.sellerId}
               onChange={(e) =>
                 setFilters({ ...filters, sellerId: e.target.value, page: 1 })
               }
             >
-              <option value="">Todos os Vendedores</option>
+              <option value="">{t('allSellers')}</option>
               {sellers.map((seller) => (
                 <option key={seller.id} value={seller.id} title={seller.name}>
                   {truncateText(seller.name, TRUNCATION_LIMITS.SELECT_OPTION)}
@@ -242,7 +245,7 @@ export default function SalesHistoryPage() {
                   })
                 }
               >
-                Limpar Filtros
+                {tCommon('clearFilters')}
               </Button>
             </div>
           </div>
@@ -256,8 +259,8 @@ export default function SalesHistoryPage() {
         ) : isEmpty ? (
           <EmptyState
             icon={Receipt}
-            title="Nenhuma venda registrada"
-            description="O histórico de vendas aparecerá aqui"
+            title={t('emptyTitle')}
+            description={t('emptyDescription')}
           />
         ) : (
           <>
@@ -265,15 +268,15 @@ export default function SalesHistoryPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Nº Venda</TableHead>
-                    <TableHead>Lote</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Vendedor</TableHead>
-                    <TableHead>Valor Total</TableHead>
-                    <TableHead>Comissão</TableHead>
-                    <TableHead>Líquido</TableHead>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Ações</TableHead>
+                    <TableHead>{t('saleNumber')}</TableHead>
+                    <TableHead>{t('batch')}</TableHead>
+                    <TableHead>{t('customer')}</TableHead>
+                    <TableHead>{t('seller')}</TableHead>
+                    <TableHead>{t('totalValue')}</TableHead>
+                    <TableHead>{t('commission')}</TableHead>
+                    <TableHead>{t('netValue')}</TableHead>
+                    <TableHead>{t('date')}</TableHead>
+                    <TableHead>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -363,7 +366,7 @@ export default function SalesHistoryPage() {
                               <div className="grid grid-cols-3 gap-6">
                                 <div>
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
-                                    Produto
+                                    {t('product')}
                                   </p>
                                   <p 
                                     className="text-sm font-medium text-obsidian"
@@ -374,7 +377,7 @@ export default function SalesHistoryPage() {
                                 </div>
                                 <div>
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
-                                    Contato Cliente
+                                    {t('customerContact')}
                                   </p>
                                   <p 
                                     className="text-sm text-slate-600"
@@ -386,7 +389,7 @@ export default function SalesHistoryPage() {
                                 {sale.notes && (
                                   <div>
                                     <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
-                                      Observações
+                                      {t('notes')}
                                     </p>
                                     <p 
                                       className="text-sm text-slate-600"

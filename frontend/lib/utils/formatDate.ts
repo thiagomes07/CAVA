@@ -1,32 +1,55 @@
 import { format, formatDistance, formatRelative, parseISO, isValid } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { ptBR, enUS, es } from 'date-fns/locale';
 
-export function formatDate(date: string | Date, formatStr: string = 'dd/MM/yyyy'): string {
+// Locale type
+export type DateLocale = 'pt' | 'en' | 'es';
+
+// Locale mapping
+const localeMap = {
+  pt: ptBR,
+  en: enUS,
+  es: es,
+};
+
+// Get date-fns locale from string
+function getLocale(locale?: DateLocale) {
+  return localeMap[locale || 'pt'] || ptBR;
+}
+
+export function formatDate(date: string | Date, formatStr: string = 'dd/MM/yyyy', locale?: DateLocale): string {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '-';
-    return format(dateObj, formatStr, { locale: ptBR });
+    return format(dateObj, formatStr, { locale: getLocale(locale) });
   } catch {
     return '-';
   }
 }
 
-export function formatDateTime(date: string | Date): string {
-  return formatDate(date, "dd/MM/yyyy 'às' HH:mm");
+export function formatDateTime(date: string | Date, locale?: DateLocale): string {
+  const atWord = locale === 'en' ? 'at' : locale === 'es' ? 'a las' : 'às';
+  return formatDate(date, `dd/MM/yyyy '${atWord}' HH:mm`, locale);
 }
 
-export function formatDateLong(date: string | Date): string {
+export function formatDateLong(date: string | Date, locale?: DateLocale): string {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '-';
-    return format(dateObj, "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
+    
+    const formatStr = locale === 'en' 
+      ? "MMMM dd, yyyy"
+      : locale === 'es' 
+        ? "dd 'de' MMMM 'de' yyyy"
+        : "dd 'de' MMMM 'de' yyyy";
+    
+    return format(dateObj, formatStr, { locale: getLocale(locale) });
   } catch {
     return '-';
   }
 }
 
-export function formatDateShort(date: string | Date): string {
-  return formatDate(date, 'dd/MM/yy');
+export function formatDateShort(date: string | Date, locale?: DateLocale): string {
+  return formatDate(date, 'dd/MM/yy', locale);
 }
 
 export function formatDateISO(date: string | Date): string {
@@ -49,23 +72,23 @@ export function formatDateTimeISO(date: string | Date): string {
   }
 }
 
-export function formatRelativeDate(date: string | Date): string {
+export function formatRelativeDate(date: string | Date, locale?: DateLocale): string {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '-';
-    return formatRelative(dateObj, new Date(), { locale: ptBR });
+    return formatRelative(dateObj, new Date(), { locale: getLocale(locale) });
   } catch {
     return '-';
   }
 }
 
-export function formatDistanceToNow(date: string | Date): string {
+export function formatDistanceToNow(date: string | Date, locale?: DateLocale): string {
   try {
     const dateObj = typeof date === 'string' ? parseISO(date) : date;
     if (!isValid(dateObj)) return '-';
     return formatDistance(dateObj, new Date(), { 
       addSuffix: true, 
-      locale: ptBR 
+      locale: getLocale(locale) 
     });
   } catch {
     return '-';

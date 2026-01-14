@@ -3,6 +3,7 @@
 import { useMemo, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 import { 
   LayoutDashboard, 
   Package, 
@@ -24,6 +25,7 @@ import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
 import { useToast } from '@/lib/hooks/useToast';
+import { LanguageSwitcher } from './LanguageSwitcher';
 import type { UserRole } from '@/lib/types';
 
 interface MenuItem {
@@ -37,49 +39,49 @@ interface MenuItem {
 // Menu items organized by role with proper route prefixes
 const industryMenuItems: MenuItem[] = [
   {
-    label: 'Dashboard',
+    label: 'navigation.dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Catálogo',
+    label: 'navigation.catalog',
     href: '/catalog',
     icon: Package,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
-    label: 'Estoque',
+    label: 'navigation.inventory',
     href: '/inventory',
     icon: Layers,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Vendas',
+    label: 'navigation.sales',
     href: '/sales',
     icon: Receipt,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Links',
+    label: 'navigation.links',
     href: '/links',
     icon: Link2,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Leads',
+    label: 'navigation.leads',
     href: '/leads',
     icon: Inbox,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'Parceiros',
+    label: 'navigation.brokers',
     href: '/brokers',
     icon: Users,
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
-    label: 'Equipe',
+    label: 'navigation.team',
     href: '/team',
     icon: UserPlus,
     roles: ['ADMIN_INDUSTRIA'],
@@ -88,25 +90,25 @@ const industryMenuItems: MenuItem[] = [
 
 const brokerMenuItems: MenuItem[] = [
   {
-    label: 'Dashboard',
+    label: 'navigation.dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['BROKER'],
   },
   {
-    label: 'Estoque Compartilhado',
+    label: 'navigation.sharedInventory',
     href: '/shared-inventory',
     icon: PackageOpen,
     roles: ['BROKER'],
   },
   {
-    label: 'Links',
+    label: 'navigation.links',
     href: '/links',
     icon: Link2,
     roles: ['BROKER'],
   },
   {
-    label: 'Leads',
+    label: 'navigation.leads',
     href: '/leads',
     icon: Inbox,
     roles: ['BROKER'],
@@ -120,6 +122,9 @@ export function Sidebar() {
   const logout = useAuthStore((state) => state.logout);
   const { sidebarOpen, toggleSidebar } = useUIStore();
   const { success, error: showError } = useToast();
+  const t = useTranslations();
+  const tAuth = useTranslations('auth');
+  const tRoles = useTranslations('roles');
   
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -150,10 +155,10 @@ export function Sidebar() {
   const handleLogout = async () => {
     try {
       await logout();
-      success('Logout realizado com sucesso');
+      success(tAuth('logoutSuccess'));
       router.push('/login');
     } catch {
-      showError('Erro ao fazer logout');
+      showError(tAuth('logoutError'));
     }
   };
 
@@ -269,7 +274,7 @@ export function Sidebar() {
                   >
                     <Icon className="w-5 h-5 shrink-0" />
                     {sidebarOpen && (
-                      <span className="truncate">{item.label}</span>
+                      <span className="truncate">{t(item.label)}</span>
                     )}
                   </Link>
                 </li>
@@ -277,6 +282,11 @@ export function Sidebar() {
             })}
           </ul>
         </nav>
+
+        {/* Language Switcher */}
+        <div className="px-3 py-2 border-t border-white/10">
+          <LanguageSwitcher variant="sidebar" collapsed={!sidebarOpen} />
+        </div>
 
         {/* User Info with Dropdown */}
         <div className="p-6 border-t border-white/10" ref={userMenuRef}>
@@ -301,7 +311,7 @@ export function Sidebar() {
                   )}
                 >
                   <LogOut className="w-4 h-4" />
-                  Sair
+                  {tAuth('logout')}
                 </button>
               </div>
             )}
@@ -331,9 +341,9 @@ export function Sidebar() {
                       {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
                     </p>
                     <p className="text-xs text-porcelain/60 truncate">
-                      {user.role === 'ADMIN_INDUSTRIA' && 'Administrador'}
-                      {user.role === 'VENDEDOR_INTERNO' && 'Vendedor'}
-                      {user.role === 'BROKER' && 'Broker'}
+                      {user.role === 'ADMIN_INDUSTRIA' && tRoles('admin')}
+                      {user.role === 'VENDEDOR_INTERNO' && tRoles('seller')}
+                      {user.role === 'BROKER' && tRoles('broker')}
                     </p>
                   </div>
                   <ChevronUp 

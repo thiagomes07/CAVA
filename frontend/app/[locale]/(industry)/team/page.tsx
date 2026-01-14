@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, Link2, Receipt, Edit2, UserX } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +45,9 @@ type InviteSellerInput = z.infer<typeof inviteSellerSchema>;
 
 export default function TeamManagementPage() {
   const { success, error } = useToast();
+  const t = useTranslations('team');
+  const tCommon = useTranslations('common');
+  const tValidation = useTranslations('validation');
 
   const [sellers, setSellers] = useState<User[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,7 +75,7 @@ export default function TeamManagementPage() {
       });
       setSellers(data);
     } catch (err) {
-      error('Erro ao carregar vendedores');
+      error(t('loadError'));
     } finally {
       setIsLoading(false);
     }
@@ -86,12 +90,12 @@ export default function TeamManagementPage() {
         role: 'VENDEDOR_INTERNO',
       });
 
-      success('Vendedor cadastrado. Email de acesso enviado.');
+      success(t('sellerCreated'));
       setShowInviteModal(false);
       reset();
       fetchSellers();
     } catch (err) {
-      error('Erro ao cadastrar vendedor');
+      error(t('sellerCreateError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -105,12 +109,12 @@ export default function TeamManagementPage() {
 
       success(
         currentStatus
-          ? 'Vendedor desativado com sucesso'
-          : 'Vendedor ativado com sucesso'
+          ? t('sellerDeactivated')
+          : t('sellerActivated')
       );
       fetchSellers();
     } catch (err) {
-      error('Erro ao alterar status do vendedor');
+      error(t('sellerStatusError'));
     }
   };
 
@@ -123,15 +127,15 @@ export default function TeamManagementPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Equipe Interna
+              {t('title')}
             </h1>
             <p className="text-sm text-slate-500">
-              Gerencie seus vendedores internos
+              {t('subtitle')}
             </p>
           </div>
           <Button variant="primary" onClick={() => setShowInviteModal(true)}>
             <Plus className="w-4 h-4 mr-2" />
-            ADICIONAR VENDEDOR
+            {t('addSeller')}
           </Button>
         </div>
       </div>
@@ -143,9 +147,9 @@ export default function TeamManagementPage() {
         ) : isEmpty ? (
           <EmptyState
             icon={Plus}
-            title="Nenhum vendedor cadastrado"
-            description="Adicione vendedores internos para ajudar nas vendas"
-            actionLabel="+ Adicionar Vendedor"
+            title={t('noSellers')}
+            description={t('noSellersDescription')}
+            actionLabel={t('addSellerButton')}
             onAction={() => setShowInviteModal(true)}
           />
         ) : (
@@ -153,13 +157,13 @@ export default function TeamManagementPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Telefone</TableHead>
-                  <TableHead>Links Criados</TableHead>
-                  <TableHead>Vendas</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Ações</TableHead>
+                  <TableHead>{tCommon('name')}</TableHead>
+                  <TableHead>{tCommon('email')}</TableHead>
+                  <TableHead>{tCommon('phone')}</TableHead>
+                  <TableHead>{t('linksCreated')}</TableHead>
+                  <TableHead>{t('salesCount')}</TableHead>
+                  <TableHead>{tCommon('status')}</TableHead>
+                  <TableHead>{tCommon('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -174,7 +178,7 @@ export default function TeamManagementPage() {
                           {truncateText(seller.name, TRUNCATION_LIMITS.SELLER_NAME)}
                         </p>
                         <p className="text-xs text-slate-500">
-                          Desde {formatDate(seller.createdAt, 'MMM yyyy')}
+                          {t('since', { date: formatDate(seller.createdAt, 'MMM yyyy') })}
                         </p>
                       </div>
                     </TableCell>
@@ -221,7 +225,7 @@ export default function TeamManagementPage() {
                       <Badge
                         variant={seller.isActive ? 'DISPONIVEL' : 'INATIVO'}
                       >
-                        {seller.isActive ? 'Ativo' : 'Inativo'}
+                        {seller.isActive ? tCommon('active') : tCommon('inactive')}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -236,7 +240,7 @@ export default function TeamManagementPage() {
                               ? 'hover:bg-rose-50 text-rose-600'
                               : 'hover:bg-emerald-50 text-emerald-600'
                           )}
-                          title={seller.isActive ? 'Desativar' : 'Ativar'}
+                          title={seller.isActive ? t('deactivate') : t('activate')}
                         >
                           <UserX className="w-4 h-4" />
                         </button>
@@ -254,7 +258,7 @@ export default function TeamManagementPage() {
       <Modal open={showInviteModal} onClose={() => setShowInviteModal(false)}>
         <ModalClose onClose={() => setShowInviteModal(false)} />
         <ModalHeader>
-          <ModalTitle>Adicionar Vendedor</ModalTitle>
+          <ModalTitle>{t('addSellerTitle')}</ModalTitle>
         </ModalHeader>
 
         <form onSubmit={handleSubmit(onSubmit)}>
@@ -262,7 +266,7 @@ export default function TeamManagementPage() {
             <div className="space-y-6">
               <Input
                 {...register('name')}
-                label="Nome Completo"
+                label={t('fullName')}
                 placeholder="João Silva"
                 error={errors.name?.message}
                 disabled={isSubmitting}
@@ -271,16 +275,16 @@ export default function TeamManagementPage() {
               <Input
                 {...register('email')}
                 type="email"
-                label="Email"
+                label={tCommon('email')}
                 placeholder="joao@exemplo.com"
-                helperText="Um email de acesso será enviado automaticamente"
+                helperText={t('emailHelperText')}
                 error={errors.email?.message}
                 disabled={isSubmitting}
               />
 
               <Input
                 {...register('phone')}
-                label="Telefone (Opcional)"
+                label={t('phoneOptional')}
                 placeholder="(11) 98765-4321"
                 error={errors.phone?.message}
                 disabled={isSubmitting}
@@ -295,10 +299,10 @@ export default function TeamManagementPage() {
               onClick={() => setShowInviteModal(false)}
               disabled={isSubmitting}
             >
-              Cancelar
+              {tCommon('cancel')}
             </Button>
             <Button type="submit" variant="primary" loading={isSubmitting}>
-              CRIAR ACESSO
+              {t('createAccess')}
             </Button>
           </ModalFooter>
         </form>

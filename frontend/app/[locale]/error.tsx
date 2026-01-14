@@ -1,48 +1,17 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useTranslations } from 'next-intl';
 import { AlertTriangle, RotateCcw, Home } from 'lucide-react';
-import Link from 'next/link';
+import { Link } from '@/i18n/routing';
 
 interface ErrorProps {
   error: Error & { digest?: string };
   reset: () => void;
 }
 
-// Fallback error page for non-locale routes
-// Uses browser language detection for basic i18n
-function getTexts() {
-  const lang = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : 'pt';
-  
-  const texts: Record<string, { title: string; description: string; code: string; retry: string; home: string }> = {
-    pt: {
-      title: 'Algo deu errado',
-      description: 'Desculpe, ocorreu um erro inesperado. Nossa equipe foi notificada.',
-      code: 'Código',
-      retry: 'Tentar novamente',
-      home: 'Voltar ao início',
-    },
-    en: {
-      title: 'Something went wrong',
-      description: 'Sorry, an unexpected error occurred. Our team has been notified.',
-      code: 'Code',
-      retry: 'Try again',
-      home: 'Back to home',
-    },
-    es: {
-      title: 'Algo salió mal',
-      description: 'Lo sentimos, ocurrió un error inesperado. Nuestro equipo fue notificado.',
-      code: 'Código',
-      retry: 'Intentar de nuevo',
-      home: 'Volver al inicio',
-    },
-  };
-  
-  return texts[lang] || texts.pt;
-}
-
 export default function Error({ error, reset }: ErrorProps) {
-  const t = getTexts();
+  const t = useTranslations('errors');
 
   useEffect(() => {
     console.error('Application error:', error);
@@ -58,18 +27,18 @@ export default function Error({ error, reset }: ErrorProps) {
 
         {/* Title */}
         <h1 className="font-serif text-3xl text-obsidian mb-3">
-          {t.title}
+          {t('generic')}
         </h1>
 
         {/* Description */}
         <p className="text-slate-500 mb-8">
-          {t.description}
+          {t('genericDescription')}
         </p>
 
         {/* Error digest (for debugging) */}
         {error.digest && (
           <p className="text-xs text-slate-400 mb-6 font-mono">
-            {t.code}: {error.digest}
+            {t('code')}: {error.digest}
           </p>
         )}
 
@@ -80,7 +49,7 @@ export default function Error({ error, reset }: ErrorProps) {
             className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-obsidian text-white rounded-sm font-medium text-sm transition-all duration-200 hover:bg-obsidian-hover hover:scale-[1.02]"
           >
             <RotateCcw className="w-4 h-4" />
-            {t.retry}
+            {t('tryAgain')}
           </button>
           
           <Link
@@ -88,7 +57,7 @@ export default function Error({ error, reset }: ErrorProps) {
             className="inline-flex items-center justify-center gap-2 px-6 py-3 border border-slate-200 text-obsidian rounded-sm font-medium text-sm transition-all duration-200 hover:bg-slate-50"
           >
             <Home className="w-4 h-4" />
-            {t.home}
+            {t('backToHome')}
           </Link>
         </div>
       </div>
