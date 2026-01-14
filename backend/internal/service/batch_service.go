@@ -33,13 +33,39 @@ func NewBatchService(
 }
 
 func (s *batchService) Create(ctx context.Context, industryID string, input entity.CreateBatchInput) (*entity.Batch, error) {
-	// Validar que produto existe e pertence à indústria
-	product, err := s.productRepo.FindByID(ctx, input.ProductID)
-	if err != nil {
-		return nil, err
-	}
-	if product.IndustryID != industryID {
-		return nil, domainErrors.ForbiddenError()
+	var productID string
+
+	// Se NewProduct é fornecido, cria o produto inline
+	if input.NewProduct != nil {
+		product, err := s.productRepo.Create(ctx, &entity.Product{
+			IndustryID:  industryID,
+			Name:        input.NewProduct.Name,
+			SKU:         input.NewProduct.SKU,
+			Material:    input.NewProduct.Material,
+			Finish:      input.NewProduct.Finish,
+			Description: input.NewProduct.Description,
+			IsPublic:    input.NewProduct.IsPublic,
+			IsActive:    true,
+		})
+		if err != nil {
+			s.logger.Error("erro ao criar produto inline", zap.Error(err))
+			return nil, err
+		}
+		productID = product.ID
+		s.logger.Info("produto criado inline",
+			zap.String("productId", product.ID),
+			zap.String("productName", product.Name),
+		)
+	} else {
+		// Validar que produto existe e pertence à indústria
+		product, err := s.productRepo.FindByID(ctx, input.ProductID)
+		if err != nil {
+			return nil, err
+		}
+		if product.IndustryID != industryID {
+			return nil, domainErrors.ForbiddenError()
+		}
+		productID = input.ProductID
 	}
 
 	// Validar e formatar batch code
@@ -77,6 +103,15 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		return nil, domainErrors.ValidationError("Preço deve ser maior que 0")
 	}
 
+	// Validar unidade de preço (default M2)
+	priceUnit := entity.PriceUnitM2
+	if input.PriceUnit != "" {
+		if !input.PriceUnit.IsValid() {
+			return nil, domainErrors.ValidationError("Unidade de preço inválida. Use M2 ou FT2")
+		}
+		priceUnit = input.PriceUnit
+	}
+
 	// Validar data de entrada (não pode ser futura)
 	entryDate, err := time.Parse(time.RFC3339, input.EntryDate)
 	if err != nil {
@@ -88,21 +123,23 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 
 	// Criar lote
 	batch := &entity.Batch{
-		ID:            uuid.New().String(),
-		ProductID:     input.ProductID,
-		IndustryID:    industryID,
-		BatchCode:     batchCode.String(),
-		Height:        input.Height,
-		Width:         input.Width,
-		Thickness:     input.Thickness,
-		QuantitySlabs: input.QuantitySlabs,
-		IndustryPrice: input.IndustryPrice,
-		OriginQuarry:  input.OriginQuarry,
-		EntryDate:     entryDate,
-		Status:        entity.BatchStatusDisponivel,
-		IsActive:      true,
-		CreatedAt:     time.Now(),
-		UpdatedAt:     time.Now(),
+		ID:             uuid.New().String(),
+		ProductID:      productID,
+		IndustryID:     industryID,
+		BatchCode:      batchCode.String(),
+		Height:         input.Height,
+		Width:          input.Width,
+		Thickness:      input.Thickness,
+		QuantitySlabs:  input.QuantitySlabs,
+		AvailableSlabs: input.QuantitySlabs, // Inicialmente todas as chapas estão disponíveis
+		IndustryPrice:  input.IndustryPrice,
+		PriceUnit:      priceUnit,
+		OriginQuarry:   input.OriginQuarry,
+		EntryDate:      entryDate,
+		Status:         entity.BatchStatusDisponivel,
+		IsActive:       true,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
 	}
 
 	// Calcular área total
@@ -121,6 +158,8 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		zap.String("batchId", batch.ID),
 		zap.String("batchCode", batch.BatchCode),
 		zap.Float64("totalArea", batch.TotalArea),
+		zap.String("priceUnit", string(batch.PriceUnit)),
+		zap.Int("quantitySlabs", batch.QuantitySlabs),
 	)
 
 	return batch, nil
@@ -263,6 +302,22 @@ func (s *batchService) Update(ctx context.Context, id string, input entity.Updat
 		if *input.QuantitySlabs <= 0 {
 			return nil, domainErrors.ValidationError("Quantidade de chapas deve ser maior que 0")
 		}
+		// Ajustar available_slabs proporcionalmente se quantity_slabs mudar
+		oldQuantity := batch.QuantitySlabs
+		newQuantity := *input.QuantitySlabs
+		if newQuantity < batch.QuantitySlabs-batch.AvailableSlabs {
+			return nil, domainErrors.ValidationError("Quantidade não pode ser menor que chapas já reservadas/vendidas")
+		}
+		// Ajustar available_slabs se aumentar a quantidade
+		if newQuantity > oldQuantity {
+			batch.AvailableSlabs += (newQuantity - oldQuantity)
+		} else if newQuantity < oldQuantity {
+			// Se diminuir, reduz das disponíveis
+			reduction := oldQuantity - newQuantity
+			if batch.AvailableSlabs >= reduction {
+				batch.AvailableSlabs -= reduction
+			}
+		}
 		batch.QuantitySlabs = *input.QuantitySlabs
 		dimensionsChanged = true
 	}
@@ -272,6 +327,13 @@ func (s *batchService) Update(ctx context.Context, id string, input entity.Updat
 			return nil, domainErrors.ValidationError("Preço deve ser maior que 0")
 		}
 		batch.IndustryPrice = *input.IndustryPrice
+	}
+
+	if input.PriceUnit != nil {
+		if !input.PriceUnit.IsValid() {
+			return nil, domainErrors.ValidationError("Unidade de preço inválida. Use M2 ou FT2")
+		}
+		batch.PriceUnit = *input.PriceUnit
 	}
 
 	if input.OriginQuarry != nil {
@@ -335,6 +397,21 @@ func (s *batchService) CheckAvailability(ctx context.Context, id string) (bool, 
 	}
 
 	return batch.IsAvailable(), nil
+}
+
+// CheckAvailabilityForQuantity verifica se o lote tem quantidade suficiente de chapas disponíveis
+func (s *batchService) CheckAvailabilityForQuantity(ctx context.Context, id string, quantity int) (bool, error) {
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return false, err
+	}
+
+	return batch.HasAvailableSlabs(quantity), nil
+}
+
+// ConvertPrice converte um preço de uma unidade para outra
+func (s *batchService) ConvertPrice(price float64, from, to entity.PriceUnit) float64 {
+	return entity.ConvertPrice(price, from, to)
 }
 
 func (s *batchService) AddMedias(ctx context.Context, batchID string, medias []entity.CreateMediaInput) error {

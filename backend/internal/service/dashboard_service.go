@@ -12,29 +12,29 @@ import (
 )
 
 type dashboardService struct {
-	batchRepo  repository.BatchRepository
-	salesRepo  repository.SalesHistoryRepository
-	linkRepo   repository.SalesLinkRepository
-	leadRepo   repository.LeadRepository
-	sharedRepo repository.SharedInventoryRepository
-	logger     *zap.Logger
+	batchRepo   repository.BatchRepository
+	salesRepo   repository.SalesHistoryRepository
+	linkRepo    repository.SalesLinkRepository
+	clienteRepo repository.ClienteRepository
+	sharedRepo  repository.SharedInventoryRepository
+	logger      *zap.Logger
 }
 
 func NewDashboardService(
 	batchRepo repository.BatchRepository,
 	salesRepo repository.SalesHistoryRepository,
 	linkRepo repository.SalesLinkRepository,
-	leadRepo repository.LeadRepository,
+	clienteRepo repository.ClienteRepository,
 	sharedRepo repository.SharedInventoryRepository,
 	logger *zap.Logger,
 ) *dashboardService {
 	return &dashboardService{
-		batchRepo:  batchRepo,
-		salesRepo:  salesRepo,
-		linkRepo:   linkRepo,
-		leadRepo:   leadRepo,
-		sharedRepo: sharedRepo,
-		logger:     logger,
+		batchRepo:   batchRepo,
+		salesRepo:   salesRepo,
+		linkRepo:    linkRepo,
+		clienteRepo: clienteRepo,
+		sharedRepo:  sharedRepo,
+		logger:      logger,
 	}
 }
 
@@ -105,17 +105,17 @@ func (s *dashboardService) GetIndustryMetrics(ctx context.Context, industryID st
 		mu.Unlock()
 	}()
 
-	// 5. Total de leads
+	// 5. Total de clientes
 	go func() {
 		defer wg.Done()
-		count, err := s.leadRepo.CountByIndustry(ctx, industryID)
+		count, err := s.clienteRepo.CountByIndustry(ctx, industryID)
 		if err != nil {
-			s.logger.Error("erro ao contar leads", zap.Error(err))
+			s.logger.Error("erro ao contar clientes", zap.Error(err))
 			errChan <- err
 			return
 		}
 		mu.Lock()
-		metrics.LeadsCount = &count
+		metrics.ClientesCount = &count
 		mu.Unlock()
 	}()
 

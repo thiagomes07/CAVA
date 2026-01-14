@@ -2,6 +2,8 @@ export type UserRole = 'ADMIN_INDUSTRIA' | 'BROKER' | 'VENDEDOR_INTERNO';
 
 export type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO';
 
+export type PriceUnit = 'M2' | 'FT2';
+
 export type MaterialType = 
   | 'GRANITO' 
   | 'MARMORE' 
@@ -76,8 +78,10 @@ export interface Batch {
   width: number;
   thickness: number;
   quantitySlabs: number;
+  availableSlabs: number;
   totalArea: number;
   industryPrice: number;
+  priceUnit: PriceUnit;
   originQuarry?: string;
   entryDate: string;
   status: BatchStatus;
@@ -93,6 +97,7 @@ export interface SharedInventoryBatch {
   batchId: string;
   brokerUserId: string;
   negotiatedPrice?: number;
+  negotiatedPriceUnit?: PriceUnit;
   sharedAt: string;
   batch: Batch;
   broker: User;
@@ -120,7 +125,7 @@ export interface SalesLink {
   createdBy?: User;
 }
 
-export interface Lead {
+export interface Cliente {
   id: string;
   salesLinkId: string;
   name: string;
@@ -136,14 +141,15 @@ export interface Lead {
 export interface Reservation {
   id: string;
   batchId: string;
-  leadId?: string;
+  clienteId?: string;
   reservedByUserId: string;
+  quantitySlabsReserved: number;
   expiresAt: string;
   notes?: string;
   isActive: boolean;
   createdAt: string;
   batch?: Batch;
-  lead?: Lead;
+  cliente?: Cliente;
   reservedBy?: User;
 }
 
@@ -151,10 +157,14 @@ export interface Sale {
   id: string;
   batchId: string;
   soldByUserId: string;
-  leadId?: string;
+  clienteId?: string;
   customerName: string;
   customerContact: string;
   salePrice: number;
+  quantitySlabsSold: number;
+  totalAreaSold: number;
+  pricePerUnit: number;
+  priceUnit: PriceUnit;
   brokerCommission?: number;
   netIndustryValue: number;
   saleDate: string;
@@ -163,7 +173,7 @@ export interface Sale {
   createdAt: string;
   batch?: Batch;
   soldBy?: User;
-  lead?: Lead;
+  cliente?: Cliente;
 }
 
 export interface DashboardMetrics {
@@ -171,7 +181,7 @@ export interface DashboardMetrics {
   monthlySales: number;
   reservedBatches: number;
   activeLinks?: number;
-  leadsCount?: number;
+  clientesCount?: number;
   monthlyCommission?: number;
 }
 

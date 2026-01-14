@@ -24,20 +24,20 @@ export const routesByRole: RoleRouteMap = {
     '/sales',
     '/team',
     '/links',
-    '/leads',
+    '/clientes',
   ],
   VENDEDOR_INTERNO: [
     '/dashboard',
     '/inventory',
     '/sales',
     '/links',
-    '/leads',
+    '/clientes',
   ],
   BROKER: [
     '/dashboard',
     '/shared-inventory',
     '/links',
-    '/leads',
+    '/clientes',
   ],
 };
 

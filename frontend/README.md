@@ -22,7 +22,7 @@ src/
 │   │   ├── dashboard/
 │   │   ├── shared-inventory/
 │   │   ├── links/
-│   │   ├── leads/
+│   │   ├── clientes/
 │   │   └── layout.tsx
 │   ├── (seller)/
 │   │   ├── dashboard/
@@ -213,7 +213,7 @@ module.exports = {
 | `/team` | ADMIN_INDUSTRIA | Gestão de Vendedores Internos |
 | `/links` | ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER | Links de venda gerados |
 | `/links/new` | ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER | Criar novo link |
-| `/leads` | ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER | Gestão de leads capturados |
+| `/clientes` | ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER | Gestão de clientes capturados |
 | `/dashboard` | BROKER | Dashboard do broker |
 | `/shared-inventory` | BROKER | Lotes compartilhados comigo |
 | `/[slug]` | Público | Visualização do link (Landing Page) |
@@ -234,7 +234,7 @@ module.exports = {
 - Links
   - Meus Links
   - Novo Link
-- Leads
+- Clientes
 - Parceiros
   - Brokers
   - Vendedores Internos
@@ -244,13 +244,13 @@ module.exports = {
 - Dashboard
 - Estoque Compartilhado
 - Meus Links
-- Leads
+- Clientes
 
 **Sidebar (VENDEDOR_INTERNO):**
 - Dashboard
 - Estoque
 - Meus Links
-- Leads
+- Clientes
 
 ---
 
@@ -584,7 +584,7 @@ module.exports = {
 - **Grid Métricas (4 cards):**
   - Lotes Disponíveis para Mim
   - Links Ativos Gerados
-  - Leads Capturados
+  - Clientes Capturados
   - Comissão do Mês (R$)
 - **Seção "Novos Lotes Compartilhados":**
   - Cards horizontais (foto + info rápida + Button: "Criar Link")
@@ -705,7 +705,7 @@ module.exports = {
     - Tipo (Badge: Lote/Produto/Catálogo)
     - Preço (se aplicável)
     - Visualizações (número + ícone `Eye`)
-    - Interações (número de leads + ícone `Users`)
+    - Interações (número de clientes + ícone `Users`)
     - Status (Badge: Ativo/Expirado)
     - Criado em (date format)
     - Ações: Copy Link, Edit, Archive
@@ -792,7 +792,7 @@ module.exports = {
 - Query: `GET /api/public/links/[slug]`
   - Retorna: `SalesLink` populado com batch/product e medias
   - Incrementa `views_count` no backend
-- Mutation: `POST /api/public/leads/interest`
+- Mutation: `POST /api/public/clientes/interest`
   - Input: `{ salesLinkId, name, contact, message, marketingOptIn }`
   - Output: `{ success: true }`
 - Tracking: Google Analytics event ao carregar e ao interagir
@@ -805,17 +805,17 @@ module.exports = {
 
 ---
 
-### 4.9. Gestão de Leads
+### 4.9. Gestão de Clientes
 
-#### **`/leads`**
+#### **`/clientes`**
 
 **Acesso:** ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER
 
-**Objetivo:** Visualizar e gerenciar leads capturados via links.
+**Objetivo:** Visualizar e gerenciar clientes capturados via links.
 
 **Layout & UI:**
 - **Header:**
-  - Título font-serif: "Meus Leads"
+  - Título font-serif: "Meus Clientes"
   - Button secondary: "Exportar CSV"
 - **Filtros:**
   - Search "Nome ou Contato"
@@ -832,15 +832,15 @@ module.exports = {
     - Opt-in (ícone `Check` ou `-`)
     - Data
     - Ações: Ver Detalhes, Marcar Resolvido
-- Click na linha: abre sidebar com histórico completo do lead
+- Click na linha: abre sidebar com histórico completo do cliente
 
 **Dados & Integração:**
-- Query: `GET /api/leads?search=&linkId=&startDate=&endDate=&optIn=`
-- Query (detail): `GET /api/leads/[id]/interactions`
-- Mutation: `PATCH /api/leads/[id]/status`
+- Query: `GET /api/clientes?search=&linkId=&startDate=&endDate=&optIn=`
+- Query (detail): `GET /api/clientes/[id]/interactions`
+- Mutation: `PATCH /api/clientes/[id]/status`
 
 **Estados:**
-- Empty: EmptyState "Nenhum lead capturado ainda"
+- Empty: EmptyState "Nenhum cliente capturado ainda"
 - Sidebar loading: skeleton
 
 ---
@@ -891,7 +891,7 @@ module.exports = {
 - Título font-serif: "Reservar Lote"
 - Preview do lote (foto + código + dimensões)
 - Form:
-  - Select "Cliente" (autocomplete de leads existentes ou "Novo Cliente")
+  - Select "Cliente" (autocomplete de clientes existentes ou "Novo Cliente")
   - Se novo: inputs Nome, Contato
   - Date picker "Validade da Reserva" (default: +7 dias)
   - Textarea "Observações"
@@ -901,7 +901,7 @@ module.exports = {
 
 **Dados & Integração:**
 - Mutation: `POST /api/reservations`
-  - Input: `{ batchId, leadId?, expiresAt, notes }`
+  - Input: `{ batchId, clienteId?, expiresAt, notes }`
 - Optimistic update: atualiza status do lote localmente para `RESERVADO` antes do response
 - WebSocket (opcional): notifica outros usuários que lote foi reservado
 
@@ -1163,7 +1163,7 @@ module.exports = {
 | Vendedor criado | Success | "Vendedor cadastrado. Email de acesso enviado." |
 | Estoque compartilhado | Success | "Lote compartilhado com [Broker]" |
 | Compartilhamento removido | Info | "Compartilhamento removido" |
-| Lead capturado | Success | "Novo lead recebido!" |
+| Cliente capturado | Success | "Novo cliente recebido!" |
 | Foto enviada | Success | "Foto enviada com sucesso" |
 | Foto removida | Info | "Foto removida" |
 | Upload erro | Error | "Erro ao enviar arquivo. Tente novamente." |
@@ -1212,7 +1212,7 @@ module.exports = {
 | `/brokers/[id]/shared` | `Share2` | "Nenhum lote compartilhado" | "Compartilhe lotes do seu estoque com este broker" | "+ Compartilhar Lote" |
 | `/team` | `UserPlus` | "Nenhum vendedor cadastrado" | "Adicione vendedores internos para ajudar nas vendas" | "+ Adicionar Vendedor" |
 | `/links` | `Link` | "Nenhum link criado" | "Crie links personalizados para compartilhar com seus clientes" | "+ Novo Link" |
-| `/leads` | `Inbox` | "Nenhum lead ainda" | "Quando clientes demonstrarem interesse, eles aparecerão aqui" | — |
+| `/clientes` | `Inbox` | "Nenhum cliente ainda" | "Quando clientes demonstrarem interesse, eles aparecerão aqui" | — |
 | `/sales` | `Receipt` | "Nenhuma venda registrada" | "O histórico de vendas aparecerá aqui" | — |
 | `/shared-inventory` (Broker) | `PackageOpen` | "Nenhum lote disponível" | "Aguarde a indústria compartilhar lotes com você" | — |
 | Dashboard (atividades) | `Activity` | "Nenhuma movimentação recente" | "As últimas atividades do sistema aparecerão aqui" | — |
@@ -1290,7 +1290,7 @@ module.exports = {
 | `/inventory` | 50 | Completa (com info + números) |
 | `/catalog` | 24 (grid 3x8) | Simplificada (apenas setas) |
 | `/links` | 25 | Completa |
-| `/leads` | 50 | Completa |
+| `/clientes` | 50 | Completa |
 | `/sales` | 50 | Completa |
 | `/brokers` | 25 | Simplificada |
 | `/team` | 25 | Simplificada |

@@ -7,8 +7,8 @@ export * from './useBatches';
 // Dashboard
 export * from './useDashboard';
 
-// Leads
-export * from './useLeads';
+// Clientes
+export * from './useClientes';
 
 // Sales Links
 export * from './useSalesLinks';

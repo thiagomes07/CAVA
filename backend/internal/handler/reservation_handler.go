@@ -34,11 +34,11 @@ func NewReservationHandler(
 
 // Create godoc
 // @Summary Cria uma nova reserva
-// @Description Cria uma reserva de lote (atualiza status do lote para RESERVADO)
+// @Description Cria uma reserva de chapas de um lote (reserva quantidade específica de chapas)
 // @Tags reservations
 // @Accept json
 // @Produce json
-// @Param body body entity.CreateReservationInput true "Dados da reserva"
+// @Param body body entity.CreateReservationInput true "Dados da reserva (incluindo quantitySlabsReserved)"
 // @Success 201 {object} entity.Reservation
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
@@ -71,6 +71,7 @@ func (h *ReservationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		h.logger.Error("erro ao criar reserva",
 			zap.String("batchId", input.BatchID),
 			zap.String("userId", userID),
+			zap.Int("slabsRequested", input.QuantitySlabsReserved),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -81,6 +82,7 @@ func (h *ReservationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		zap.String("reservationId", reservation.ID),
 		zap.String("batchId", reservation.BatchID),
 		zap.String("userId", userID),
+		zap.Int("slabsReserved", reservation.QuantitySlabsReserved),
 	)
 
 	response.Created(w, reservation)
@@ -88,12 +90,12 @@ func (h *ReservationHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // ConfirmSale godoc
 // @Summary Confirma venda de uma reserva
-// @Description Confirma venda (cria SalesHistory, atualiza status do lote para VENDIDO)
+// @Description Confirma venda de chapas reservadas (pode ser venda parcial ou total)
 // @Tags reservations
 // @Accept json
 // @Produce json
 // @Param id path string true "ID da reserva"
-// @Param body body entity.ConfirmSaleInput true "Dados da venda"
+// @Param body body entity.ConfirmSaleInput true "Dados da venda (incluindo quantitySlabsSold)"
 // @Success 200 {object} entity.Sale
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
@@ -132,6 +134,7 @@ func (h *ReservationHandler) ConfirmSale(w http.ResponseWriter, r *http.Request)
 		h.logger.Error("erro ao confirmar venda",
 			zap.String("reservationId", id),
 			zap.String("userId", userID),
+			zap.Int("slabsSold", input.QuantitySlabsSold),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -142,6 +145,8 @@ func (h *ReservationHandler) ConfirmSale(w http.ResponseWriter, r *http.Request)
 		zap.String("saleId", sale.ID),
 		zap.String("reservationId", id),
 		zap.String("userId", userID),
+		zap.Int("slabsSold", sale.QuantitySlabsSold),
+		zap.Float64("totalAreaSold", sale.TotalAreaSold),
 	)
 
 	response.OK(w, sale)

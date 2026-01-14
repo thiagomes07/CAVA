@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, Edit2, Eye, Archive } from 'lucide-react';
+import { Plus, Search, Edit2, Eye, Archive, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -17,12 +17,25 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
+import { formatPricePerUnit, getPriceUnitLabel, calculateAvailabilityPercentage } from '@/lib/utils/priceConversion';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Batch, Product, BatchStatus } from '@/lib/types';
 import type { BatchFilter } from '@/lib/schemas/batch.schema';
 import { batchStatuses } from '@/lib/schemas/batch.schema';
 import { cn } from '@/lib/utils/cn';
+
+// Tipos de ordenação
+type SortField = 'availableSlabs' | 'totalArea' | 'industryPrice' | 'batchCode' | null;
+type SortDirection = 'asc' | 'desc';
+
+// Opções de filtro de disponibilidade
+const availabilityOptions = [
+  { value: '', label: 'Todas as disponibilidades' },
+  { value: 'available', label: 'Com chapas disponíveis' },
+  { value: 'low', label: 'Estoque baixo (≤3)' },
+  { value: 'none', label: 'Sem disponibilidade' },
+] as const;
 
 export default function InventoryPage() {
   const router = useRouter();
@@ -37,10 +50,15 @@ export default function InventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
 
-  const [filters, setFilters] = useState<BatchFilter>({
+  // Estado de ordenação
+  const [sortField, setSortField] = useState<SortField>(null);
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const [filters, setFilters] = useState<BatchFilter & { availability?: string }>({
     productId: searchParams.get('productId') || '',
     status: (searchParams.get('status') as BatchStatus) || '',
     code: searchParams.get('code') || '',
+    availability: searchParams.get('availability') || '',
     page: parseInt(searchParams.get('page') || '1'),
     limit: 50,
   });
@@ -69,11 +87,21 @@ export default function InventoryPage() {
   const fetchBatches = async () => {
     try {
       setIsLoading(true);
+      
+      // Mapear filtro de disponibilidade para parâmetro da API
+      const apiFilters: Record<string, string | number | boolean | undefined> = { 
+        ...filters,
+        availability: undefined 
+      };
+      if (filters.availability === 'available') {
+        apiFilters.onlyWithAvailable = true;
+      }
+      
       const data = await apiClient.get<{
         batches: Batch[];
         total: number;
         page: number;
-      }>('/batches', { params: filters });
+      }>('/batches', { params: apiFilters });
 
       setBatches(data.batches);
       setTotalItems(data.total);
@@ -85,18 +113,90 @@ export default function InventoryPage() {
     }
   };
 
+  // Handler de ordenação
+  const handleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('desc');
+    }
+  };
+
+  // Ícone de ordenação
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) {
+      return <ArrowUpDown className="w-4 h-4 ml-1 opacity-50" />;
+    }
+    return sortDirection === 'asc' 
+      ? <ArrowUp className="w-4 h-4 ml-1" />
+      : <ArrowDown className="w-4 h-4 ml-1" />;
+  };
+
+  // Ordenação e filtro local (para melhor UX)
+  const sortedBatches = useMemo(() => {
+    let result = [...batches];
+    
+    // Filtro de disponibilidade local
+    if (filters.availability === 'low') {
+      result = result.filter(b => b.availableSlabs > 0 && b.availableSlabs <= 3);
+    } else if (filters.availability === 'none') {
+      result = result.filter(b => b.availableSlabs === 0);
+    }
+    
+    // Ordenação
+    if (sortField) {
+      result.sort((a, b) => {
+        let aVal: number | string = 0;
+        let bVal: number | string = 0;
+        
+        switch (sortField) {
+          case 'availableSlabs':
+            aVal = a.availableSlabs;
+            bVal = b.availableSlabs;
+            break;
+          case 'totalArea':
+            aVal = a.totalArea;
+            bVal = b.totalArea;
+            break;
+          case 'industryPrice':
+            aVal = a.industryPrice;
+            bVal = b.industryPrice;
+            break;
+          case 'batchCode':
+            aVal = a.batchCode;
+            bVal = b.batchCode;
+            break;
+        }
+        
+        if (typeof aVal === 'string') {
+          return sortDirection === 'asc' 
+            ? aVal.localeCompare(bVal as string)
+            : (bVal as string).localeCompare(aVal);
+        }
+        
+        return sortDirection === 'asc' ? aVal - (bVal as number) : (bVal as number) - aVal;
+      });
+    }
+    
+    return result;
+  }, [batches, sortField, sortDirection, filters.availability]);
+
   const handleClearFilters = () => {
     setFilters({
       productId: '',
       status: '',
       code: '',
+      availability: '',
       page: 1,
       limit: 50,
     });
+    setSortField(null);
+    setSortDirection('desc');
     router.push('/inventory');
   };
 
-  const hasFilters = filters.productId || filters.status || filters.code;
+  const hasFilters = filters.productId || filters.status || filters.code || filters.availability;
   const isEmpty = batches.length === 0;
 
   return (
@@ -127,7 +227,7 @@ export default function InventoryPage() {
       {/* Filters */}
       <div className="px-8 py-6">
         <div className="bg-porcelain rounded-sm border border-slate-100 p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Select
               value={filters.productId}
               onChange={(e) =>
@@ -156,6 +256,20 @@ export default function InventoryPage() {
               {batchStatuses.map((status) => (
                 <option key={status} value={status}>
                   {status}
+                </option>
+              ))}
+            </Select>
+
+            {/* Filtro de Disponibilidade */}
+            <Select
+              value={filters.availability}
+              onChange={(e) =>
+                setFilters({ ...filters, availability: e.target.value, page: 1 })
+              }
+            >
+              {availabilityOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
                 </option>
               ))}
             </Select>
@@ -215,17 +329,55 @@ export default function InventoryPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('photo')}</TableHead>
-                    <TableHead>{t('code')}</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('batchCode')}
+                        className="flex items-center hover:text-obsidian transition-colors"
+                      >
+                        {t('code')}
+                        <SortIcon field="batchCode" />
+                      </button>
+                    </TableHead>
                     <TableHead>{t('product')}</TableHead>
                     <TableHead>{t('dimensions')}</TableHead>
-                    <TableHead>{t('totalArea')}</TableHead>
-                    <TableHead>{t('price')}</TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('availableSlabs')}
+                        className="flex items-center hover:text-obsidian transition-colors"
+                      >
+                        {t('slabs')}
+                        <SortIcon field="availableSlabs" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('totalArea')}
+                        className="flex items-center hover:text-obsidian transition-colors"
+                      >
+                        {t('totalArea')}
+                        <SortIcon field="totalArea" />
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        onClick={() => handleSort('industryPrice')}
+                        className="flex items-center hover:text-obsidian transition-colors"
+                      >
+                        {t('price')}
+                        <SortIcon field="industryPrice" />
+                      </button>
+                    </TableHead>
                     <TableHead>{t('status')}</TableHead>
                     {canEdit && <TableHead>{t('actions')}</TableHead>}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {batches.map((batch) => (
+                  {sortedBatches.map((batch) => {
+                    const availabilityPct = calculateAvailabilityPercentage(
+                      batch.availableSlabs,
+                      batch.quantitySlabs
+                    );
+                    return (
                     <TableRow key={batch.id}>
                       <TableCell>
                         <div className="w-20 h-20 rounded-sm overflow-hidden bg-slate-200">
@@ -270,13 +422,36 @@ export default function InventoryPage() {
                         </span>
                       </TableCell>
                       <TableCell>
+                        <div className="flex flex-col">
+                          <span className={cn(
+                            "font-mono text-sm font-semibold",
+                            batch.availableSlabs === 0 ? "text-rose-600" : 
+                            batch.availableSlabs === batch.quantitySlabs ? "text-emerald-600" : 
+                            "text-amber-600"
+                          )}>
+                            {batch.availableSlabs}/{batch.quantitySlabs}
+                          </span>
+                          <div className="w-16 h-1.5 bg-slate-200 rounded-full mt-1">
+                            <div 
+                              className={cn(
+                                "h-full rounded-full transition-all",
+                                availabilityPct === 0 ? "bg-rose-500" :
+                                availabilityPct === 100 ? "bg-emerald-500" :
+                                "bg-amber-500"
+                              )}
+                              style={{ width: `${availabilityPct}%` }}
+                            />
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
                         <span className="font-mono text-sm text-slate-600">
                           {formatArea(batch.totalArea)}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className="font-serif text-obsidian">
-                          {formatCurrency(batch.industryPrice)}
+                          {formatPricePerUnit(batch.industryPrice, batch.priceUnit)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -303,7 +478,7 @@ export default function InventoryPage() {
                         </TableCell>
                       )}
                     </TableRow>
-                  ))}
+                  )})}
                 </TableBody>
               </Table>
             </div>

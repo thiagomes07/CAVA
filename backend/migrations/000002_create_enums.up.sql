@@ -31,7 +31,7 @@ CREATE TYPE media_type_enum AS ENUM (
     'VIDEO'
 );
 
--- ENUM: Tipos de interação de leads
+-- ENUM: Tipos de interação de clientes
 CREATE TYPE interaction_type_enum AS ENUM (
     'INTERESSE_LOTE',
     'INTERESSE_CATALOGO',
@@ -55,8 +55,8 @@ CREATE TYPE finish_type_enum AS ENUM (
     'FLAMEADO'
 );
 
--- ENUM: Status de leads
-CREATE TYPE lead_status_type AS ENUM (
+-- ENUM: Status de clientes
+CREATE TYPE cliente_status_type AS ENUM (
     'NOVO',
     'CONTATADO',
     'RESOLVIDO'
@@ -67,7 +67,7 @@ COMMENT ON TYPE user_role_type IS 'Tipos de roles de usuários no sistema';
 COMMENT ON TYPE batch_status_type IS 'Status possíveis de um lote de estoque';
 COMMENT ON TYPE link_type_enum IS 'Tipos de links de venda públicos';
 COMMENT ON TYPE media_type_enum IS 'Tipos de mídia suportados';
-COMMENT ON TYPE interaction_type_enum IS 'Tipos de interação de leads';
+COMMENT ON TYPE interaction_type_enum IS 'Tipos de interação de clientes';
 COMMENT ON TYPE reservation_status_type IS 'Status de reservas de lotes';
 COMMENT ON TYPE finish_type_enum IS 'Tipos de acabamento de produtos';
-COMMENT ON TYPE lead_status_type IS 'Status de acompanhamento de leads';
+COMMENT ON TYPE cliente_status_type IS 'Status de acompanhamento de clientes';

@@ -19,14 +19,14 @@ func NewReservationRepository(db *DB) *reservationRepository {
 func (r *reservationRepository) Create(ctx context.Context, tx *sql.Tx, reservation *entity.Reservation) error {
 	query := `
 		INSERT INTO reservations (
-			id, batch_id, reserved_by_user_id, lead_id, status, notes, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+			id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes, expires_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING created_at
 	`
 
 	err := tx.QueryRowContext(ctx, query,
 		reservation.ID, reservation.BatchID, reservation.ReservedByUserID,
-		reservation.LeadID, reservation.Status, reservation.Notes,
+		reservation.ClienteID, reservation.QuantitySlabsReserved, reservation.Status, reservation.Notes,
 		reservation.ExpiresAt,
 	).Scan(&reservation.CreatedAt)
 
@@ -39,7 +39,7 @@ func (r *reservationRepository) Create(ctx context.Context, tx *sql.Tx, reservat
 
 func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
 		       expires_at, created_at, is_active
 		FROM reservations
 		WHERE id = $1
@@ -47,8 +47,8 @@ func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entit
 
 	res := &entity.Reservation{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&res.ID, &res.BatchID, &res.ReservedByUserID, &res.LeadID,
-		&res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+		&res.ID, &res.BatchID, &res.ReservedByUserID, &res.ClienteID,
+		&res.QuantitySlabsReserved, &res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
 	)
 
 	if err == sql.ErrNoRows {
@@ -63,7 +63,7 @@ func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entit
 
 func (r *reservationRepository) FindByBatchID(ctx context.Context, batchID string) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
 		       expires_at, created_at, is_active
 		FROM reservations
 		WHERE batch_id = $1
@@ -81,7 +81,7 @@ func (r *reservationRepository) FindByBatchID(ctx context.Context, batchID strin
 
 func (r *reservationRepository) FindActive(ctx context.Context, userID string) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
 		       expires_at, created_at, is_active
 		FROM reservations
 		WHERE reserved_by_user_id = $1 
@@ -102,7 +102,7 @@ func (r *reservationRepository) FindActive(ctx context.Context, userID string) (
 
 func (r *reservationRepository) FindExpired(ctx context.Context) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
 		       expires_at, created_at, is_active
 		FROM reservations
 		WHERE status = 'ATIVA'
@@ -211,7 +211,7 @@ func (r *reservationRepository) Cancel(ctx context.Context, tx *sql.Tx, id strin
 
 func (r *reservationRepository) List(ctx context.Context, filters entity.ReservationFilters) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, lead_id, status, notes,
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
 		       expires_at, created_at, is_active
 		FROM reservations
 		WHERE 1=1
@@ -254,8 +254,8 @@ func (r *reservationRepository) scanReservations(rows *sql.Rows) ([]entity.Reser
 	for rows.Next() {
 		var res entity.Reservation
 		if err := rows.Scan(
-			&res.ID, &res.BatchID, &res.ReservedByUserID, &res.LeadID,
-			&res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+			&res.ID, &res.BatchID, &res.ReservedByUserID, &res.ClienteID,
+			&res.QuantitySlabsReserved, &res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}

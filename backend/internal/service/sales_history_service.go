@@ -13,7 +13,7 @@ type salesHistoryService struct {
 	salesRepo   repository.SalesHistoryRepository
 	batchRepo   repository.BatchRepository
 	userRepo    repository.UserRepository
-	leadRepo    repository.LeadRepository
+	clienteRepo repository.ClienteRepository
 	logger      *zap.Logger
 }
 
@@ -21,15 +21,15 @@ func NewSalesHistoryService(
 	salesRepo repository.SalesHistoryRepository,
 	batchRepo repository.BatchRepository,
 	userRepo repository.UserRepository,
-	leadRepo repository.LeadRepository,
+	clienteRepo repository.ClienteRepository,
 	logger *zap.Logger,
 ) *salesHistoryService {
 	return &salesHistoryService{
-		salesRepo: salesRepo,
-		batchRepo: batchRepo,
-		userRepo:  userRepo,
-		leadRepo:  leadRepo,
-		logger:    logger,
+		salesRepo:   salesRepo,
+		batchRepo:   batchRepo,
+		userRepo:    userRepo,
+		clienteRepo: clienteRepo,
+		logger:      logger,
 	}
 }
 
@@ -70,9 +70,9 @@ func (s *salesHistoryService) RegisterSale(ctx context.Context, input entity.Cre
 		return nil, domainErrors.ValidationError("Vendedor inativo")
 	}
 
-	// Validar lead (se fornecido)
-	if input.LeadID != nil {
-		_, err := s.leadRepo.FindByID(ctx, *input.LeadID)
+	// Validar cliente (se fornecido)
+	if input.ClienteID != nil {
+		_, err := s.clienteRepo.FindByID(ctx, *input.ClienteID)
 		if err != nil {
 			return nil, err
 		}
@@ -94,7 +94,7 @@ func (s *salesHistoryService) RegisterSale(ctx context.Context, input entity.Cre
 		BatchID:          input.BatchID,
 		SoldByUserID:     input.SoldByUserID,
 		IndustryID:       input.IndustryID,
-		LeadID:           input.LeadID,
+		ClienteID:        input.ClienteID,
 		CustomerName:     input.CustomerName,
 		CustomerContact:  input.CustomerContact,
 		SalePrice:        input.SalePrice,
@@ -212,16 +212,16 @@ func (s *salesHistoryService) populateSaleData(ctx context.Context, sale *entity
 		sale.SoldBy = seller
 	}
 
-	// Buscar lead (se houver)
-	if sale.LeadID != nil {
-		lead, err := s.leadRepo.FindByID(ctx, *sale.LeadID)
+	// Buscar cliente (se houver)
+	if sale.ClienteID != nil {
+		cliente, err := s.clienteRepo.FindByID(ctx, *sale.ClienteID)
 		if err != nil {
-			// Não retornar erro se lead não encontrado
-			s.logger.Warn("lead não encontrado",
-				zap.String("leadId", *sale.LeadID),
+			// Não retornar erro se cliente não encontrado
+			s.logger.Warn("cliente não encontrado",
+				zap.String("clienteId", *sale.ClienteID),
 			)
 		} else {
-			sale.Lead = lead
+			sale.Cliente = cliente
 		}
 	}
 

@@ -63,7 +63,7 @@ export const salesLinkSchema = z
     }
   );
 
-export const leadCaptureSchema = z.object({
+export const clienteCaptureSchema = z.object({
   name: z
     .string()
     .min(1, 'Nome é obrigatório')
@@ -108,6 +108,6 @@ export const validateSlugSchema = z.object({
 });
 
 export type SalesLinkInput = z.infer<typeof salesLinkSchema>;
-export type LeadCaptureInput = z.infer<typeof leadCaptureSchema>;
+export type ClienteCaptureInput = z.infer<typeof clienteCaptureSchema>;
 export type LinkFilter = z.infer<typeof linkFilterSchema>;
 export type ValidateSlugInput = z.infer<typeof validateSlugSchema>;

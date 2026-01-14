@@ -11,9 +11,9 @@ import (
 	"go.uber.org/zap"
 )
 
-type leadService struct {
-	leadRepo        repository.LeadRepository
-	interactionRepo repository.LeadInteractionRepository
+type clienteService struct {
+	clienteRepo     repository.ClienteRepository
+	interactionRepo repository.ClienteInteractionRepository
 	linkRepo        repository.SalesLinkRepository
 	db              DatabaseExecutor
 	logger          *zap.Logger
@@ -24,15 +24,15 @@ type DatabaseExecutor interface {
 	ExecuteInTx(ctx context.Context, fn func(tx interface{}) error) error
 }
 
-func NewLeadService(
-	leadRepo repository.LeadRepository,
-	interactionRepo repository.LeadInteractionRepository,
+func NewClienteService(
+	clienteRepo repository.ClienteRepository,
+	interactionRepo repository.ClienteInteractionRepository,
 	linkRepo repository.SalesLinkRepository,
 	db DatabaseExecutor,
 	logger *zap.Logger,
-) *leadService {
-	return &leadService{
-		leadRepo:        leadRepo,
+) *clienteService {
+	return &clienteService{
+		clienteRepo:     clienteRepo,
 		interactionRepo: interactionRepo,
 		linkRepo:        linkRepo,
 		db:              db,
@@ -40,7 +40,7 @@ func NewLeadService(
 	}
 }
 
-func (s *leadService) CaptureInterest(ctx context.Context, input entity.CreateLeadInput) error {
+func (s *clienteService) CaptureInterest(ctx context.Context, input entity.CreateClienteInput) error {
 	// Validar que link de venda existe
 	link, err := s.linkRepo.FindBySlug(ctx, input.SalesLinkID)
 	if err != nil {
@@ -56,51 +56,51 @@ func (s *leadService) CaptureInterest(ctx context.Context, input entity.CreateLe
 		return domainErrors.NewNotFoundError("Link de venda")
 	}
 
-	// Verificar se lead já existe por contato
-	existingLead, err := s.leadRepo.FindByContact(ctx, input.Contact)
+	// Verificar se cliente já existe por contato
+	existingCliente, err := s.clienteRepo.FindByContact(ctx, input.Contact)
 	if err != nil && !isNotFoundError(err) {
-		s.logger.Error("erro ao buscar lead por contato", zap.Error(err))
+		s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
 		return domainErrors.InternalError(err)
 	}
 
 	// Executar em transação
 	return s.db.ExecuteInTx(ctx, func(tx interface{}) error {
-		var leadID string
+		var clienteID string
 
-		if existingLead != nil {
-			// Lead já existe, apenas atualizar última interação
-			leadID = existingLead.ID
-			if err := s.leadRepo.UpdateLastInteraction(ctx, nil, leadID); err != nil {
+		if existingCliente != nil {
+			// Cliente já existe, apenas atualizar última interação
+			clienteID = existingCliente.ID
+			if err := s.clienteRepo.UpdateLastInteraction(ctx, nil, clienteID); err != nil {
 				return err
 			}
-			s.logger.Info("lead existente atualizado", zap.String("leadId", leadID))
+			s.logger.Info("cliente existente atualizado", zap.String("clienteId", clienteID))
 		} else {
-			// Criar novo lead
-			lead := &entity.Lead{
+			// Criar novo cliente
+			cliente := &entity.Cliente{
 				ID:             uuid.New().String(),
 				SalesLinkID:    link.ID,
 				Name:           input.Name,
 				Contact:        input.Contact,
 				Message:        input.Message,
 				MarketingOptIn: input.MarketingOptIn,
-				Status:         entity.LeadStatusNovo,
+				Status:         entity.ClienteStatusNovo,
 				CreatedAt:      time.Now(),
 				UpdatedAt:      time.Now(),
 			}
 
-			if err := s.leadRepo.Create(ctx, nil, lead); err != nil {
-				s.logger.Error("erro ao criar lead", zap.Error(err))
+			if err := s.clienteRepo.Create(ctx, nil, cliente); err != nil {
+				s.logger.Error("erro ao criar cliente", zap.Error(err))
 				return err
 			}
 
-			leadID = lead.ID
-			s.logger.Info("novo lead criado", zap.String("leadId", leadID))
+			clienteID = cliente.ID
+			s.logger.Info("novo cliente criado", zap.String("clienteId", clienteID))
 		}
 
 		// Criar interação
-		interaction := &entity.LeadInteraction{
+		interaction := &entity.ClienteInteraction{
 			ID:              uuid.New().String(),
-			LeadID:          leadID,
+			ClienteID:       clienteID,
 			SalesLinkID:     link.ID,
 			Message:         input.Message,
 			InteractionType: s.determineInteractionType(link.LinkType),
@@ -121,7 +121,7 @@ func (s *leadService) CaptureInterest(ctx context.Context, input entity.CreateLe
 		}
 
 		s.logger.Info("interação criada com sucesso",
-			zap.String("leadId", leadID),
+			zap.String("clienteId", clienteID),
 			zap.String("linkId", link.ID),
 		)
 
@@ -129,95 +129,95 @@ func (s *leadService) CaptureInterest(ctx context.Context, input entity.CreateLe
 	})
 }
 
-func (s *leadService) GetByID(ctx context.Context, id string) (*entity.Lead, error) {
-	lead, err := s.leadRepo.FindByID(ctx, id)
+func (s *clienteService) GetByID(ctx context.Context, id string) (*entity.Cliente, error) {
+	cliente, err := s.clienteRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
 	// Buscar link de venda relacionado
-	if lead.SalesLinkID != "" {
-		link, err := s.linkRepo.FindByID(ctx, lead.SalesLinkID)
+	if cliente.SalesLinkID != "" {
+		link, err := s.linkRepo.FindByID(ctx, cliente.SalesLinkID)
 		if err != nil {
-			s.logger.Warn("erro ao buscar link do lead",
-				zap.String("leadId", id),
-				zap.String("linkId", lead.SalesLinkID),
+			s.logger.Warn("erro ao buscar link do cliente",
+				zap.String("clienteId", id),
+				zap.String("linkId", cliente.SalesLinkID),
 				zap.Error(err),
 			)
 		} else {
-			lead.SalesLink = link
+			cliente.SalesLink = link
 		}
 	}
 
-	return lead, nil
+	return cliente, nil
 }
 
-func (s *leadService) List(ctx context.Context, filters entity.LeadFilters) (*entity.LeadListResponse, error) {
-	leads, total, err := s.leadRepo.List(ctx, filters)
+func (s *clienteService) List(ctx context.Context, filters entity.ClienteFilters) (*entity.ClienteListResponse, error) {
+	clientes, total, err := s.clienteRepo.List(ctx, filters)
 	if err != nil {
-		s.logger.Error("erro ao listar leads", zap.Error(err))
+		s.logger.Error("erro ao listar clientes", zap.Error(err))
 		return nil, err
 	}
 
-	// Buscar dados relacionados para cada lead
-	for i := range leads {
-		if leads[i].SalesLinkID != "" {
-			link, err := s.linkRepo.FindByID(ctx, leads[i].SalesLinkID)
+	// Buscar dados relacionados para cada cliente
+	for i := range clientes {
+		if clientes[i].SalesLinkID != "" {
+			link, err := s.linkRepo.FindByID(ctx, clientes[i].SalesLinkID)
 			if err != nil {
-				s.logger.Warn("erro ao buscar link do lead",
-					zap.String("leadId", leads[i].ID),
+				s.logger.Warn("erro ao buscar link do cliente",
+					zap.String("clienteId", clientes[i].ID),
 					zap.Error(err),
 				)
 			} else {
-				leads[i].SalesLink = link
+				clientes[i].SalesLink = link
 			}
 		}
 	}
 
-	return &entity.LeadListResponse{
-		Leads: leads,
-		Total: total,
-		Page:  filters.Page,
+	return &entity.ClienteListResponse{
+		Clientes: clientes,
+		Total:    total,
+		Page:     filters.Page,
 	}, nil
 }
 
-func (s *leadService) UpdateStatus(ctx context.Context, id string, status entity.LeadStatus) (*entity.Lead, error) {
+func (s *clienteService) UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) (*entity.Cliente, error) {
 	// Validar status
 	if !status.IsValid() {
 		return nil, domainErrors.ValidationError("Status inválido")
 	}
 
 	// Atualizar status
-	if err := s.leadRepo.UpdateStatus(ctx, id, status); err != nil {
-		s.logger.Error("erro ao atualizar status do lead",
-			zap.String("leadId", id),
+	if err := s.clienteRepo.UpdateStatus(ctx, id, status); err != nil {
+		s.logger.Error("erro ao atualizar status do cliente",
+			zap.String("clienteId", id),
 			zap.String("status", string(status)),
 			zap.Error(err),
 		)
 		return nil, err
 	}
 
-	s.logger.Info("status do lead atualizado",
-		zap.String("leadId", id),
+	s.logger.Info("status do cliente atualizado",
+		zap.String("clienteId", id),
 		zap.String("status", string(status)),
 	)
 
-	// Retornar lead atualizado
+	// Retornar cliente atualizado
 	return s.GetByID(ctx, id)
 }
 
-func (s *leadService) GetInteractions(ctx context.Context, leadID string) ([]entity.LeadInteraction, error) {
-	// Verificar se lead existe
-	_, err := s.leadRepo.FindByID(ctx, leadID)
+func (s *clienteService) GetInteractions(ctx context.Context, clienteID string) ([]entity.ClienteInteraction, error) {
+	// Verificar se cliente existe
+	_, err := s.clienteRepo.FindByID(ctx, clienteID)
 	if err != nil {
 		return nil, err
 	}
 
 	// Buscar interações
-	interactions, err := s.interactionRepo.FindByLeadID(ctx, leadID)
+	interactions, err := s.interactionRepo.FindByClienteID(ctx, clienteID)
 	if err != nil {
-		s.logger.Error("erro ao buscar interações do lead",
-			zap.String("leadId", leadID),
+		s.logger.Error("erro ao buscar interações do cliente",
+			zap.String("clienteId", clienteID),
 			zap.Error(err),
 		)
 		return nil, err
@@ -227,7 +227,7 @@ func (s *leadService) GetInteractions(ctx context.Context, leadID string) ([]ent
 }
 
 // determineInteractionType determina o tipo de interação baseado no tipo de link
-func (s *leadService) determineInteractionType(linkType entity.LinkType) entity.InteractionType {
+func (s *clienteService) determineInteractionType(linkType entity.LinkType) entity.InteractionType {
 	switch linkType {
 	case entity.LinkTypeLoteUnico:
 		return entity.InteractionInteresseLote

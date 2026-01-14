@@ -21,16 +21,18 @@ func NewSalesHistoryRepository(db *DB) *salesHistoryRepository {
 func (r *salesHistoryRepository) Create(ctx context.Context, tx *sql.Tx, sale *entity.Sale) error {
 	query := `
 		INSERT INTO sales_history (
-			id, batch_id, sold_by_user_id, industry_id, lead_id,
-			customer_name, customer_contact, sale_price, broker_commission,
+			id, batch_id, sold_by_user_id, industry_id, cliente_id,
+			customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
+			price_per_unit, price_unit, sale_price, broker_commission,
 			net_industry_value, invoice_url, notes, sold_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		RETURNING created_at
 	`
 
 	err := tx.QueryRowContext(ctx, query,
-		sale.ID, sale.BatchID, sale.SoldByUserID, sale.IndustryID, sale.LeadID,
-		sale.CustomerName, sale.CustomerContact, sale.SalePrice,
+		sale.ID, sale.BatchID, sale.SoldByUserID, sale.IndustryID, sale.ClienteID,
+		sale.CustomerName, sale.CustomerContact, sale.QuantitySlabsSold, sale.TotalAreaSold,
+		sale.PricePerUnit, sale.PriceUnit, sale.SalePrice,
 		sale.BrokerCommission, sale.NetIndustryValue, sale.InvoiceURL,
 		sale.Notes, sale.SaleDate,
 	).Scan(&sale.CreatedAt)
@@ -44,8 +46,9 @@ func (r *salesHistoryRepository) Create(ctx context.Context, tx *sql.Tx, sale *e
 
 func (r *salesHistoryRepository) FindByID(ctx context.Context, id string) (*entity.Sale, error) {
 	query := `
-		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
-		       customer_name, customer_contact, sale_price, broker_commission,
+		SELECT id, batch_id, sold_by_user_id, industry_id, cliente_id,
+		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
+		       price_per_unit, price_unit, sale_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE id = $1
@@ -53,8 +56,9 @@ func (r *salesHistoryRepository) FindByID(ctx context.Context, id string) (*enti
 
 	sale := &entity.Sale{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&sale.ID, &sale.BatchID, &sale.SoldByUserID, &sale.IndustryID, &sale.LeadID,
-		&sale.CustomerName, &sale.CustomerContact, &sale.SalePrice,
+		&sale.ID, &sale.BatchID, &sale.SoldByUserID, &sale.IndustryID, &sale.ClienteID,
+		&sale.CustomerName, &sale.CustomerContact, &sale.QuantitySlabsSold, &sale.TotalAreaSold,
+		&sale.PricePerUnit, &sale.PriceUnit, &sale.SalePrice,
 		&sale.BrokerCommission, &sale.NetIndustryValue, &sale.InvoiceURL,
 		&sale.Notes, &sale.SaleDate, &sale.CreatedAt,
 	)
@@ -79,8 +83,9 @@ func (r *salesHistoryRepository) FindByIndustryID(ctx context.Context, industryI
 
 func (r *salesHistoryRepository) FindByBrokerID(ctx context.Context, brokerID string, limit int) ([]entity.Sale, error) {
 	query := `
-		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
-		       customer_name, customer_contact, sale_price, broker_commission,
+		SELECT id, batch_id, sold_by_user_id, industry_id, cliente_id,
+		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
+		       price_per_unit, price_unit, sale_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE sold_by_user_id = $1
@@ -99,8 +104,9 @@ func (r *salesHistoryRepository) FindByBrokerID(ctx context.Context, brokerID st
 
 func (r *salesHistoryRepository) FindByPeriod(ctx context.Context, industryID string, startDate, endDate time.Time) ([]entity.Sale, error) {
 	query := `
-		SELECT id, batch_id, sold_by_user_id, industry_id, lead_id,
-		       customer_name, customer_contact, sale_price, broker_commission,
+		SELECT id, batch_id, sold_by_user_id, industry_id, cliente_id,
+		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
+		       price_per_unit, price_unit, sale_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE industry_id = $1 
@@ -126,8 +132,9 @@ func (r *salesHistoryRepository) listWithFilters(ctx context.Context, sellerID, 
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := psql.Select(
-		"id", "batch_id", "sold_by_user_id", "industry_id", "lead_id",
-		"customer_name", "customer_contact", "sale_price", "broker_commission",
+		"id", "batch_id", "sold_by_user_id", "industry_id", "cliente_id",
+		"customer_name", "customer_contact", "quantity_slabs_sold", "total_area_sold",
+		"price_per_unit", "price_unit", "sale_price", "broker_commission",
 		"net_industry_value", "invoice_url", "notes", "sold_at", "created_at",
 	).From("sales_history")
 
@@ -299,8 +306,9 @@ func (r *salesHistoryRepository) scanSales(rows *sql.Rows) ([]entity.Sale, error
 	for rows.Next() {
 		var s entity.Sale
 		if err := rows.Scan(
-			&s.ID, &s.BatchID, &s.SoldByUserID, &s.IndustryID, &s.LeadID,
-			&s.CustomerName, &s.CustomerContact, &s.SalePrice,
+			&s.ID, &s.BatchID, &s.SoldByUserID, &s.IndustryID, &s.ClienteID,
+			&s.CustomerName, &s.CustomerContact, &s.QuantitySlabsSold, &s.TotalAreaSold,
+			&s.PricePerUnit, &s.PriceUnit, &s.SalePrice,
 			&s.BrokerCommission, &s.NetIndustryValue, &s.InvoiceURL,
 			&s.Notes, &s.SaleDate, &s.CreatedAt,
 		); err != nil {

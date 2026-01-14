@@ -41,6 +41,7 @@ func NewBatchHandler(
 // @Param productId query string false "Filtrar por produto"
 // @Param status query string false "Filtrar por status"
 // @Param code query string false "Buscar por código"
+// @Param onlyWithAvailable query bool false "Apenas lotes com chapas disponíveis"
 // @Param page query int false "Número da página"
 // @Param limit query int false "Itens por página"
 // @Success 200 {object} entity.BatchListResponse
@@ -72,6 +73,10 @@ func (h *BatchHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	if code := r.URL.Query().Get("code"); code != "" {
 		filters.Code = &code
+	}
+
+	if onlyWithAvailable := r.URL.Query().Get("onlyWithAvailable"); onlyWithAvailable == "true" {
+		filters.OnlyWithAvailable = true
 	}
 
 	if page := r.URL.Query().Get("page"); page != "" {
@@ -314,4 +319,58 @@ func (h *BatchHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	)
 
 	response.OK(w, batch)
+}
+
+// CheckAvailability godoc
+// @Summary Verifica disponibilidade de chapas
+// @Description Verifica se o lote possui quantidade específica de chapas disponíveis
+// @Tags batches
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Param quantity query int true "Quantidade de chapas desejada"
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id}/check-availability [get]
+func (h *BatchHandler) CheckAvailability(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	// Obter quantidade desejada (opcional)
+	quantity := 1
+	if q := r.URL.Query().Get("quantity"); q != "" {
+		if parsed, err := strconv.Atoi(q); err == nil && parsed > 0 {
+			quantity = parsed
+		}
+	}
+
+	// Verificar disponibilidade
+	available, err := h.batchService.CheckAvailabilityForQuantity(r.Context(), id, quantity)
+	if err != nil {
+		h.logger.Error("erro ao verificar disponibilidade do lote",
+			zap.String("id", id),
+			zap.Int("quantity", quantity),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	// Obter informações do lote para retornar detalhes
+	batch, err := h.batchService.GetByID(r.Context(), id)
+	if err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, map[string]interface{}{
+		"batchId":           id,
+		"requestedQuantity": quantity,
+		"available":         available,
+		"availableSlabs":    batch.AvailableSlabs,
+		"totalSlabs":        batch.QuantitySlabs,
+	})
 }

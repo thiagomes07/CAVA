@@ -200,6 +200,16 @@ func ReservationExpiredError() *AppError {
 	}
 }
 
+// InsufficientSlabsError indica que não há chapas suficientes para a operação
+func InsufficientSlabsError(requested, available int) *AppError {
+	return &AppError{
+		Code:       "INSUFFICIENT_SLABS",
+		Message:    fmt.Sprintf("Quantidade de chapas insuficiente: solicitado %d, disponível %d", requested, available),
+		Details:    map[string]interface{}{"requested": requested, "available": available},
+		StatusCode: http.StatusBadRequest,
+	}
+}
+
 // InvalidPriceError indica que o preço é inválido
 func InvalidPriceError(message string) *AppError {
 	return &AppError{

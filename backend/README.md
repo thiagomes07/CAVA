@@ -2,7 +2,7 @@
 
 ## 1. Visão Geral
 
-CAVA é um sistema B2B de gestão de estoque de rochas ornamentais que conecta indústrias a vendedores internos e brokers externos. O backend Go fornece uma API REST para gerenciar catálogo de produtos, lotes físicos de estoque, compartilhamento B2B de inventário, criação de links de venda públicos, captura de leads e histórico de vendas. O sistema implementa autenticação baseada em JWT com refresh tokens, controle de acesso por roles (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER), proteção CSRF, rate limiting e integração com storage S3-compatible para upload de mídias.
+CAVA é um sistema B2B de gestão de estoque de rochas ornamentais que conecta indústrias a vendedores internos e brokers externos. O backend Go fornece uma API REST para gerenciar catálogo de produtos, lotes físicos de estoque, compartilhamento B2B de inventário, criação de links de venda públicos, captura de clientes e histórico de vendas. O sistema implementa autenticação baseada em JWT com refresh tokens, controle de acesso por roles (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER), proteção CSRF, rate limiting e integração com storage S3-compatible para upload de mídias.
 
 ---
 
@@ -84,7 +84,7 @@ Clears authentication cookies.
   monthlySales: number
   reservedBatches: number
   activeLinks?: number
-  leadsCount?: number
+  clientesCount?: number
 }
 ```
 **Status**: 200
@@ -226,6 +226,15 @@ Soft delete (sets isActive to false).
 
 ## Batches (Inventory)
 
+### Slab-Based Inventory Management
+
+Each batch contains multiple individual slabs that can be reserved and sold separately. The system tracks:
+- `quantitySlabs`: Total number of slabs in the batch
+- `availableSlabs`: Number of slabs currently available for reservation
+- `priceUnit`: Price unit for the batch (M2 or FT2)
+
+**Price Unit Conversion**: 1 m² = 10.76391042 ft²
+
 ### `GET /api/batches`
 **Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO)  
 **Query Params**:
@@ -234,6 +243,7 @@ Soft delete (sets isActive to false).
   productId?: string
   status?: 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO' | ''
   code?: string // search by batch code
+  onlyWithAvailable?: boolean // filter only batches with available slabs
   page?: number // default: 1
   limit?: number // default: 50, max: 100
 }
@@ -255,9 +265,11 @@ interface Batch {
   height: number // cm, positive, max: 1000
   width: number // cm, positive, max: 1000
   thickness: number // cm, positive, max: 100
-  quantitySlabs: number // integer, positive
+  quantitySlabs: number // integer, positive - total slabs
+  availableSlabs: number // integer - slabs available for reservation
   totalArea: number // calculated: m²
-  industryPrice: number // positive
+  industryPrice: number // positive - price per area unit
+  priceUnit: 'M2' | 'FT2' // area unit for pricing
   originQuarry?: string // max: 100
   entryDate: string // ISO date, cannot be future
   status: BatchStatus
@@ -294,18 +306,51 @@ Used to verify availability before reservation.
 
 ---
 
+### `GET /api/batches/:id/check-availability`
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER)  
+**Query Params**:
+```typescript
+{
+  quantity?: number // number of slabs to check (default: 1)
+}
+```
+**Response**:
+```typescript
+{
+  batchId: string
+  requestedQuantity: number
+  available: boolean
+  availableSlabs: number
+  totalSlabs: number
+}
+```
+**Status**: 200, 404
+
+Used to verify if specific quantity of slabs is available.
+
+---
+
 ### `POST /api/batches`
 **Auth**: Required (ADMIN_INDUSTRIA)  
 **Body**:
 ```typescript
 {
-  productId: string
+  productId?: string // required if newProduct not provided
+  newProduct?: { // inline product creation
+    name: string
+    sku?: string
+    material: MaterialType
+    finish: FinishType
+    description?: string
+    isPublic?: boolean
+  }
   batchCode: string // format: AAA-999999, auto-uppercase
   height: number // positive, max: 1000
   width: number // positive, max: 1000
   thickness: number // positive, max: 100
   quantitySlabs: number // integer, positive
-  industryPrice: number // positive
+  industryPrice: number // positive - price per area unit
+  priceUnit?: 'M2' | 'FT2' // default: M2
   originQuarry?: string // max: 100
   entryDate: string // ISO date, not future
   medias?: File[] // handled via separate upload
@@ -316,6 +361,8 @@ Used to verify availability before reservation.
 Batch
 ```
 **Status**: 201, 400
+
+**Note**: When creating a batch, `availableSlabs` is automatically set equal to `quantitySlabs`.
 
 ---
 
@@ -348,15 +395,23 @@ Batch
 
 ## Reservations
 
+### Slab-Based Reservations
+
+Reservations now reserve a specific number of slabs from a batch, not the entire batch. This allows:
+- Partial reservations (reserve 3 of 10 slabs)
+- Multiple reservations on the same batch
+- Partial sales (sell 2 of 3 reserved slabs, return 1)
+
 ### `POST /api/reservations`
 **Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER)  
 **Body**:
 ```typescript
 {
   batchId: string
-  leadId?: string
-  customerName?: string // min: 2, optional if leadId provided
-  customerContact?: string // optional if leadId provided
+  quantitySlabsReserved: number // required, must be > 0 and <= availableSlabs
+  clienteId?: string
+  customerName?: string // min: 2, optional if clienteId provided
+  customerContact?: string // optional if clienteId provided
   expiresAt: string // ISO date, must be future, default: +7 days
   notes?: string // max: 500
 }
@@ -369,20 +424,64 @@ Reservation
 interface Reservation {
   id: string
   batchId: string
-  leadId?: string
+  clienteId?: string
   reservedByUserId: string
+  quantitySlabsReserved: number // number of slabs in this reservation
   expiresAt: string
   notes?: string
   isActive: boolean
   createdAt: string
   batch?: Batch
-  lead?: Lead
+  cliente?: Cliente
   reservedBy?: User
 }
 ```
-**Status**: 201, 400 (batch not available), 404
+**Status**: 201, 400 (insufficient slabs available), 404
 
-Updates batch status to RESERVADO.
+**Behavior**:
+- Decrements `batch.availableSlabs` by `quantitySlabsReserved`
+- Sets batch status to RESERVADO only if ALL slabs are reserved
+
+---
+
+### `POST /api/reservations/:id/confirm-sale`
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER)  
+**Body**:
+```typescript
+{
+  quantitySlabsSold: number // required, must be > 0 and <= quantitySlabsReserved
+  customerName: string
+  customerContact: string
+  salePrice: number // total sale price
+  brokerCommission?: number
+  invoiceUrl?: string
+  notes?: string
+}
+```
+**Response**:
+```typescript
+Sale
+```
+**Status**: 200, 400, 404
+
+**Behavior**:
+- If selling fewer slabs than reserved, returns unsold slabs to `batch.availableSlabs`
+- Sets batch status to VENDIDO only if ALL slabs are sold (availableSlabs = 0)
+- Calculates `totalAreaSold` based on slab dimensions × quantity
+
+---
+
+### `DELETE /api/reservations/:id`
+**Auth**: Required (ADMIN_INDUSTRIA, VENDEDOR_INTERNO, BROKER)  
+**Response**:
+```typescript
+{ success: true }
+```
+**Status**: 200, 404
+
+**Behavior**:
+- Returns all reserved slabs to `batch.availableSlabs`
+- Sets batch status back to DISPONIVEL if it was RESERVADO
 
 ---
 
@@ -609,7 +708,7 @@ interface SalesLink {
   productId?: string
   title?: string // max: 100
   customMessage?: string // max: 500
-  slugToken: string // min: 3, max: 50, lowercase, no leading/trailing hyphens
+  slugToken: string // min: 3, max: 50, lowercase, no clienteing/trailing hyphens
   displayPrice?: number // positive
   showPrice: boolean
   viewsCount: number
@@ -720,7 +819,7 @@ Increments viewsCount on each request.
 
 ---
 
-### `POST /api/public/leads/interest`
+### `POST /api/public/clientes/interest`
 **Auth**: Public  
 **Body**:
 ```typescript
@@ -742,9 +841,9 @@ Increments viewsCount on each request.
 
 ---
 
-## Leads
+## Clientes
 
-### `GET /api/leads`
+### `GET /api/clientes`
 **Auth**: Required  
 **Query Params**:
 ```typescript
@@ -762,13 +861,13 @@ Increments viewsCount on each request.
 **Response**:
 ```typescript
 {
-  leads: Lead[]
+  clientes: Cliente[]
   total: number
   page: number
 }
 ```
 ```typescript
-interface Lead {
+interface Cliente {
   id: string
   salesLinkId: string
   name: string
@@ -785,17 +884,17 @@ interface Lead {
 
 ---
 
-### `GET /api/leads/:id`
+### `GET /api/clientes/:id`
 **Auth**: Required  
 **Response**:
 ```typescript
-Lead
+Cliente
 ```
 **Status**: 200, 404
 
 ---
 
-### `GET /api/leads/:id/interactions`
+### `GET /api/clientes/:id/interactions`
 **Auth**: Required  
 **Response**:
 ```typescript
@@ -805,7 +904,7 @@ unknown[] // interaction history
 
 ---
 
-### `PATCH /api/leads/:id/status`
+### `PATCH /api/clientes/:id/status`
 **Auth**: Required  
 **Body**:
 ```typescript
@@ -815,7 +914,7 @@ unknown[] // interaction history
 ```
 **Response**:
 ```typescript
-Lead
+Cliente
 ```
 **Status**: 200, 404, 400
 
@@ -848,7 +947,7 @@ interface Sale {
   id: string
   batchId: string
   soldByUserId: string
-  leadId?: string
+  clienteId?: string
   customerName: string
   customerContact: string
   salePrice: number
@@ -860,7 +959,7 @@ interface Sale {
   createdAt: string
   batch?: Batch
   soldBy?: User
-  lead?: Lead
+  cliente?: Cliente
 }
 ```
 **Status**: 200
@@ -1008,11 +1107,16 @@ type UserRole = 'ADMIN_INDUSTRIA' | 'BROKER' | 'VENDEDOR_INTERNO'
 
 type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO'
 
+type PriceUnit = 'M2' | 'FT2' // M2 = meters squared, FT2 = feet squared
+
 type MaterialType = 'GRANITO' | 'MARMORE' | 'QUARTZITO' | 'LIMESTONE' | 'TRAVERTINO' | 'OUTROS'
 
 type FinishType = 'POLIDO' | 'LEVIGADO' | 'BRUTO' | 'APICOADO' | 'FLAMEADO'
 
 type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO'
+
+// Conversion factor: 1 m² = 10.76391042 ft²
+const M2_TO_FT2_FACTOR = 10.76391042
 
 interface User {
   id: string
@@ -1032,6 +1136,29 @@ interface Media {
   displayOrder: number
   isCover: boolean
   createdAt: string
+}
+
+interface Sale {
+  id: string
+  batchId: string
+  soldByUserId: string
+  clienteId?: string
+  customerName: string
+  customerContact: string
+  salePrice: number
+  quantitySlabsSold: number // number of slabs sold
+  totalAreaSold: number // total area in m²
+  pricePerUnit: number // price per area unit
+  priceUnit: PriceUnit // M2 or FT2
+  brokerCommission?: number
+  netIndustryValue: number
+  saleDate: string
+  invoiceUrl?: string
+  notes?: string
+  createdAt: string
+  batch?: Batch
+  soldBy?: User
+  cliente?: Cliente
 }
 ```
 
@@ -1055,8 +1182,8 @@ interface Media {
 
 8. **Role-Based Access**: 
    - `ADMIN_INDUSTRIA`: Full access to industry management
-   - `VENDEDOR_INTERNO`: Access to inventory, links, leads
-   - `BROKER`: Access to shared inventory, links, leads
+   - `VENDEDOR_INTERNO`: Access to inventory, links, clientes
+   - `BROKER`: Access to shared inventory, links, clientes
 
 9. **Optimistic Updates**: Frontend performs optimistic updates for reservations. Backend must validate and may reject.
 
@@ -1239,11 +1366,11 @@ CREATE TABLE sales_links (
 );
 
 -- =============================================
--- 8. CLIENTES, LEADS E INTERAÇÕES
+-- 8. CLIENTES, CLIENTES E INTERAÇÕES
 -- =============================================
 
--- Tabela: Leads (Clientes Potenciais)
-CREATE TABLE leads (
+-- Tabela: Clientes (Clientes Potenciais)
+CREATE TABLE clientes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255), -- Não é unique global pois pode repetir em industrias diferentes, mas idealmente seria
@@ -1254,10 +1381,10 @@ CREATE TABLE leads (
     last_interaction TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Tabela: Interações (O que o lead fez)
-CREATE TABLE lead_interactions (
+-- Tabela: Interações (O que o cliente fez)
+CREATE TABLE cliente_interactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
     sales_link_id UUID NOT NULL REFERENCES sales_links(id) ON DELETE SET NULL,
     
     -- Detalhes do interesse
@@ -1270,11 +1397,11 @@ CREATE TABLE lead_interactions (
 );
 
 -- Tabela: Assinaturas (Quero receber novidades)
-CREATE TABLE lead_subscriptions (
+CREATE TABLE cliente_subscriptions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    lead_id UUID NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+    cliente_id UUID NOT NULL REFERENCES clientes(id) ON DELETE CASCADE,
     product_id UUID REFERENCES products(id) ON DELETE CASCADE, -- Interesse neste tipo
-    linked_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Vendedor dono do lead
+    linked_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Vendedor dono do cliente
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -1287,7 +1414,7 @@ CREATE TABLE reservations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE RESTRICT,
     seller_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    cliente_id UUID REFERENCES clientes(id) ON DELETE SET NULL,
     
     status reservation_status_type DEFAULT 'ATIVA',
     notes TEXT,
@@ -1301,7 +1428,7 @@ CREATE TABLE sales_history (
     batch_id UUID NOT NULL REFERENCES batches(id),
     seller_user_id UUID NOT NULL REFERENCES users(id),
     industry_id UUID NOT NULL REFERENCES industries(id),
-    lead_id UUID REFERENCES leads(id),
+    cliente_id UUID REFERENCES clientes(id),
     
     final_sold_price DECIMAL(12,2) NOT NULL, -- Valor total pago pelo cliente
     industry_net_value DECIMAL(12,2) NOT NULL, -- Valor que fica para a industria
@@ -1712,7 +1839,7 @@ CREATE TABLE sales_history (
 │   │   │   ├── batch.go                    # Structs: Batch, BatchStatus Enum
 │   │   │   ├── shared_inventory.go         # Structs: SharedInventoryBatch, SharedCatalogPermissions
 │   │   │   ├── sales_link.go               # Structs: SalesLink, LinkType Enum
-│   │   │   ├── lead.go                     # Structs: Lead, LeadInteraction, LeadSubscription
+│   │   │   ├── cliente.go                     # Structs: Cliente, ClienteInteraction, ClienteSubscription
 │   │   │   ├── reservation.go              # Structs: Reservation, ReservationStatus Enum
 │   │   │   ├── sale.go                     # Structs: Sale (SalesHistory), Invoice
 │   │   │   └── dashboard.go                # Structs: MetricsDTO, ActivityDTO
@@ -1728,8 +1855,8 @@ CREATE TABLE sales_history (
 │   │   │   ├── media_repository.go
 │   │   │   ├── shared_inventory_repository.go
 │   │   │   ├── sales_link_repository.go
-│   │   │   ├── lead_repository.go
-│   │   │   ├── lead_interaction_repository.go
+│   │   │   ├── cliente_repository.go
+│   │   │   ├── cliente_interaction_repository.go
 │   │   │   ├── reservation_repository.go
 │   │   │   └── sales_history_repository.go
 │   │   │
@@ -1740,7 +1867,7 @@ CREATE TABLE sales_history (
 │   │       ├── batch_service.go
 │   │       ├── shared_inventory_service.go
 │   │       ├── sales_link_service.go
-│   │       ├── lead_service.go
+│   │       ├── cliente_service.go
 │   │       ├── reservation_service.go
 │   │       ├── sales_history_service.go
 │   │       ├── dashboard_service.go
@@ -1755,7 +1882,7 @@ CREATE TABLE sales_history (
 │   │   ├── shared_inventory_handler.go     # Sharing logic, Negotiated Price
 │   │   ├── sales_link_handler.go           # Link creation, Slug validation
 │   │   ├── public_handler.go               # Landing pages (Leitura de links públicos)
-│   │   ├── lead_handler.go                 # Lead capture, Status update
+│   │   ├── cliente_handler.go                 # Cliente capture, Status update
 │   │   ├── reservation_handler.go          # Create Reservation, Confirm Sale
 │   │   ├── sales_history_handler.go        # List sales, Summary
 │   │   ├── dashboard_handler.go            # Admin/Broker Metrics
@@ -1780,8 +1907,8 @@ CREATE TABLE sales_history (
 │   │   ├── media_repository.go
 │   │   ├── shared_inventory_repository.go
 │   │   ├── sales_link_repository.go
-│   │   ├── lead_repository.go
-│   │   ├── lead_interaction_repository.go
+│   │   ├── cliente_repository.go
+│   │   ├── cliente_interaction_repository.go
 │   │   ├── reservation_repository.go
 │   │   └── sales_history_repository.go
 │   │
@@ -1792,7 +1919,7 @@ CREATE TABLE sales_history (
 │   │   ├── batch_service.go                # Area calculation, Validations
 │   │   ├── shared_inventory_service.go     # Sharing rules
 │   │   ├── sales_link_service.go           # Slug generation, Views increment
-│   │   ├── lead_service.go                 # Capture logic, Interaction logging
+│   │   ├── cliente_service.go                 # Capture logic, Interaction logging
 │   │   ├── reservation_service.go          # Transactional reservation, Expiration job
 │   │   ├── sales_history_service.go        # Commission calc, Net value calc
 │   │   ├── dashboard_service.go            # Aggregation queries
@@ -1810,7 +1937,7 @@ CREATE TABLE sales_history (
 │   ├── 000005_create_batch_tables.up.sql
 │   ├── 000006_create_sharing_tables.up.sql
 │   ├── 000007_create_sales_tables.up.sql
-│   ├── 000008_create_lead_tables.up.sql
+│   ├── 000008_create_cliente_tables.up.sql
 │   ├── 000009_create_operational_tables.up.sql # Reservations, SalesHistory
 │   ├── 000010_create_indexes.up.sql
 │   └── 000011_seed_data.up.sql
@@ -1896,18 +2023,18 @@ CREATE TABLE sales_history (
 - Desativar link (soft delete via is_active=false)
 - Listar com paginação e filtros
 
-**LeadRepository**:
-- Criar lead
-- Buscar lead por ID
-- Buscar lead por email (verificar duplicatas)
-- Buscar leads por link de venda
-- Buscar leads com filtros (data, status, optIn)
-- Atualizar status do lead
+**ClienteRepository**:
+- Criar cliente
+- Buscar cliente por ID
+- Buscar cliente por email (verificar duplicatas)
+- Buscar clientes por link de venda
+- Buscar clientes com filtros (data, status, optIn)
+- Atualizar status do cliente
 - Listar com paginação
 
-**LeadInteractionRepository**:
+**ClienteInteractionRepository**:
 - Criar interação
-- Buscar interações por lead
+- Buscar interações por cliente
 - Buscar interações por link de venda
 
 **ReservationRepository**:
@@ -1973,12 +2100,12 @@ CREATE TABLE sales_history (
 - Buscar links com filtros
 - Gerar URL completa do link (base URL + slug)
 
-**LeadService**:
-- Capturar lead de landing page (criar lead e interação)
-- Buscar leads com filtros
-- Atualizar status do lead
-- Buscar interações do lead
-- Associar lead a reserva
+**ClienteService**:
+- Capturar cliente de landing page (criar cliente e interação)
+- Buscar clientes com filtros
+- Atualizar status do cliente
+- Buscar interações do cliente
+- Associar cliente a reserva
 
 **ReservationService**:
 - Criar reserva (verificar disponibilidade, atualizar status do lote, criar reserva - TUDO EM TRANSAÇÃO)
@@ -1994,7 +2121,7 @@ CREATE TABLE sales_history (
 - Buscar vendas do broker (para dashboard broker)
 
 **DashboardService**:
-- Buscar métricas do dashboard admin/vendedor (lotes disponíveis, vendas mensais, lotes reservados, links ativos, leads count)
+- Buscar métricas do dashboard admin/vendedor (lotes disponíveis, vendas mensais, lotes reservados, links ativos, clientes count)
 - Buscar métricas do dashboard broker (lotes disponíveis compartilhados, vendas mensais, links ativos, comissão mensal)
 - Buscar atividades recentes (últimas 10 ações: reserva, venda, compartilhamento, criação)
 
@@ -2136,7 +2263,7 @@ CREATE TABLE sales_history (
 **Quando Usar**:
 - Criar reserva + atualizar status do lote
 - Confirmar venda + criar SalesHistory + atualizar status do lote
-- Criar lead + criar interação
+- Criar cliente + criar interação
 - Qualquer operação que precise manter consistência entre múltiplas tabelas
 
 **Como Implementar**:
@@ -2201,7 +2328,7 @@ CREATE TABLE sales_history (
 - batches(product_id, status, is_active) - para filtrar lotes disponíveis por produto
 - sales_links(slug_token) UNIQUE - para busca rápida de landing page
 - sales_links(created_by_user_id, is_active) - para listar links do usuário
-- leads(sales_link_id, created_at) - para listar leads por link ordenados por data
+- clientes(sales_link_id, created_at) - para listar clientes por link ordenados por data
 - reservations(batch_id, status, expires_at) - para buscar reservas ativas e expiradas
 - sales_history(industry_id, sale_date) - para relatórios de vendas por período
 - shared_inventory_batches(broker_user_id, is_active) - para inventário do broker
@@ -2242,8 +2369,8 @@ CREATE TABLE sales_history (
 **ReservationService**:
 - Verificar que lote está disponível (SELECT FOR UPDATE)
 - Verificar que expiresAt é futuro
-- Validar que leadId existe (se fornecido)
-- Se customerName/Contact fornecidos, criar lead automaticamente
+- Validar que clienteId existe (se fornecido)
+- Se customerName/Contact fornecidos, criar cliente automaticamente
 
 **SalesHistoryService**:
 - Validar que finalSoldPrice >= industryNetValue
@@ -2272,10 +2399,10 @@ CREATE TABLE sales_history (
 6. UPDATE reservations SET status = 'CONFIRMADA_VENDA' WHERE id = $1
 7. Commit transação
 
-**Capturar Lead**:
+**Capturar Cliente**:
 1. Iniciar transação (opcional, mas recomendado)
-2. INSERT INTO leads (...) ou SELECT se já existe por email
-3. INSERT INTO lead_interactions (...)
+2. INSERT INTO clientes (...) ou SELECT se já existe por email
+3. INSERT INTO cliente_interactions (...)
 4. Commit transação
 
 ---
@@ -2732,8 +2859,8 @@ Seguir ordem de dependências:
 8. **000008_create_batch_medias**: tabela batch_medias (depende de batches)
 9. **000009_create_shared_inventory**: tabelas de compartilhamento (dependem de users e batches)
 10. **000010_create_sales_links**: tabela sales_links (depende de users, batches, products)
-11. **000011_create_leads**: tabelas de leads (dependem de sales_links)
-12. **000012_create_reservations**: tabela reservations (depende de batches, users, leads)
+11. **000011_create_clientes**: tabelas de clientes (dependem de sales_links)
+12. **000012_create_reservations**: tabela reservations (depende de batches, users, clientes)
 13. **000013_create_sales_history**: tabela sales_history (depende de várias tabelas)
 14. **000014_create_indexes**: índices adicionais para performance
 15. **000015_seed_initial_data**: dados iniciais (opcional)
@@ -2748,7 +2875,7 @@ Além dos índices definidos no DDL base, criar:
 - `CREATE INDEX idx_products_industry_active ON products(industry_id) WHERE deleted_at IS NULL;`
 - `CREATE INDEX idx_batches_product_status ON batches(product_id, status) WHERE is_active = true;`
 - `CREATE INDEX idx_sales_links_created_by ON sales_links(created_by_user_id) WHERE is_active = true;`
-- `CREATE INDEX idx_leads_link_created ON leads(sales_link_id, created_at DESC);`
+- `CREATE INDEX idx_clientes_link_created ON clientes(sales_link_id, created_at DESC);`
 - `CREATE INDEX idx_reservations_expires ON reservations(expires_at) WHERE status = 'ATIVA';`
 - `CREATE INDEX idx_sales_history_date ON sales_history(industry_id, sold_at DESC);`
 - `CREATE INDEX idx_shared_inventory_broker ON shared_inventory_batches(broker_user_id) WHERE is_active = true;`
@@ -3095,7 +3222,7 @@ Backend:
 
 **Requisição**:
 - POST /api/reservations
-- Body: { batchId, leadId?, customerName?, customerContact?, expiresAt, notes? }
+- Body: { batchId, clienteId?, customerName?, customerContact?, expiresAt, notes? }
 - Headers: Authorization, X-CSRF-Token
 
 **Backend**:
@@ -3107,8 +3234,8 @@ Backend:
 
 2. **Service Layer**:
    - Valida regra de negócio:
-     - Se leadId fornecido, verifica que lead existe
-     - Se customerName/Contact fornecidos sem leadId, cria lead automaticamente
+     - Se clienteId fornecido, verifica que cliente existe
+     - Se customerName/Contact fornecidos sem clienteId, cria cliente automaticamente
      - Valida expiresAt é futuro
    - Inicia transação no banco
 
@@ -3191,10 +3318,10 @@ Backend:
 
 ---
 
-### 15.4 Captura de Lead
+### 15.4 Captura de Cliente
 
 **Requisição**:
-- POST /api/public/leads/interest
+- POST /api/public/clientes/interest
 - Body: { salesLinkId, name, contact, message?, marketingOptIn }
 - Sem autenticação (público)
 
@@ -3202,19 +3329,19 @@ Backend:
 
 1. **Handler Layer**:
    - Valida input (name, contact obrigatórios, contact formato email ou phone)
-   - Chama LeadService.CaptureInterest(input)
+   - Chama ClienteService.CaptureInterest(input)
 
 2. **Service Layer**:
    - Valida que salesLinkId existe via SalesLinkRepository.FindByID
    - Se não encontrado → NotFoundError
-   - Verifica se lead já existe por email/phone via LeadRepository.FindByContact(contact)
+   - Verifica se cliente já existe por email/phone via ClienteRepository.FindByContact(contact)
    - Inicia transação
 
 3. **Repository Layer (em transação)**:
-   - Se lead não existe: LeadRepository.Create(lead)
-   - Se lead existe: atualizar last_interaction = NOW()
-   - LeadInteractionRepository.Create(interaction) com:
-     - leadID
+   - Se cliente não existe: ClienteRepository.Create(cliente)
+   - Se cliente existe: atualizar last_interaction = NOW()
+   - ClienteInteractionRepository.Create(interaction) com:
+     - clienteID
      - salesLinkID
      - message (se fornecido)
      - interaction_type: inferir do linkType (INTERESSE_LOTE, INTERESSE_CATALOGO, etc)
@@ -3260,7 +3387,7 @@ Backend:
      - batchID
      - soldByUserID (do contexto)
      - industryID (da reserva/batch)
-     - leadID (da reserva, se houver)
+     - clienteID (da reserva, se houver)
      - finalSoldPrice
      - brokerCommission
      - netIndustryValue
@@ -3363,7 +3490,7 @@ Backend:
      - BatchRepository.CountByStatus(industryID, "RESERVADO") → reservedBatches
      - SalesHistoryRepository.SumMonthlySales(industryID, currentMonth) → monthlySales
      - SalesLinkRepository.CountActive(industryID) → activeLinks
-     - LeadRepository.CountByIndustry(industryID) → leadsCount
+     - ClienteRepository.CountByIndustry(industryID) → clientesCount
    - Aguarda todas as queries completarem (sync.WaitGroup ou channels)
    - Retorna métricas
 

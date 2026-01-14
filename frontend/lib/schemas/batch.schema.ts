@@ -7,8 +7,27 @@ export const batchStatuses = [
   'INATIVO',
 ] as const;
 
+export const priceUnits = ['M2', 'FT2'] as const;
+
 export const batchSchema = z.object({
-  productId: z.string().min(1, 'Produto é obrigatório'),
+  productId: z.string().min(1, 'Produto é obrigatório').optional(),
+  newProduct: z
+    .object({
+      name: z.string().min(1, 'Nome do produto é obrigatório'),
+      sku: z.string().optional(),
+      material: z.enum([
+        'GRANITO',
+        'MARMORE',
+        'QUARTZITO',
+        'LIMESTONE',
+        'TRAVERTINO',
+        'OUTROS',
+      ]),
+      finish: z.enum(['POLIDO', 'LEVIGADO', 'BRUTO', 'APICOADO', 'FLAMEADO']),
+      description: z.string().optional(),
+      isPublic: z.boolean().default(true),
+    })
+    .optional(),
   batchCode: z
     .string()
     .min(1, 'Código do lote é obrigatório')
@@ -34,6 +53,7 @@ export const batchSchema = z.object({
   industryPrice: z
     .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero'),
+  priceUnit: z.enum(priceUnits).default('M2'),
   originQuarry: z
     .string()
     .max(100, 'Nome da pedreira deve ter no máximo 100 caracteres')
@@ -47,19 +67,28 @@ export const batchSchema = z.object({
       today.setHours(0, 0, 0, 0);
       return parsed <= today;
     }, 'Data de entrada não pode ser futura'),
-});
+})
+  .refine((data) => data.productId || data.newProduct, {
+    message: 'Selecione um produto ou crie um novo',
+    path: ['productId'],
+  });
 
 export const batchFilterSchema = z.object({
   productId: z.string().optional(),
   status: z.enum([...batchStatuses, '']).optional(),
   code: z.string().optional(),
+  onlyWithAvailable: z.boolean().optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(50),
 });
 
 export const reservationSchema = z.object({
   batchId: z.string().min(1, 'Lote é obrigatório'),
-  leadId: z.string().optional(),
+  clienteId: z.string().optional(),
+  quantitySlabsReserved: z
+    .number({ message: 'Quantidade deve ser um número' })
+    .int('Quantidade deve ser um número inteiro')
+    .positive('Quantidade deve ser maior que zero'),
   customerName: z
     .string()
     .min(1, 'Nome do cliente é obrigatório')
@@ -87,14 +116,40 @@ export const reservationSchema = z.object({
     .optional(),
 });
 
+export const confirmSaleSchema = z.object({
+  quantitySlabsSold: z
+    .number({ message: 'Quantidade deve ser um número' })
+    .int('Quantidade deve ser um número inteiro')
+    .positive('Quantidade deve ser maior que zero'),
+  customerName: z
+    .string()
+    .min(1, 'Nome do cliente é obrigatório')
+    .min(2, 'Nome deve ter no mínimo 2 caracteres'),
+  customerContact: z.string().min(1, 'Contato do cliente é obrigatório'),
+  salePrice: z
+    .number({ message: 'Preço deve ser um número' })
+    .positive('Preço deve ser maior que zero'),
+  brokerCommission: z
+    .number({ message: 'Comissão deve ser um número' })
+    .min(0, 'Comissão não pode ser negativa')
+    .optional(),
+  invoiceUrl: z.string().url('URL inválida').optional().or(z.literal('')),
+  notes: z
+    .string()
+    .max(500, 'Observações devem ter no máximo 500 caracteres')
+    .optional(),
+});
+
 export const updateBatchPriceSchema = z.object({
   negotiatedPrice: z
     .number({ message: 'Preço deve ser um número' })
     .positive('Preço deve ser maior que zero')
     .optional(),
+  negotiatedPriceUnit: z.enum(priceUnits).optional(),
 });
 
 export type BatchInput = z.infer<typeof batchSchema>;
 export type BatchFilter = z.infer<typeof batchFilterSchema>;
 export type ReservationInput = z.infer<typeof reservationSchema>;
+export type ConfirmSaleInput = z.infer<typeof confirmSaleSchema>;
 export type UpdateBatchPriceInput = z.infer<typeof updateBatchPriceSchema>;

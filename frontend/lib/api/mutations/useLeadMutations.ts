@@ -1,14 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { leadKeys } from '@/lib/api/queries/useLeads';
-import type { Lead } from '@/lib/types';
-import type { LeadCaptureInput } from '@/lib/schemas/link.schema';
+import { clienteKeys } from '@/lib/api/queries/useClientes';
+import type { Cliente } from '@/lib/types';
+import type { ClienteCaptureInput } from '@/lib/schemas/link.schema';
 
-export function useCreateLead() {
+export function useCreateCliente() {
   return useMutation({
-    mutationFn: async (data: LeadCaptureInput & { salesLinkId: string }) => {
+    mutationFn: async (data: ClienteCaptureInput & { salesLinkId: string }) => {
       const response = await apiClient.post<{ success: boolean }>(
-        '/public/leads/interest',
+        '/public/clientes/interest',
         data
       );
       return response;
@@ -16,17 +16,17 @@ export function useCreateLead() {
   });
 }
 
-export function useUpdateLeadStatus() {
+export function useUpdateClienteStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const response = await apiClient.patch<Lead>(`/leads/${id}/status`, { status });
+      const response = await apiClient.patch<Cliente>(`/clientes/${id}/status`, { status });
       return response;
     },
     onSuccess: (_, { id }) => {
-      queryClient.invalidateQueries({ queryKey: leadKeys.all });
-      queryClient.invalidateQueries({ queryKey: leadKeys.detail(id) });
+      queryClient.invalidateQueries({ queryKey: clienteKeys.all });
+      queryClient.invalidateQueries({ queryKey: clienteKeys.detail(id) });
     },
   });
 }

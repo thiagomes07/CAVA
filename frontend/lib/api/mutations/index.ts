@@ -7,8 +7,8 @@ export * from './useBatchMutations';
 // Sales Links
 export * from './useSalesLinkMutations';
 
-// Leads
-export * from './useLeadMutations';
+// Clientes
+export * from './useClienteMutations';
 
 // Users (Brokers & Sellers)
 export * from './useUserMutations';

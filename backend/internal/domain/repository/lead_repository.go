@@ -3,35 +3,36 @@ package repository
 import (
 	"context"
 	"database/sql"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
-// LeadRepository define o contrato para operações com leads
-type LeadRepository interface {
-	// Create cria um novo lead
-	Create(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error
+// ClienteRepository define o contrato para operações com clientes
+type ClienteRepository interface {
+	// Create cria um novo cliente
+	Create(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error
 
-	// FindByID busca lead por ID
-	FindByID(ctx context.Context, id string) (*entity.Lead, error)
+	// FindByID busca cliente por ID
+	FindByID(ctx context.Context, id string) (*entity.Cliente, error)
 
-	// FindByContact busca lead por contato (email ou telefone)
-	FindByContact(ctx context.Context, contact string) (*entity.Lead, error)
+	// FindByContact busca cliente por contato (email ou telefone)
+	FindByContact(ctx context.Context, contact string) (*entity.Cliente, error)
 
-	// FindBySalesLinkID busca leads por link de venda
-	FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Lead, error)
+	// FindBySalesLinkID busca clientes por link de venda
+	FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Cliente, error)
 
-	// List lista leads com filtros e paginação
-	List(ctx context.Context, filters entity.LeadFilters) ([]entity.Lead, int, error)
+	// List lista clientes com filtros e paginação
+	List(ctx context.Context, filters entity.ClienteFilters) ([]entity.Cliente, int, error)
 
-	// Update atualiza os dados do lead
-	Update(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error
+	// Update atualiza os dados do cliente
+	Update(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error
 
-	// UpdateStatus atualiza o status do lead
-	UpdateStatus(ctx context.Context, id string, status entity.LeadStatus) error
+	// UpdateStatus atualiza o status do cliente
+	UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) error
 
 	// UpdateLastInteraction atualiza a data da última interação
 	UpdateLastInteraction(ctx context.Context, tx *sql.Tx, id string) error
 
-	// CountByIndustry conta leads de uma indústria
+	// CountByIndustry conta clientes de uma indústria
 	CountByIndustry(ctx context.Context, industryID string) (int, error)
 }

@@ -4,6 +4,15 @@ import { batchKeys } from '@/lib/api/queries/useBatches';
 import type { Batch } from '@/lib/types';
 import type { BatchInput, ReservationInput } from '@/lib/schemas/batch.schema';
 import { useToast } from '@/lib/hooks/useToast';
+import { getErrorMessage } from '@/lib/hooks/useToast';
+
+// Mensagens de erro específicas para operações de lote
+const batchErrorMessages: Record<string, string> = {
+  INSUFFICIENT_SLABS: 'Quantidade de chapas insuficiente. O estoque foi alterado.',
+  BATCH_NOT_FOUND: 'Lote não encontrado.',
+  BATCH_NOT_AVAILABLE: 'Este lote não está mais disponível para reserva.',
+  RESERVATION_EXPIRED: 'Esta reserva já expirou.',
+};
 
 export function useCreateBatch() {
   const queryClient = useQueryClient();
@@ -84,7 +93,7 @@ export function useReserveBatch() {
 
       return { previousBatches };
     },
-    onError: (_err, _data, context) => {
+    onError: (err: unknown, _data, context) => {
       if (context?.previousBatches) {
         queryClient.setQueriesData(
           { queryKey: batchKeys.lists() },
@@ -92,7 +101,24 @@ export function useReserveBatch() {
         );
       }
 
-      toastError('Reserva não pôde ser concluída. Tente novamente.');
+      // Tratamento de erro específico
+      const errorCode = (err as { code?: string })?.code;
+      const errorDetails = (err as { details?: { requested?: number; available?: number } })?.details;
+      
+      let errorMessage = 'Reserva não pôde ser concluída. Tente novamente.';
+      
+      if (errorCode && batchErrorMessages[errorCode]) {
+        errorMessage = batchErrorMessages[errorCode];
+        
+        // Mensagem específica para INSUFFICIENT_SLABS com detalhes
+        if (errorCode === 'INSUFFICIENT_SLABS' && errorDetails) {
+          errorMessage = `Chapas insuficientes: solicitado ${errorDetails.requested}, disponível ${errorDetails.available}.`;
+        }
+      } else if (errorCode) {
+        errorMessage = getErrorMessage(errorCode);
+      }
+
+      toastError(errorMessage);
     },
   });
 }

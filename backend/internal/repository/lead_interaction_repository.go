@@ -8,18 +8,18 @@ import (
 	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 )
 
-type leadInteractionRepository struct {
+type clienteInteractionRepository struct {
 	db *DB
 }
 
-func NewLeadInteractionRepository(db *DB) *leadInteractionRepository {
-	return &leadInteractionRepository{db: db}
+func NewClienteInteractionRepository(db *DB) *clienteInteractionRepository {
+	return &clienteInteractionRepository{db: db}
 }
 
-func (r *leadInteractionRepository) Create(ctx context.Context, tx *sql.Tx, interaction *entity.LeadInteraction) error {
+func (r *clienteInteractionRepository) Create(ctx context.Context, tx *sql.Tx, interaction *entity.ClienteInteraction) error {
 	query := `
-		INSERT INTO lead_interactions (
-			id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		INSERT INTO cliente_interactions (
+			id, cliente_id, sales_link_id, target_batch_id, target_product_id,
 			message, interaction_type
 		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING created_at
@@ -28,13 +28,13 @@ func (r *leadInteractionRepository) Create(ctx context.Context, tx *sql.Tx, inte
 	var err error
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
-			interaction.ID, interaction.LeadID, interaction.SalesLinkID,
+			interaction.ID, interaction.ClienteID, interaction.SalesLinkID,
 			interaction.TargetBatchID, interaction.TargetProductID,
 			interaction.Message, interaction.InteractionType,
 		).Scan(&interaction.CreatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
-			interaction.ID, interaction.LeadID, interaction.SalesLinkID,
+			interaction.ID, interaction.ClienteID, interaction.SalesLinkID,
 			interaction.TargetBatchID, interaction.TargetProductID,
 			interaction.Message, interaction.InteractionType,
 		).Scan(&interaction.CreatedAt)
@@ -47,16 +47,16 @@ func (r *leadInteractionRepository) Create(ctx context.Context, tx *sql.Tx, inte
 	return nil
 }
 
-func (r *leadInteractionRepository) FindByLeadID(ctx context.Context, leadID string) ([]entity.LeadInteraction, error) {
+func (r *clienteInteractionRepository) FindByClienteID(ctx context.Context, clienteID string) ([]entity.ClienteInteraction, error) {
 	query := `
-		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		SELECT id, cliente_id, sales_link_id, target_batch_id, target_product_id,
 		       message, interaction_type, created_at
-		FROM lead_interactions
-		WHERE lead_id = $1
+		FROM cliente_interactions
+		WHERE cliente_id = $1
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, leadID)
+	rows, err := r.db.QueryContext(ctx, query, clienteID)
 	if err != nil {
 		return nil, errors.DatabaseError(err)
 	}
@@ -65,11 +65,11 @@ func (r *leadInteractionRepository) FindByLeadID(ctx context.Context, leadID str
 	return r.scanInteractions(rows)
 }
 
-func (r *leadInteractionRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.LeadInteraction, error) {
+func (r *clienteInteractionRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.ClienteInteraction, error) {
 	query := `
-		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		SELECT id, cliente_id, sales_link_id, target_batch_id, target_product_id,
 		       message, interaction_type, created_at
-		FROM lead_interactions
+		FROM cliente_interactions
 		WHERE sales_link_id = $1
 		ORDER BY created_at DESC
 	`
@@ -83,17 +83,17 @@ func (r *leadInteractionRepository) FindBySalesLinkID(ctx context.Context, sales
 	return r.scanInteractions(rows)
 }
 
-func (r *leadInteractionRepository) FindByID(ctx context.Context, id string) (*entity.LeadInteraction, error) {
+func (r *clienteInteractionRepository) FindByID(ctx context.Context, id string) (*entity.ClienteInteraction, error) {
 	query := `
-		SELECT id, lead_id, sales_link_id, target_batch_id, target_product_id,
+		SELECT id, cliente_id, sales_link_id, target_batch_id, target_product_id,
 		       message, interaction_type, created_at
-		FROM lead_interactions
+		FROM cliente_interactions
 		WHERE id = $1
 	`
 
-	interaction := &entity.LeadInteraction{}
+	interaction := &entity.ClienteInteraction{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&interaction.ID, &interaction.LeadID, &interaction.SalesLinkID,
+		&interaction.ID, &interaction.ClienteID, &interaction.SalesLinkID,
 		&interaction.TargetBatchID, &interaction.TargetProductID,
 		&interaction.Message, &interaction.InteractionType, &interaction.CreatedAt,
 	)
@@ -108,12 +108,12 @@ func (r *leadInteractionRepository) FindByID(ctx context.Context, id string) (*e
 	return interaction, nil
 }
 
-func (r *leadInteractionRepository) scanInteractions(rows *sql.Rows) ([]entity.LeadInteraction, error) {
-	interactions := []entity.LeadInteraction{}
+func (r *clienteInteractionRepository) scanInteractions(rows *sql.Rows) ([]entity.ClienteInteraction, error) {
+	interactions := []entity.ClienteInteraction{}
 	for rows.Next() {
-		var i entity.LeadInteraction
+		var i entity.ClienteInteraction
 		if err := rows.Scan(
-			&i.ID, &i.LeadID, &i.SalesLinkID, &i.TargetBatchID,
+			&i.ID, &i.ClienteID, &i.SalesLinkID, &i.TargetBatchID,
 			&i.TargetProductID, &i.Message, &i.InteractionType, &i.CreatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)

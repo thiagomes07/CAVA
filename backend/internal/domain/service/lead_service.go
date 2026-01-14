@@ -2,23 +2,24 @@ package service
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
-// LeadService define o contrato para operações com leads
-type LeadService interface {
-	// CaptureInterest captura lead de landing page (cria lead e interação em transação)
-	CaptureInterest(ctx context.Context, input entity.CreateLeadInput) error
+// ClienteService define o contrato para operações com clientes
+type ClienteService interface {
+	// CaptureInterest captura cliente de landing page (cria cliente e interação em transação)
+	CaptureInterest(ctx context.Context, input entity.CreateClienteInput) error
 
-	// GetByID busca lead por ID
-	GetByID(ctx context.Context, id string) (*entity.Lead, error)
+	// GetByID busca cliente por ID
+	GetByID(ctx context.Context, id string) (*entity.Cliente, error)
 
-	// List lista leads com filtros
-	List(ctx context.Context, filters entity.LeadFilters) (*entity.LeadListResponse, error)
+	// List lista clientes com filtros
+	List(ctx context.Context, filters entity.ClienteFilters) (*entity.ClienteListResponse, error)
 
-	// UpdateStatus atualiza status do lead
-	UpdateStatus(ctx context.Context, id string, status entity.LeadStatus) (*entity.Lead, error)
+	// UpdateStatus atualiza status do cliente
+	UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) (*entity.Cliente, error)
 
-	// GetInteractions busca interações do lead
-	GetInteractions(ctx context.Context, leadID string) ([]entity.LeadInteraction, error)
+	// GetInteractions busca interações do cliente
+	GetInteractions(ctx context.Context, clienteID string) ([]entity.ClienteInteraction, error)
 }

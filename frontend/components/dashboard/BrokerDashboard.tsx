@@ -21,7 +21,7 @@ import { cn } from '@/lib/utils/cn';
 interface BrokerMetrics {
   availableBatches: number;
   activeLinks: number;
-  leadsCount: number;
+  clientesCount: number;
   monthlyCommission: number;
 }
 
@@ -62,7 +62,7 @@ export function BrokerDashboard() {
       setMetrics({
         availableBatches: 0,
         activeLinks: 0,
-        leadsCount: 0,
+        clientesCount: 0,
         monthlyCommission: 0,
       });
     } finally {
@@ -150,8 +150,8 @@ export function BrokerDashboard() {
               />
               <MetricCard
                 icon={Inbox}
-                title={t('capturedLeads')}
-                value={metrics?.leadsCount || 0}
+                title={t('capturedClientes')}
+                value={metrics?.clientesCount || 0}
                 subtitle={t('total')}
                 color="purple"
               />
@@ -203,11 +203,11 @@ export function BrokerDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/leads')}
+              onClick={() => router.push('/clientes')}
             >
               <Inbox className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">{t('viewLeads')}</p>
+                <p className="font-semibold">{t('viewClientes')}</p>
                 <p className="text-xs text-slate-500 font-normal">
                   {t('manageInterested')}
                 </p>

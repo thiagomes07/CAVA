@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
 // BatchService define o contrato para operações com lotes
 type BatchService interface {
-	// Create cria um novo lote (calcula área total automaticamente)
+	// Create cria um novo lote (calcula área total automaticamente, suporta criação inline de produto)
 	Create(ctx context.Context, industryID string, input entity.CreateBatchInput) (*entity.Batch, error)
 
 	// GetByID busca lote por ID com dados relacionados
@@ -25,8 +26,14 @@ type BatchService interface {
 	// UpdateStatus atualiza apenas o status do lote
 	UpdateStatus(ctx context.Context, id string, status entity.BatchStatus) (*entity.Batch, error)
 
-	// CheckAvailability verifica se lote está disponível
+	// CheckAvailability verifica se lote está disponível (tem chapas disponíveis)
 	CheckAvailability(ctx context.Context, id string) (bool, error)
+
+	// CheckAvailabilityForQuantity verifica se lote tem quantidade específica de chapas disponíveis
+	CheckAvailabilityForQuantity(ctx context.Context, id string, quantity int) (bool, error)
+
+	// ConvertPrice converte preço entre unidades M2 e FT2
+	ConvertPrice(price float64, from, to entity.PriceUnit) float64
 
 	// AddMedias adiciona mídias ao lote
 	AddMedias(ctx context.Context, batchID string, medias []entity.CreateMediaInput) error

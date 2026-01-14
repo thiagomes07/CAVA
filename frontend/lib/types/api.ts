@@ -39,6 +39,7 @@ export interface FilterParams {
   material?: string;
   includeInactive?: boolean;
   optIn?: boolean;
+  onlyWithAvailable?: boolean;
 }
 
 export type QueryParams = PaginationParams & FilterParams;

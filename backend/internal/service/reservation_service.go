@@ -15,7 +15,7 @@ import (
 type reservationService struct {
 	reservationRepo repository.ReservationRepository
 	batchRepo       repository.BatchRepository
-	leadRepo        repository.LeadRepository
+	clienteRepo     repository.ClienteRepository
 	salesRepo       repository.SalesHistoryRepository
 	db              ReservationDB
 	logger          *zap.Logger
@@ -30,7 +30,7 @@ type ReservationDB interface {
 func NewReservationService(
 	reservationRepo repository.ReservationRepository,
 	batchRepo repository.BatchRepository,
-	leadRepo repository.LeadRepository,
+	clienteRepo repository.ClienteRepository,
 	salesRepo repository.SalesHistoryRepository,
 	db ReservationDB,
 	logger *zap.Logger,
@@ -38,7 +38,7 @@ func NewReservationService(
 	return &reservationService{
 		reservationRepo: reservationRepo,
 		batchRepo:       batchRepo,
-		leadRepo:        leadRepo,
+		clienteRepo:     clienteRepo,
 		salesRepo:       salesRepo,
 		db:              db,
 		logger:          logger,
@@ -46,9 +46,14 @@ func NewReservationService(
 }
 
 func (s *reservationService) Create(ctx context.Context, userID string, input entity.CreateReservationInput) (*entity.Reservation, error) {
-	// Validar leadId OU customerName/Contact
-	if input.LeadID == nil && (input.CustomerName == nil || input.CustomerContact == nil) {
-		return nil, domainErrors.ValidationError("LeadId ou CustomerName/CustomerContact são obrigatórios")
+	// Validar clienteId OU customerName/Contact
+	if input.ClienteID == nil && (input.CustomerName == nil || input.CustomerContact == nil) {
+		return nil, domainErrors.ValidationError("ClienteId ou CustomerName/CustomerContact são obrigatórios")
+	}
+
+	// Validar quantidade de chapas
+	if input.QuantitySlabsReserved <= 0 {
+		return nil, domainErrors.ValidationError("Quantidade de chapas deve ser maior que 0")
 	}
 
 	// Validar data de expiração
@@ -76,31 +81,42 @@ func (s *reservationService) Create(ctx context.Context, userID string, input en
 			return err
 		}
 
-		// 2. Verificar disponibilidade
-		if !batch.IsAvailable() {
-			s.logger.Warn("tentativa de reserva de lote não disponível",
+		// 2. Verificar disponibilidade de chapas
+		if !batch.HasAvailableSlabs(input.QuantitySlabsReserved) {
+			s.logger.Warn("tentativa de reserva com quantidade insuficiente de chapas",
 				zap.String("batchId", input.BatchID),
-				zap.String("status", string(batch.Status)),
+				zap.Int("requested", input.QuantitySlabsReserved),
+				zap.Int("available", batch.AvailableSlabs),
 			)
-			return domainErrors.BatchNotAvailableError()
+			return domainErrors.InsufficientSlabsError(input.QuantitySlabsReserved, batch.AvailableSlabs)
 		}
 
-		// 3. Atualizar status do lote para RESERVADO
-		if err := s.batchRepo.UpdateStatus(ctx, tx, input.BatchID, entity.BatchStatusReservado); err != nil {
+		// 3. Decrementar chapas disponíveis atomicamente
+		if err := s.batchRepo.DecrementAvailableSlabs(ctx, tx, input.BatchID, input.QuantitySlabsReserved); err != nil {
 			return err
 		}
 
-		// 4. Criar reserva
+		// 4. Atualizar status do lote se necessário
+		// Se todas as chapas foram reservadas, status = RESERVADO
+		newAvailableSlabs := batch.AvailableSlabs - input.QuantitySlabsReserved
+		if newAvailableSlabs == 0 {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, input.BatchID, entity.BatchStatusReservado); err != nil {
+				return err
+			}
+		}
+
+		// 5. Criar reserva
 		reservation = &entity.Reservation{
-			ID:               uuid.New().String(),
-			BatchID:          input.BatchID,
-			LeadID:           input.LeadID,
-			ReservedByUserID: userID,
-			Status:           entity.ReservationStatusAtiva,
-			Notes:            input.Notes,
-			ExpiresAt:        expiresAt,
-			IsActive:         true,
-			CreatedAt:        time.Now(),
+			ID:                    uuid.New().String(),
+			BatchID:               input.BatchID,
+			ClienteID:             input.ClienteID,
+			ReservedByUserID:      userID,
+			QuantitySlabsReserved: input.QuantitySlabsReserved,
+			Status:                entity.ReservationStatusAtiva,
+			Notes:                 input.Notes,
+			ExpiresAt:             expiresAt,
+			IsActive:              true,
+			CreatedAt:             time.Now(),
 		}
 
 		if err := s.reservationRepo.Create(ctx, tx, reservation); err != nil {
@@ -111,6 +127,8 @@ func (s *reservationService) Create(ctx context.Context, userID string, input en
 			zap.String("reservationId", reservation.ID),
 			zap.String("batchId", input.BatchID),
 			zap.String("userId", userID),
+			zap.Int("quantityReserved", input.QuantitySlabsReserved),
+			zap.Int("remainingAvailable", newAvailableSlabs),
 		)
 
 		return nil
@@ -148,16 +166,16 @@ func (s *reservationService) GetByID(ctx context.Context, id string) (*entity.Re
 		}
 	}
 
-	// Buscar lead relacionado (se houver)
-	if reservation.LeadID != nil {
-		lead, err := s.leadRepo.FindByID(ctx, *reservation.LeadID)
+	// Buscar cliente relacionado (se houver)
+	if reservation.ClienteID != nil {
+		cliente, err := s.clienteRepo.FindByID(ctx, *reservation.ClienteID)
 		if err != nil {
-			s.logger.Warn("erro ao buscar lead da reserva",
+			s.logger.Warn("erro ao buscar cliente da reserva",
 				zap.String("reservationId", id),
 				zap.Error(err),
 			)
 		} else {
-			reservation.Lead = lead
+			reservation.Cliente = cliente
 		}
 	}
 
@@ -183,14 +201,26 @@ func (s *reservationService) Cancel(ctx context.Context, id string) error {
 			return err
 		}
 
-		// 4. Voltar status do lote para DISPONIVEL
-		if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+		// 4. Devolver chapas ao lote
+		if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, reservation.QuantitySlabsReserved); err != nil {
 			return err
+		}
+
+		// 5. Atualizar status do lote para DISPONIVEL se estava RESERVADO
+		batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+		if err != nil {
+			return err
+		}
+		if batch.Status == entity.BatchStatusReservado {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+				return err
+			}
 		}
 
 		s.logger.Info("reserva cancelada com sucesso",
 			zap.String("reservationId", id),
 			zap.String("batchId", reservation.BatchID),
+			zap.Int("slabsReturned", reservation.QuantitySlabsReserved),
 		)
 
 		return nil
@@ -201,6 +231,11 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 	// Validar preço
 	if input.FinalSoldPrice <= 0 {
 		return nil, domainErrors.ValidationError("Preço de venda deve ser maior que 0")
+	}
+
+	// Validar quantidade
+	if input.QuantitySlabsSold <= 0 {
+		return nil, domainErrors.ValidationError("Quantidade de chapas vendidas deve ser maior que 0")
 	}
 
 	var sale *entity.Sale
@@ -223,14 +258,30 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			return domainErrors.ReservationExpiredError()
 		}
 
-		// 4. Buscar batch para obter industryPrice
+		// 4. Validar quantidade vendida não excede reservada
+		if input.QuantitySlabsSold > reservation.QuantitySlabsReserved {
+			return domainErrors.ValidationError("Quantidade vendida não pode exceder quantidade reservada")
+		}
+
+		// 5. Buscar batch para obter industryPrice e calcular valores
 		batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
 		if err != nil {
 			return err
 		}
 
-		// 5. Calcular comissão e net value
-		netIndustryValue := batch.IndustryPrice
+		// 6. Calcular área vendida e valores
+		slabArea := batch.CalculateSlabArea()
+		totalAreaSold := slabArea * float64(input.QuantitySlabsSold)
+
+		// Preço por unidade de área da indústria
+		pricePerUnit := batch.IndustryPrice
+		priceUnit := batch.PriceUnit
+
+		// Calcular valor base da indústria
+		pricePerM2 := batch.GetPriceInUnit(entity.PriceUnitM2)
+		netIndustryValue := pricePerM2 * totalAreaSold
+
+		// Calcular comissão
 		brokerCommission := input.FinalSoldPrice - netIndustryValue
 
 		// Validar que preço de venda >= preço da indústria
@@ -238,30 +289,34 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			return domainErrors.InvalidPriceError("Preço de venda não pode ser menor que o preço da indústria")
 		}
 
-		// 6. Criar registro de venda
+		// 7. Criar registro de venda
 		sale = &entity.Sale{
-			ID:               uuid.New().String(),
-			BatchID:          reservation.BatchID,
-			SoldByUserID:     userID,
-			IndustryID:       batch.IndustryID,
-			LeadID:           reservation.LeadID,
-			CustomerName:     "", // Será preenchido com dados do lead ou input
-			CustomerContact:  "",
-			SalePrice:        input.FinalSoldPrice,
-			BrokerCommission: brokerCommission,
-			NetIndustryValue: netIndustryValue,
-			InvoiceURL:       input.InvoiceURL,
-			Notes:            input.Notes,
-			SaleDate:         time.Now(),
-			CreatedAt:        time.Now(),
+			ID:                uuid.New().String(),
+			BatchID:           reservation.BatchID,
+			SoldByUserID:      userID,
+			IndustryID:        batch.IndustryID,
+			ClienteID:         reservation.ClienteID,
+			CustomerName:      "", // Será preenchido com dados do cliente ou input
+			CustomerContact:   "",
+			QuantitySlabsSold: input.QuantitySlabsSold,
+			TotalAreaSold:     totalAreaSold,
+			PricePerUnit:      pricePerUnit,
+			PriceUnit:         priceUnit,
+			SalePrice:         input.FinalSoldPrice,
+			BrokerCommission:  brokerCommission,
+			NetIndustryValue:  netIndustryValue,
+			InvoiceURL:        input.InvoiceURL,
+			Notes:             input.Notes,
+			SaleDate:          time.Now(),
+			CreatedAt:         time.Now(),
 		}
 
 		// Preencher dados do cliente
-		if reservation.LeadID != nil {
-			lead, err := s.leadRepo.FindByID(ctx, *reservation.LeadID)
+		if reservation.ClienteID != nil {
+			cliente, err := s.clienteRepo.FindByID(ctx, *reservation.ClienteID)
 			if err == nil {
-				sale.CustomerName = lead.Name
-				sale.CustomerContact = lead.Contact
+				sale.CustomerName = cliente.Name
+				sale.CustomerContact = cliente.Contact
 			}
 		}
 
@@ -269,12 +324,34 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			return err
 		}
 
-		// 7. Atualizar status do lote para VENDIDO
-		if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusVendido); err != nil {
-			return err
+		// 8. Se vendeu parcialmente, devolver as chapas não vendidas ao lote
+		slabsToReturn := reservation.QuantitySlabsReserved - input.QuantitySlabsSold
+		if slabsToReturn > 0 {
+			if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, slabsToReturn); err != nil {
+				return err
+			}
 		}
 
-		// 8. Atualizar status da reserva para CONFIRMADA_VENDA
+		// 9. Verificar se lote deve ser marcado como VENDIDO
+		// Buscar lote atualizado para verificar available_slabs
+		updatedBatch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+		if err != nil {
+			return err
+		}
+		if updatedBatch.AvailableSlabs == 0 {
+			// Verificar se todas as chapas foram vendidas (não apenas reservadas)
+			// Se ainda tem reservas ativas, manter como RESERVADO
+			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusVendido); err != nil {
+				return err
+			}
+		} else if updatedBatch.Status == entity.BatchStatusReservado {
+			// Se devolvemos chapas, voltar para DISPONIVEL
+			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+				return err
+			}
+		}
+
+		// 10. Atualizar status da reserva para CONFIRMADA_VENDA
 		if err := s.reservationRepo.UpdateStatus(ctx, tx, reservationID, entity.ReservationStatusConfirmadaVenda); err != nil {
 			return err
 		}
@@ -284,6 +361,8 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			zap.String("reservationId", reservationID),
 			zap.String("batchId", reservation.BatchID),
 			zap.Float64("salePrice", input.FinalSoldPrice),
+			zap.Int("quantitySold", input.QuantitySlabsSold),
+			zap.Float64("totalAreaSold", totalAreaSold),
 		)
 
 		return nil
@@ -321,12 +400,12 @@ func (s *reservationService) ListActive(ctx context.Context, userID string) ([]e
 			}
 		}
 
-		if reservations[i].LeadID != nil {
-			lead, err := s.leadRepo.FindByID(ctx, *reservations[i].LeadID)
+		if reservations[i].ClienteID != nil {
+			cliente, err := s.clienteRepo.FindByID(ctx, *reservations[i].ClienteID)
 			if err != nil {
-				s.logger.Warn("erro ao buscar lead", zap.Error(err))
+				s.logger.Warn("erro ao buscar cliente", zap.Error(err))
 			} else {
-				reservations[i].Lead = lead
+				reservations[i].Cliente = cliente
 			}
 		}
 	}
@@ -351,15 +430,27 @@ func (s *reservationService) ExpireReservations(ctx context.Context) (int, error
 				return err
 			}
 
-			// 2. Voltar status do lote para DISPONIVEL
-			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+			// 2. Devolver chapas ao lote
+			if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, reservation.QuantitySlabsReserved); err != nil {
 				return err
+			}
+
+			// 3. Atualizar status do lote para DISPONIVEL se estava totalmente RESERVADO
+			batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+			if err != nil {
+				return err
+			}
+			if batch.Status == entity.BatchStatusReservado {
+				if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+					return err
+				}
 			}
 
 			count++
 			s.logger.Info("reserva expirada",
 				zap.String("reservationId", reservation.ID),
 				zap.String("batchId", reservation.BatchID),
+				zap.Int("slabsReturned", reservation.QuantitySlabsReserved),
 			)
 
 			return nil

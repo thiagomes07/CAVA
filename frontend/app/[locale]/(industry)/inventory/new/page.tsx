@@ -2,18 +2,20 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Upload, X, Package } from 'lucide-react';
+import { ArrowLeft, Upload, X, Package, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
+import { Toggle } from '@/components/ui/toggle';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
-import { batchSchema, type BatchInput } from '@/lib/schemas/batch.schema';
+import { batchSchema, type BatchInput, priceUnits } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
-import type { Product } from '@/lib/types';
+import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import type { Product, PriceUnit, MaterialType, FinishType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
 interface UploadedMedia {
@@ -29,6 +31,7 @@ export default function NewBatchPage() {
   const [medias, setMedias] = useState<UploadedMedia[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calculatedArea, setCalculatedArea] = useState<number>(0);
+  const [showNewProductForm, setShowNewProductForm] = useState(false);
 
   const {
     register,
@@ -36,11 +39,13 @@ export default function NewBatchPage() {
     formState: { errors },
     watch,
     setValue,
+    control,
   } = useForm<BatchInput>({
     resolver: zodResolver(batchSchema),
     defaultValues: {
       quantitySlabs: 1,
       entryDate: new Date().toISOString().split('T')[0],
+      priceUnit: 'M2',
     },
   });
 
@@ -48,6 +53,8 @@ export default function NewBatchPage() {
   const width = watch('width');
   const quantitySlabs = watch('quantitySlabs');
   const productId = watch('productId');
+  const priceUnit = watch('priceUnit') || 'M2';
+  const industryPrice = watch('industryPrice');
 
   useEffect(() => {
     fetchProducts();
@@ -178,42 +185,126 @@ export default function NewBatchPage() {
         <div className="max-w-4xl mx-auto space-y-8">
           {/* Vinculação */}
           <Card>
-            <h2 className="text-lg font-semibold text-obsidian mb-6">
-              Vinculação
-            </h2>
-
-            <div className="space-y-4">
-              <Select
-                {...register('productId')}
-                label="Produto"
-                error={errors.productId?.message}
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-obsidian">
+                Vinculação
+              </h2>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => {
+                  setShowNewProductForm(!showNewProductForm);
+                  if (!showNewProductForm) {
+                    setValue('productId', undefined);
+                  } else {
+                    setValue('newProduct', undefined);
+                  }
+                }}
                 disabled={isSubmitting}
               >
-                <option value="">Selecione o produto...</option>
-                {products.map((product) => (
-                  <option key={product.id} value={product.id}>
-                    {product.name} {product.sku && `(${product.sku})`}
-                  </option>
-                ))}
-              </Select>
+                <Plus className="w-4 h-4 mr-2" />
+                {showNewProductForm ? 'Selecionar Existente' : 'Criar Novo Produto'}
+              </Button>
+            </div>
 
-              {selectedProduct && (
-                <div className="flex items-center gap-4 p-4 bg-mineral rounded-sm">
-                  {selectedProduct.medias?.[0] && (
-                    <img
-                      src={selectedProduct.medias[0].url}
-                      alt={selectedProduct.name}
-                      className="w-20 h-20 rounded-sm object-cover"
-                    />
+            <div className="space-y-4">
+              {!showNewProductForm ? (
+                <>
+                  <Select
+                    {...register('productId')}
+                    label="Produto"
+                    error={errors.productId?.message}
+                    disabled={isSubmitting}
+                  >
+                    <option value="">Selecione o produto...</option>
+                    {products.map((product) => (
+                      <option key={product.id} value={product.id}>
+                        {product.name} {product.sku && `(${product.sku})`}
+                      </option>
+                    ))}
+                  </Select>
+
+                  {selectedProduct && (
+                    <div className="flex items-center gap-4 p-4 bg-mineral rounded-sm">
+                      {selectedProduct.medias?.[0] && (
+                        <img
+                          src={selectedProduct.medias[0].url}
+                          alt={selectedProduct.name}
+                          className="w-20 h-20 rounded-sm object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-semibold text-obsidian">
+                          {selectedProduct.name}
+                        </p>
+                        <p className="text-sm text-slate-500">
+                          {selectedProduct.material} • {selectedProduct.finish}
+                        </p>
+                      </div>
+                    </div>
                   )}
-                  <div>
-                    <p className="font-semibold text-obsidian">
-                      {selectedProduct.name}
-                    </p>
-                    <p className="text-sm text-slate-500">
-                      {selectedProduct.material} • {selectedProduct.finish}
-                    </p>
+                </>
+              ) : (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm space-y-4">
+                  <p className="text-sm font-semibold text-blue-900">
+                    Novo Produto (será criado junto com o lote)
+                  </p>
+                  
+                  <Input
+                    {...register('newProduct.name')}
+                    label="Nome do Produto"
+                    placeholder="Ex: Granito Verde Ubatuba"
+                    error={errors.newProduct?.name?.message}
+                    disabled={isSubmitting}
+                  />
+
+                  <Input
+                    {...register('newProduct.sku')}
+                    label="SKU (Opcional)"
+                    placeholder="Ex: GRN-VU-001"
+                    error={errors.newProduct?.sku?.message}
+                    disabled={isSubmitting}
+                  />
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Select
+                      {...register('newProduct.material')}
+                      label="Material"
+                      error={errors.newProduct?.material?.message}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="GRANITO">Granito</option>
+                      <option value="MARMORE">Mármore</option>
+                      <option value="QUARTZITO">Quartzito</option>
+                      <option value="LIMESTONE">Limestone</option>
+                      <option value="TRAVERTINO">Travertino</option>
+                      <option value="OUTROS">Outros</option>
+                    </Select>
+
+                    <Select
+                      {...register('newProduct.finish')}
+                      label="Acabamento"
+                      error={errors.newProduct?.finish?.message}
+                      disabled={isSubmitting}
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="POLIDO">Polido</option>
+                      <option value="LEVIGADO">Levigado</option>
+                      <option value="BRUTO">Bruto</option>
+                      <option value="APICOADO">Apicoado</option>
+                      <option value="FLAMEADO">Flameado</option>
+                    </Select>
                   </div>
+
+                  <Input
+                    {...register('newProduct.description')}
+                    label="Descrição (Opcional)"
+                    placeholder="Descrição do produto..."
+                    error={errors.newProduct?.description?.message}
+                    disabled={isSubmitting}
+                  />
                 </div>
               )}
             </div>
@@ -324,16 +415,83 @@ export default function NewBatchPage() {
               Precificação
             </h2>
 
-            <Input
-              {...register('industryPrice', { valueAsNumber: true })}
-              type="number"
-              step="0.01"
-              label="Preço Base Indústria (R$)"
-              placeholder="5000.00"
-              helperText="Este é o preço de repasse para brokers"
-              error={errors.industryPrice?.message}
-              disabled={isSubmitting}
-            />
+            <div className="space-y-6">
+              {/* Unidade de Preço */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Unidade de Preço
+                </label>
+                <Controller
+                  name="priceUnit"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('M2')}
+                        className={cn(
+                          'px-4 py-2 rounded-sm font-medium transition-colors',
+                          field.value === 'M2'
+                            ? 'bg-obsidian text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/m²
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('FT2')}
+                        className={cn(
+                          'px-4 py-2 rounded-sm font-medium transition-colors',
+                          field.value === 'FT2'
+                            ? 'bg-obsidian text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/ft²
+                      </button>
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Selecione a unidade de área para o preço. 1 m² = 10,76 ft²
+                </p>
+              </div>
+
+              <Input
+                {...register('industryPrice', { valueAsNumber: true })}
+                type="number"
+                step="0.01"
+                label={`Preço Base Indústria (R$/${getPriceUnitLabel(priceUnit as PriceUnit)})`}
+                placeholder="150.00"
+                helperText="Este é o preço de repasse para brokers"
+                error={errors.industryPrice?.message}
+                disabled={isSubmitting}
+              />
+
+              {/* Preço Total Calculado */}
+              {calculatedArea > 0 && industryPrice > 0 && (
+                <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-sm">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900">
+                      Valor Total do Lote
+                    </p>
+                    <p className="text-2xl font-mono font-bold text-blue-700">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {formatArea(calculatedArea)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* Fotos do Lote */}

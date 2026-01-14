@@ -103,7 +103,7 @@ export const TRUNCATION_LIMITS = {
   NOTES: 100,
   
   /**
-   * Lead messages in table preview
+   * Cliente messages in table preview
    */
   MESSAGE_PREVIEW: 50,
   

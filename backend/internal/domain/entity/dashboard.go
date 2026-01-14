@@ -10,7 +10,7 @@ type IndustryMetrics struct {
 	MonthlySales     float64 `json:"monthlySales"`
 	ReservedBatches  int     `json:"reservedBatches"`
 	ActiveLinks      *int    `json:"activeLinks,omitempty"`
-	LeadsCount       *int    `json:"leadsCount,omitempty"`
+	ClientesCount    *int    `json:"clientesCount,omitempty"`
 }
 
 // BrokerMetrics representa as métricas do dashboard do broker

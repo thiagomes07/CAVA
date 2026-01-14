@@ -23,7 +23,7 @@ export default function NotFound() {
         </h1>
 
         {/* Description */}
-        <p className="text-slate-600 mb-8 leading-relaxed">
+        <p className="text-slate-600 mb-8 clienteing-relaxed">
           {t('notFoundDescription')}
           <br />
           {t('checkAddress')}

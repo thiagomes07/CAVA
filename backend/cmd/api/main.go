@@ -258,37 +258,37 @@ func initLogger() *zap.Logger {
 
 // Repositories agrupa todos os repositories
 type Repositories struct {
-	User            domainRepo.UserRepository
-	Session         domainRepo.SessionRepository
-	Product         domainRepo.ProductRepository
-	Batch           domainRepo.BatchRepository
-	Media           domainRepo.MediaRepository
-	Reservation     domainRepo.ReservationRepository
-	SalesLink       domainRepo.SalesLinkRepository
-	Lead            domainRepo.LeadRepository
-	LeadInteraction domainRepo.LeadInteractionRepository
-	SalesHistory    domainRepo.SalesHistoryRepository
-	SharedInventory domainRepo.SharedInventoryRepository
-	Industry        domainRepo.IndustryRepository
-	DB              *repository.DB
+	User               domainRepo.UserRepository
+	Session            domainRepo.SessionRepository
+	Product            domainRepo.ProductRepository
+	Batch              domainRepo.BatchRepository
+	Media              domainRepo.MediaRepository
+	Reservation        domainRepo.ReservationRepository
+	SalesLink          domainRepo.SalesLinkRepository
+	Cliente            domainRepo.ClienteRepository
+	ClienteInteraction domainRepo.ClienteInteractionRepository
+	SalesHistory       domainRepo.SalesHistoryRepository
+	SharedInventory    domainRepo.SharedInventoryRepository
+	Industry           domainRepo.IndustryRepository
+	DB                 *repository.DB
 }
 
 // initRepositories inicializa todos os repositories
 func initRepositories(db *repository.DB) Repositories {
 	return Repositories{
-		User:            repository.NewUserRepository(db),
-		Session:         repository.NewSessionRepository(db),
-		Product:         repository.NewProductRepository(db),
-		Batch:           repository.NewBatchRepository(db),
-		Media:           repository.NewMediaRepository(db),
-		Reservation:     repository.NewReservationRepository(db),
-		SalesLink:       repository.NewSalesLinkRepository(db),
-		Lead:            repository.NewLeadRepository(db),
-		LeadInteraction: repository.NewLeadInteractionRepository(db),
-		SalesHistory:    repository.NewSalesHistoryRepository(db),
-		SharedInventory: repository.NewSharedInventoryRepository(db),
-		Industry:        repository.NewIndustryRepository(db),
-		DB:              db,
+		User:               repository.NewUserRepository(db),
+		Session:            repository.NewSessionRepository(db),
+		Product:            repository.NewProductRepository(db),
+		Batch:              repository.NewBatchRepository(db),
+		Media:              repository.NewMediaRepository(db),
+		Reservation:        repository.NewReservationRepository(db),
+		SalesLink:          repository.NewSalesLinkRepository(db),
+		Cliente:            repository.NewClienteRepository(db),
+		ClienteInteraction: repository.NewClienteInteractionRepository(db),
+		SalesHistory:       repository.NewSalesHistoryRepository(db),
+		SharedInventory:    repository.NewSharedInventoryRepository(db),
+		Industry:           repository.NewIndustryRepository(db),
+		DB:                 db,
 	}
 }
 
@@ -336,7 +336,7 @@ func initServices(
 	reservationService := service.NewReservationService(
 		repos.Reservation,
 		repos.Batch,
-		repos.Lead,
+		repos.Cliente,
 		repos.SalesHistory,
 		repos.DB,
 		logger,
@@ -347,7 +347,7 @@ func initServices(
 		repos.Batch,
 		repos.SalesHistory,
 		repos.SalesLink,
-		repos.Lead,
+		repos.Cliente,
 		repos.SharedInventory,
 		logger,
 	)
@@ -361,10 +361,10 @@ func initServices(
 		logger,
 	)
 
-	// Lead Service
-	leadService := service.NewLeadService(
-		repos.Lead,
-		repos.LeadInteraction,
+	// Cliente Service
+	clienteService := service.NewClienteService(
+		repos.Cliente,
+		repos.ClienteInteraction,
 		repos.SalesLink,
 		newDBExecutorAdapter(repos.DB),
 		logger,
@@ -375,7 +375,7 @@ func initServices(
 		repos.SalesHistory,
 		repos.Batch,
 		repos.User,
-		repos.Lead,
+		repos.Cliente,
 		logger,
 	)
 
@@ -402,7 +402,7 @@ func initServices(
 		Reservation:     reservationService,
 		Dashboard:       dashboardService,
 		SalesLink:       salesLinkService,
-		Lead:            leadService,
+		Cliente:         clienteService,
 		SalesHistory:    salesHistoryService,
 		SharedInventory: sharedInventoryService,
 		Storage:         storageService,

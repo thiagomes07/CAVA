@@ -237,7 +237,7 @@ export default function LinksManagementPage() {
                     <TableHead>{t('type')}</TableHead>
                     <TableHead>{t('price')}</TableHead>
                     <TableHead>{t('views')}</TableHead>
-                    <TableHead>{t('leads')}</TableHead>
+                    <TableHead>{t('clientes')}</TableHead>
                     <TableHead>{t('status')}</TableHead>
                     <TableHead>{t('createdAt')}</TableHead>
                     <TableHead>{t('actions')}</TableHead>
@@ -308,7 +308,7 @@ export default function LinksManagementPage() {
                         </TableCell>
                         <TableCell>
                           <button
-                            onClick={() => router.push(`/leads?linkId=${link.id}`)}
+                            onClick={() => router.push(`/clientes?linkId=${link.id}`)}
                             className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
                           >
                             <Users className="w-4 h-4" />
@@ -399,7 +399,7 @@ export default function LinksManagementPage() {
                 </div>
                 <div className="p-4 bg-emerald-50 rounded-sm">
                   <p className="text-xs uppercase tracking-widest text-emerald-600 mb-1">
-                    {t('capturedLeads')}
+                    {t('capturedClientes')}
                   </p>
                   <p className="text-3xl font-mono font-bold text-emerald-700">
                     0

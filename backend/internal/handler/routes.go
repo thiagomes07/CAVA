@@ -23,7 +23,7 @@ type Handler struct {
 	Reservation     *ReservationHandler
 	Dashboard       *DashboardHandler
 	SalesLink       *SalesLinkHandler
-	Lead            *LeadHandler
+	Cliente         *ClienteHandler
 	SalesHistory    *SalesHistoryHandler
 	SharedInventory *SharedInventoryHandler
 	Upload          *UploadHandler
@@ -52,7 +52,7 @@ type Services struct {
 	Reservation     service.ReservationService
 	Dashboard       service.DashboardService
 	SalesLink       service.SalesLinkService
-	Lead            service.LeadService
+	Cliente         service.ClienteService
 	SalesHistory    service.SalesHistoryService
 	SharedInventory service.SharedInventoryService
 	Storage         service.StorageService
@@ -69,11 +69,11 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Reservation:     NewReservationHandler(services.Reservation, cfg.Validator, cfg.Logger),
 		Dashboard:       NewDashboardHandler(services.Dashboard, cfg.Logger),
 		SalesLink:       NewSalesLinkHandler(services.SalesLink, cfg.Validator, cfg.Logger),
-		Lead:            NewLeadHandler(services.Lead, cfg.Validator, cfg.Logger),
+		Cliente:         NewClienteHandler(services.Cliente, cfg.Validator, cfg.Logger),
 		SalesHistory:    NewSalesHistoryHandler(services.SalesHistory, cfg.Validator, cfg.Logger),
 		SharedInventory: NewSharedInventoryHandler(services.SharedInventory, cfg.Validator, cfg.Logger),
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
-		Public:          NewPublicHandler(services.SalesLink, services.Lead, cfg.Validator, cfg.Logger),
+		Public:          NewPublicHandler(services.SalesLink, services.Cliente, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -125,8 +125,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Links públicos
 			r.Get("/links/{slug}", h.Public.GetLinkBySlug)
 
-			// Captura de leads
-			r.Post("/leads/interest", h.Public.CaptureLeadInterest)
+			// Captura de clientes
+			r.Post("/clientes/interest", h.Public.CaptureClienteInterest)
 		})
 
 		// ============================================
@@ -182,6 +182,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Post("/", h.Batch.Create)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Batch.GetByID)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/status", h.Batch.CheckStatus)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/check-availability", h.Batch.CheckAvailability)
 				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.Batch.Update)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.Batch.UpdateStatus)
 			})
@@ -245,13 +246,13 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			})
 
 			// ----------------------------------------
-			// LEADS
+			// CLIENTES
 			// ----------------------------------------
-			r.Route("/leads", func(r chi.Router) {
-				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Lead.List)
-				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Lead.GetByID)
-				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Lead.GetInteractions)
-				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Lead.UpdateStatus)
+			r.Route("/clientes", func(r chi.Router) {
+				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Cliente.List)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Cliente.GetByID)
+				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Cliente.GetInteractions)
+				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Cliente.UpdateStatus)
 			})
 
 			// ----------------------------------------

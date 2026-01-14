@@ -1,21 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import type { Lead } from '@/lib/types';
-import type { LeadFilter } from '@/lib/schemas/lead.schema';
+import type { Cliente } from '@/lib/types';
+import type { ClienteFilter } from '@/lib/schemas/cliente.schema';
 
-interface LeadsResponse {
-  leads: Lead[];
+interface ClientesResponse {
+  clientes: Cliente[];
   total: number;
   page: number;
 }
 
-export const leadKeys = {
-  all: ['leads'] as const,
-  lists: () => [...leadKeys.all, 'list'] as const,
-  list: (filters: Partial<LeadFilter>) => [...leadKeys.lists(), filters] as const,
-  details: () => [...leadKeys.all, 'detail'] as const,
-  detail: (id: string) => [...leadKeys.details(), id] as const,
-  interactions: (id: string) => [...leadKeys.all, 'interactions', id] as const,
+export const clienteKeys = {
+  all: ['clientes'] as const,
+  lists: () => [...clienteKeys.all, 'list'] as const,
+  list: (filters: Partial<ClienteFilter>) => [...clienteKeys.lists(), filters] as const,
+  details: () => [...clienteKeys.all, 'detail'] as const,
+  detail: (id: string) => [...clienteKeys.details(), id] as const,
+  interactions: (id: string) => [...clienteKeys.all, 'interactions', id] as const,
 };
 
 const defaultFilters = {
@@ -23,13 +23,13 @@ const defaultFilters = {
   limit: 25,
 };
 
-export function useLeads(filters: Partial<LeadFilter> = {}) {
+export function useClientes(filters: Partial<ClienteFilter> = {}) {
   const mergedFilters = { ...defaultFilters, ...filters };
   
   return useQuery({
-    queryKey: leadKeys.list(mergedFilters),
+    queryKey: clienteKeys.list(mergedFilters),
     queryFn: async () => {
-      const data = await apiClient.get<LeadsResponse>('/leads', {
+      const data = await apiClient.get<ClientesResponse>('/clientes', {
         params: mergedFilters,
       });
       return data;
@@ -37,22 +37,22 @@ export function useLeads(filters: Partial<LeadFilter> = {}) {
   });
 }
 
-export function useLead(id: string) {
+export function useCliente(id: string) {
   return useQuery({
-    queryKey: leadKeys.detail(id),
+    queryKey: clienteKeys.detail(id),
     queryFn: async () => {
-      const data = await apiClient.get<Lead>(`/leads/${id}`);
+      const data = await apiClient.get<Cliente>(`/clientes/${id}`);
       return data;
     },
     enabled: !!id,
   });
 }
 
-export function useLeadInteractions(id: string) {
+export function useClienteInteractions(id: string) {
   return useQuery({
-    queryKey: leadKeys.interactions(id),
+    queryKey: clienteKeys.interactions(id),
     queryFn: async () => {
-      const data = await apiClient.get<unknown[]>(`/leads/${id}/interactions`);
+      const data = await apiClient.get<unknown[]>(`/clientes/${id}/interactions`);
       return data;
     },
     enabled: !!id,

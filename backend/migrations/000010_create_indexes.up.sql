@@ -14,7 +14,7 @@ CREATE INDEX idx_shared_inventory_count ON shared_inventory_batches(broker_user_
 
 -- Índices para busca textual
 CREATE INDEX idx_products_name_trgm ON products USING gin(name gin_trgm_ops);
-CREATE INDEX idx_leads_name_trgm ON leads USING gin(name gin_trgm_ops);
+CREATE INDEX idx_clientes_name_trgm ON clientes USING gin(name gin_trgm_ops);
 
 -- Nota: Para usar trigram, é necessário criar a extensão pg_trgm
 -- CREATE EXTENSION IF NOT EXISTS pg_trgm;
@@ -31,7 +31,7 @@ CREATE INDEX idx_products_created_desc ON products(industry_id, created_at DESC)
 CREATE INDEX idx_batches_entry_date_desc ON batches(industry_id, entry_date DESC) 
     WHERE is_active = TRUE;
 
-CREATE INDEX idx_leads_created_desc ON leads(sales_link_id, created_at DESC);
+CREATE INDEX idx_clientes_created_desc ON clientes(sales_link_id, created_at DESC);
 
 -- Índices parciais para queries específicas
 -- Índice para encontrar reservas expiradas (checagem feita em runtime)

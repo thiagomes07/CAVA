@@ -10,17 +10,17 @@ import (
 	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 )
 
-type leadRepository struct {
+type clienteRepository struct {
 	db *DB
 }
 
-func NewLeadRepository(db *DB) *leadRepository {
-	return &leadRepository{db: db}
+func NewClienteRepository(db *DB) *clienteRepository {
+	return &clienteRepository{db: db}
 }
 
-func (r *leadRepository) Create(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error {
+func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
 	query := `
-		INSERT INTO leads (
+		INSERT INTO clientes (
 			id, sales_link_id, name, contact, message, marketing_opt_in, status
 		) VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING created_at, updated_at, last_interaction
@@ -29,14 +29,14 @@ func (r *leadRepository) Create(ctx context.Context, tx *sql.Tx, lead *entity.Le
 	var err error
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
-			lead.ID, lead.SalesLinkID, lead.Name, lead.Contact,
-			lead.Message, lead.MarketingOptIn, lead.Status,
-		).Scan(&lead.CreatedAt, &lead.UpdatedAt, &lead.UpdatedAt)
+			cliente.ID, cliente.SalesLinkID, cliente.Name, cliente.Contact,
+			cliente.Message, cliente.MarketingOptIn, cliente.Status,
+		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
-			lead.ID, lead.SalesLinkID, lead.Name, lead.Contact,
-			lead.Message, lead.MarketingOptIn, lead.Status,
-		).Scan(&lead.CreatedAt, &lead.UpdatedAt, &lead.UpdatedAt)
+			cliente.ID, cliente.SalesLinkID, cliente.Name, cliente.Contact,
+			cliente.Message, cliente.MarketingOptIn, cliente.Status,
+		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	}
 
 	if err != nil {
@@ -46,63 +46,63 @@ func (r *leadRepository) Create(ctx context.Context, tx *sql.Tx, lead *entity.Le
 	return nil
 }
 
-func (r *leadRepository) FindByID(ctx context.Context, id string) (*entity.Lead, error) {
+func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	query := `
 		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
-		FROM leads
+		FROM clientes
 		WHERE id = $1
 	`
 
-	lead := &entity.Lead{}
+	cliente := &entity.Cliente{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&lead.ID, &lead.SalesLinkID, &lead.Name, &lead.Contact,
-		&lead.Message, &lead.MarketingOptIn, &lead.Status,
-		&lead.CreatedAt, &lead.UpdatedAt,
+		&cliente.ID, &cliente.SalesLinkID, &cliente.Name, &cliente.Contact,
+		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
+		&cliente.CreatedAt, &cliente.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.NewNotFoundError("Lead")
+		return nil, errors.NewNotFoundError("Cliente")
 	}
 	if err != nil {
 		return nil, errors.DatabaseError(err)
 	}
 
-	return lead, nil
+	return cliente, nil
 }
 
-func (r *leadRepository) FindByContact(ctx context.Context, contact string) (*entity.Lead, error) {
+func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (*entity.Cliente, error) {
 	query := `
 		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
-		FROM leads
+		FROM clientes
 		WHERE contact = $1
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
 
-	lead := &entity.Lead{}
+	cliente := &entity.Cliente{}
 	err := r.db.QueryRowContext(ctx, query, contact).Scan(
-		&lead.ID, &lead.SalesLinkID, &lead.Name, &lead.Contact,
-		&lead.Message, &lead.MarketingOptIn, &lead.Status,
-		&lead.CreatedAt, &lead.UpdatedAt,
+		&cliente.ID, &cliente.SalesLinkID, &cliente.Name, &cliente.Contact,
+		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
+		&cliente.CreatedAt, &cliente.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
-		return nil, errors.NewNotFoundError("Lead")
+		return nil, errors.NewNotFoundError("Cliente")
 	}
 	if err != nil {
 		return nil, errors.DatabaseError(err)
 	}
 
-	return lead, nil
+	return cliente, nil
 }
 
-func (r *leadRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Lead, error) {
+func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Cliente, error) {
 	query := `
 		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
-		FROM leads
+		FROM clientes
 		WHERE sales_link_id = $1
 		ORDER BY created_at DESC
 	`
@@ -113,16 +113,16 @@ func (r *leadRepository) FindBySalesLinkID(ctx context.Context, salesLinkID stri
 	}
 	defer rows.Close()
 
-	return r.scanLeads(rows)
+	return r.scanClientes(rows)
 }
 
-func (r *leadRepository) List(ctx context.Context, filters entity.LeadFilters) ([]entity.Lead, int, error) {
+func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilters) ([]entity.Cliente, int, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := psql.Select(
 		"id", "sales_link_id", "name", "contact", "message",
 		"marketing_opt_in", "status", "created_at", "updated_at",
-	).From("leads")
+	).From("clientes")
 
 	if filters.LinkID != nil {
 		query = query.Where(sq.Eq{"sales_link_id": *filters.LinkID})
@@ -159,7 +159,7 @@ func (r *leadRepository) List(ctx context.Context, filters entity.LeadFilters) (
 	}
 
 	// Count
-	countQuery := psql.Select("COUNT(*)").From("leads")
+	countQuery := psql.Select("COUNT(*)").From("clientes")
 	if filters.LinkID != nil {
 		countQuery = countQuery.Where(sq.Eq{"sales_link_id": *filters.LinkID})
 	}
@@ -210,17 +210,17 @@ func (r *leadRepository) List(ctx context.Context, filters entity.LeadFilters) (
 	}
 	defer rows.Close()
 
-	leads, err := r.scanLeads(rows)
+	clientes, err := r.scanClientes(rows)
 	if err != nil {
 		return nil, 0, err
 	}
 
-	return leads, total, nil
+	return clientes, total, nil
 }
 
-func (r *leadRepository) Update(ctx context.Context, tx *sql.Tx, lead *entity.Lead) error {
+func (r *clienteRepository) Update(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
 	query := `
-		UPDATE leads
+		UPDATE clientes
 		SET name = $1, contact = $2, message = $3, marketing_opt_in = $4,
 		    status = $5, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $6
@@ -230,18 +230,18 @@ func (r *leadRepository) Update(ctx context.Context, tx *sql.Tx, lead *entity.Le
 	var err error
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
-			lead.Name, lead.Contact, lead.Message, lead.MarketingOptIn,
-			lead.Status, lead.ID,
-		).Scan(&lead.UpdatedAt)
+			cliente.Name, cliente.Contact, cliente.Message, cliente.MarketingOptIn,
+			cliente.Status, cliente.ID,
+		).Scan(&cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
-			lead.Name, lead.Contact, lead.Message, lead.MarketingOptIn,
-			lead.Status, lead.ID,
-		).Scan(&lead.UpdatedAt)
+			cliente.Name, cliente.Contact, cliente.Message, cliente.MarketingOptIn,
+			cliente.Status, cliente.ID,
+		).Scan(&cliente.UpdatedAt)
 	}
 
 	if err == sql.ErrNoRows {
-		return errors.NewNotFoundError("Lead")
+		return errors.NewNotFoundError("Cliente")
 	}
 	if err != nil {
 		return errors.DatabaseError(err)
@@ -250,9 +250,9 @@ func (r *leadRepository) Update(ctx context.Context, tx *sql.Tx, lead *entity.Le
 	return nil
 }
 
-func (r *leadRepository) UpdateStatus(ctx context.Context, id string, status entity.LeadStatus) error {
+func (r *clienteRepository) UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) error {
 	query := `
-		UPDATE leads
+		UPDATE clientes
 		SET status = $1, updated_at = CURRENT_TIMESTAMP
 		WHERE id = $2
 	`
@@ -268,15 +268,15 @@ func (r *leadRepository) UpdateStatus(ctx context.Context, id string, status ent
 	}
 
 	if rows == 0 {
-		return errors.NewNotFoundError("Lead")
+		return errors.NewNotFoundError("Cliente")
 	}
 
 	return nil
 }
 
-func (r *leadRepository) UpdateLastInteraction(ctx context.Context, tx *sql.Tx, id string) error {
+func (r *clienteRepository) UpdateLastInteraction(ctx context.Context, tx *sql.Tx, id string) error {
 	query := `
-		UPDATE leads
+		UPDATE clientes
 		SET last_interaction = CURRENT_TIMESTAMP
 		WHERE id = $1
 	`
@@ -295,10 +295,10 @@ func (r *leadRepository) UpdateLastInteraction(ctx context.Context, tx *sql.Tx, 
 	return nil
 }
 
-func (r *leadRepository) CountByIndustry(ctx context.Context, industryID string) (int, error) {
+func (r *clienteRepository) CountByIndustry(ctx context.Context, industryID string) (int, error) {
 	query := `
 		SELECT COUNT(DISTINCT l.id)
-		FROM leads l
+		FROM clientes l
 		INNER JOIN sales_links sl ON l.sales_link_id = sl.id
 		WHERE sl.industry_id = $1
 	`
@@ -312,17 +312,17 @@ func (r *leadRepository) CountByIndustry(ctx context.Context, industryID string)
 	return count, nil
 }
 
-func (r *leadRepository) scanLeads(rows *sql.Rows) ([]entity.Lead, error) {
-	leads := []entity.Lead{}
+func (r *clienteRepository) scanClientes(rows *sql.Rows) ([]entity.Cliente, error) {
+	clientes := []entity.Cliente{}
 	for rows.Next() {
-		var l entity.Lead
+		var l entity.Cliente
 		if err := rows.Scan(
 			&l.ID, &l.SalesLinkID, &l.Name, &l.Contact, &l.Message,
 			&l.MarketingOptIn, &l.Status, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
-		leads = append(leads, l)
+		clientes = append(clientes, l)
 	}
-	return leads, nil
+	return clientes, nil
 }

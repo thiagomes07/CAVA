@@ -175,10 +175,10 @@ export default function LoginPage() {
         {/* Content */}
         <div className="relative z-10 flex items-center justify-center w-full p-12 text-center">
           <div className="max-w-lg">
-            <h2 className="font-serif text-5xl text-porcelain mb-6 leading-tight">
+            <h2 className="font-serif text-5xl text-porcelain mb-6 clienteing-tight">
               {t('heroTitle')}
             </h2>
-            <p className="text-lg text-porcelain/80 leading-relaxed">
+            <p className="text-lg text-porcelain/80 clienteing-relaxed">
               {t('heroSubtitle')}
             </p>
           </div>

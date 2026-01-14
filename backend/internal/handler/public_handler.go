@@ -16,7 +16,7 @@ import (
 // PublicHandler gerencia requisições públicas (sem autenticação)
 type PublicHandler struct {
 	salesLinkService service.SalesLinkService
-	leadService      service.LeadService
+	clienteService   service.ClienteService
 	validator        *validator.Validator
 	logger           *zap.Logger
 }
@@ -24,13 +24,13 @@ type PublicHandler struct {
 // NewPublicHandler cria uma nova instância de PublicHandler
 func NewPublicHandler(
 	salesLinkService service.SalesLinkService,
-	leadService service.LeadService,
+	clienteService service.ClienteService,
 	validator *validator.Validator,
 	logger *zap.Logger,
 ) *PublicHandler {
 	return &PublicHandler{
 		salesLinkService: salesLinkService,
-		leadService:      leadService,
+		clienteService:   clienteService,
 		validator:        validator,
 		logger:           logger,
 	}
@@ -95,19 +95,19 @@ func (h *PublicHandler) GetLinkBySlug(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, link)
 }
 
-// CaptureLeadInterest godoc
-// @Summary Captura interesse de lead
+// CaptureClienteInterest godoc
+// @Summary Captura interesse de cliente
 // @Description Captura informações de um potencial cliente
 // @Tags public
 // @Accept json
 // @Produce json
-// @Param body body entity.CreateLeadInput true "Dados do lead"
-// @Success 201 {object} entity.CreateLeadResponse
+// @Param body body entity.CreateClienteInput true "Dados do cliente"
+// @Success 201 {object} entity.CreateClienteResponse
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
-// @Router /api/public/leads/interest [post]
-func (h *PublicHandler) CaptureLeadInterest(w http.ResponseWriter, r *http.Request) {
-	var input entity.CreateLeadInput
+// @Router /api/public/clientes/interest [post]
+func (h *PublicHandler) CaptureClienteInterest(w http.ResponseWriter, r *http.Request) {
+	var input entity.CreateClienteInput
 
 	// Parse JSON body
 	if err := response.ParseJSON(r, &input); err != nil {
@@ -121,9 +121,9 @@ func (h *PublicHandler) CaptureLeadInterest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// Capturar lead
-	if err := h.leadService.CaptureInterest(r.Context(), input); err != nil {
-		h.logger.Error("erro ao capturar lead",
+	// Capturar cliente
+	if err := h.clienteService.CaptureInterest(r.Context(), input); err != nil {
+		h.logger.Error("erro ao capturar cliente",
 			zap.String("salesLinkId", input.SalesLinkID),
 			zap.String("name", input.Name),
 			zap.Error(err),
@@ -132,11 +132,11 @@ func (h *PublicHandler) CaptureLeadInterest(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	h.logger.Info("lead capturado",
+	h.logger.Info("cliente capturado",
 		zap.String("salesLinkId", input.SalesLinkID),
 		zap.String("name", input.Name),
 		zap.String("contact", input.Contact),
 	)
 
-	response.Created(w, entity.CreateLeadResponse{Success: true})
+	response.Created(w, entity.CreateClienteResponse{Success: true})
 }

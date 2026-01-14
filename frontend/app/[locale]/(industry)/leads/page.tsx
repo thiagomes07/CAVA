@@ -18,27 +18,27 @@ import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Lead, SalesLink } from '@/lib/types';
-import type { LeadFilter } from '@/lib/schemas/lead.schema';
-import { leadStatuses } from '@/lib/schemas/lead.schema';
+import type { Cliente, SalesLink } from '@/lib/types';
+import type { ClienteFilter } from '@/lib/schemas/cliente.schema';
+import { clienteStatuses } from '@/lib/schemas/cliente.schema';
 import { cn } from '@/lib/utils/cn';
 
-export default function LeadsManagementPage() {
+export default function ClientesManagementPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { success, error } = useToast();
-  const t = useTranslations('leads');
+  const t = useTranslations('clientes');
   const tCommon = useTranslations('common');
 
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [salesLinks, setSalesLinks] = useState<SalesLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  const [filters, setFilters] = useState<LeadFilter>({
+  const [filters, setFilters] = useState<ClienteFilter>({
     search: searchParams.get('search') || '',
     linkId: searchParams.get('linkId') || '',
     startDate: '',
@@ -54,7 +54,7 @@ export default function LeadsManagementPage() {
   }, []);
 
   useEffect(() => {
-    fetchLeads();
+    fetchClientes();
   }, [filters]);
 
   const fetchSalesLinks = async () => {
@@ -68,38 +68,38 @@ export default function LeadsManagementPage() {
     }
   };
 
-  const fetchLeads = async () => {
+  const fetchClientes = async () => {
     try {
       setIsLoading(true);
       const data = await apiClient.get<{
-        leads: Lead[];
+        clientes: Cliente[];
         total: number;
         page: number;
-      }>('/leads', { params: filters });
+      }>('/clientes', { params: filters });
 
-      setLeads(data.leads);
+      setClientes(data.clientes);
       setTotalItems(data.total);
     } catch (err) {
       error(t('loadError'));
-      setLeads([]);
+      setClientes([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleUpdateStatus = async (leadId: string, newStatus: typeof leadStatuses[number]) => {
+  const handleUpdateStatus = async (clienteId: string, newStatus: typeof clienteStatuses[number]) => {
     try {
       setIsUpdatingStatus(true);
       
-      await apiClient.patch(`/leads/${leadId}/status`, {
+      await apiClient.patch(`/clientes/${clienteId}/status`, {
         status: newStatus,
       });
 
       success(t('statusUpdated'));
-      fetchLeads();
+      fetchClientes();
       
-      if (selectedLead?.id === leadId) {
-        setSelectedLead({ ...selectedLead, status: newStatus });
+      if (selectedCliente?.id === clienteId) {
+        setSelectedCliente({ ...selectedCliente, status: newStatus });
       }
     } catch (err) {
       error(t('statusError'));
@@ -108,8 +108,8 @@ export default function LeadsManagementPage() {
     }
   };
 
-  const handleViewDetails = (lead: Lead) => {
-    setSelectedLead(lead);
+  const handleViewDetails = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
     setShowDetailModal(true);
   };
 
@@ -133,7 +133,7 @@ export default function LeadsManagementPage() {
       page: 1,
       limit: 50,
     });
-    router.push('/leads');
+    router.push('/clientes');
   };
 
   const handleCopyContact = async (contact: string) => {
@@ -146,7 +146,7 @@ export default function LeadsManagementPage() {
   };
 
   const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate || filters.status;
-  const isEmpty = leads.length === 0;
+  const isEmpty = clientes.length === 0;
 
   const getStatusBadge = (status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO') => {
     const variants: Record<'NOVO' | 'CONTATADO' | 'RESOLVIDO', string> = {
@@ -285,23 +285,23 @@ export default function LeadsManagementPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {leads.map((lead) => {
-                    const isEmail = lead.contact.includes('@');
+                  {clientes.map((cliente) => {
+                    const isEmail = cliente.contact.includes('@');
                     
                     return (
                       <TableRow 
-                        key={lead.id}
+                        key={cliente.id}
                         className="cursor-pointer"
-                        onClick={() => handleViewDetails(lead)}
+                        onClick={() => handleViewDetails(cliente)}
                       >
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
                             <span 
                               className="font-medium text-obsidian"
-                              title={lead.name}
+                              title={cliente.name}
                             >
-                              {truncateText(lead.name, TRUNCATION_LIMITS.USER_NAME_SHORT)}
+                              {truncateText(cliente.name, TRUNCATION_LIMITS.USER_NAME_SHORT)}
                             </span>
                           </div>
                         </TableCell>
@@ -309,33 +309,33 @@ export default function LeadsManagementPage() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleCopyContact(lead.contact);
+                              handleCopyContact(cliente.contact);
                             }}
                             className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
-                            title={lead.contact}
+                            title={cliente.contact}
                           >
                             {isEmail ? (
                               <Mail className="w-4 h-4" />
                             ) : (
                               <Phone className="w-4 h-4" />
                             )}
-                            <span>{truncateText(lead.contact, TRUNCATION_LIMITS.CONTACT)}</span>
+                            <span>{truncateText(cliente.contact, TRUNCATION_LIMITS.CONTACT)}</span>
                           </button>
                         </TableCell>
                         <TableCell>
                           <div>
                             <p 
                               className="text-sm text-slate-600"
-                              title={lead.salesLink?.title || lead.salesLink?.slugToken}
+                              title={cliente.salesLink?.title || cliente.salesLink?.slugToken}
                             >
-                              {truncateText(lead.salesLink?.title || lead.salesLink?.slugToken, TRUNCATION_LIMITS.LINK_TITLE) || '-'}
+                              {truncateText(cliente.salesLink?.title || cliente.salesLink?.slugToken, TRUNCATION_LIMITS.LINK_TITLE) || '-'}
                             </p>
-                            {lead.salesLink && (
+                            {cliente.salesLink && (
                               <Badge
                                 variant="default"
                                 className="mt-1"
                               >
-                                {lead.salesLink.linkType.replace('_', ' ')}
+                                {cliente.salesLink.linkType.replace('_', ' ')}
                               </Badge>
                             )}
                           </div>
@@ -343,22 +343,22 @@ export default function LeadsManagementPage() {
                         <TableCell>
                           <span 
                             className="text-sm text-slate-600"
-                            title={lead.salesLink?.batch?.product?.name || lead.salesLink?.product?.name || 'Catálogo'}
+                            title={cliente.salesLink?.batch?.product?.name || cliente.salesLink?.product?.name || 'Catálogo'}
                           >
                             {truncateText(
-                              lead.salesLink?.batch?.product?.name ||
-                                lead.salesLink?.product?.name ||
+                              cliente.salesLink?.batch?.product?.name ||
+                                cliente.salesLink?.product?.name ||
                                 'Catálogo',
                               TRUNCATION_LIMITS.PRODUCT_NAME_SHORT
                             )}
                           </span>
                         </TableCell>
                         <TableCell>
-                          {lead.message ? (
+                          {cliente.message ? (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                handleViewDetails(lead);
+                                handleViewDetails(cliente);
                               }}
                               className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
                             >
@@ -370,7 +370,7 @@ export default function LeadsManagementPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          {lead.marketingOptIn ? (
+                          {cliente.marketingOptIn ? (
                             <Check className="w-5 h-5 text-emerald-600" />
                           ) : (
                             <span className="text-slate-400">-</span>
@@ -379,8 +379,8 @@ export default function LeadsManagementPage() {
                         <TableCell>
                           <div onClick={(e: React.MouseEvent) => e.stopPropagation()}>
                             <Select
-                              value={lead.status}
-                              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(lead.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
+                              value={cliente.status}
+                              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(cliente.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
                               disabled={isUpdatingStatus}
                               className="text-xs"
                             >
@@ -392,7 +392,7 @@ export default function LeadsManagementPage() {
                         </TableCell>
                         <TableCell>
                           <span className="text-sm text-slate-500">
-                            {formatDate(lead.createdAt)}
+                            {formatDate(cliente.createdAt)}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -401,7 +401,7 @@ export default function LeadsManagementPage() {
                             size="sm"
                             onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                               e.stopPropagation();
-                              handleViewDetails(lead);
+                              handleViewDetails(cliente);
                             }}
                           >
                             {t('viewDetails')}
@@ -429,10 +429,10 @@ export default function LeadsManagementPage() {
       <Modal open={showDetailModal} onClose={() => setShowDetailModal(false)}>
         <ModalClose onClose={() => setShowDetailModal(false)} />
         <ModalHeader>
-          <ModalTitle>{t('leadDetails')}</ModalTitle>
+          <ModalTitle>{t('clienteDetails')}</ModalTitle>
         </ModalHeader>
         <ModalContent>
-          {selectedLead && (
+          {selectedCliente && (
             <div className="space-y-6">
               {/* Contact Info */}
               <div>
@@ -444,11 +444,11 @@ export default function LeadsManagementPage() {
                     <User className="w-5 h-5 text-slate-400" />
                     <div>
                       <p className="text-sm text-slate-500">{t('name')}</p>
-                      <p className="font-medium text-obsidian">{selectedLead.name}</p>
+                      <p className="font-medium text-obsidian">{selectedCliente.name}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {selectedLead.contact.includes('@') ? (
+                    {selectedCliente.contact.includes('@') ? (
                       <Mail className="w-5 h-5 text-slate-400" />
                     ) : (
                       <Phone className="w-5 h-5 text-slate-400" />
@@ -456,9 +456,9 @@ export default function LeadsManagementPage() {
                     <div>
                       <p className="text-sm text-slate-500">{t('contact')}</p>
                       <div className="flex items-center gap-2">
-                        <p className="font-medium text-obsidian">{selectedLead.contact}</p>
+                        <p className="font-medium text-obsidian">{selectedCliente.contact}</p>
                         <button
-                          onClick={() => handleCopyContact(selectedLead.contact)}
+                          onClick={() => handleCopyContact(selectedCliente.contact)}
                           className="text-blue-600 hover:text-blue-700"
                         >
                           <Copy className="w-4 h-4" />
@@ -470,14 +470,14 @@ export default function LeadsManagementPage() {
               </div>
 
               {/* Message */}
-              {selectedLead.message && (
+              {selectedCliente.message && (
                 <div>
                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
                     {t('message')}
                   </p>
                   <div className="p-4 bg-slate-50 rounded-sm">
                     <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                      {selectedLead.message}
+                      {selectedCliente.message}
                     </p>
                   </div>
                 </div>
@@ -486,24 +486,24 @@ export default function LeadsManagementPage() {
               {/* Origin */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  {t('leadOrigin')}
+                  {t('clienteOrigin')}
                 </p>
                 <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
                   <p className="text-sm font-semibold text-blue-900 mb-1">
-                    {selectedLead.salesLink?.title || t('untitledLink')}
+                    {selectedCliente.salesLink?.title || t('untitledLink')}
                   </p>
                   <p className="text-xs text-blue-700 mb-2">
-                    /{selectedLead.salesLink?.slugToken}
+                    /{selectedCliente.salesLink?.slugToken}
                   </p>
-                  {selectedLead.salesLink?.batch && (
+                  {selectedCliente.salesLink?.batch && (
                     <p className="text-sm text-blue-800">
-                      {t('batch')}: {selectedLead.salesLink.batch.batchCode} •{' '}
-                      {selectedLead.salesLink.batch.product?.name}
+                      {t('batch')}: {selectedCliente.salesLink.batch.batchCode} •{' '}
+                      {selectedCliente.salesLink.batch.product?.name}
                     </p>
                   )}
-                  {selectedLead.salesLink?.product && (
+                  {selectedCliente.salesLink?.product && (
                     <p className="text-sm text-blue-800">
-                      {t('productLabel')}: {selectedLead.salesLink.product.name}
+                      {t('productLabel')}: {selectedCliente.salesLink.product.name}
                     </p>
                   )}
                 </div>
@@ -511,7 +511,7 @@ export default function LeadsManagementPage() {
 
               {/* Marketing Opt-in */}
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-sm">
-                {selectedLead.marketingOptIn ? (
+                {selectedCliente.marketingOptIn ? (
                   <>
                     <Check className="w-5 h-5 text-emerald-600" />
                     <p className="text-sm text-slate-600">
@@ -531,11 +531,11 @@ export default function LeadsManagementPage() {
               {/* Status */}
               <div>
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  {t('leadStatus')}
+                  {t('clienteStatus')}
                 </p>
                 <Select
-                  value={selectedLead.status}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(selectedLead.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
+                  value={selectedCliente.status}
+                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(selectedCliente.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
                   disabled={isUpdatingStatus}
                 >
                   <option value="NOVO">{t('statusNew')}</option>
@@ -547,7 +547,7 @@ export default function LeadsManagementPage() {
               {/* Metadata */}
               <div className="pt-4 border-t border-slate-200">
                 <p className="text-xs text-slate-500">
-                  {t('leadCapturedAt', { date: formatDate(selectedLead.createdAt, 'dd/MM/yyyy HH:mm') })}
+                  {t('clienteCapturedAt', { date: formatDate(selectedCliente.createdAt, 'dd/MM/yyyy HH:mm') })}
                 </p>
               </div>
             </div>

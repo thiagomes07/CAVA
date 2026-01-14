@@ -75,6 +75,8 @@ export function useToast() {
 
 export const errorMessages: Record<string, string> = {
   BATCH_NOT_AVAILABLE: 'Este lote não está mais disponível',
+  INSUFFICIENT_SLABS: 'Quantidade de chapas insuficiente para esta operação',
+  RESERVATION_EXPIRED: 'Esta reserva já expirou',
   UNAUTHORIZED: 'Você não tem permissão para esta ação',
   VALIDATION_ERROR: 'Erro de validação nos dados enviados',
   NETWORK_ERROR: 'Erro de conexão. Verifique sua internet.',

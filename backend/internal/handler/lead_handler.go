@@ -12,30 +12,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// LeadHandler gerencia requisições de leads
-type LeadHandler struct {
-	leadService service.LeadService
-	validator   *validator.Validator
-	logger      *zap.Logger
+// ClienteHandler gerencia requisições de clientes
+type ClienteHandler struct {
+	clienteService service.ClienteService
+	validator      *validator.Validator
+	logger         *zap.Logger
 }
 
-// NewLeadHandler cria uma nova instância de LeadHandler
-func NewLeadHandler(
-	leadService service.LeadService,
+// NewClienteHandler cria uma nova instância de ClienteHandler
+func NewClienteHandler(
+	clienteService service.ClienteService,
 	validator *validator.Validator,
 	logger *zap.Logger,
-) *LeadHandler {
-	return &LeadHandler{
-		leadService: leadService,
-		validator:   validator,
-		logger:      logger,
+) *ClienteHandler {
+	return &ClienteHandler{
+		clienteService: clienteService,
+		validator:      validator,
+		logger:         logger,
 	}
 }
 
 // List godoc
-// @Summary Lista leads
-// @Description Lista leads com filtros e paginação
-// @Tags leads
+// @Summary Lista clientes
+// @Description Lista clientes com filtros e paginação
+// @Tags clientes
 // @Produce json
 // @Param search query string false "Buscar por nome ou contato"
 // @Param linkId query string false "Filtrar por link de venda"
@@ -45,11 +45,11 @@ func NewLeadHandler(
 // @Param optIn query bool false "Filtrar por opt-in"
 // @Param page query int false "Número da página"
 // @Param limit query int false "Itens por página"
-// @Success 200 {object} entity.LeadListResponse
-// @Router /api/leads [get]
-func (h *LeadHandler) List(w http.ResponseWriter, r *http.Request) {
+// @Success 200 {object} entity.ClienteListResponse
+// @Router /api/clientes [get]
+func (h *ClienteHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Extrair filtros da query string
-	filters := entity.LeadFilters{
+	filters := entity.ClienteFilters{
 		Page:  1,
 		Limit: 50,
 	}
@@ -63,7 +63,7 @@ func (h *LeadHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if status := r.URL.Query().Get("status"); status != "" {
-		s := entity.LeadStatus(status)
+		s := entity.ClienteStatus(status)
 		if s.IsValid() {
 			filters.Status = &s
 		}
@@ -102,10 +102,10 @@ func (h *LeadHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buscar leads
-	result, err := h.leadService.List(r.Context(), filters)
+	// Buscar clientes
+	result, err := h.clienteService.List(r.Context(), filters)
 	if err != nil {
-		h.logger.Error("erro ao listar leads",
+		h.logger.Error("erro ao listar clientes",
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -116,24 +116,24 @@ func (h *LeadHandler) List(w http.ResponseWriter, r *http.Request) {
 }
 
 // GetByID godoc
-// @Summary Busca lead por ID
-// @Description Retorna detalhes de um lead específico
-// @Tags leads
+// @Summary Busca cliente por ID
+// @Description Retorna detalhes de um cliente específico
+// @Tags clientes
 // @Produce json
-// @Param id path string true "ID do lead"
-// @Success 200 {object} entity.Lead
+// @Param id path string true "ID do cliente"
+// @Success 200 {object} entity.Cliente
 // @Failure 404 {object} response.ErrorResponse
-// @Router /api/leads/{id} [get]
-func (h *LeadHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+// @Router /api/clientes/{id} [get]
+func (h *ClienteHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.BadRequest(w, "ID do lead é obrigatório", nil)
+		response.BadRequest(w, "ID do cliente é obrigatório", nil)
 		return
 	}
 
-	lead, err := h.leadService.GetByID(r.Context(), id)
+	cliente, err := h.clienteService.GetByID(r.Context(), id)
 	if err != nil {
-		h.logger.Error("erro ao buscar lead",
+		h.logger.Error("erro ao buscar cliente",
 			zap.String("id", id),
 			zap.Error(err),
 		)
@@ -141,28 +141,28 @@ func (h *LeadHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, lead)
+	response.OK(w, cliente)
 }
 
 // GetInteractions godoc
-// @Summary Busca interações do lead
-// @Description Retorna histórico de interações de um lead
-// @Tags leads
+// @Summary Busca interações do cliente
+// @Description Retorna histórico de interações de um cliente
+// @Tags clientes
 // @Produce json
-// @Param id path string true "ID do lead"
-// @Success 200 {array} entity.LeadInteraction
+// @Param id path string true "ID do cliente"
+// @Success 200 {array} entity.ClienteInteraction
 // @Failure 404 {object} response.ErrorResponse
-// @Router /api/leads/{id}/interactions [get]
-func (h *LeadHandler) GetInteractions(w http.ResponseWriter, r *http.Request) {
+// @Router /api/clientes/{id}/interactions [get]
+func (h *ClienteHandler) GetInteractions(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.BadRequest(w, "ID do lead é obrigatório", nil)
+		response.BadRequest(w, "ID do cliente é obrigatório", nil)
 		return
 	}
 
-	interactions, err := h.leadService.GetInteractions(r.Context(), id)
+	interactions, err := h.clienteService.GetInteractions(r.Context(), id)
 	if err != nil {
-		h.logger.Error("erro ao buscar interações do lead",
+		h.logger.Error("erro ao buscar interações do cliente",
 			zap.String("id", id),
 			zap.Error(err),
 		)
@@ -174,25 +174,25 @@ func (h *LeadHandler) GetInteractions(w http.ResponseWriter, r *http.Request) {
 }
 
 // UpdateStatus godoc
-// @Summary Atualiza status do lead
-// @Description Atualiza o status de um lead
-// @Tags leads
+// @Summary Atualiza status do cliente
+// @Description Atualiza o status de um cliente
+// @Tags clientes
 // @Accept json
 // @Produce json
-// @Param id path string true "ID do lead"
-// @Param body body entity.UpdateLeadStatusInput true "Status do lead"
-// @Success 200 {object} entity.Lead
+// @Param id path string true "ID do cliente"
+// @Param body body entity.UpdateClienteStatusInput true "Status do cliente"
+// @Success 200 {object} entity.Cliente
 // @Failure 400 {object} response.ErrorResponse
 // @Failure 404 {object} response.ErrorResponse
-// @Router /api/leads/{id}/status [patch]
-func (h *LeadHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
+// @Router /api/clientes/{id}/status [patch]
+func (h *ClienteHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if id == "" {
-		response.BadRequest(w, "ID do lead é obrigatório", nil)
+		response.BadRequest(w, "ID do cliente é obrigatório", nil)
 		return
 	}
 
-	var input entity.UpdateLeadStatusInput
+	var input entity.UpdateClienteStatusInput
 
 	// Parse JSON body
 	if err := response.ParseJSON(r, &input); err != nil {
@@ -207,9 +207,9 @@ func (h *LeadHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Atualizar status
-	lead, err := h.leadService.UpdateStatus(r.Context(), id, input.Status)
+	cliente, err := h.clienteService.UpdateStatus(r.Context(), id, input.Status)
 	if err != nil {
-		h.logger.Error("erro ao atualizar status do lead",
+		h.logger.Error("erro ao atualizar status do cliente",
 			zap.String("id", id),
 			zap.Error(err),
 		)
@@ -217,10 +217,10 @@ func (h *LeadHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.logger.Info("status do lead atualizado",
-		zap.String("leadId", id),
+	h.logger.Info("status do cliente atualizado",
+		zap.String("clienteId", id),
 		zap.String("status", string(input.Status)),
 	)
 
-	response.OK(w, lead)
+	response.OK(w, cliente)
 }

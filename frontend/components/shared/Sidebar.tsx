@@ -69,8 +69,8 @@ const industryMenuItems: MenuItem[] = [
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
-    label: 'navigation.leads',
-    href: '/leads',
+    label: 'navigation.clientes',
+    href: '/clientes',
     icon: Inbox,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
@@ -108,8 +108,8 @@ const brokerMenuItems: MenuItem[] = [
     roles: ['BROKER'],
   },
   {
-    label: 'navigation.leads',
-    href: '/leads',
+    label: 'navigation.clientes',
+    href: '/clientes',
     icon: Inbox,
     roles: ['BROKER'],
   },

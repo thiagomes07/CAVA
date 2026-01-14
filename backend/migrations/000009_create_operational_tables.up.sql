@@ -8,7 +8,7 @@ CREATE TABLE reservations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE RESTRICT,
     reserved_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
-    lead_id UUID REFERENCES leads(id) ON DELETE SET NULL,
+    cliente_id UUID REFERENCES clientes(id) ON DELETE SET NULL,
     status reservation_status_type DEFAULT 'ATIVA',
     notes TEXT,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -19,7 +19,7 @@ CREATE TABLE reservations (
 -- Índices para reservations
 CREATE INDEX idx_reservations_batch ON reservations(batch_id);
 CREATE INDEX idx_reservations_user ON reservations(reserved_by_user_id);
-CREATE INDEX idx_reservations_lead ON reservations(lead_id);
+CREATE INDEX idx_reservations_cliente ON reservations(cliente_id);
 CREATE INDEX idx_reservations_status ON reservations(status);
 CREATE INDEX idx_reservations_expires_at ON reservations(expires_at) 
     WHERE status = 'ATIVA';
@@ -38,7 +38,7 @@ CREATE TABLE sales_history (
     batch_id UUID NOT NULL REFERENCES batches(id),
     sold_by_user_id UUID NOT NULL REFERENCES users(id),
     industry_id UUID NOT NULL REFERENCES industries(id),
-    lead_id UUID REFERENCES leads(id),
+    cliente_id UUID REFERENCES clientes(id),
     customer_name VARCHAR(255) NOT NULL,
     customer_contact VARCHAR(255) NOT NULL,
     sale_price DECIMAL(12,2) NOT NULL CHECK (sale_price > 0),
@@ -54,7 +54,7 @@ CREATE TABLE sales_history (
 CREATE INDEX idx_sales_history_batch ON sales_history(batch_id);
 CREATE INDEX idx_sales_history_seller ON sales_history(sold_by_user_id);
 CREATE INDEX idx_sales_history_industry ON sales_history(industry_id);
-CREATE INDEX idx_sales_history_lead ON sales_history(lead_id);
+CREATE INDEX idx_sales_history_cliente ON sales_history(cliente_id);
 CREATE INDEX idx_sales_history_sold_at ON sales_history(sold_at DESC);
 CREATE INDEX idx_sales_history_industry_date ON sales_history(industry_id, sold_at DESC);
 

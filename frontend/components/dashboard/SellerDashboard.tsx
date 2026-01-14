@@ -143,11 +143,11 @@ export function SellerDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/leads')}
+              onClick={() => router.push('/clientes')}
             >
               <Inbox className="w-5 h-5 mr-3" />
               <div className="text-left">
-                <p className="font-semibold">{t('viewLeads')}</p>
+                <p className="font-semibold">{t('viewClientes')}</p>
                 <p className="text-xs text-slate-500 font-normal">
                   {t('manageInterested')}
                 </p>

@@ -14,7 +14,7 @@ Sistema completo para gestão de estoque e vendas de rochas ornamentais, conecta
 - 🤝 Compartilhamento de estoque com brokers
 - 🔗 Criação de links de venda públicos personalizados
 - 📊 Dashboard com métricas em tempo real
-- 👥 Gestão de leads e histórico de vendas
+- 👥 Gestão de clientes e histórico de vendas
 - 🔐 Autenticação JWT com refresh tokens e controle de acesso por roles
 
 ## 📋 Pré-requisitos
@@ -72,7 +72,7 @@ O sistema possui 3 tipos de usuários (seeds automáticos criados no primeiro ru
 |------|-------|-------|------------|
 | Admin Indústria | admin@pedrasdemo.com | Admin@123 | Acesso total |
 | Vendedor Interno | vendedor@pedrasdemo.com | Vendedor@123 | Gestão de estoque e vendas |
-| Broker | broker@example.com | Broker@123 | Estoque compartilhado e leads |
+| Broker | broker@example.com | Broker@123 | Estoque compartilhado e clientes |
 
 ## 🗄️ Estrutura do Projeto
 
@@ -141,7 +141,7 @@ rm -rf .next node_modules && npm install
 | GET | `/api/batches` | Lista lotes de estoque |
 | POST | `/api/sales-links` | Criar link de venda |
 | GET | `/api/public/links/:slug` | Acessar link público |
-| POST | `/api/public/leads/interest` | Registrar interesse (lead) |
+| POST | `/api/public/clientes/interest` | Registrar interesse (cliente) |
 
 Documentação completa: `backend/README.md`
 

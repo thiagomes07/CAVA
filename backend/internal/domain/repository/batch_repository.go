@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
@@ -23,7 +24,7 @@ type BatchRepository interface {
 	// FindByStatus busca lotes por status
 	FindByStatus(ctx context.Context, industryID string, status entity.BatchStatus) ([]entity.Batch, error)
 
-	// FindAvailable busca lotes disponíveis
+	// FindAvailable busca lotes disponíveis (com chapas disponíveis)
 	FindAvailable(ctx context.Context, industryID string) ([]entity.Batch, error)
 
 	// FindByCode busca lotes por código (busca parcial)
@@ -37,6 +38,15 @@ type BatchRepository interface {
 
 	// UpdateStatus atualiza apenas o status do lote
 	UpdateStatus(ctx context.Context, tx *sql.Tx, id string, status entity.BatchStatus) error
+
+	// UpdateAvailableSlabs atualiza a quantidade de chapas disponíveis
+	UpdateAvailableSlabs(ctx context.Context, tx *sql.Tx, id string, availableSlabs int) error
+
+	// DecrementAvailableSlabs decrementa a quantidade de chapas disponíveis
+	DecrementAvailableSlabs(ctx context.Context, tx *sql.Tx, id string, quantity int) error
+
+	// IncrementAvailableSlabs incrementa a quantidade de chapas disponíveis
+	IncrementAvailableSlabs(ctx context.Context, tx *sql.Tx, id string, quantity int) error
 
 	// CountByStatus conta lotes por status
 	CountByStatus(ctx context.Context, industryID string, status entity.BatchStatus) (int, error)

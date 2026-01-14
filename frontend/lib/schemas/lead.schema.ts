@@ -1,8 +1,8 @@
 import { z } from 'zod';
 
-export const leadStatuses = ['NOVO', 'CONTATADO', 'RESOLVIDO'] as const;
+export const clienteStatuses = ['NOVO', 'CONTATADO', 'RESOLVIDO'] as const;
 
-export const leadFilterSchema = z.object({
+export const clienteFilterSchema = z.object({
   search: z.string().optional(),
   linkId: z.string().optional(),
   startDate: z
@@ -14,16 +14,16 @@ export const leadFilterSchema = z.object({
     .refine((val) => !val || !isNaN(Date.parse(val)), 'Data inválida')
     .optional(),
   optIn: z.boolean().optional(),
-  status: z.enum([...leadStatuses, '']).optional(),
+  status: z.enum([...clienteStatuses, '']).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(50),
 });
 
-export const updateLeadStatusSchema = z.object({
-  status: z.enum(leadStatuses, {
+export const updateClienteStatusSchema = z.object({
+  status: z.enum(clienteStatuses, {
     message: 'Status é obrigatório',
   }),
 });
 
-export type LeadFilter = z.infer<typeof leadFilterSchema>;
-export type UpdateLeadStatusInput = z.infer<typeof updateLeadStatusSchema>;
+export type ClienteFilter = z.infer<typeof clienteFilterSchema>;
+export type UpdateClienteStatusInput = z.infer<typeof updateClienteStatusSchema>;
