@@ -87,8 +87,14 @@ function getRedirectForRole(pathname: string, role: string): string | null {
   for (const [route, redirects] of Object.entries(roleBasedRedirects)) {
     if (pathname === route || pathname.startsWith(`${route}/`)) {
       const redirect = redirects[role];
-      if (redirect && redirect !== pathname) {
-        return pathname.replace(route, redirect);
+      if (!redirect) continue;
+
+      // Avoid no-op redirects (e.g., ADMIN_INDUSTRIA -> /inventory stays /inventory)
+      if (redirect === route) continue;
+
+      const redirectPath = pathname.replace(route, redirect);
+      if (redirectPath !== pathname) {
+        return redirectPath;
       }
     }
   }
@@ -216,10 +222,12 @@ export async function middleware(request: NextRequest) {
   const accessToken = request.cookies.get('access_token')?.value;
   const rawRole = request.cookies.get('user_role')?.value;
   const userRole = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
+  const hasValidAccessToken = !!accessToken && !isTokenExpired(accessToken);
 
   // Auth routes are public, but redirect if already authenticated
   if (isAuthRoute(pathnameWithoutLocale)) {
-    if (accessToken && userRole) {
+    // Allow access to login when the access token is missing or expired to avoid redirect loops
+    if (hasValidAccessToken && userRole) {
       const dashboardUrl = getDashboardForRole(userRole);
       const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
       return NextResponse.redirect(redirectUrl);
@@ -233,7 +241,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // No token or expired token - try refresh or redirect to login
-  if (!accessToken || isTokenExpired(accessToken)) {
+  if (!hasValidAccessToken) {
     try {
       return await attemptRefresh(request, pathnameWithoutLocale, currentLocale);
     } catch (error) {
