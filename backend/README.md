@@ -1095,6 +1095,8 @@ All endpoints may return error responses in this format:
 - `CONFLICT` - Resource conflict (409)
 - `CSRF_TOKEN_MISSING` - CSRF token required (419)
 - `BATCH_NOT_AVAILABLE` - Batch already reserved/sold (400)
+- `INSUFFICIENT_SLABS` - Requested quantity exceeds available slabs (400)
+- `RESERVATION_EXPIRED` - Reservation has expired (400)
 - `SLUG_EXISTS` - Slug already in use (409)
 - `INTERNAL_ERROR` - Server error (500)
 
@@ -1206,6 +1208,7 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 -- =============================================
 CREATE TYPE user_role_type AS ENUM ('ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER');
 CREATE TYPE batch_status_type AS ENUM ('DISPONIVEL', 'RESERVADO', 'VENDIDO', 'INATIVO');
+CREATE TYPE price_unit_type AS ENUM ('M2', 'FT2'); -- Unidade de preço: metro quadrado ou pé quadrado
 CREATE TYPE link_type_enum AS ENUM ('LOTE_UNICO', 'CATALOGO_COMPLETO', 'PRODUTO_GERAL');
 CREATE TYPE media_type_enum AS ENUM ('IMAGE', 'VIDEO');
 CREATE TYPE interaction_type_enum AS ENUM ('INTERESSE_LOTE', 'INTERESSE_CATALOGO', 'DUVIDA_GERAL');
@@ -1280,22 +1283,29 @@ CREATE TABLE product_medias (
 CREATE TABLE batches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+    industry_id UUID NOT NULL REFERENCES industries(id) ON DELETE CASCADE,
     batch_code VARCHAR(100) NOT NULL, -- Ex: Lote #505
     
     -- Dimensões Físicas
     height DECIMAL(8,2) NOT NULL, -- em cm
     width DECIMAL(8,2) NOT NULL, -- em cm
     thickness DECIMAL(8,2) NOT NULL, -- em cm
-    quantity_slabs INTEGER DEFAULT 1, -- Qtd de chapas neste lote
-    net_area DECIMAL(10,2), -- Area total em m2
+    quantity_slabs INTEGER NOT NULL DEFAULT 1, -- Qtd total de chapas neste lote
+    available_slabs INTEGER NOT NULL DEFAULT 1, -- Chapas disponíveis para reserva
+    total_area DECIMAL(10,2), -- Área total em m²
     
-    industry_price DECIMAL(12,2) NOT NULL, -- Preço base da industria
+    industry_price DECIMAL(12,2) NOT NULL, -- Preço base por unidade de área
+    price_unit price_unit_type DEFAULT 'M2', -- Unidade de preço (M2 ou FT2)
     status batch_status_type DEFAULT 'DISPONIVEL',
     origin_quarry VARCHAR(255), -- Pedreira
+    is_active BOOLEAN DEFAULT TRUE,
     
     entry_date TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT chk_quantity_positive CHECK (quantity_slabs > 0),
+    CONSTRAINT chk_available_valid CHECK (available_slabs >= 0 AND available_slabs <= quantity_slabs)
 );
 
 -- Tabela: Mídias do Lote (Fotos Reais)
@@ -1319,6 +1329,7 @@ CREATE TABLE shared_inventory_batches (
     industry_owner_id UUID NOT NULL REFERENCES industries(id) ON DELETE CASCADE,
     
     negotiated_price DECIMAL(12,2), -- Preço especial para este broker
+    negotiated_price_unit price_unit_type, -- Unidade do preço negociado
     shared_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE,
     
@@ -1416,10 +1427,14 @@ CREATE TABLE reservations (
     seller_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     cliente_id UUID REFERENCES clientes(id) ON DELETE SET NULL,
     
+    quantity_slabs_reserved INTEGER NOT NULL DEFAULT 1, -- Quantidade de chapas reservadas
     status reservation_status_type DEFAULT 'ATIVA',
     notes TEXT,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT chk_quantity_reserved_positive CHECK (quantity_slabs_reserved > 0)
 );
 
 -- Tabela: Histórico de Vendas (Faturamento)
@@ -1430,12 +1445,21 @@ CREATE TABLE sales_history (
     industry_id UUID NOT NULL REFERENCES industries(id),
     cliente_id UUID REFERENCES clientes(id),
     
-    final_sold_price DECIMAL(12,2) NOT NULL, -- Valor total pago pelo cliente
-    industry_net_value DECIMAL(12,2) NOT NULL, -- Valor que fica para a industria
-    broker_commission DECIMAL(12,2) DEFAULT 0, -- Margem do vendedor
+    quantity_slabs_sold INTEGER NOT NULL DEFAULT 1, -- Quantidade de chapas vendidas
+    total_area_sold DECIMAL(10,2) NOT NULL, -- Área total vendida em m²
+    price_per_unit DECIMAL(12,2) NOT NULL, -- Preço por unidade de área
+    price_unit price_unit_type DEFAULT 'M2', -- Unidade de preço
+    sale_price DECIMAL(12,2) NOT NULL, -- Valor total da venda
+    industry_net_value DECIMAL(12,2) NOT NULL, -- Valor líquido para a indústria
+    broker_commission DECIMAL(12,2) DEFAULT 0, -- Comissão do broker
     
-    invoice_number VARCHAR(100),
-    sold_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    customer_name VARCHAR(255) NOT NULL,
+    customer_contact VARCHAR(255) NOT NULL,
+    invoice_url VARCHAR(500),
+    notes TEXT,
+    sold_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    
+    CONSTRAINT chk_quantity_sold_positive CHECK (quantity_slabs_sold > 0)
 );
 -- =============================================
 -- FIM DO SCRIPT

@@ -49,6 +49,7 @@ src/
 │   │   └── LoadingState.tsx
 │   ├── catalog/
 │   ├── inventory/
+│   │   └── ReservationModal.tsx  -- Modal para seleção de quantidade de chapas
 │   ├── sales/
 │   └── public/
 ├── lib/
@@ -57,6 +58,9 @@ src/
 │   │   ├── queries/
 │   │   └── mutations/
 │   ├── hooks/
+│   │   ├── useAuth.ts
+│   │   ├── useToast.ts
+│   │   └── usePriceUnit.ts  -- Preferência de unidade m²/ft² com persistência
 │   ├── utils/
 │   ├── schemas/
 │   └── types/
@@ -887,27 +891,34 @@ module.exports = {
 
 **Trigger:** Botão "Reservar" em card de lote (em `/inventory` ou `/shared-inventory`)
 
-**Modal UI:**
-- Título font-serif: "Reservar Lote"
-- Preview do lote (foto + código + dimensões)
+**Modal UI (ReservationModal):**
+- Título font-serif: "Reservar Chapas"
+- Preview do lote (foto + código + dimensões + chapas disponíveis)
 - Form:
+  - **Seletor de quantidade de chapas:** botões +/- com input numérico central
+    - Mínimo: 1
+    - Máximo: `batch.availableSlabs`
+    - Barra de progresso visual
+    - Exibição de área total calculada
   - Select "Cliente" (autocomplete de clientes existentes ou "Novo Cliente")
   - Se novo: inputs Nome, Contato
   - Date picker "Validade da Reserva" (default: +7 dias)
   - Textarea "Observações"
 - Footer:
   - Button secondary: "Cancelar"
-  - Button primary: "CONFIRMAR RESERVA"
+  - Button primary: "RESERVAR X CHAPAS"
 
 **Dados & Integração:**
 - Mutation: `POST /api/reservations`
-  - Input: `{ batchId, clienteId?, expiresAt, notes }`
-- Optimistic update: atualiza status do lote localmente para `RESERVADO` antes do response
-- WebSocket (opcional): notifica outros usuários que lote foi reservado
+  - Input: `{ batchId, quantitySlabsReserved, clienteId?, expiresAt, notes }`
+- Optimistic update: decrementa `availableSlabs` localmente antes do response
+- Se `availableSlabs` ficar 0, status vira `RESERVADO`
+- WebSocket (opcional): notifica outros usuários sobre mudança de disponibilidade
 
 **Estados:**
-- Success: toast + atualiza lista
-- Error (lote já reservado por outro): modal de erro explicativo
+- Success: toast "X chapas reservadas até [data]" + atualiza lista
+- Error `INSUFFICIENT_SLABS`: toast com quantidade disponível atualizada
+- Error (lote indisponível): modal de erro explicativo
 
 ---
 
@@ -1153,7 +1164,8 @@ module.exports = {
 | Produto excluído | Success | "Produto removido do catálogo" |
 | Lote criado | Success | "Lote cadastrado com sucesso" |
 | Lote atualizado | Success | "Lote atualizado com sucesso" |
-| Lote reservado | Success | "Lote reservado até [data]" |
+| Lote reservado | Success | "X chapas reservadas até [data]" |
+| Chapas insuficientes | Error | "Quantidade insuficiente: disponível X chapas" |
 | Lote indisponível | Error | "Este lote não está mais disponível" |
 | Reserva cancelada | Info | "Reserva cancelada" |
 | Link criado | Success | "Link criado! Copiado para área de transferência" |
@@ -1407,7 +1419,8 @@ module.exports = {
 | Dimensões | > 0, number | change (real-time) |
 | Slug | alphanumeric + hífens, único | debounced change (500ms) |
 | Data | data válida, >= hoje (para expiração) | blur |
-| Quantidade | integer > 0 | change |
+| Quantidade | integer > 0, <= availableSlabs | change |
+| Quantidade chapas | 1 <= n <= availableSlabs | change (real-time) |
 | URL | formato URL válido | blur |
 | Upload | formato (jpg/png/webp), size (< 5MB) | change |
 
