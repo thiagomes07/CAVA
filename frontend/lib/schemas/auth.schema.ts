@@ -54,11 +54,13 @@ export function createInviteBrokerSchema(t: TranslationFunction) {
     name: z
       .string()
       .min(1, t('required', { field: t('name') }))
-      .min(2, t('minLength', { field: t('name'), min: 2 })),
+      .refine((v) => v.trim().length >= 2, t('minLength', { field: t('name'), min: 2 }))
+      .transform((v) => v.trim()),
     email: z
       .string()
       .min(1, t('required', { field: t('email') }))
-      .email(t('email')),
+      .email(t('email'))
+      .transform((v) => v.trim()),
     phone: z
       .string()
       .optional()
@@ -137,11 +139,13 @@ export const inviteBrokerSchema = z.object({
   name: z
     .string()
     .min(1, 'Nome é obrigatório')
-    .min(2, 'Nome deve ter no mínimo 2 caracteres'),
+    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
+    .transform((v) => v.trim()),
   email: z
     .string()
     .min(1, 'Email é obrigatório')
-    .email('Email inválido'),
+    .email('Email inválido')
+    .transform((v) => v.trim()),
   phone: z
     .string()
     .optional()

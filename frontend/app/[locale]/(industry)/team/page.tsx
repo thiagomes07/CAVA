@@ -1,7 +1,8 @@
-'use client';
+"use client";
 
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
+import { useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, Link2, Receipt, Edit2, UserX } from 'lucide-react';
@@ -28,10 +29,15 @@ import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User } from '@/lib/types';
 import { z } from 'zod';
 import { cn } from '@/lib/utils/cn';
+import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 
 const inviteSellerSchema = z.object({
-  name: z.string().min(1, 'Nome é obrigatório').min(2, 'Nome deve ter no mínimo 2 caracteres'),
-  email: z.string().min(1, 'Email é obrigatório').email('Email inválido'),
+  name: z
+    .string()
+    .min(1, 'Nome é obrigatório')
+    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
+    .transform((v) => v.trim()),
+  email: z.string().min(1, 'Email é obrigatório').email('Email inválido').transform((v) => v.trim()),
   phone: z
     .string()
     .optional()
@@ -59,9 +65,12 @@ export default function TeamManagementPage() {
     handleSubmit,
     formState: { errors },
     reset,
+    control,
   } = useForm<InviteSellerInput>({
     resolver: zodResolver(inviteSellerSchema),
   });
+
+  const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
 
   useEffect(() => {
     fetchSellers();
@@ -87,6 +96,7 @@ export default function TeamManagementPage() {
 
       await apiClient.post('/users', {
         ...data,
+        phone: sanitizePhone(data.phone),
         role: 'VENDEDOR_INTERNO',
       });
 
@@ -283,7 +293,8 @@ export default function TeamManagementPage() {
               />
 
               <Input
-                {...register('phone')}
+                value={phoneField.value}
+                onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
                 label={t('phoneOptional')}
                 placeholder="(11) 98765-4321"
                 error={errors.phone?.message}

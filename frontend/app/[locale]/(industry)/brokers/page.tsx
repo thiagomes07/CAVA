@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX } from 'lucide-react';
@@ -23,6 +23,7 @@ import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { inviteBrokerSchema, type InviteBrokerInput } from '@/lib/schemas/auth.schema';
+import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatPhone } from '@/lib/utils/validators';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -51,9 +52,13 @@ export default function BrokersManagementPage() {
     handleSubmit,
     formState: { errors },
     reset,
+    control,
   } = useForm<InviteBrokerInput>({
     resolver: zodResolver(inviteBrokerSchema),
   });
+
+  const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
+  const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
   useEffect(() => {
     fetchBrokers();
@@ -75,7 +80,11 @@ export default function BrokersManagementPage() {
     try {
       setIsSubmitting(true);
 
-      await apiClient.post('/brokers/invite', data);
+      await apiClient.post('/brokers/invite', {
+        ...data,
+        phone: sanitizePhone(data.phone),
+        whatsapp: sanitizePhone((data as any).whatsapp),
+      });
 
       success(t('inviteSent', { email: data.email }));
       setShowInviteModal(false);
@@ -282,7 +291,8 @@ export default function BrokersManagementPage() {
               />
 
               <Input
-                {...register('phone')}
+                value={phoneField.value}
+                onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
                 label={tTeam('phoneOptional')}
                 placeholder="(11) 98765-4321"
                 error={errors.phone?.message}
@@ -290,7 +300,8 @@ export default function BrokersManagementPage() {
               />
 
               <Input
-                {...register('whatsapp')}
+                value={whatsappField.value}
+                onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
                 label={t('whatsappOptional')}
                 placeholder="(11) 98765-4321"
                 helperText={t('whatsappHelperText')}
