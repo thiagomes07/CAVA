@@ -193,6 +193,12 @@ func (h *BatchHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Garantir que ao menos productId ou newProduct tenha sido enviado
+	if (input.ProductID == nil || *input.ProductID == "") && input.NewProduct == nil {
+		response.BadRequest(w, "ProductID é obrigatório quando não há novo produto", nil)
+		return
+	}
+
 	// Obter industryID do contexto
 	industryID := middleware.GetIndustryID(r.Context())
 	if industryID == "" {

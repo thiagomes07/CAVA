@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Upload, X, Package, Trash2 } from 'lucide-react';
+import { Upload, X, Package, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -247,22 +247,14 @@ export default function EditBatchPage() {
       {/* Header */}
       <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="font-serif text-3xl text-obsidian">
-                  Editar Lote
-                </h1>
-                <Badge variant={batch.status}>{batch.status}</Badge>
-              </div>
-              <p className="text-sm text-slate-500 font-mono">{batch.batchCode}</p>
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="font-serif text-3xl text-obsidian">
+                Editar Lote
+              </h1>
+              <Badge variant={batch.status}>{batch.status}</Badge>
             </div>
+            <p className="text-sm text-slate-500 font-mono">{batch.batchCode}</p>
           </div>
 
           <Button

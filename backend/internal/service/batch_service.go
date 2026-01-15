@@ -62,14 +62,14 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		)
 	} else {
 		// Validar que produto existe e pertence à indústria
-		product, err := s.productRepo.FindByID(ctx, input.ProductID)
+		product, err := s.productRepo.FindByID(ctx, *input.ProductID)
 		if err != nil {
 			return nil, err
 		}
 		if product.IndustryID != industryID {
 			return nil, domainErrors.ForbiddenError()
 		}
-		productID = input.ProductID
+		productID = *input.ProductID
 	}
 
 	// Validar e formatar batch code
@@ -116,8 +116,11 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		priceUnit = input.PriceUnit
 	}
 
-	// Validar data de entrada (não pode ser futura)
+	// Validar data de entrada (aceita ISO date ou RFC3339) e não pode ser futura
 	entryDate, err := time.Parse(time.RFC3339, input.EntryDate)
+	if err != nil {
+		entryDate, err = time.Parse("2006-01-02", input.EntryDate)
+	}
 	if err != nil {
 		return nil, domainErrors.ValidationError("Data de entrada inválida")
 	}

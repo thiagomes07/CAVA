@@ -123,31 +123,22 @@ export default function NewBatchPage() {
     try {
       setIsSubmitting(true);
 
-      let mediaUrls: string[] = [];
+      // 1) Cria o lote primeiro
+      const created = await apiClient.post<{ id: string }>('/batches', data);
 
+      // 2) Se houver mídias, faz upload vinculando ao lote criado
       if (medias.length > 0) {
         const formData = new FormData();
+        formData.append('batchId', created.id);
         medias.forEach((media) => {
-          formData.append('files', media.file);
+          formData.append('medias', media.file);
         });
 
-        const uploadResult = await apiClient.upload<{ urls: string[] }>(
+        await apiClient.upload<{ urls: string[] }>(
           '/upload/batch-medias',
           formData
         );
-        mediaUrls = uploadResult.urls;
       }
-
-      const batchData = {
-        ...data,
-        medias: mediaUrls.map((url, index) => ({
-          url,
-          displayOrder: index,
-          isCover: index === 0,
-        })),
-      };
-
-      await apiClient.post('/batches', batchData);
 
       success('Lote cadastrado com sucesso');
       router.push('/inventory');

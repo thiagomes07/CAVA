@@ -161,7 +161,7 @@ func (b *Batch) CalculatePriceForSlabs(quantity int) float64 {
 
 // CreateBatchInput representa os dados para criar um lote
 type CreateBatchInput struct {
-	ProductID     string    `json:"productId" validate:"required,uuid"`
+	ProductID     *string   `json:"productId,omitempty" validate:"omitempty,uuid"`
 	BatchCode     string    `json:"batchCode" validate:"required,batchcode"` // AAA-999999
 	Height        float64   `json:"height" validate:"required,gt=0,lte=1000"`
 	Width         float64   `json:"width" validate:"required,gt=0,lte=1000"`

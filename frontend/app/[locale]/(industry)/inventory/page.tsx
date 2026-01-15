@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, Edit2, Eye, Archive, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Search, Edit2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -466,13 +466,6 @@ export default function InventoryPage() {
                               title={t('edit')}
                             >
                               <Edit2 className="w-4 h-4 text-slate-600" />
-                            </button>
-                            <button
-                              onClick={() => router.push(`/inventory/${batch.id}`)}
-                              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-                              title={t('viewDetails')}
-                            >
-                              <Eye className="w-4 h-4 text-slate-600" />
                             </button>
                           </div>
                         </TableCell>
