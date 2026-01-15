@@ -76,16 +76,33 @@ func (h *Hasher) Hash(password string) (string, error) {
 
 // Verify verifica se uma senha corresponde ao hash
 func (h *Hasher) Verify(password, encodedHash string) error {
-	// Adicionar pepper à senha
-	password = password + h.pepper
+	// Primeira tentativa: usa o pepper configurado
+	if err := h.verifyWithPepper(password, encodedHash, h.pepper); err == nil {
+		return nil
+	} else {
+		// Guardar erro primário para retornar caso fallback também falhe
+		primaryErr := err
 
-	// Decodificar hash
+		// Fallback: tentar sem pepper (compatibilidade com hashes antigos/seeds gerados sem pepper)
+		if h.pepper != "" {
+			if err := h.verifyWithPepper(password, encodedHash, ""); err == nil {
+				return nil
+			}
+		}
+
+		return primaryErr
+	}
+}
+
+// verifyWithPepper executa a verificação usando o pepper informado
+func (h *Hasher) verifyWithPepper(password, encodedHash, pepper string) error {
+	password = password + pepper
+
 	params, salt, hash, err := h.decodeHash(encodedHash)
 	if err != nil {
 		return fmt.Errorf("erro ao decodificar hash: %w", err)
 	}
 
-	// Gerar hash com a senha fornecida usando os mesmos parâmetros
 	otherHash := argon2.IDKey(
 		[]byte(password),
 		salt,
@@ -95,7 +112,6 @@ func (h *Hasher) Verify(password, encodedHash string) error {
 		params.KeyLength,
 	)
 
-	// Comparação constant-time para prevenir timing attacks
 	if subtle.ConstantTimeCompare(hash, otherHash) != 1 {
 		return fmt.Errorf("senha incorreta")
 	}

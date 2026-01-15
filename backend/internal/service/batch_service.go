@@ -37,7 +37,8 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 
 	// Se NewProduct é fornecido, cria o produto inline
 	if input.NewProduct != nil {
-		product, err := s.productRepo.Create(ctx, &entity.Product{
+		product := &entity.Product{
+			ID:          uuid.New().String(),
 			IndustryID:  industryID,
 			Name:        input.NewProduct.Name,
 			SKU:         input.NewProduct.SKU,
@@ -46,8 +47,11 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 			Description: input.NewProduct.Description,
 			IsPublic:    input.NewProduct.IsPublic,
 			IsActive:    true,
-		})
-		if err != nil {
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+		}
+
+		if err := s.productRepo.Create(ctx, product); err != nil {
 			s.logger.Error("erro ao criar produto inline", zap.Error(err))
 			return nil, err
 		}

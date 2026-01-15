@@ -10,6 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	migrate "github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/thiagomes07/CAVA/backend/internal/config"
 	domainRepo "github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
@@ -74,6 +77,16 @@ func main() {
 	}()
 
 	logger.Info("conexão com PostgreSQL estabelecida")
+
+	// ============================================
+	// 3.1 RODAR MIGRATIONS (AUTO)
+	// ============================================
+	if cfg.App.AutoMigrate {
+		if err := runMigrations(cfg, logger); err != nil {
+			logger.Fatal("falha ao rodar migrations", zap.Error(err))
+		}
+		logger.Info("migrations executadas com sucesso")
+	}
 
 	// ============================================
 	// 4. CONECTAR AO MINIO/S3
@@ -484,4 +497,29 @@ func startReservationExpirationJob(ctx context.Context, reservationService domai
 			}
 		}
 	}
+}
+
+// runMigrations executa as migrations pendentes usando golang-migrate
+func runMigrations(cfg *config.Config, logger *zap.Logger) error {
+	// Usar URL no formato aceito pelo driver postgres do migrate
+	dsn := fmt.Sprintf(
+		"postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		cfg.Database.User,
+		cfg.Database.Password,
+		cfg.Database.Host,
+		cfg.Database.Port,
+		cfg.Database.Name,
+		cfg.Database.SSLMode,
+	)
+
+	m, err := migrate.New(cfg.App.MigrationsPath, dsn)
+	if err != nil {
+		return fmt.Errorf("erro ao inicializar migrate: %w", err)
+	}
+
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("erro ao aplicar migrations: %w", err)
+	}
+
+	return nil
 }
