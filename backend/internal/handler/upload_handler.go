@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -288,7 +289,26 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 		urls = append(urls, url)
 	}
 
-	h.logger.Info("mídias de lote enviadas",
+	// Persistir URLs no banco de dados
+	var mediasToCreate []entity.CreateMediaInput
+	for i, url := range urls {
+		mediasToCreate = append(mediasToCreate, entity.CreateMediaInput{
+			URL:          url,
+			DisplayOrder: i,
+			IsCover:      false,
+		})
+	}
+
+	if err := h.batchService.AddMedias(r.Context(), batchID, mediasToCreate); err != nil {
+		h.logger.Error("erro ao persistir mídias no banco",
+			zap.String("batchId", batchID),
+			zap.Error(err),
+		)
+		// Não retorna erro pois o upload já foi feito com sucesso
+		// As URLs ainda serão retornadas, mas um warning é logado
+	}
+
+	h.logger.Info("mídias de lote enviadas e persistidas",
 		zap.String("batchId", batchID),
 		zap.Int("count", len(urls)),
 	)
@@ -425,6 +445,56 @@ func (h *UploadHandler) DeleteBatchMedia(w http.ResponseWriter, r *http.Request)
 	h.logger.Info("mídia de lote removida",
 		zap.String("mediaId", id),
 		zap.String("batchId", media.BatchID),
+	)
+
+	response.OK(w, map[string]bool{"success": true})
+}
+
+// UpdateBatchMediasOrder godoc
+// @Summary Atualiza ordem das mídias de um lote
+// @Description Atualiza a ordem de exibição das mídias de um lote
+// @Tags uploads
+// @Accept json
+// @Produce json
+// @Param body body []map[string]interface{} true "Array de mídias com id e displayOrder"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Router /api/batch-medias/order [patch]
+func (h *UploadHandler) UpdateBatchMediasOrder(w http.ResponseWriter, r *http.Request) {
+	var input []struct {
+		ID           string `json:"id"`
+		DisplayOrder int    `json:"displayOrder"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.BadRequest(w, "JSON inválido", nil)
+		return
+	}
+
+	if len(input) == 0 {
+		response.BadRequest(w, "Lista de mídias vazia", nil)
+		return
+	}
+
+	ctx := r.Context()
+
+	for _, media := range input {
+		if media.ID == "" {
+			continue
+		}
+
+		if err := h.mediaRepo.UpdateDisplayOrder(ctx, media.ID, media.DisplayOrder); err != nil {
+			h.logger.Error("erro ao atualizar ordem da mídia",
+				zap.String("mediaId", media.ID),
+				zap.Int("displayOrder", media.DisplayOrder),
+				zap.Error(err),
+			)
+			// Continua para outras mídias mesmo se uma falhar
+		}
+	}
+
+	h.logger.Info("ordem das mídias atualizada",
+		zap.Int("count", len(input)),
 	)
 
 	response.OK(w, map[string]bool{"success": true})

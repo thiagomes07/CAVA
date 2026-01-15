@@ -148,7 +148,48 @@ export const updateBatchPriceSchema = z.object({
   negotiatedPriceUnit: z.enum(priceUnits).optional(),
 });
 
+// Schema para edição de lote (campos opcionais, compatível com UpdateBatchInput do backend)
+export const editBatchSchema = z.object({
+  batchCode: z
+    .string()
+    .min(1, 'Código do lote é obrigatório')
+    .max(50, 'Código deve ter no máximo 50 caracteres')
+    .regex(/^[A-Z]{3}-\d{6}$/i, 'Formato inválido. Use AAA-999999')
+    .transform((val) => val.toUpperCase())
+    .optional(),
+  height: z
+    .number({ message: 'Altura deve ser um número' })
+    .positive('Altura deve ser maior que zero')
+    .max(1000, 'Altura deve ser menor que 1000 cm')
+    .optional(),
+  width: z
+    .number({ message: 'Largura deve ser um número' })
+    .positive('Largura deve ser maior que zero')
+    .max(1000, 'Largura deve ser menor que 1000 cm')
+    .optional(),
+  thickness: z
+    .number({ message: 'Espessura deve ser um número' })
+    .positive('Espessura deve ser maior que zero')
+    .max(100, 'Espessura deve ser menor que 100 cm')
+    .optional(),
+  quantitySlabs: z
+    .number({ message: 'Quantidade deve ser um número' })
+    .int('Quantidade deve ser um número inteiro')
+    .positive('Quantidade deve ser maior que zero')
+    .optional(),
+  industryPrice: z
+    .number({ message: 'Preço deve ser um número' })
+    .positive('Preço deve ser maior que zero')
+    .optional(),
+  priceUnit: z.enum(priceUnits).optional(),
+  originQuarry: z
+    .string()
+    .max(100, 'Nome da pedreira deve ter no máximo 100 caracteres')
+    .optional(),
+});
+
 export type BatchInput = z.infer<typeof batchSchema>;
+export type EditBatchInput = z.infer<typeof editBatchSchema>;
 export type BatchFilter = z.infer<typeof batchFilterSchema>;
 export type ReservationInput = z.infer<typeof reservationSchema>;
 export type ConfirmSaleInput = z.infer<typeof confirmSaleSchema>;

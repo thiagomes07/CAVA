@@ -2,25 +2,24 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Package, Trash2 } from 'lucide-react';
+import { Upload, X, Package, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
-import { batchSchema, type BatchInput } from '@/lib/schemas/batch.schema';
-import { batchStatuses } from '@/lib/schemas/batch.schema';
+import { editBatchSchema, type EditBatchInput } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
-import { formatDate } from '@/lib/utils/formatDate';
+import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Batch, Product, Media, BatchStatus } from '@/lib/types';
+import type { Batch, Media, PriceUnit } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
 interface UploadedMedia {
@@ -35,8 +34,8 @@ export default function EditBatchPage() {
   const { success, error } = useToast();
 
   const [batch, setBatch] = useState<Batch | null>(null);
-  const [products, setProducts] = useState<Product[]>([]);
   const [existingMedias, setExistingMedias] = useState<Media[]>([]);
+  const [mediasToDelete, setMediasToDelete] = useState<string[]>([]);
   const [newMedias, setNewMedias] = useState<UploadedMedia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,17 +50,18 @@ export default function EditBatchPage() {
     watch,
     setValue,
     reset,
-  } = useForm<BatchInput>({
-    resolver: zodResolver(batchSchema),
+    control,
+  } = useForm<EditBatchInput>({
+    resolver: zodResolver(editBatchSchema),
   });
 
   const height = watch('height');
   const width = watch('width');
   const quantitySlabs = watch('quantitySlabs');
-  const productId = watch('productId');
+  const priceUnit = watch('priceUnit') || 'M2';
+  const industryPrice = watch('industryPrice');
 
   useEffect(() => {
-    fetchProducts();
     fetchBatch();
   }, [batchId]);
 
@@ -74,17 +74,6 @@ export default function EditBatchPage() {
     }
   }, [height, width, quantitySlabs]);
 
-  const fetchProducts = async () => {
-    try {
-      const data = await apiClient.get<{ products: Product[] }>('/products', {
-        params: { includeInactive: false, limit: 1000 },
-      });
-      setProducts(data.products);
-    } catch (err) {
-      error('Erro ao carregar produtos');
-    }
-  };
-
   const fetchBatch = async () => {
     try {
       setIsLoading(true);
@@ -93,15 +82,14 @@ export default function EditBatchPage() {
       setExistingMedias(data.medias || []);
 
       reset({
-        productId: data.productId,
         batchCode: data.batchCode,
         height: data.height,
         width: data.width,
         thickness: data.thickness,
         quantitySlabs: data.quantitySlabs,
         industryPrice: data.industryPrice,
+        priceUnit: data.priceUnit || 'M2',
         originQuarry: data.originQuarry || '',
-        entryDate: formatDate(data.entryDate, 'yyyy-MM-dd'),
       });
     } catch (err) {
       error('Erro ao carregar lote');
@@ -148,6 +136,10 @@ export default function EditBatchPage() {
   };
 
   const handleRemoveExistingMedia = (index: number) => {
+    const mediaToRemove = existingMedias[index];
+    if (mediaToRemove?.id) {
+      setMediasToDelete((prev) => [...prev, mediaToRemove.id]);
+    }
     setExistingMedias((prev) => prev.filter((_, i) => i !== index));
   };
 
@@ -157,6 +149,7 @@ export default function EditBatchPage() {
 
   const handleReorderExisting = (fromIndex: number, toIndex: number) => {
     setExistingMedias((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
       const updated = [...prev];
       const [moved] = updated.splice(fromIndex, 1);
       updated.splice(toIndex, 0, moved);
@@ -164,44 +157,92 @@ export default function EditBatchPage() {
     });
   };
 
-  const onSubmit = async (data: BatchInput) => {
+  const handleSetExistingCover = (index: number) => {
+    setExistingMedias((prev) => {
+      if (index === 0) return prev;
+      const updated = [...prev];
+      const [cover] = updated.splice(index, 1);
+      updated.unshift(cover);
+      return updated.map((media, i) => ({ ...media, displayOrder: i }));
+    });
+  };
+
+  const handleMoveNewMedia = (from: number, to: number) => {
+    setNewMedias((prev) => {
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleSetNewCover = (index: number) => {
+    // Se não há mídias existentes, a nova mídia se torna capa (primeira posição)
+    if (existingMedias.length === 0 && index !== 0) {
+      setNewMedias((prev) => {
+        const next = [...prev];
+        const [cover] = next.splice(index, 1);
+        next.unshift(cover);
+        return next;
+      });
+    }
+  };
+
+  const onSubmit = async (data: EditBatchInput) => {
     try {
       setIsSubmitting(true);
 
-      let newMediaUrls: string[] = [];
+      // 1. Deletar mídias removidas (ignora erros 404)
+      if (mediasToDelete.length > 0) {
+        await Promise.all(
+          mediasToDelete.map((mediaId) =>
+            apiClient.delete(`/batch-medias/${mediaId}`).catch((err) => {
+              console.error(`Erro ao deletar mídia ${mediaId}:`, err);
+            })
+          )
+        );
+      }
 
+      // 2. Atualizar ordem das mídias existentes
+      if (existingMedias.length > 0) {
+        const orderPayload = existingMedias.map((media, index) => ({
+          id: media.id,
+          displayOrder: index,
+        }));
+
+        await apiClient.patch('/batch-medias/order', orderPayload).catch((err) => {
+          console.error('Erro ao atualizar ordem das mídias:', err);
+        });
+      }
+
+      // 3. Upload de novas mídias
       if (newMedias.length > 0) {
         const formData = new FormData();
+        formData.append('batchId', batchId);
         newMedias.forEach((media) => {
-          formData.append('files', media.file);
+          formData.append('medias', media.file);
         });
 
-        const uploadResult = await apiClient.upload<{ urls: string[] }>(
+        await apiClient.upload<{ urls: string[] }>(
           '/upload/batch-medias',
           formData
         );
-        newMediaUrls = uploadResult.urls;
       }
 
-      const allMedias = [
-        ...existingMedias.map((m, i) => ({
-          url: m.url,
-          displayOrder: i,
-          isCover: i === 0,
-        })),
-        ...newMediaUrls.map((url, i) => ({
-          url,
-          displayOrder: existingMedias.length + i,
-          isCover: existingMedias.length === 0 && i === 0,
-        })),
-      ];
-
-      const batchData = {
-        ...data,
-        medias: allMedias,
+      // 4. Atualizar dados do lote (apenas campos válidos do UpdateBatchInput)
+      const updatePayload: EditBatchInput = {
+        batchCode: data.batchCode,
+        height: data.height,
+        width: data.width,
+        thickness: data.thickness,
+        quantitySlabs: data.quantitySlabs,
+        industryPrice: data.industryPrice,
+        priceUnit: data.priceUnit,
+        originQuarry: data.originQuarry,
       };
 
-      await apiClient.put(`/batches/${batchId}`, batchData);
+      await apiClient.put(`/batches/${batchId}`, updatePayload);
 
       success('Lote atualizado com sucesso');
       router.push('/inventory');
@@ -239,7 +280,6 @@ export default function EditBatchPage() {
 
   if (!batch) return null;
 
-  const selectedProduct = products.find((p) => p.id === productId);
   const allMedias = [...existingMedias, ...newMedias.map((m) => ({ ...m, id: `new-${Math.random()}` }))];
 
   return (
@@ -271,53 +311,41 @@ export default function EditBatchPage() {
       {/* Form */}
       <form onSubmit={handleSubmit(onSubmit)} className="px-8 py-8">
         <div className="max-w-4xl mx-auto space-y-8">
-          {/* Vinculação */}
-          <Card>
-            <h2 className="text-lg font-semibold text-obsidian mb-6">
-              Vinculação
-            </h2>
+          {/* Informações do Produto (somente leitura) */}
+          {batch.product && (
+            <Card>
+              <h2 className="text-lg font-semibold text-obsidian mb-6">
+                Produto Vinculado
+              </h2>
 
-            <div className="space-y-4">
-              <Select
-                {...register('productId')}
-                label="Produto"
-                error={errors.productId?.message}
-                disabled={isSubmitting}
-              >
-                {products.map((product) => (
-                  <option key={product.id} value={product.id} title={`${product.name}${product.sku ? ` (${product.sku})` : ''}`}>
-                    {truncateText(product.name, TRUNCATION_LIMITS.SELECT_OPTION)} {product.sku && `(${truncateText(product.sku, TRUNCATION_LIMITS.SKU)})`}
-                  </option>
-                ))}
-              </Select>
-
-              {selectedProduct && (
-                <div className="flex items-center gap-4 p-4 bg-mineral rounded-sm">
-                  {selectedProduct.medias?.[0] && (
-                    <img
-                      src={selectedProduct.medias[0].url}
-                      alt={selectedProduct.name}
-                      className="w-20 h-20 rounded-sm object-cover"
-                    />
-                  )}
-                  <div>
-                    <p 
-                      className="font-semibold text-obsidian"
-                      title={selectedProduct.name}
-                    >
-                      {truncateText(selectedProduct.name, TRUNCATION_LIMITS.PRODUCT_NAME)}
-                    </p>
-                    <p 
-                      className="text-sm text-slate-500"
-                      title={`${selectedProduct.material} • ${selectedProduct.finish}`}
-                    >
-                      {truncateText(`${selectedProduct.material} • ${selectedProduct.finish}`, TRUNCATION_LIMITS.MATERIAL_NAME)}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-4 p-4 bg-mineral rounded-sm">
+                {batch.product.medias?.[0] && (
+                  <img
+                    src={batch.product.medias[0].url}
+                    alt={batch.product.name}
+                    className="w-20 h-20 rounded-sm object-cover"
+                  />
+                )}
+                <div>
+                  <p 
+                    className="font-semibold text-obsidian"
+                    title={batch.product.name}
+                  >
+                    {truncateText(batch.product.name, TRUNCATION_LIMITS.PRODUCT_NAME)}
+                  </p>
+                  <p 
+                    className="text-sm text-slate-500"
+                    title={`${batch.product.material} • ${batch.product.finish}`}
+                  >
+                    {truncateText(`${batch.product.material} • ${batch.product.finish}`, TRUNCATION_LIMITS.MATERIAL_NAME)}
+                  </p>
                 </div>
-              )}
-            </div>
-          </Card>
+              </div>
+              <p className="text-xs text-slate-500 mt-3">
+                O produto não pode ser alterado após a criação do lote.
+              </p>
+            </Card>
+          )}
 
           {/* Identificação */}
           <Card>
@@ -337,14 +365,6 @@ export default function EditBatchPage() {
                 {...register('originQuarry')}
                 label="Pedreira de Origem (Opcional)"
                 error={errors.originQuarry?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('entryDate')}
-                type="date"
-                label="Data de Entrada"
-                error={errors.entryDate?.message}
                 disabled={isSubmitting}
               />
             </div>
@@ -416,15 +436,82 @@ export default function EditBatchPage() {
               Precificação
             </h2>
 
-            <Input
-              {...register('industryPrice', { valueAsNumber: true })}
-              type="number"
-              step="0.01"
-              label="Preço Base Indústria (R$)"
-              helperText="Este é o preço de repasse para brokers"
-              error={errors.industryPrice?.message}
-              disabled={isSubmitting}
-            />
+            <div className="space-y-6">
+              {/* Unidade de Preço */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Unidade de Preço
+                </label>
+                <Controller
+                  name="priceUnit"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('M2')}
+                        className={cn(
+                          'px-4 py-2 rounded-sm font-medium transition-colors',
+                          field.value === 'M2'
+                            ? 'bg-obsidian text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/m²
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('FT2')}
+                        className={cn(
+                          'px-4 py-2 rounded-sm font-medium transition-colors',
+                          field.value === 'FT2'
+                            ? 'bg-obsidian text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/ft²
+                      </button>
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-500 mt-2">
+                  Selecione a unidade de área para o preço. 1 m² = 10,76 ft²
+                </p>
+              </div>
+
+              <Input
+                {...register('industryPrice', { valueAsNumber: true })}
+                type="number"
+                step="0.01"
+                label={`Preço Base Indústria (R$/${getPriceUnitLabel(priceUnit as PriceUnit)})`}
+                helperText="Este é o preço de repasse para brokers"
+                error={errors.industryPrice?.message}
+                disabled={isSubmitting}
+              />
+
+              {/* Preço Total Calculado */}
+              {calculatedArea > 0 && industryPrice > 0 && (
+                <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-sm">
+                  <Package className="w-5 h-5 text-blue-600" />
+                  <div>
+                    <p className="text-sm font-semibold text-blue-900">
+                      Valor Total do Lote
+                    </p>
+                    <p className="text-2xl font-mono font-bold text-blue-700">
+                      {new Intl.NumberFormat('pt-BR', {
+                        style: 'currency',
+                        currency: 'BRL',
+                      }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-1">
+                      {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {formatArea(calculatedArea)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
           </Card>
 
           {/* Fotos do Lote */}
@@ -468,21 +555,132 @@ export default function EditBatchPage() {
 
             {allMedias.length > 0 && (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {/* Mídias Existentes */}
                 {existingMedias.map((media, index) => (
-                  <MediaPreview
+                  <div
                     key={media.id}
-                    preview={media.url}
-                    isCover={index === 0}
-                    onRemove={() => handleRemoveExistingMedia(index)}
-                  />
+                    className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
+                  >
+                    <img
+                      src={media.url}
+                      alt={`Foto ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
+                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleReorderExisting(index, index - 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === 0}
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetExistingCover(index)}
+                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
+                          disabled={index === 0}
+                        >
+                          Definir capa
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleReorderExisting(index, index + 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === existingMedias.length - 1}
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveExistingMedia(index)}
+                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {index === 0 && (
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
+                          CAPA
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 ))}
+
+                {/* Novas Mídias */}
                 {newMedias.map((media, index) => (
-                  <MediaPreview
+                  <div
                     key={`new-${index}`}
-                    preview={media.preview}
-                    isCover={existingMedias.length === 0 && index === 0}
-                    onRemove={() => handleRemoveNewMedia(index)}
-                  />
+                    className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-dashed border-emerald-400 group"
+                  >
+                    <img
+                      src={media.preview}
+                      alt={`Nova foto ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
+                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveNewMedia(index, index - 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === 0}
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetNewCover(index)}
+                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
+                          disabled={existingMedias.length > 0 || index === 0}
+                        >
+                          Definir capa
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMoveNewMedia(index, index + 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === newMedias.length - 1}
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveNewMedia(index)}
+                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {existingMedias.length === 0 && index === 0 && (
+                      <div className="absolute top-2 left-2">
+                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
+                          CAPA
+                        </span>
+                      </div>
+                    )}
+
+                    <div className="absolute top-2 right-2">
+                      <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
+                        NOVA
+                      </span>
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
@@ -536,42 +734,6 @@ export default function EditBatchPage() {
           </Button>
         </ModalFooter>
       </Modal>
-    </div>
-  );
-}
-
-interface MediaPreviewProps {
-  preview: string;
-  isCover: boolean;
-  onRemove: () => void;
-}
-
-function MediaPreview({ preview, isCover, onRemove }: MediaPreviewProps) {
-  return (
-    <div className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group">
-      <img
-        src={preview}
-        alt="Preview"
-        className="w-full h-full object-cover"
-      />
-
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-        <button
-          type="button"
-          onClick={onRemove}
-          className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {isCover && (
-        <div className="absolute top-2 left-2">
-          <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
-            CAPA
-          </span>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Upload, X, Package, Plus } from 'lucide-react';
+import { ArrowLeft, Upload, X, Package, Plus, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -117,6 +117,26 @@ export default function NewBatchPage() {
 
   const handleRemoveMedia = (index: number) => {
     setMedias((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMoveMedia = (from: number, to: number) => {
+    setMedias((prev) => {
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  };
+
+  const handleSetCover = (index: number) => {
+    setMedias((prev) => {
+      if (index === 0) return prev;
+      const next = [...prev];
+      const [cover] = next.splice(index, 1);
+      next.unshift(cover);
+      return next;
+    });
   };
 
   const onSubmit = async (data: BatchInput) => {
@@ -537,14 +557,43 @@ export default function NewBatchPage() {
                       className="w-full h-full object-cover"
                     />
 
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedia(index)}
-                        className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
+                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveMedia(index, index - 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === 0}
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(index)}
+                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
+                          disabled={index === 0}
+                        >
+                          Definir capa
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleMoveMedia(index, index + 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === medias.length - 1}
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia(index)}
+                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {index === 0 && (
