@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Plus, Search, Edit2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
@@ -50,15 +50,13 @@ export default function InventoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
 
-  // Estado de ordenação
-  const [sortField, setSortField] = useState<SortField>(null);
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
-
-  const [filters, setFilters] = useState<BatchFilter & { availability?: string }>({
+  const [filters, setFilters] = useState<BatchFilter & { availability?: string; sortBy?: string; sortDir?: string }>({
     productId: searchParams.get('productId') || '',
     status: (searchParams.get('status') as BatchStatus) || '',
     code: searchParams.get('code') || '',
     availability: searchParams.get('availability') || '',
+    sortBy: searchParams.get('sortBy') || '',
+    sortDir: searchParams.get('sortDir') || 'desc',
     page: parseInt(searchParams.get('page') || '1'),
     limit: 50,
   });
@@ -88,13 +86,23 @@ export default function InventoryPage() {
     try {
       setIsLoading(true);
       
-      // Mapear filtro de disponibilidade para parâmetro da API
+      // Mapear filtro de disponibilidade para parâmetros da API
       const apiFilters: Record<string, string | number | boolean | undefined> = { 
         ...filters,
         availability: undefined 
       };
-      if (filters.availability === 'available') {
-        apiFilters.onlyWithAvailable = true;
+      
+      // Mapear opções de disponibilidade para parâmetros do backend
+      switch (filters.availability) {
+        case 'available':
+          apiFilters.onlyWithAvailable = true;
+          break;
+        case 'low':
+          apiFilters.lowStock = true;
+          break;
+        case 'none':
+          apiFilters.noStock = true;
+          break;
       }
       
       const data = await apiClient.get<{
@@ -113,74 +121,28 @@ export default function InventoryPage() {
     }
   };
 
-  // Handler de ordenação
+  // Handler de ordenação - agora faz requisição ao backend
   const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('desc');
-    }
+    if (field === null) return;
+    
+    const newSortDir = filters.sortBy === field && filters.sortDir === 'desc' ? 'asc' : 'desc';
+    setFilters({ 
+      ...filters, 
+      sortBy: field, 
+      sortDir: newSortDir,
+      page: 1 // Volta para primeira página ao ordenar
+    });
   };
 
   // Ícone de ordenação
   const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) {
+    if (filters.sortBy !== field) {
       return <ArrowUpDown className="w-4 h-4 ml-1 opacity-50" />;
     }
-    return sortDirection === 'asc' 
+    return filters.sortDir === 'asc' 
       ? <ArrowUp className="w-4 h-4 ml-1" />
       : <ArrowDown className="w-4 h-4 ml-1" />;
   };
-
-  // Ordenação e filtro local (para melhor UX)
-  const sortedBatches = useMemo(() => {
-    let result = [...batches];
-    
-    // Filtro de disponibilidade local
-    if (filters.availability === 'low') {
-      result = result.filter(b => b.availableSlabs > 0 && b.availableSlabs <= 3);
-    } else if (filters.availability === 'none') {
-      result = result.filter(b => b.availableSlabs === 0);
-    }
-    
-    // Ordenação
-    if (sortField) {
-      result.sort((a, b) => {
-        let aVal: number | string = 0;
-        let bVal: number | string = 0;
-        
-        switch (sortField) {
-          case 'availableSlabs':
-            aVal = a.availableSlabs;
-            bVal = b.availableSlabs;
-            break;
-          case 'totalArea':
-            aVal = a.totalArea;
-            bVal = b.totalArea;
-            break;
-          case 'industryPrice':
-            aVal = a.industryPrice;
-            bVal = b.industryPrice;
-            break;
-          case 'batchCode':
-            aVal = a.batchCode;
-            bVal = b.batchCode;
-            break;
-        }
-        
-        if (typeof aVal === 'string') {
-          return sortDirection === 'asc' 
-            ? aVal.localeCompare(bVal as string)
-            : (bVal as string).localeCompare(aVal);
-        }
-        
-        return sortDirection === 'asc' ? aVal - (bVal as number) : (bVal as number) - aVal;
-      });
-    }
-    
-    return result;
-  }, [batches, sortField, sortDirection, filters.availability]);
 
   const handleClearFilters = () => {
     setFilters({
@@ -188,15 +150,15 @@ export default function InventoryPage() {
       status: '',
       code: '',
       availability: '',
+      sortBy: '',
+      sortDir: 'desc',
       page: 1,
       limit: 50,
     });
-    setSortField(null);
-    setSortDirection('desc');
     router.push('/inventory');
   };
 
-  const hasFilters = filters.productId || filters.status || filters.code || filters.availability;
+  const hasFilters = filters.productId || filters.status || filters.code || filters.availability || filters.sortBy;
   const isEmpty = batches.length === 0;
 
   return (
@@ -372,7 +334,7 @@ export default function InventoryPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {sortedBatches.map((batch) => {
+                  {batches.map((batch) => {
                     const availabilityPct = calculateAvailabilityPercentage(
                       batch.availableSlabs,
                       batch.quantitySlabs

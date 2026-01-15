@@ -208,6 +208,10 @@ type BatchFilters struct {
 	Status            *BatchStatus `json:"status,omitempty"`
 	Code              *string      `json:"code,omitempty"`              // Busca parcial
 	OnlyWithAvailable bool         `json:"onlyWithAvailable,omitempty"` // Apenas lotes com chapas disponíveis
+	LowStock          bool         `json:"lowStock,omitempty"`          // Apenas lotes com estoque baixo (≤3)
+	NoStock           bool         `json:"noStock,omitempty"`           // Apenas lotes sem estoque
+	SortBy            string       `json:"sortBy,omitempty"`            // Campo para ordenação: batchCode, availableSlabs, totalArea, industryPrice, entryDate
+	SortDir           string       `json:"sortDir,omitempty"`           // Direção: asc ou desc
 	Page              int          `json:"page" validate:"min=1"`
 	Limit             int          `json:"limit" validate:"min=1,max=100"`
 }

@@ -203,6 +203,12 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 	if filters.OnlyWithAvailable {
 		query = query.Where(sq.Gt{"available_slabs": 0})
 	}
+	if filters.LowStock {
+		query = query.Where(sq.And{sq.Gt{"available_slabs": 0}, sq.LtOrEq{"available_slabs": 3}})
+	}
+	if filters.NoStock {
+		query = query.Where(sq.Eq{"available_slabs": 0})
+	}
 
 	// Contar total
 	countQuery := psql.Select("COUNT(*)").From("batches").
@@ -220,6 +226,12 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 	if filters.OnlyWithAvailable {
 		countQuery = countQuery.Where(sq.Gt{"available_slabs": 0})
 	}
+	if filters.LowStock {
+		countQuery = countQuery.Where(sq.And{sq.Gt{"available_slabs": 0}, sq.LtOrEq{"available_slabs": 3}})
+	}
+	if filters.NoStock {
+		countQuery = countQuery.Where(sq.Eq{"available_slabs": 0})
+	}
 
 	countSQL, countArgs, _ := countQuery.ToSql()
 	var total int
@@ -227,9 +239,35 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 		return nil, 0, errors.DatabaseError(err)
 	}
 
-	// Paginação
+	// Paginação e ordenação
 	offset := (filters.Page - 1) * filters.Limit
-	query = query.OrderBy("entry_date DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+	
+	// Determinar ordenação
+	orderColumn := "entry_date"
+	orderDir := "DESC"
+	
+	// Mapear campos de ordenação válidos
+	validSortColumns := map[string]string{
+		"batchCode":      "batch_code",
+		"availableSlabs": "available_slabs",
+		"totalArea":      "net_area",
+		"industryPrice":  "industry_price",
+		"entryDate":      "entry_date",
+	}
+	
+	if filters.SortBy != "" {
+		if col, ok := validSortColumns[filters.SortBy]; ok {
+			orderColumn = col
+		}
+	}
+	
+	if filters.SortDir == "asc" {
+		orderDir = "ASC"
+	} else if filters.SortDir == "desc" {
+		orderDir = "DESC"
+	}
+	
+	query = query.OrderBy(orderColumn + " " + orderDir).Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()
 	if err != nil {

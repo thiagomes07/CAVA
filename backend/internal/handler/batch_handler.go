@@ -79,6 +79,14 @@ func (h *BatchHandler) List(w http.ResponseWriter, r *http.Request) {
 		filters.OnlyWithAvailable = true
 	}
 
+	if lowStock := r.URL.Query().Get("lowStock"); lowStock == "true" {
+		filters.LowStock = true
+	}
+
+	if noStock := r.URL.Query().Get("noStock"); noStock == "true" {
+		filters.NoStock = true
+	}
+
 	if page := r.URL.Query().Get("page"); page != "" {
 		if p, err := strconv.Atoi(page); err == nil && p > 0 {
 			filters.Page = p
@@ -89,6 +97,15 @@ func (h *BatchHandler) List(w http.ResponseWriter, r *http.Request) {
 		if l, err := strconv.Atoi(limit); err == nil && l > 0 && l <= 100 {
 			filters.Limit = l
 		}
+	}
+
+	// Parâmetros de ordenação
+	if sortBy := r.URL.Query().Get("sortBy"); sortBy != "" {
+		filters.SortBy = sortBy
+	}
+
+	if sortDir := r.URL.Query().Get("sortDir"); sortDir != "" {
+		filters.SortDir = sortDir
 	}
 
 	// Validar filtros
