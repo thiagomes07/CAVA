@@ -159,6 +159,16 @@ func (s *authService) Login(ctx context.Context, input entity.LoginInput) (*enti
 	// Limpar senha antes de retornar
 	user.Password = ""
 
+	// Registrar primeiro login se ainda não ocorreu
+	if user.FirstLoginAt == nil {
+		if err := s.userRepo.SetFirstLoginAt(ctx, user.ID); err != nil {
+			s.logger.Warn("erro ao registrar primeiro login", zap.Error(err))
+			// Continuar mesmo se falhar
+		}
+		now := time.Now()
+		user.FirstLoginAt = &now
+	}
+
 	s.logger.Info("login realizado com sucesso",
 		zap.String("userId", user.ID),
 		zap.String("email", user.Email),

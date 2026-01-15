@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
@@ -28,6 +29,9 @@ type UserRepository interface {
 	// Update atualiza os dados do usuário
 	Update(ctx context.Context, user *entity.User) error
 
+	// UpdatePassword atualiza a senha do usuário
+	UpdatePassword(ctx context.Context, id string, hashedPassword string) error
+
 	// UpdateStatus atualiza o status ativo/inativo do usuário
 	UpdateStatus(ctx context.Context, id string, isActive bool) error
 
@@ -36,4 +40,13 @@ type UserRepository interface {
 
 	// List lista todos os usuários com filtros opcionais
 	List(ctx context.Context, role *entity.UserRole) ([]entity.User, error)
+
+	// ListByIndustry lista usuários por industryID com filtro de role opcional
+	ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error)
+
+	// UpdateEmail atualiza o email do usuário
+	UpdateEmail(ctx context.Context, id string, email string) error
+
+	// SetFirstLoginAt define a data do primeiro login
+	SetFirstLoginAt(ctx context.Context, id string) error
 }

@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
 import type { Cliente } from '@/lib/types';
-import type { ClienteFilter } from '@/lib/schemas/cliente.schema';
+import type { ClienteFilter } from '@/lib/schemas/lead.schema';
 
 interface ClientesResponse {
   clientes: Cliente[];

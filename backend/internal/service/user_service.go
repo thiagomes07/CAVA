@@ -91,9 +91,10 @@ func (s *userService) Create(ctx context.Context, input entity.CreateUserInput) 
 }
 
 func (s *userService) CreateSeller(ctx context.Context, industryID string, input entity.CreateSellerInput) (*entity.User, error) {
-	// Validar role (deve ser apenas VENDEDOR_INTERNO)
-	if input.Role != entity.RoleVendedorInterno {
-		return nil, domainErrors.ValidationError("Apenas VENDEDOR_INTERNO pode ser criado por esta rota")
+	// Determinar role baseado no campo isAdmin
+	role := entity.RoleVendedorInterno
+	if input.IsAdmin {
+		role = entity.RoleAdminIndustria
 	}
 
 	// Verificar se email já existe
@@ -116,7 +117,7 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		return nil, domainErrors.InternalError(err)
 	}
 
-	// Criar usuário vendedor
+	// Criar usuário vendedor ou admin
 	user := &entity.User{
 		ID:         uuid.New().String(),
 		IndustryID: &industryID,
@@ -124,7 +125,7 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		Email:      input.Email,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
-		Role:       entity.RoleVendedorInterno,
+		Role:       role,
 		IsActive:   true,
 		CreatedAt:  time.Now(),
 		UpdatedAt:  time.Now(),
@@ -138,14 +139,20 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 	// Limpar senha antes de retornar
 	user.Password = ""
 
-	s.logger.Info("vendedor interno criado com sucesso",
+	roleDesc := "vendedor interno"
+	if input.IsAdmin {
+		roleDesc = "admin"
+	}
+
+	s.logger.Info(roleDesc+" criado com sucesso",
 		zap.String("userId", user.ID),
 		zap.String("email", user.Email),
 		zap.String("industryId", industryID),
+		zap.Bool("isAdmin", input.IsAdmin),
 	)
 
 	// Nota: Aqui seria enviado email com a senha temporária
-	s.logger.Warn("senha temporária gerada para vendedor (deve ser enviada por email)",
+	s.logger.Warn("senha temporária gerada para "+roleDesc+" (deve ser enviada por email)",
 		zap.String("userId", user.ID),
 		zap.String("temporaryPassword", temporaryPassword),
 	)
@@ -179,6 +186,24 @@ func (s *userService) List(ctx context.Context, role *entity.UserRole) ([]entity
 	users, err := s.userRepo.List(ctx, role)
 	if err != nil {
 		s.logger.Error("erro ao listar usuários", zap.Error(err))
+		return nil, err
+	}
+
+	// Limpar senhas
+	for i := range users {
+		users[i].Password = ""
+	}
+
+	return users, nil
+}
+
+func (s *userService) ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error) {
+	users, err := s.userRepo.ListByIndustry(ctx, industryID, role)
+	if err != nil {
+		s.logger.Error("erro ao listar usuários por indústria",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
 		return nil, err
 	}
 
@@ -224,6 +249,21 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 }
 
 func (s *userService) UpdateStatus(ctx context.Context, id string, isActive bool) (*entity.User, error) {
+	// Buscar usuário para verificar role antes de alterar status
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Impedir inativação de contas admin
+	if !isActive && user.Role == entity.RoleAdminIndustria {
+		s.logger.Warn("tentativa de inativar conta admin bloqueada",
+			zap.String("userId", id),
+			zap.String("email", user.Email),
+		)
+		return nil, domainErrors.NewForbiddenError("Não é possível inativar contas de administrador")
+	}
+
 	// Atualizar status
 	if err := s.userRepo.UpdateStatus(ctx, id, isActive); err != nil {
 		s.logger.Error("erro ao atualizar status do usuário",
@@ -234,14 +274,9 @@ func (s *userService) UpdateStatus(ctx context.Context, id string, isActive bool
 		return nil, err
 	}
 
-	// Buscar usuário atualizado
-	user, err := s.userRepo.FindByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// Limpar senha
-	user.Password = ""
+	// Atualizar objeto user com novo status
+	user.IsActive = isActive
+	user.Password = "" // Limpar senha
 
 	status := "inativo"
 	if isActive {
@@ -326,6 +361,125 @@ func (s *userService) GetBrokers(ctx context.Context, industryID string) ([]enti
 	}
 
 	return brokers, nil
+}
+
+func (s *userService) ResendInvite(ctx context.Context, userID string, newEmail *string) (*entity.User, error) {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verificar se usuário já logou
+	if user.FirstLoginAt != nil {
+		s.logger.Warn("tentativa de reenviar convite para usuário que já logou",
+			zap.String("userId", userID),
+		)
+		return nil, domainErrors.NewBadRequestError("Não é possível reenviar convite para usuário que já acessou o sistema")
+	}
+
+	// Se novo email foi fornecido, verificar se é diferente e se já existe
+	if newEmail != nil && *newEmail != "" {
+		// Verificar se é igual ao email atual
+		if *newEmail == user.Email {
+			return nil, domainErrors.NewBadRequestError("O novo email deve ser diferente do email atual")
+		}
+
+		exists, err := s.userRepo.ExistsByEmail(ctx, *newEmail)
+		if err != nil {
+			s.logger.Error("erro ao verificar email existente", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+		if exists {
+			return nil, domainErrors.EmailExistsError(*newEmail)
+		}
+
+		// Atualizar email
+		if err := s.userRepo.UpdateEmail(ctx, userID, *newEmail); err != nil {
+			s.logger.Error("erro ao atualizar email", zap.Error(err))
+			return nil, err
+		}
+		user.Email = *newEmail
+	}
+
+	// Gerar nova senha temporária
+	temporaryPassword := s.generateTemporaryPassword()
+
+	// Hash da senha temporária
+	hashedPassword, err := s.hasher.Hash(temporaryPassword)
+	if err != nil {
+		s.logger.Error("erro ao fazer hash da senha temporária", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+
+	// Atualizar senha
+	if err := s.userRepo.UpdatePassword(ctx, userID, hashedPassword); err != nil {
+		s.logger.Error("erro ao atualizar senha", zap.Error(err))
+		return nil, err
+	}
+
+	// Limpar senha antes de retornar
+	user.Password = ""
+
+	s.logger.Info("convite reenviado com sucesso",
+		zap.String("userId", userID),
+		zap.String("email", user.Email),
+	)
+
+	// Nota: Aqui seria enviado email com a senha temporária
+	s.logger.Warn("senha temporária gerada para reenvio (deve ser enviada por email)",
+		zap.String("userId", userID),
+		zap.String("temporaryPassword", temporaryPassword),
+	)
+
+	return user, nil
+}
+
+func (s *userService) UpdateEmail(ctx context.Context, userID string, email string) (*entity.User, error) {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verificar se usuário já logou
+	if user.FirstLoginAt != nil {
+		s.logger.Warn("tentativa de atualizar email de usuário que já logou",
+			zap.String("userId", userID),
+		)
+		return nil, domainErrors.NewBadRequestError("Não é possível alterar email de usuário que já acessou o sistema")
+	}
+
+	// Verificar se email é diferente
+	if email == user.Email {
+		return user, nil
+	}
+
+	// Verificar se novo email já existe
+	exists, err := s.userRepo.ExistsByEmail(ctx, email)
+	if err != nil {
+		s.logger.Error("erro ao verificar email existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if exists {
+		return nil, domainErrors.EmailExistsError(email)
+	}
+
+	// Atualizar email
+	if err := s.userRepo.UpdateEmail(ctx, userID, email); err != nil {
+		s.logger.Error("erro ao atualizar email", zap.Error(err))
+		return nil, err
+	}
+
+	user.Email = email
+	user.Password = ""
+
+	s.logger.Info("email atualizado com sucesso",
+		zap.String("userId", userID),
+		zap.String("newEmail", email),
+	)
+
+	return user, nil
 }
 
 func (s *userService) generateTemporaryPassword() string {

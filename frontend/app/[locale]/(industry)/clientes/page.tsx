@@ -1,27 +1,41 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { Cliente, SalesLink } from '@/lib/types';
-import type { ClienteFilter } from '@/lib/schemas/cliente.schema';
-import { clienteStatuses } from '@/lib/schemas/cliente.schema';
+import type { ClienteFilter } from '@/lib/schemas/lead.schema';
+import { clienteStatuses } from '@/lib/schemas/lead.schema';
 import { cn } from '@/lib/utils/cn';
+
+// Schema for creating a new cliente
+const createClienteSchema = z.object({
+  name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(100),
+  contact: z.string().min(5, 'Contato deve ter no mínimo 5 caracteres'),
+  message: z.string().max(500).optional(),
+  marketingOptIn: z.boolean(),
+});
+
+type CreateClienteForm = z.infer<typeof createClienteSchema>;
 
 export default function ClientesManagementPage() {
   const router = useRouter();
@@ -36,7 +50,26 @@ export default function ClientesManagementPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    watch,
+    setValue,
+    formState: { errors },
+  } = useForm<CreateClienteForm>({
+    resolver: zodResolver(createClienteSchema),
+    defaultValues: {
+      name: '',
+      contact: '',
+      message: '',
+      marketingOptIn: false,
+    },
+  });
 
   const [filters, setFilters] = useState<ClienteFilter>({
     search: searchParams.get('search') || '',
@@ -49,13 +82,24 @@ export default function ClientesManagementPage() {
     limit: 50,
   });
 
-  useEffect(() => {
-    fetchSalesLinks();
-  }, []);
+  const fetchClientes = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const data = await apiClient.get<{
+        clientes: Cliente[];
+        total: number;
+        page: number;
+      }>('/clientes', { params: filters });
 
-  useEffect(() => {
-    fetchClientes();
-  }, [filters]);
+      setClientes(data.clientes);
+      setTotalItems(data.total);
+    } catch {
+      error(t('loadError'));
+      setClientes([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [filters, error, t]);
 
   const fetchSalesLinks = async () => {
     try {
@@ -68,24 +112,17 @@ export default function ClientesManagementPage() {
     }
   };
 
-  const fetchClientes = async () => {
-    try {
-      setIsLoading(true);
-      const data = await apiClient.get<{
-        clientes: Cliente[];
-        total: number;
-        page: number;
-      }>('/clientes', { params: filters });
+  useEffect(() => {
+    fetchSalesLinks();
+  }, []);
 
-      setClientes(data.clientes);
-      setTotalItems(data.total);
-    } catch (err) {
-      error(t('loadError'));
-      setClientes([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // Run fetch when filters change. Depending on the `fetchClientes` callback
+  // identity can lead to re-runs if its dependencies are unstable, so
+  // depend directly on `filters` which is the authoritative trigger.
+  useEffect(() => {
+    fetchClientes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters]);
 
   const handleUpdateStatus = async (clienteId: string, newStatus: typeof clienteStatuses[number]) => {
     try {
@@ -101,10 +138,29 @@ export default function ClientesManagementPage() {
       if (selectedCliente?.id === clienteId) {
         setSelectedCliente({ ...selectedCliente, status: newStatus });
       }
-    } catch (err) {
+    } catch {
       error(t('statusError'));
     } finally {
       setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleCreateCliente = async (data: CreateClienteForm) => {
+    try {
+      setIsCreating(true);
+      await apiClient.post('/clientes', data);
+      success(t('clienteCreated'));
+      setShowCreateModal(false);
+      reset();
+      fetchClientes();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'CONFLICT') {
+        error(t('contactAlreadyExists'));
+      } else {
+        error(t('createError'));
+      }
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -117,7 +173,7 @@ export default function ClientesManagementPage() {
     try {
       success(t('exportStarted'));
       // Implementar lógica de exportação CSV
-    } catch (err) {
+    } catch {
       error(t('exportError'));
     }
   };
@@ -140,22 +196,13 @@ export default function ClientesManagementPage() {
     try {
       await navigator.clipboard.writeText(contact);
       success(t('contactCopied'));
-    } catch (err) {
+    } catch {
       error(t('copyError'));
     }
   };
 
   const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate || filters.status;
   const isEmpty = clientes.length === 0;
-
-  const getStatusBadge = (status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO') => {
-    const variants: Record<'NOVO' | 'CONTATADO' | 'RESOLVIDO', string> = {
-      NOVO: 'bg-blue-50 text-blue-700 border-blue-200',
-      CONTATADO: 'bg-amber-50 text-amber-700 border-amber-200',
-      RESOLVIDO: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-    };
-    return variants[status];
-  };
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -170,10 +217,16 @@ export default function ClientesManagementPage() {
               {t('subtitle')}
             </p>
           </div>
-          <Button variant="secondary" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            {t('exportCsv')}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+              <Plus className="w-4 h-4 mr-2" />
+              {t('addCliente')}
+            </Button>
+            <Button variant="secondary" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              {t('exportCsv')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -488,25 +541,36 @@ export default function ClientesManagementPage() {
                 <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
                   {t('clienteOrigin')}
                 </p>
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-                  <p className="text-sm font-semibold text-blue-900 mb-1">
-                    {selectedCliente.salesLink?.title || t('untitledLink')}
-                  </p>
-                  <p className="text-xs text-blue-700 mb-2">
-                    /{selectedCliente.salesLink?.slugToken}
-                  </p>
-                  {selectedCliente.salesLink?.batch && (
-                    <p className="text-sm text-blue-800">
-                      {t('batch')}: {selectedCliente.salesLink.batch.batchCode} •{' '}
-                      {selectedCliente.salesLink.batch.product?.name}
+                {selectedCliente.salesLinkId ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
+                    <p className="text-sm font-semibold text-blue-900 mb-1">
+                      {selectedCliente.salesLink?.title || t('untitledLink')}
                     </p>
-                  )}
-                  {selectedCliente.salesLink?.product && (
-                    <p className="text-sm text-blue-800">
-                      {t('productLabel')}: {selectedCliente.salesLink.product.name}
+                    <p className="text-xs text-blue-700 mb-2">
+                      /{selectedCliente.salesLink?.slugToken}
                     </p>
-                  )}
-                </div>
+                    {selectedCliente.salesLink?.batch && (
+                      <p className="text-sm text-blue-800">
+                        {t('batch')}: {selectedCliente.salesLink.batch.batchCode} •{' '}
+                        {selectedCliente.salesLink.batch.product?.name}
+                      </p>
+                    )}
+                    {selectedCliente.salesLink?.product && (
+                      <p className="text-sm text-blue-800">
+                        {t('productLabel')}: {selectedCliente.salesLink.product.name}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-sm">
+                    <p className="text-sm font-semibold text-slate-700">
+                      {t('manuallyCreated')}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {t('manuallyCreatedDescription')}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Marketing Opt-in */}
@@ -561,6 +625,89 @@ export default function ClientesManagementPage() {
             {tCommon('close')}
           </Button>
         </ModalFooter>
+      </Modal>
+
+      {/* Create Cliente Modal */}
+      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)}>
+        <ModalClose onClose={() => setShowCreateModal(false)} />
+        <ModalHeader>
+          <ModalTitle>{t('addClienteTitle')}</ModalTitle>
+        </ModalHeader>
+        <form onSubmit={handleSubmit(handleCreateCliente)}>
+          <ModalContent>
+            <div className="space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-obsidian mb-2">
+                  {t('name')} *
+                </label>
+                <Input
+                  {...register('name')}
+                  placeholder={t('namePlaceholder')}
+                  error={errors.name?.message}
+                />
+              </div>
+
+              {/* Contact */}
+              <div>
+                <label className="block text-sm font-medium text-obsidian mb-2">
+                  {t('contact')} *
+                </label>
+                <Input
+                  {...register('contact')}
+                  placeholder={t('contactPlaceholder')}
+                  error={errors.contact?.message}
+                  helperText={t('contactHelperText')}
+                />
+              </div>
+
+              {/* Message */}
+              <div>
+                <label className="block text-sm font-medium text-obsidian mb-2">
+                  {t('noteOptional')}
+                </label>
+                <textarea
+                  {...register('message')}
+                  placeholder={t('notePlaceholder')}
+                  rows={3}
+                  className={cn(
+                    'w-full px-4 py-3 rounded-sm border bg-porcelain text-obsidian',
+                    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+                    'resize-none',
+                    errors.message ? 'border-red-500' : 'border-slate-200'
+                  )}
+                />
+                {errors.message && (
+                  <p className="mt-1 text-sm text-red-600">{errors.message.message}</p>
+                )}
+              </div>
+
+              {/* Marketing Opt-in */}
+              <Checkbox
+                id="marketingOptIn"
+                checked={watch('marketingOptIn')}
+                onChange={(e) => setValue('marketingOptIn', e.target.checked)}
+                label={t('marketingOptInLabel')}
+                description={t('marketingOptInDescription')}
+              />
+            </div>
+          </ModalContent>
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setShowCreateModal(false);
+                reset();
+              }}
+            >
+              {tCommon('cancel')}
+            </Button>
+            <Button type="submit" variant="primary" disabled={isCreating}>
+              {isCreating ? tCommon('saving') : t('createCliente')}
+            </Button>
+          </ModalFooter>
+        </form>
       </Modal>
     </div>
   );

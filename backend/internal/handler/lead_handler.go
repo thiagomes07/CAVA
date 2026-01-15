@@ -32,6 +32,50 @@ func NewClienteHandler(
 	}
 }
 
+// Create godoc
+// @Summary Cria um cliente manualmente
+// @Description Cria um novo cliente manualmente (usuário autenticado)
+// @Tags clientes
+// @Accept json
+// @Produce json
+// @Param body body entity.CreateClienteManualInput true "Dados do cliente"
+// @Success 201 {object} entity.CreateClienteResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 409 {object} response.ErrorResponse
+// @Router /api/clientes [post]
+func (h *ClienteHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var input entity.CreateClienteManualInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Criar cliente
+	cliente, err := h.clienteService.CreateManual(r.Context(), input)
+	if err != nil {
+		h.logger.Error("erro ao criar cliente",
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("cliente criado manualmente",
+		zap.String("clienteId", cliente.ID),
+		zap.String("name", cliente.Name),
+	)
+
+	response.Created(w, entity.CreateClienteResponse{Success: true, Cliente: cliente})
+}
+
 // List godoc
 // @Summary Lista clientes
 // @Description Lista clientes com filtros e paginação

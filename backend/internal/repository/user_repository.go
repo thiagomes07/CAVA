@@ -45,7 +45,7 @@ func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
 func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, password_hash, phone, role, 
-		       is_active, created_at, updated_at
+		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE id = $1
 	`
@@ -54,7 +54,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&user.ID, &user.IndustryID, &user.Name, &user.Email,
 		&user.Password, &user.Phone, &user.Role,
-		&user.IsActive, &user.CreatedAt, &user.UpdatedAt,
+		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -70,7 +70,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, password_hash, phone, role, 
-		       is_active, created_at, updated_at
+		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE email = $1
 	`
@@ -79,7 +79,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&user.ID, &user.IndustryID, &user.Name, &user.Email,
 		&user.Password, &user.Phone, &user.Role,
-		&user.IsActive, &user.CreatedAt, &user.UpdatedAt,
+		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -95,7 +95,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string) ([]entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, phone, role, 
-		       is_active, created_at, updated_at
+		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE industry_id = $1
 		ORDER BY created_at DESC
@@ -112,7 +112,7 @@ func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+			&u.Phone, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -125,7 +125,7 @@ func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string
 func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) ([]entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, phone, role, 
-		       is_active, created_at, updated_at
+		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE role = $1 AND is_active = TRUE
 		ORDER BY name
@@ -142,7 +142,7 @@ func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) (
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+			&u.Phone, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -156,7 +156,7 @@ func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]
 	query := `
 		SELECT 
 			u.id, u.name, u.email, u.phone, u.role, 
-			u.is_active, u.created_at, u.updated_at,
+			u.is_active, u.first_login_at, u.created_at, u.updated_at,
 			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
 		FROM users u
 		LEFT JOIN shared_inventory_batches sib 
@@ -179,7 +179,7 @@ func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]
 		var b entity.BrokerWithStats
 		if err := rows.Scan(
 			&b.ID, &b.Name, &b.Email, &b.Phone, &b.Role,
-			&b.IsActive, &b.CreatedAt, &b.UpdatedAt,
+			&b.IsActive, &b.FirstLoginAt, &b.CreatedAt, &b.UpdatedAt,
 			&b.SharedBatchesCount,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
@@ -251,7 +251,7 @@ func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, phone, role, 
-		       is_active, created_at, updated_at
+		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE 1=1
 	`
@@ -275,7 +275,7 @@ func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]ent
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Role, &u.IsActive, &u.CreatedAt, &u.UpdatedAt,
+			&u.Phone, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -283,4 +283,109 @@ func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]ent
 	}
 
 	return users, nil
+}
+
+func (r *userRepository) ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error) {
+	query := `
+		SELECT id, industry_id, name, email, phone, role, 
+		       is_active, first_login_at, created_at, updated_at
+		FROM users
+		WHERE industry_id = $1
+	`
+	args := []interface{}{industryID}
+
+	if role != nil {
+		query += ` AND role = $2`
+		args = append(args, *role)
+	}
+
+	query += ` ORDER BY name`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	users := []entity.User{}
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(
+			&u.ID, &u.IndustryID, &u.Name, &u.Email,
+			&u.Phone, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		users = append(users, u)
+	}
+
+	return users, nil
+}
+
+func (r *userRepository) UpdatePassword(ctx context.Context, id string, hashedPassword string) error {
+	query := `
+		UPDATE users
+		SET password_hash = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, hashedPassword, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Usuário")
+	}
+
+	return nil
+}
+
+func (r *userRepository) UpdateEmail(ctx context.Context, id string, email string) error {
+	query := `
+		UPDATE users
+		SET email = $1, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $2
+	`
+
+	result, err := r.db.ExecContext(ctx, query, email, id)
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" { // unique_violation
+				return errors.EmailExistsError(email)
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Usuário")
+	}
+
+	return nil
+}
+
+func (r *userRepository) SetFirstLoginAt(ctx context.Context, id string) error {
+	query := `
+		UPDATE users
+		SET first_login_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND first_login_at IS NULL
+	`
+
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
 }

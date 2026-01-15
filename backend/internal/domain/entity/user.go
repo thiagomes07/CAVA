@@ -24,16 +24,17 @@ func (r UserRole) IsValid() bool {
 
 // User representa um usuário do sistema
 type User struct {
-	ID         string    `json:"id"`
-	IndustryID *string   `json:"industryId,omitempty"` // NULL para brokers freelancers
-	Name       string    `json:"name"`
-	Email      string    `json:"email"`
-	Password   string    `json:"-"` // Nunca serializar senha
-	Phone      *string   `json:"phone,omitempty"`
-	Role       UserRole  `json:"role"`
-	IsActive   bool      `json:"isActive"`
-	CreatedAt  time.Time `json:"createdAt"`
-	UpdatedAt  time.Time `json:"updatedAt"`
+	ID           string     `json:"id"`
+	IndustryID   *string    `json:"industryId,omitempty"` // NULL para brokers freelancers
+	Name         string     `json:"name"`
+	Email        string     `json:"email"`
+	Password     string     `json:"-"` // Nunca serializar senha
+	Phone        *string    `json:"phone,omitempty"`
+	Role         UserRole   `json:"role"`
+	IsActive     bool       `json:"isActive"`
+	FirstLoginAt *time.Time `json:"firstLoginAt,omitempty"` // NULL = nunca logou
+	CreatedAt    time.Time  `json:"createdAt"`
+	UpdatedAt    time.Time  `json:"updatedAt"`
 }
 
 // CreateUserInput representa os dados para criar um usuário (com senha manual)
@@ -48,10 +49,11 @@ type CreateUserInput struct {
 
 // CreateSellerInput representa os dados para criar um vendedor interno (senha gerada automaticamente)
 type CreateSellerInput struct {
-	Name  string   `json:"name" validate:"required,min=2,max=255"`
-	Email string   `json:"email" validate:"required,email"`
-	Phone *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Role  UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO"`
+	Name    string   `json:"name" validate:"required,min=2,max=255"`
+	Email   string   `json:"email" validate:"required,email"`
+	Phone   *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Role    UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO ADMIN_INDUSTRIA"`
+	IsAdmin bool     `json:"isAdmin"`
 }
 
 // UpdateUserInput representa os dados para atualizar um usuário
@@ -63,6 +65,16 @@ type UpdateUserInput struct {
 // UpdateUserStatusInput representa os dados para atualizar status do usuário
 type UpdateUserStatusInput struct {
 	IsActive bool `json:"isActive"`
+}
+
+// UpdateUserEmailInput representa os dados para atualizar email do usuário (antes do primeiro login)
+type UpdateUserEmailInput struct {
+	Email string `json:"email" validate:"required,email"`
+}
+
+// ResendInviteInput representa os dados para reenviar convite (pode incluir novo email)
+type ResendInviteInput struct {
+	NewEmail *string `json:"newEmail,omitempty" validate:"omitempty,email"`
 }
 
 // LoginInput representa os dados de login

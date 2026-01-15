@@ -62,7 +62,7 @@ type Services struct {
 // NewHandler cria uma nova instância de Handler com todos os handlers
 func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Handler {
 	return &Handler{
-		Auth:            NewAuthHandler(services.Auth, cfg.Validator, cfg.Logger, cfg.CookieDomain, cfg.CookieSecure, cfg.AccessTokenTTL, cfg.RefreshTokenTTL),
+		Auth:            NewAuthHandler(services.Auth, services.User, cfg.Validator, cfg.Logger, cfg.CookieDomain, cfg.CookieSecure, cfg.AccessTokenTTL, cfg.RefreshTokenTTL),
 		User:            NewUserHandler(services.User, cfg.Validator, cfg.Logger),
 		Product:         NewProductHandler(services.Product, cfg.Validator, cfg.Logger),
 		Batch:           NewBatchHandler(services.Batch, cfg.Validator, cfg.Logger),
@@ -141,6 +141,19 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		})
 
 		// ============================================
+		// ROTAS DE PERFIL (usuário logado)
+		// ============================================
+		r.Route("/profile", func(r chi.Router) {
+			r.Use(m.Auth.Authenticate)
+			r.Use(m.RateApi.Limit)
+			r.Use(m.CSRF.ValidateCSRF)
+
+			r.Get("/", h.Auth.GetProfile)
+			r.Patch("/", h.Auth.UpdateProfile)
+			r.Patch("/password", h.Auth.ChangePassword)
+		})
+
+		// ============================================
 		// ROTAS AUTENTICADAS
 		// ============================================
 		r.Group(func(r chi.Router) {
@@ -207,6 +220,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Post("/", h.User.Create)
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.User.GetByID)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.User.UpdateStatus)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/resend-invite", h.User.ResendInvite)
+				r.With(m.RBAC.RequireAdmin).Patch("/{id}/email", h.User.UpdateEmail)
 			})
 
 			// ----------------------------------------
@@ -251,6 +266,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// ----------------------------------------
 			r.Route("/clientes", func(r chi.Router) {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Cliente.List)
+				r.With(m.RBAC.RequireIndustryUser).Post("/", h.Cliente.Create)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Cliente.GetByID)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Cliente.GetInteractions)
 				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Cliente.UpdateStatus)

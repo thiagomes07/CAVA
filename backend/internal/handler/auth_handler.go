@@ -6,6 +6,7 @@ import (
 
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"github.com/thiagomes07/CAVA/backend/pkg/validator"
 	"go.uber.org/zap"
@@ -14,6 +15,7 @@ import (
 // AuthHandler gerencia requisições de autenticação
 type AuthHandler struct {
 	authService  service.AuthService
+	userService  service.UserService
 	validator    *validator.Validator
 	logger       *zap.Logger
 	cookieDomain string
@@ -25,6 +27,7 @@ type AuthHandler struct {
 // NewAuthHandler cria uma nova instância de AuthHandler
 func NewAuthHandler(
 	authService service.AuthService,
+	userService service.UserService,
 	validator *validator.Validator,
 	logger *zap.Logger,
 	cookieDomain string,
@@ -34,6 +37,7 @@ func NewAuthHandler(
 ) *AuthHandler {
 	return &AuthHandler{
 		authService:  authService,
+		userService:  userService,
 		validator:    validator,
 		logger:       logger,
 		cookieDomain: cookieDomain,
@@ -219,4 +223,124 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		HttpOnly: true,
 		SameSite: http.SameSiteStrictMode,
 	})
+}
+
+// GetProfile godoc
+// @Summary Obtém perfil do usuário logado
+// @Description Retorna os dados do usuário autenticado
+// @Tags profile
+// @Produce json
+// @Success 200 {object} entity.User
+// @Failure 401 {object} response.ErrorResponse
+// @Router /api/profile [get]
+func (h *AuthHandler) GetProfile(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	user, err := h.userService.GetByID(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("erro ao buscar perfil",
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, user)
+}
+
+// UpdateProfile godoc
+// @Summary Atualiza perfil do usuário logado
+// @Description Atualiza nome e telefone do usuário autenticado
+// @Tags profile
+// @Accept json
+// @Produce json
+// @Param body body entity.UpdateUserInput true "Dados a atualizar"
+// @Success 200 {object} entity.User
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /api/profile [patch]
+func (h *AuthHandler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	var input entity.UpdateUserInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	user, err := h.userService.Update(r.Context(), userID, input)
+	if err != nil {
+		h.logger.Error("erro ao atualizar perfil",
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("perfil atualizado",
+		zap.String("userId", userID),
+	)
+
+	response.OK(w, user)
+}
+
+// ChangePassword godoc
+// @Summary Altera senha do usuário logado
+// @Description Permite ao usuário trocar sua senha
+// @Tags profile
+// @Accept json
+// @Produce json
+// @Param body body entity.ChangePasswordInput true "Senhas atual e nova"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /api/profile/password [patch]
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	var input entity.ChangePasswordInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	err := h.authService.ChangePassword(r.Context(), userID, input)
+	if err != nil {
+		h.logger.Warn("erro ao alterar senha",
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("senha alterada com sucesso",
+		zap.String("userId", userID),
+	)
+
+	response.OK(w, map[string]bool{"success": true})
 }

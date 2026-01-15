@@ -23,6 +23,9 @@ type UserService interface {
 	// List lista usuários com filtros
 	List(ctx context.Context, role *entity.UserRole) ([]entity.User, error)
 
+	// ListByIndustry lista usuários por indústria com filtro de role opcional
+	ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error)
+
 	// Update atualiza dados do usuário
 	Update(ctx context.Context, id string, input entity.UpdateUserInput) (*entity.User, error)
 
@@ -34,4 +37,10 @@ type UserService interface {
 
 	// GetBrokers lista brokers com estatísticas
 	GetBrokers(ctx context.Context, industryID string) ([]entity.BrokerWithStats, error)
+
+	// ResendInvite reenvia convite (apenas se usuário nunca logou)
+	ResendInvite(ctx context.Context, userID string, newEmail *string) (*entity.User, error)
+
+	// UpdateEmail atualiza email do usuário (apenas se nunca logou)
+	UpdateEmail(ctx context.Context, userID string, email string) (*entity.User, error)
 }

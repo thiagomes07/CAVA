@@ -34,13 +34,20 @@ func NewUserHandler(
 
 // List godoc
 // @Summary Lista usuários
-// @Description Lista usuários com filtro opcional por role
+// @Description Lista usuários da indústria com filtro opcional por role
 // @Tags users
 // @Produce json
 // @Param role query string false "Filtrar por role"
 // @Success 200 {array} entity.User
 // @Router /api/users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
+	// Obter industryID do contexto
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
 	// Extrair filtro de role da query
 	roleStr := r.URL.Query().Get("role")
 
@@ -54,10 +61,11 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		roleFilter = &role
 	}
 
-	// Buscar usuários
-	users, err := h.userService.List(r.Context(), roleFilter)
+	// Buscar usuários da indústria
+	users, err := h.userService.ListByIndustry(r.Context(), industryID, roleFilter)
 	if err != nil {
 		h.logger.Error("erro ao listar usuários",
+			zap.String("industryId", industryID),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -97,8 +105,8 @@ func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 }
 
 // Create godoc
-// @Summary Cria um novo usuário (vendedor interno)
-// @Description Cria um novo usuário vendedor interno com senha temporária gerada automaticamente
+// @Summary Cria um novo usuário (vendedor interno ou admin)
+// @Description Cria um novo usuário vendedor interno ou admin com senha temporária gerada automaticamente
 // @Tags users
 // @Accept json
 // @Produce json
@@ -115,8 +123,12 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Forçar role como VENDEDOR_INTERNO (única opção permitida)
-	input.Role = entity.RoleVendedorInterno
+	// Se isAdmin = true, role = ADMIN_INDUSTRIA, senão VENDEDOR_INTERNO
+	if input.IsAdmin {
+		input.Role = entity.RoleAdminIndustria
+	} else {
+		input.Role = entity.RoleVendedorInterno
+	}
 
 	// Validar input
 	if err := h.validator.Validate(input); err != nil {
@@ -131,17 +143,23 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Criar vendedor com senha temporária
+	// Criar vendedor/admin com senha temporária
 	user, err := h.userService.CreateSeller(r.Context(), industryID, input)
 	if err != nil {
-		h.logger.Error("erro ao criar vendedor interno",
+		h.logger.Error("erro ao criar usuário",
+			zap.Bool("isAdmin", input.IsAdmin),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
 		return
 	}
 
-	h.logger.Info("vendedor interno criado",
+	roleDesc := "vendedor interno"
+	if input.IsAdmin {
+		roleDesc = "admin"
+	}
+
+	h.logger.Info(roleDesc+" criado",
 		zap.String("userId", user.ID),
 		zap.String("email", user.Email),
 		zap.String("industryId", industryID),
@@ -272,4 +290,102 @@ func (h *UserHandler) InviteBroker(w http.ResponseWriter, r *http.Request) {
 	)
 
 	response.Created(w, user)
+}
+
+// ResendInvite godoc
+// @Summary Reenvia convite de acesso
+// @Description Gera nova senha temporária e reenvia email (opcionalmente para novo email)
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do usuário"
+// @Param body body entity.ResendInviteInput false "Novo email (opcional)"
+// @Success 200 {object} entity.User
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/users/{id}/resend-invite [post]
+func (h *UserHandler) ResendInvite(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do usuário é obrigatório", nil)
+		return
+	}
+
+	var input entity.ResendInviteInput
+
+	// Parse JSON body (pode ser vazio)
+	if err := response.ParseJSON(r, &input); err != nil {
+		// Ignora erro de parse se body vazio
+		input = entity.ResendInviteInput{}
+	}
+
+	// Reenviar convite
+	user, err := h.userService.ResendInvite(r.Context(), id, input.NewEmail)
+	if err != nil {
+		h.logger.Error("erro ao reenviar convite",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("convite reenviado",
+		zap.String("userId", id),
+		zap.String("email", user.Email),
+	)
+
+	response.OK(w, user)
+}
+
+// UpdateEmail godoc
+// @Summary Atualiza email do usuário
+// @Description Atualiza email apenas se usuário nunca logou
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do usuário"
+// @Param body body entity.UpdateUserEmailInput true "Novo email"
+// @Success 200 {object} entity.User
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/users/{id}/email [patch]
+func (h *UserHandler) UpdateEmail(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do usuário é obrigatório", nil)
+		return
+	}
+
+	var input entity.UpdateUserEmailInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Atualizar email
+	user, err := h.userService.UpdateEmail(r.Context(), id, input.Email)
+	if err != nil {
+		h.logger.Error("erro ao atualizar email",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("email atualizado",
+		zap.String("userId", id),
+		zap.String("email", user.Email),
+	)
+
+	response.OK(w, user)
 }

@@ -29,6 +29,7 @@ export interface User {
   role: UserRole;
   industryId?: string;
   isActive: boolean;
+  firstLoginAt?: string;
   createdAt: string;
   updatedAt: string;
 }

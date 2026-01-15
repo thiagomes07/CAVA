@@ -22,7 +22,7 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 	query := `
 		INSERT INTO clientes (
 			id, sales_link_id, name, contact, message, marketing_opt_in, status
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		) VALUES ($1, NULLIF($2, ''), $3, $4, $5, $6, $7)
 		RETURNING created_at, updated_at, last_interaction
 	`
 
@@ -48,7 +48,7 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 
 func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	query := `
-		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
 		FROM clientes
 		WHERE id = $1
@@ -73,7 +73,7 @@ func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cl
 
 func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (*entity.Cliente, error) {
 	query := `
-		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
 		FROM clientes
 		WHERE contact = $1
@@ -100,7 +100,7 @@ func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (
 
 func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Cliente, error) {
 	query := `
-		SELECT id, sales_link_id, name, contact, message, marketing_opt_in,
+		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
 		       status, created_at, updated_at
 		FROM clientes
 		WHERE sales_link_id = $1
@@ -120,7 +120,7 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := psql.Select(
-		"id", "sales_link_id", "name", "contact", "message",
+		"id", "COALESCE(sales_link_id::text, '')", "name", "contact", "message",
 		"marketing_opt_in", "status", "created_at", "updated_at",
 	).From("clientes")
 

@@ -17,7 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
-  ChevronUp
+  ChevronUp,
+  User
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -316,26 +317,31 @@ export function Sidebar() {
               </div>
             )}
 
-            {/* User Info Button */}
-            <button
-              type="button"
-              onClick={() => sidebarOpen && setUserMenuOpen(!userMenuOpen)}
+            {/* User Info Area */}
+            <div
               className={cn(
-                'w-full flex items-center gap-3 rounded-sm transition-colors duration-200',
-                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
-                sidebarOpen ? 'p-2 -m-2' : 'justify-center',
-                userMenuOpen && 'bg-white/10'
+                'w-full flex items-center gap-3 rounded-sm',
+                sidebarOpen ? 'p-2 -m-2' : 'justify-center'
               )}
-              aria-expanded={userMenuOpen}
-              aria-haspopup="true"
             >
-              <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center shrink-0">
-                <span className="text-sm font-semibold">
-                  {user.name.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              {sidebarOpen && (
-                <>
+              {/* Avatar + Name - Clickable to go to Profile */}
+              <Link
+                href="/profile"
+                onClick={closeOnMobile}
+                className={cn(
+                  'flex items-center gap-3 flex-1 min-w-0 rounded-sm transition-colors duration-200',
+                  'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                  'py-1 px-1 -ml-1',
+                  !sidebarOpen && 'justify-center'
+                )}
+                title={t('navigation.profile')}
+              >
+                <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center shrink-0">
+                  <span className="text-sm font-semibold">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                {sidebarOpen && (
                   <div className="flex-1 min-w-0 text-left">
                     <p className="text-sm font-medium truncate" title={user.name}>
                       {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
@@ -346,21 +352,49 @@ export function Sidebar() {
                       {user.role === 'BROKER' && tRoles('broker')}
                     </p>
                   </div>
+                )}
+              </Link>
+              
+              {/* Chevron Button - Opens Dropdown */}
+              {sidebarOpen && (
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className={cn(
+                    'p-2 rounded-sm transition-colors duration-200',
+                    'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                    userMenuOpen && 'bg-white/10'
+                  )}
+                  aria-expanded={userMenuOpen}
+                  aria-haspopup="true"
+                  title={tAuth('logout')}
+                >
                   <ChevronUp 
                     className={cn(
                       'w-4 h-4 text-porcelain/60 transition-transform duration-200',
                       userMenuOpen && 'rotate-180'
                     )} 
                   />
-                </>
+                </button>
               )}
-            </button>
+            </div>
           </div>
         </div>
 
-        {/* Collapsed Sidebar - Logout Button */}
+        {/* Collapsed Sidebar - Profile & Logout Buttons */}
         {!sidebarOpen && (
-          <div className="hidden lg:block p-3 border-t border-white/10">
+          <div className="hidden lg:flex lg:flex-col gap-1 p-3 border-t border-white/10">
+            <Link
+              href="/profile"
+              className={cn(
+                'w-full p-3 rounded-sm transition-colors duration-200',
+                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                'flex items-center justify-center'
+              )}
+              title={t('navigation.profile')}
+            >
+              <User className="w-5 h-5" />
+            </Link>
             <button
               type="button"
               onClick={handleLogout}
@@ -369,7 +403,7 @@ export function Sidebar() {
                 'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
                 'flex items-center justify-center'
               )}
-              title="Sair"
+              title={tAuth('logout')}
             >
               <LogOut className="w-5 h-5" />
             </button>

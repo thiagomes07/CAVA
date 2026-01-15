@@ -5,10 +5,11 @@ import { useRouter } from 'next/navigation';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX } from 'lucide-react';
+import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX, RefreshCw, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import {
   Modal,
@@ -20,7 +21,7 @@ import {
 } from '@/components/ui/modal';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { inviteBrokerSchema, type InviteBrokerInput } from '@/lib/schemas/auth.schema';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
@@ -30,6 +31,24 @@ import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { z } from 'zod';
+
+// Schema for resend invite modal (optional new email)
+const resendInviteSchema = z.object({
+  changeEmail: z.boolean(),
+  newEmail: z.string().email('Email inválido').optional().or(z.literal('')),
+}).refine((data) => {
+  // If changeEmail is true, newEmail must be provided
+  if (data.changeEmail && (!data.newEmail || data.newEmail.trim() === '')) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Informe o novo email',
+  path: ['newEmail'],
+});
+
+type ResendInviteInput = z.infer<typeof resendInviteSchema>;
 
 interface BrokerWithStats extends User {
   sharedBatchesCount: number;
@@ -45,6 +64,8 @@ export default function BrokersManagementPage() {
   const [brokers, setBrokers] = useState<BrokerWithStats[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showResendModal, setShowResendModal] = useState(false);
+  const [selectedBroker, setSelectedBroker] = useState<BrokerWithStats | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const {
@@ -60,6 +81,24 @@ export default function BrokersManagementPage() {
   const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
   const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
+  // Form for resend invite modal
+  const {
+    register: registerResend,
+    handleSubmit: handleSubmitResend,
+    formState: { errors: errorsResend },
+    reset: resetResend,
+    watch: watchResend,
+    setValue: setResendValue,
+  } = useForm<ResendInviteInput>({
+    resolver: zodResolver(resendInviteSchema),
+    defaultValues: {
+      changeEmail: false,
+      newEmail: '',
+    },
+  });
+
+  const changeEmail = watchResend('changeEmail');
+
   useEffect(() => {
     fetchBrokers();
   }, []);
@@ -69,7 +108,7 @@ export default function BrokersManagementPage() {
       setIsLoading(true);
       const data = await apiClient.get<BrokerWithStats[]>('/brokers');
       setBrokers(data);
-    } catch (err) {
+    } catch {
       error(t('loadError'));
     } finally {
       setIsLoading(false);
@@ -83,7 +122,7 @@ export default function BrokersManagementPage() {
       await apiClient.post('/brokers/invite', {
         ...data,
         phone: sanitizePhone(data.phone),
-        whatsapp: sanitizePhone((data as any).whatsapp),
+        whatsapp: sanitizePhone(data.whatsapp),
       });
 
       success(t('inviteSent', { email: data.email }));
@@ -91,7 +130,11 @@ export default function BrokersManagementPage() {
       reset();
       fetchBrokers();
     } catch (err) {
-      error(t('inviteError'));
+      if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
+        error(t('emailAlreadyExists'));
+      } else {
+        error(t('inviteError'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -107,10 +150,53 @@ export default function BrokersManagementPage() {
         currentStatus ? t('brokerDeactivated') : t('brokerActivated')
       );
       fetchBrokers();
-    } catch (err) {
+    } catch {
       error(t('brokerStatusError'));
     }
   };
+
+  const handleOpenResendModal = (broker: BrokerWithStats) => {
+    setSelectedBroker(broker);
+    resetResend({ changeEmail: false, newEmail: '' });
+    setShowResendModal(true);
+  };
+
+  const onSubmitResend = async (data: ResendInviteInput) => {
+    if (!selectedBroker) return;
+
+    try {
+      setIsSubmitting(true);
+      
+      const payload: { newEmail?: string } = {};
+      if (data.changeEmail && data.newEmail && data.newEmail.trim() !== '') {
+        payload.newEmail = data.newEmail.trim();
+      }
+
+      await apiClient.post(`/users/${selectedBroker.id}/resend-invite`, payload);
+      success(t('inviteResent'));
+      setShowResendModal(false);
+      resetResend();
+      setSelectedBroker(null);
+      fetchBrokers();
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'BAD_REQUEST') {
+        if (err.message?.includes('diferente')) {
+          error(t('emailMustBeDifferent'));
+        } else {
+          error(t('cannotResendAfterLogin'));
+        }
+      } else if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
+        error(t('emailAlreadyExists'));
+      } else {
+        error(t('resendError'));
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Check if user can have invite resent (never logged in)
+  const canResendInvite = (broker: BrokerWithStats) => !broker.firstLoginAt;
 
   const isEmpty = brokers.length === 0;
 
@@ -226,12 +312,31 @@ export default function BrokersManagementPage() {
                       </button>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={broker.isActive ? 'DISPONIVEL' : 'INATIVO'}>
-                        {broker.isActive ? tCommon('active') : tCommon('inactive')}
-                      </Badge>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={broker.isActive ? 'DISPONIVEL' : 'INATIVO'}>
+                          {broker.isActive ? tCommon('active') : tCommon('inactive')}
+                        </Badge>
+                        {/* Indicador visual de primeiro login */}
+                        {canResendInvite(broker) && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full" title={t('pendingFirstLogin')}>
+                            <Clock className="w-3 h-3" />
+                            {t('pendingAccess')}
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
+                        {/* Reenviar convite - apenas se nunca logou */}
+                        {canResendInvite(broker) && (
+                          <button
+                            onClick={() => handleOpenResendModal(broker)}
+                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-sm transition-colors"
+                            title={t('resendInvite')}
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
                         <button
                           onClick={() => router.push(`/brokers/${broker.id}/shared`)}
                           className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
@@ -322,6 +427,77 @@ export default function BrokersManagementPage() {
             </Button>
             <Button type="submit" variant="primary" loading={isSubmitting}>
               {t('sendInvite')}
+            </Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      {/* Resend Invite Confirmation Modal */}
+      <Modal open={showResendModal} onClose={() => setShowResendModal(false)}>
+        <ModalClose onClose={() => setShowResendModal(false)} />
+        <ModalHeader>
+          <ModalTitle>{t('resendInviteTitle')}</ModalTitle>
+        </ModalHeader>
+
+        <form onSubmit={handleSubmitResend(onSubmitResend)}>
+          <ModalContent>
+            <div className="space-y-4">
+              {/* Info box about pending first login */}
+              <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-sm">
+                <Clock className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-orange-800">
+                    {t('pendingFirstLoginInfo', { name: selectedBroker?.name || '' })}
+                  </p>
+                  <p className="text-xs text-orange-700 mt-1">
+                    {t('resendInviteDescription')}
+                  </p>
+                </div>
+              </div>
+
+              <p className="text-sm text-slate-600">
+                {t('currentEmail')}: <strong>{selectedBroker?.email}</strong>
+              </p>
+
+              {/* Checkbox to change email */}
+              <Checkbox
+                id="changeEmail"
+                checked={changeEmail}
+                onChange={(e) => {
+                  setResendValue('changeEmail', e.target.checked);
+                  if (!e.target.checked) {
+                    setResendValue('newEmail', '');
+                  }
+                }}
+                label={t('sendToDifferentEmail')}
+                description={t('sendToDifferentEmailDescription')}
+              />
+
+              {/* New email field - only shown when checkbox is checked */}
+              {changeEmail && (
+                <Input
+                  {...registerResend('newEmail')}
+                  type="email"
+                  label={t('newEmail')}
+                  placeholder="novo@email.com"
+                  error={errorsResend.newEmail?.message}
+                  disabled={isSubmitting}
+                />
+              )}
+            </div>
+          </ModalContent>
+
+          <ModalFooter>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setShowResendModal(false)}
+              disabled={isSubmitting}
+            >
+              {tCommon('cancel')}
+            </Button>
+            <Button type="submit" variant="primary" loading={isSubmitting}>
+              {t('confirmResend')}
             </Button>
           </ModalFooter>
         </form>

@@ -129,6 +129,45 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 	})
 }
 
+// CreateManual cria um cliente manualmente (usuário autenticado)
+func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateClienteManualInput) (*entity.Cliente, error) {
+	// Verificar se cliente já existe por contato
+	existingCliente, err := s.clienteRepo.FindByContact(ctx, input.Contact)
+	if err != nil && !isNotFoundError(err) {
+		s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+
+	if existingCliente != nil {
+		return nil, domainErrors.NewConflictError("Cliente com este contato já existe")
+	}
+
+	// Criar novo cliente (sem SalesLinkID, criado manualmente)
+	cliente := &entity.Cliente{
+		ID:             uuid.New().String(),
+		SalesLinkID:    "", // Sem link associado
+		Name:           input.Name,
+		Contact:        input.Contact,
+		Message:        input.Message,
+		MarketingOptIn: input.MarketingOptIn,
+		Status:         entity.ClienteStatusNovo,
+		CreatedAt:      time.Now(),
+		UpdatedAt:      time.Now(),
+	}
+
+	if err := s.clienteRepo.Create(ctx, nil, cliente); err != nil {
+		s.logger.Error("erro ao criar cliente manual", zap.Error(err))
+		return nil, err
+	}
+
+	s.logger.Info("cliente manual criado com sucesso",
+		zap.String("clienteId", cliente.ID),
+		zap.String("name", cliente.Name),
+	)
+
+	return cliente, nil
+}
+
 func (s *clienteService) GetByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	cliente, err := s.clienteRepo.FindByID(ctx, id)
 	if err != nil {

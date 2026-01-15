@@ -75,6 +75,14 @@ type CreateClienteInput struct {
 	MarketingOptIn bool    `json:"marketingOptIn"`
 }
 
+// CreateClienteManualInput representa os dados para criar um cliente manualmente (autenticado)
+type CreateClienteManualInput struct {
+	Name           string  `json:"name" validate:"required,min=2,max=100"`
+	Contact        string  `json:"contact" validate:"required,min=5"` // Email ou telefone
+	Message        *string `json:"message,omitempty" validate:"omitempty,max=500"`
+	MarketingOptIn bool    `json:"marketingOptIn"`
+}
+
 // UpdateClienteStatusInput representa os dados para atualizar o status de um cliente
 type UpdateClienteStatusInput struct {
 	Status ClienteStatus `json:"status" validate:"required,oneof=NOVO CONTATADO RESOLVIDO"`
@@ -101,5 +109,6 @@ type ClienteListResponse struct {
 
 // CreateClienteResponse representa a resposta de criação de cliente
 type CreateClienteResponse struct {
-	Success bool `json:"success"`
+	Success bool     `json:"success"`
+	Cliente *Cliente `json:"cliente,omitempty"`
 }
