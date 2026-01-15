@@ -11,6 +11,7 @@ import { Toggle } from '@/components/ui/toggle';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
+import { Pagination } from '@/components/shared/Pagination';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -27,6 +28,7 @@ export default function CatalogPage() {
   const tCommon = useTranslations('common');
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [totalProducts, setTotalProducts] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState<ProductFilter>({
@@ -57,6 +59,7 @@ export default function CatalogPage() {
         { params: filters }
       );
       setProducts(data.products);
+      setTotalProducts(data.total);
     } catch (err) {
       error(t('loadError'));
       setProducts([]); 
@@ -172,24 +175,35 @@ export default function CatalogPage() {
             }}
           />
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {products.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                onView={() => router.push(`/admin/inventory?productId=${product.id}`)}
-                onEdit={() => router.push(`/admin/catalog/${product.id}`)}
-                translations={{
-                  noPhoto: t('noPhoto'),
-                  edit: t('edit'),
-                  viewBatches: t('viewBatches'),
-                  active: t('active'),
-                  inactive: t('inactive'),
-                  batches: (count: number) => `${count} ${count === 1 ? t('batch') : t('batchesPlural')}`
-                }}
-              />
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {products.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  onView={() => router.push(`/inventory?productId=${product.id}`)}
+                  onEdit={() => router.push(`/catalog/${product.id}`)}
+                  translations={{
+                    noPhoto: t('noPhoto'),
+                    edit: t('edit'),
+                    viewBatches: t('viewBatches'),
+                    active: t('active'),
+                    inactive: t('inactive'),
+                    batches: (count: number) => `${count} ${count === 1 ? t('batch') : t('batchesPlural')}`
+                  }}
+                />
+              ))}
+            </div>
+            
+            {/* Pagination */}
+            <Pagination
+              currentPage={filters.page || 1}
+              totalPages={Math.ceil(totalProducts / (filters.limit || 24))}
+              totalItems={totalProducts}
+              itemsPerPage={filters.limit || 24}
+              onPageChange={(page) => setFilters({ ...filters, page })}
+            />
+          </>
         )}
       </div>
     </div>
@@ -212,7 +226,8 @@ interface ProductCardProps {
 
 function ProductCard({ product, onView, onEdit, translations }: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
-  const coverImage = product.medias?.find((m) => m.isCover) || product.medias?.[0];
+  // A capa é a primeira mídia (já ordenada por displayOrder no backend)
+  const coverImage = product.medias?.[0];
 
   return (
     <div

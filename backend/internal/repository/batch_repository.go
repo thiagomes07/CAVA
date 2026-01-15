@@ -241,11 +241,11 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 
 	// Paginação e ordenação
 	offset := (filters.Page - 1) * filters.Limit
-	
+
 	// Determinar ordenação
 	orderColumn := "entry_date"
 	orderDir := "DESC"
-	
+
 	// Mapear campos de ordenação válidos
 	validSortColumns := map[string]string{
 		"batchCode":      "batch_code",
@@ -254,19 +254,19 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 		"industryPrice":  "industry_price",
 		"entryDate":      "entry_date",
 	}
-	
+
 	if filters.SortBy != "" {
 		if col, ok := validSortColumns[filters.SortBy]; ok {
 			orderColumn = col
 		}
 	}
-	
+
 	if filters.SortDir == "asc" {
 		orderDir = "ASC"
 	} else if filters.SortDir == "desc" {
 		orderDir = "DESC"
 	}
-	
+
 	query = query.OrderBy(orderColumn + " " + orderDir).Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()

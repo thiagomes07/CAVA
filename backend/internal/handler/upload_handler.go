@@ -122,6 +122,16 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Buscar mídias existentes para obter o próximo displayOrder
+	existingMedias, err := h.mediaRepo.FindProductMedias(r.Context(), productID)
+	if err != nil {
+		h.logger.Error("erro ao buscar mídias existentes",
+			zap.String("productId", productID),
+			zap.Error(err),
+		)
+	}
+	startDisplayOrder := len(existingMedias)
+
 	// Processar cada arquivo
 	var urls []string
 	for _, fileHeader := range files {
@@ -180,7 +190,26 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 		urls = append(urls, url)
 	}
 
-	h.logger.Info("mídias de produto enviadas",
+	// Persistir URLs no banco de dados
+	var mediasToCreate []entity.CreateMediaInput
+	for i, url := range urls {
+		mediasToCreate = append(mediasToCreate, entity.CreateMediaInput{
+			URL:          url,
+			DisplayOrder: startDisplayOrder + i,            // Continua a partir das mídias existentes
+			IsCover:      startDisplayOrder == 0 && i == 0, // Primeira imagem é capa apenas se não houver mídias existentes
+		})
+	}
+
+	if err := h.productService.AddMedias(r.Context(), productID, mediasToCreate); err != nil {
+		h.logger.Error("erro ao persistir mídias no banco",
+			zap.String("productId", productID),
+			zap.Error(err),
+		)
+		// Não retorna erro pois o upload já foi feito com sucesso
+		// As URLs ainda serão retornadas, mas um warning é logado
+	}
+
+	h.logger.Info("mídias de produto enviadas e persistidas",
 		zap.String("productId", productID),
 		zap.Int("count", len(urls)),
 	)
@@ -230,6 +259,16 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 		response.BadRequest(w, "Máximo 10 arquivos por upload", nil)
 		return
 	}
+
+	// Buscar mídias existentes para obter o próximo displayOrder
+	existingMedias, err := h.mediaRepo.FindBatchMedias(r.Context(), batchID)
+	if err != nil {
+		h.logger.Error("erro ao buscar mídias existentes do lote",
+			zap.String("batchId", batchID),
+			zap.Error(err),
+		)
+	}
+	startDisplayOrder := len(existingMedias)
 
 	// Processar cada arquivo
 	var urls []string
@@ -294,7 +333,7 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 	for i, url := range urls {
 		mediasToCreate = append(mediasToCreate, entity.CreateMediaInput{
 			URL:          url,
-			DisplayOrder: i,
+			DisplayOrder: startDisplayOrder + i, // Continua a partir das mídias existentes
 			IsCover:      false,
 		})
 	}
@@ -494,6 +533,56 @@ func (h *UploadHandler) UpdateBatchMediasOrder(w http.ResponseWriter, r *http.Re
 	}
 
 	h.logger.Info("ordem das mídias atualizada",
+		zap.Int("count", len(input)),
+	)
+
+	response.OK(w, map[string]bool{"success": true})
+}
+
+// UpdateProductMediasOrder godoc
+// @Summary Atualiza ordem das mídias de um produto
+// @Description Atualiza a ordem de exibição das mídias de um produto
+// @Tags uploads
+// @Accept json
+// @Produce json
+// @Param body body []map[string]interface{} true "Array de mídias com id e displayOrder"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Router /api/product-medias/order [patch]
+func (h *UploadHandler) UpdateProductMediasOrder(w http.ResponseWriter, r *http.Request) {
+	var input []struct {
+		ID           string `json:"id"`
+		DisplayOrder int    `json:"displayOrder"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
+		response.BadRequest(w, "JSON inválido", nil)
+		return
+	}
+
+	if len(input) == 0 {
+		response.BadRequest(w, "Lista de mídias vazia", nil)
+		return
+	}
+
+	ctx := r.Context()
+
+	for _, media := range input {
+		if media.ID == "" {
+			continue
+		}
+
+		if err := h.mediaRepo.UpdateDisplayOrder(ctx, media.ID, media.DisplayOrder); err != nil {
+			h.logger.Error("erro ao atualizar ordem da mídia de produto",
+				zap.String("mediaId", media.ID),
+				zap.Int("displayOrder", media.DisplayOrder),
+				zap.Error(err),
+			)
+			// Continua para outras mídias mesmo se uma falhar
+		}
+	}
+
+	h.logger.Info("ordem das mídias de produto atualizada",
 		zap.Int("count", len(input)),
 	)
 

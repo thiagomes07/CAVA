@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { Upload, X, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -20,7 +20,6 @@ import { cn } from '@/lib/utils/cn';
 interface UploadedMedia {
   file: File;
   preview: string;
-  isCover: boolean;
 }
 
 export default function NewProductPage() {
@@ -52,6 +51,12 @@ export default function NewProductPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const totalPhotos = medias.length + files.length;
+
+    if (totalPhotos > 10) {
+      error('Máximo de 10 fotos por produto');
+      return;
+    }
     
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
@@ -71,7 +76,6 @@ export default function NewProductPage() {
           {
             file,
             preview: event.target?.result as string,
-            isCover: prev.length === 0,
           },
         ]);
       };
@@ -82,57 +86,62 @@ export default function NewProductPage() {
   };
 
   const handleRemoveMedia = (index: number) => {
+    setMedias((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleMoveMedia = (from: number, to: number) => {
     setMedias((prev) => {
-      const newMedias = prev.filter((_, i) => i !== index);
-      if (newMedias.length > 0 && !newMedias.some((m) => m.isCover)) {
-        newMedias[0].isCover = true;
-      }
-      return newMedias;
+      if (to < 0 || to >= prev.length) return prev;
+      const next = [...prev];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
     });
   };
 
   const handleSetCover = (index: number) => {
-    setMedias((prev) =>
-      prev.map((media, i) => ({
-        ...media,
-        isCover: i === index,
-      }))
-    );
+    if (index === 0) return;
+    setMedias((prev) => {
+      const next = [...prev];
+      const [cover] = next.splice(index, 1);
+      next.unshift(cover);
+      return next;
+    });
   };
 
   const onSubmit = async (data: ProductInput) => {
     try {
       setIsSubmitting(true);
 
-      let mediaUrls: string[] = [];
+      // 1. Criar o produto primeiro (sem mídias)
+      const productData = {
+        name: data.name,
+        sku: data.sku || undefined,
+        material: data.material,
+        finish: data.finish,
+        description: data.description || undefined,
+        isPublic: data.isPublic,
+      };
 
-      if (medias.length > 0) {
+      const product = await apiClient.post<{ id: string }>('/products', productData);
+
+      // 2. Se houver mídias, fazer upload com o productId
+      if (medias.length > 0 && product.id) {
         const formData = new FormData();
+        formData.append('productId', product.id);
         medias.forEach((media) => {
-          formData.append('files', media.file);
+          formData.append('medias', media.file);
         });
 
-        const uploadResult = await apiClient.upload<{ urls: string[] }>(
+        await apiClient.upload<{ urls: string[] }>(
           '/upload/product-medias',
           formData
         );
-        mediaUrls = uploadResult.urls;
       }
-
-      const productData = {
-        ...data,
-        medias: mediaUrls.map((url, index) => ({
-          url,
-          displayOrder: index,
-          isCover: medias[index]?.isCover || false,
-        })),
-      };
-
-      await apiClient.post('/products', productData);
 
       success('Produto cadastrado com sucesso');
       router.push('/catalog');
-    } catch (err) {
+    } catch {
       error('Erro ao cadastrar produto');
     } finally {
       setIsSubmitting(false);
@@ -143,19 +152,11 @@ export default function NewProductPage() {
     <div className="min-h-screen bg-mineral">
       {/* Header */}
       <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
-        <div className="flex items-center gap-4 mb-4">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <div>
-            <h1 className="font-serif text-3xl text-obsidian">Novo Produto</h1>
-            <p className="text-sm text-slate-500">
-              Cadastre um novo tipo de pedra no catálogo
-            </p>
-          </div>
+        <div>
+          <h1 className="font-serif text-3xl text-obsidian">Novo Produto</h1>
+          <p className="text-sm text-slate-500">
+            Cadastre um novo tipo de pedra no catálogo
+          </p>
         </div>
       </div>
 
@@ -247,7 +248,7 @@ export default function NewProductPage() {
                   'border-2 border-dashed border-slate-300 rounded-sm',
                   'cursor-pointer transition-colors',
                   'hover:border-obsidian hover:bg-slate-50',
-                  isSubmitting && 'opacity-50 cursor-not-allowed'
+                  (isSubmitting || medias.length >= 10) && 'opacity-50 cursor-not-allowed'
                 )}
               >
                 <Upload className="w-12 h-12 text-slate-400 mb-4" />
@@ -255,7 +256,7 @@ export default function NewProductPage() {
                   Clique para selecionar ou arraste arquivos
                 </p>
                 <p className="text-xs text-slate-400">
-                  JPG, PNG ou WebP (máx. 5MB por arquivo)
+                  {medias.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
                 </p>
                 <input
                   id="file-upload"
@@ -263,10 +264,13 @@ export default function NewProductPage() {
                   accept="image/jpeg,image/png,image/webp"
                   multiple
                   onChange={handleFileSelect}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || medias.length >= 10}
                   className="hidden"
                 />
               </label>
+              <p className="text-xs text-slate-500 mt-2">
+                A primeira foto será a capa do produto
+              </p>
             </div>
 
             {/* Preview Grid */}
@@ -284,33 +288,49 @@ export default function NewProductPage() {
                     />
 
                     {/* Overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleSetCover(index)}
-                        className={cn(
-                          'px-3 py-1 rounded-sm text-xs font-semibold transition-colors',
-                          media.isCover
-                            ? 'bg-emerald-500 text-white'
-                            : 'bg-white text-obsidian hover:bg-slate-100'
-                        )}
-                      >
-                        {media.isCover ? 'Capa' : 'Definir Capa'}
-                      </button>
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
+                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleMoveMedia(index, index - 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === 0}
+                          aria-label="Mover para cima"
+                        >
+                          <ArrowUp className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleSetCover(index)}
+                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
+                          disabled={index === 0}
+                        >
+                          Definir capa
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveMedia(index)}
-                        className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
+                        <button
+                          type="button"
+                          onClick={() => handleMoveMedia(index, index + 1)}
+                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                          disabled={index === medias.length - 1}
+                          aria-label="Mover para baixo"
+                        >
+                          <ArrowDown className="w-4 h-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveMedia(index)}
+                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     {/* Cover Badge */}
-                    {media.isCover && (
+                    {index === 0 && (
                       <div className="absolute top-2 left-2">
-                        <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
+                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
                           CAPA
                         </span>
                       </div>

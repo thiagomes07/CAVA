@@ -280,6 +280,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.With(m.RBAC.RequireAdmin).Delete("/batch-medias/{id}", h.Upload.DeleteBatchMedia)
 
 			// Update media order
+			r.With(m.RBAC.RequireAdmin).Patch("/product-medias/order", h.Upload.UpdateProductMediasOrder)
 			r.With(m.RBAC.RequireAdmin).Patch("/batch-medias/order", h.Upload.UpdateBatchMediasOrder)
 		})
 	})
