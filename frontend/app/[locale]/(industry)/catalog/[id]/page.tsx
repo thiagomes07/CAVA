@@ -261,12 +261,8 @@ export default function EditProductPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-mineral">
-        <div className="px-8 py-8">
-          <div className="max-w-3xl mx-auto">
-            <LoadingState variant="form" rows={8} />
-          </div>
-        </div>
+      <div>
+        <LoadingState variant="form" rows={8} />
       </div>
     );
   }
@@ -277,9 +273,9 @@ export default function EditProductPage() {
   const allMedias = [...existingMedias, ...newMedias.map((m) => ({ ...m, id: `new-${Math.random()}` }))];
 
   return (
-    <div className="min-h-screen bg-mineral">
+    <div>
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+      <div className="bg-porcelain border-b border-slate-100 -mx-6 -mt-8 px-8 py-6">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian">Editar Produto</h1>
@@ -298,7 +294,7 @@ export default function EditProductPage() {
       </div>
 
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="px-8 py-8">
+      <form onSubmit={handleSubmit(onSubmit)} className="py-8">
         <div className="max-w-3xl mx-auto space-y-8">
           {/* Informações Básicas */}
           <Card>

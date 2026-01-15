@@ -20,29 +20,27 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
   ({ className, open, onClose, children, 'aria-labelledby': ariaLabelledBy, 'aria-describedby': ariaDescribedBy, ...props }, ref) => {
     const modalRef = useRef<HTMLDivElement>(null);
     const previousFocusRef = useRef<HTMLElement | null>(null);
+    const previousOverflowRef = useRef<string>('');
     const generatedId = useId();
     const labelId = ariaLabelledBy || `modal-title-${generatedId}`;
     const descriptionId = ariaDescribedBy || `modal-description-${generatedId}`;
 
     useEffect(() => {
-      if (open) {
-        // Store previously focused element
-        previousFocusRef.current = document.activeElement as HTMLElement;
-        document.body.style.overflow = 'hidden';
-        
-        // Focus the modal
-        setTimeout(() => {
-          modalRef.current?.focus();
-        }, 0);
-      } else {
-        document.body.style.overflow = 'unset';
-        
-        // Restore focus to previously focused element
-        previousFocusRef.current?.focus();
-      }
+      if (!open) return;
+
+      // Store previously focused element and body overflow
+      previousFocusRef.current = document.activeElement as HTMLElement;
+      previousOverflowRef.current = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      // Focus the modal
+      setTimeout(() => {
+        modalRef.current?.focus();
+      }, 0);
 
       return () => {
-        document.body.style.overflow = 'unset';
+        document.body.style.overflow = previousOverflowRef.current || '';
+        previousFocusRef.current?.focus();
       };
     }, [open]);
 

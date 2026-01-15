@@ -264,7 +264,7 @@ export default function NewBatchPage() {
                   </p>
                   
                   <Input
-                              {selectedProduct.medias?.[0] && !isPlaceholderUrl(selectedProduct.medias[0].url) && (
+                    {...register('newProduct.name')}
                     label="Nome do Produto"
                     placeholder="Ex: Granito Verde Ubatuba"
                     error={errors.newProduct?.name?.message}

@@ -28,6 +28,19 @@ export default function IndustryLayout({
     }
   }, [user, isLoading, router]);
 
+  useEffect(() => {
+    const previousHtmlOverflow = document.documentElement.style.overflow;
+    const previousBodyOverflow = document.body.style.overflow;
+
+    document.documentElement.style.overflow = 'hidden';
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.documentElement.style.overflow = previousHtmlOverflow;
+      document.body.style.overflow = previousBodyOverflow;
+    };
+  }, []);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-mineral flex items-center justify-center">
@@ -64,7 +77,7 @@ export default function IndustryLayout({
             <BackButton />
           </div>
           
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto overscroll-contain">
             <div className="container mx-auto px-6 py-8">
               {children}
             </div>
