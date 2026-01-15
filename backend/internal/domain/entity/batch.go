@@ -104,6 +104,9 @@ type Batch struct {
 	Thickness      float64     `json:"thickness"`      // cm
 	QuantitySlabs  int         `json:"quantitySlabs"`  // quantidade total de chapas
 	AvailableSlabs int         `json:"availableSlabs"` // quantidade de chapas disponíveis
+	ReservedSlabs  int         `json:"reservedSlabs"`  // quantidade de chapas reservadas
+	SoldSlabs      int         `json:"soldSlabs"`      // quantidade de chapas vendidas
+	InactiveSlabs  int         `json:"inactiveSlabs"`  // quantidade de chapas inativas
 	TotalArea      float64     `json:"totalArea"`      // m² (calculado)
 	IndustryPrice  float64     `json:"industryPrice"`  // preço por unidade de área
 	PriceUnit      PriceUnit   `json:"priceUnit"`      // unidade de preço (M2 ou FT2)
@@ -200,6 +203,13 @@ type UpdateBatchInput struct {
 // UpdateBatchStatusInput representa os dados para atualizar o status de um lote
 type UpdateBatchStatusInput struct {
 	Status BatchStatus `json:"status" validate:"required,oneof=DISPONIVEL RESERVADO VENDIDO INATIVO"`
+}
+
+// UpdateBatchAvailabilityInput representa os dados para ajustar disponibilidade/estado por quantidade
+type UpdateBatchAvailabilityInput struct {
+	Status     BatchStatus  `json:"status" validate:"required,oneof=DISPONIVEL RESERVADO VENDIDO INATIVO"`
+	FromStatus *BatchStatus `json:"fromStatus,omitempty" validate:"omitempty,oneof=DISPONIVEL RESERVADO VENDIDO INATIVO"`
+	Quantity   int          `json:"quantity" validate:"required,gt=0"`
 }
 
 // BatchFilters representa os filtros para busca de lotes

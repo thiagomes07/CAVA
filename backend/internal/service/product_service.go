@@ -228,7 +228,7 @@ func (s *productService) Update(ctx context.Context, id string, input entity.Upd
 
 func (s *productService) Delete(ctx context.Context, id string) error {
 	// Verificar se produto tem lotes associados
-	batchCount, err := s.productRepo.CountBatchesByProductID(ctx, id)
+	batchCount, err := s.productRepo.CountBlockingBatchesByProductID(ctx, id)
 	if err != nil {
 		s.logger.Error("erro ao verificar lotes do produto",
 			zap.String("productId", id),
@@ -238,7 +238,7 @@ func (s *productService) Delete(ctx context.Context, id string) error {
 	}
 
 	if batchCount > 0 {
-		return domainErrors.NewConflictError("Não é possível excluir produto com lotes associados")
+		return domainErrors.NewConflictError("Não foi possível excluir este produto pois ele tem lotes ainda disponíveis ou reservados")
 	}
 
 	// Soft delete do produto

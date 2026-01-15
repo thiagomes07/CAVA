@@ -344,6 +344,52 @@ func (h *BatchHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	response.OK(w, batch)
 }
 
+// UpdateAvailability godoc
+// @Summary Ajusta chapas por status
+// @Description Ajusta disponibilidade do lote por quantidade e status
+// @Tags batches
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Param body body entity.UpdateBatchAvailabilityInput true "Status e quantidade"
+// @Success 200 {object} entity.Batch
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id}/availability [patch]
+func (h *BatchHandler) UpdateAvailability(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	var input entity.UpdateBatchAvailabilityInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	batch, err := h.batchService.UpdateAvailability(r.Context(), id, input.Status, input.FromStatus, input.Quantity)
+	if err != nil {
+		h.logger.Error("erro ao ajustar disponibilidade do lote",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, batch)
+}
+
 // CheckAvailability godoc
 // @Summary Verifica disponibilidade de chapas
 // @Description Verifica se o lote possui quantidade específica de chapas disponíveis

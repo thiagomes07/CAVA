@@ -17,6 +17,7 @@ import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
 import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
 import type { Product, PriceUnit, MaterialType, FinishType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface UploadedMedia {
   file: File;
@@ -263,7 +264,7 @@ export default function NewBatchPage() {
                   </p>
                   
                   <Input
-                    {...register('newProduct.name')}
+                              {selectedProduct.medias?.[0] && !isPlaceholderUrl(selectedProduct.medias[0].url) && (
                     label="Nome do Produto"
                     placeholder="Ex: Granito Verde Ubatuba"
                     error={errors.newProduct?.name?.message}

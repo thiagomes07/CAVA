@@ -7,7 +7,6 @@ import { Plus, Search, Edit2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-rea
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -24,6 +23,7 @@ import type { Batch, Product, BatchStatus } from '@/lib/types';
 import type { BatchFilter } from '@/lib/schemas/batch.schema';
 import { batchStatuses } from '@/lib/schemas/batch.schema';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 // Tipos de ordenação
 type SortField = 'availableSlabs' | 'totalArea' | 'industryPrice' | 'batchCode' | null;
@@ -329,7 +329,6 @@ export default function InventoryPage() {
                         <SortIcon field="industryPrice" />
                       </button>
                     </TableHead>
-                    <TableHead>{t('status')}</TableHead>
                     {canEdit && <TableHead>{t('actions')}</TableHead>}
                   </TableRow>
                 </TableHeader>
@@ -343,7 +342,7 @@ export default function InventoryPage() {
                     <TableRow key={batch.id}>
                       <TableCell>
                         <div className="w-20 h-20 rounded-sm overflow-hidden bg-slate-200">
-                          {batch.medias?.[0] ? (
+                          {batch.medias?.[0] && !isPlaceholderUrl(batch.medias[0].url) ? (
                             <img
                               src={batch.medias[0].url}
                               alt={batch.batchCode}
@@ -415,9 +414,6 @@ export default function InventoryPage() {
                         <span className="font-serif text-obsidian">
                           {formatPricePerUnit(batch.industryPrice, batch.priceUnit)}
                         </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={batch.status}>{batch.status}</Badge>
                       </TableCell>
                       {canEdit && (
                         <TableCell>

@@ -185,7 +185,11 @@ class ApiClient {
       }
 
       if (error instanceof DOMException && error.name === 'AbortError') {
-        throw new ApiError('Request timed out', 408);
+        throw new ApiError('Request timed out', 408, 'NETWORK_TIMEOUT');
+      }
+
+      if (error instanceof TypeError && error.message.toLowerCase().includes('fetch')) {
+        throw new ApiError('Erro de conexão. Verifique sua internet ou o servidor.', 0, 'NETWORK_ERROR');
       }
 
       throw new ApiError(error instanceof Error ? error.message : 'An unexpected error occurred');

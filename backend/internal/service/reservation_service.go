@@ -91,16 +91,19 @@ func (s *reservationService) Create(ctx context.Context, userID string, input en
 			return domainErrors.InsufficientSlabsError(input.QuantitySlabsReserved, batch.AvailableSlabs)
 		}
 
-		// 3. Decrementar chapas disponíveis atomicamente
-		if err := s.batchRepo.DecrementAvailableSlabs(ctx, tx, input.BatchID, input.QuantitySlabsReserved); err != nil {
+		// 3. Atualizar distribuição de chapas
+		newAvailableSlabs := batch.AvailableSlabs - input.QuantitySlabsReserved
+		newReservedSlabs := batch.ReservedSlabs + input.QuantitySlabsReserved
+		newSoldSlabs := batch.SoldSlabs
+		newInactiveSlabs := batch.InactiveSlabs
+
+		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, input.BatchID, newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs); err != nil {
 			return err
 		}
 
-		// 4. Atualizar status do lote se necessário
-		// Se todas as chapas foram reservadas, status = RESERVADO
-		newAvailableSlabs := batch.AvailableSlabs - input.QuantitySlabsReserved
-		if newAvailableSlabs == 0 {
-			if err := s.batchRepo.UpdateStatus(ctx, tx, input.BatchID, entity.BatchStatusReservado); err != nil {
+		newStatus := deriveBatchStatus(newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs)
+		if newStatus != batch.Status {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, input.BatchID, newStatus); err != nil {
 				return err
 			}
 		}
@@ -202,17 +205,26 @@ func (s *reservationService) Cancel(ctx context.Context, id string) error {
 		}
 
 		// 4. Devolver chapas ao lote
-		if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, reservation.QuantitySlabsReserved); err != nil {
-			return err
-		}
-
-		// 5. Atualizar status do lote para DISPONIVEL se estava RESERVADO
-		batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+		batch, err := s.batchRepo.FindByIDForUpdate(ctx, tx, reservation.BatchID)
 		if err != nil {
 			return err
 		}
-		if batch.Status == entity.BatchStatusReservado {
-			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+
+		newAvailableSlabs := batch.AvailableSlabs + reservation.QuantitySlabsReserved
+		newReservedSlabs := batch.ReservedSlabs - reservation.QuantitySlabsReserved
+		newSoldSlabs := batch.SoldSlabs
+		newInactiveSlabs := batch.InactiveSlabs
+		if newReservedSlabs < 0 {
+			return domainErrors.ValidationError("Quantidade reservada inconsistente")
+		}
+
+		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, reservation.BatchID, newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs); err != nil {
+			return err
+		}
+
+		newStatus := deriveBatchStatus(newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs)
+		if newStatus != batch.Status {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, newStatus); err != nil {
 				return err
 			}
 		}
@@ -263,8 +275,8 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			return domainErrors.ValidationError("Quantidade vendida não pode exceder quantidade reservada")
 		}
 
-		// 5. Buscar batch para obter industryPrice e calcular valores
-		batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+		// 5. Buscar batch para obter industryPrice e calcular valores (lock)
+		batch, err := s.batchRepo.FindByIDForUpdate(ctx, tx, reservation.BatchID)
 		if err != nil {
 			return err
 		}
@@ -324,34 +336,28 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			return err
 		}
 
-		// 8. Se vendeu parcialmente, devolver as chapas não vendidas ao lote
+		// 8. Atualizar distribuição de chapas
 		slabsToReturn := reservation.QuantitySlabsReserved - input.QuantitySlabsSold
-		if slabsToReturn > 0 {
-			if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, slabsToReturn); err != nil {
-				return err
-			}
+		newAvailableSlabs := batch.AvailableSlabs + slabsToReturn
+		newReservedSlabs := batch.ReservedSlabs - reservation.QuantitySlabsReserved
+		newSoldSlabs := batch.SoldSlabs + input.QuantitySlabsSold
+		newInactiveSlabs := batch.InactiveSlabs
+		if newReservedSlabs < 0 {
+			return domainErrors.ValidationError("Quantidade reservada inconsistente")
 		}
 
-		// 9. Verificar se lote deve ser marcado como VENDIDO
-		// Buscar lote atualizado para verificar available_slabs
-		updatedBatch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
-		if err != nil {
+		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, reservation.BatchID, newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs); err != nil {
 			return err
 		}
-		if updatedBatch.AvailableSlabs == 0 {
-			// Verificar se todas as chapas foram vendidas (não apenas reservadas)
-			// Se ainda tem reservas ativas, manter como RESERVADO
-			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusVendido); err != nil {
-				return err
-			}
-		} else if updatedBatch.Status == entity.BatchStatusReservado {
-			// Se devolvemos chapas, voltar para DISPONIVEL
-			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+
+		newStatus := deriveBatchStatus(newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs)
+		if newStatus != batch.Status {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, newStatus); err != nil {
 				return err
 			}
 		}
 
-		// 10. Atualizar status da reserva para CONFIRMADA_VENDA
+		// 9. Atualizar status da reserva para CONFIRMADA_VENDA
 		if err := s.reservationRepo.UpdateStatus(ctx, tx, reservationID, entity.ReservationStatusConfirmadaVenda); err != nil {
 			return err
 		}
@@ -431,17 +437,26 @@ func (s *reservationService) ExpireReservations(ctx context.Context) (int, error
 			}
 
 			// 2. Devolver chapas ao lote
-			if err := s.batchRepo.IncrementAvailableSlabs(ctx, tx, reservation.BatchID, reservation.QuantitySlabsReserved); err != nil {
-				return err
-			}
-
-			// 3. Atualizar status do lote para DISPONIVEL se estava totalmente RESERVADO
-			batch, err := s.batchRepo.FindByID(ctx, reservation.BatchID)
+			batch, err := s.batchRepo.FindByIDForUpdate(ctx, tx, reservation.BatchID)
 			if err != nil {
 				return err
 			}
-			if batch.Status == entity.BatchStatusReservado {
-				if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, entity.BatchStatusDisponivel); err != nil {
+
+			newAvailableSlabs := batch.AvailableSlabs + reservation.QuantitySlabsReserved
+			newReservedSlabs := batch.ReservedSlabs - reservation.QuantitySlabsReserved
+			newSoldSlabs := batch.SoldSlabs
+			newInactiveSlabs := batch.InactiveSlabs
+			if newReservedSlabs < 0 {
+				return domainErrors.ValidationError("Quantidade reservada inconsistente")
+			}
+
+			if err := s.batchRepo.UpdateSlabCounts(ctx, tx, reservation.BatchID, newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs); err != nil {
+				return err
+			}
+
+			newStatus := deriveBatchStatus(newAvailableSlabs, newReservedSlabs, newSoldSlabs, newInactiveSlabs)
+			if newStatus != batch.Status {
+				if err := s.batchRepo.UpdateStatus(ctx, tx, reservation.BatchID, newStatus); err != nil {
 					return err
 				}
 			}

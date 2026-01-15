@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
@@ -24,6 +25,9 @@ type ProductRepository interface {
 
 	// CountBatchesByProductID conta quantos lotes estão associados ao produto
 	CountBatchesByProductID(ctx context.Context, productID string) (int, error)
+
+	// CountBlockingBatchesByProductID conta lotes que impedem exclusão do produto
+	CountBlockingBatchesByProductID(ctx context.Context, productID string) (int, error)
 
 	// ExistsBySKU verifica se o SKU já está em uso na indústria
 	ExistsBySKU(ctx context.Context, industryID, sku string) (bool, error)

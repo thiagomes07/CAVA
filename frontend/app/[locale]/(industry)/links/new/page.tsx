@@ -23,6 +23,7 @@ import { nanoid } from 'nanoid';
 import { QRCodeCanvas } from 'qrcode.react';
 import type { Batch, Product, LinkType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 type WizardStep = 'content' | 'pricing' | 'config';
 
@@ -423,7 +424,7 @@ export default function CreateSalesLinkPage() {
                             )}
                           >
                             <div className="flex items-center gap-4">
-                              {batch.medias?.[0] && (
+                              {batch.medias?.[0] && !isPlaceholderUrl(batch.medias[0].url) && (
                                 <img
                                   src={batch.medias[0].url}
                                   alt={batch.batchCode}
@@ -473,7 +474,7 @@ export default function CreateSalesLinkPage() {
                             )}
                           >
                             <div className="flex items-center gap-4">
-                              {product.medias?.[0] && (
+                              {product.medias?.[0] && !isPlaceholderUrl(product.medias[0].url) && (
                                 <img
                                   src={product.medias[0].url}
                                   alt={product.name}

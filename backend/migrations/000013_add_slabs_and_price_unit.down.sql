@@ -28,7 +28,14 @@ ALTER TABLE reservations
 ALTER TABLE batches
     DROP CONSTRAINT IF EXISTS check_available_slabs_max,
     DROP CONSTRAINT IF EXISTS check_available_slabs_non_negative,
+    DROP CONSTRAINT IF EXISTS check_reserved_slabs_non_negative,
+    DROP CONSTRAINT IF EXISTS check_sold_slabs_non_negative,
+    DROP CONSTRAINT IF EXISTS check_inactive_slabs_non_negative,
+    DROP CONSTRAINT IF EXISTS check_total_slabs_consistency,
     DROP COLUMN IF EXISTS price_unit,
+    DROP COLUMN IF EXISTS inactive_slabs,
+    DROP COLUMN IF EXISTS sold_slabs,
+    DROP COLUMN IF EXISTS reserved_slabs,
     DROP COLUMN IF EXISTS available_slabs;
 
 -- 6. Remover ENUM

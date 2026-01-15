@@ -13,12 +13,13 @@ import { Toggle } from '@/components/ui/toggle';
 import { Card } from '@/components/ui/card';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
 import { LoadingState } from '@/components/shared/LoadingState';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { productSchema, type ProductInput } from '@/lib/schemas/product.schema';
 import { materialTypes, finishTypes } from '@/lib/schemas/product.schema';
 import type { Product, Media } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface UploadedMedia {
   file: File;
@@ -247,8 +248,12 @@ export default function EditProductPage() {
       await apiClient.delete(`/products/${productId}`);
       success('Produto removido do catálogo');
       router.push('/catalog');
-    } catch {
-      error('Erro ao remover produto');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error('Erro ao remover produto');
+      }
     } finally {
       setIsDeleting(false);
     }
@@ -407,11 +412,17 @@ export default function EditProductPage() {
                     key={media.id}
                     className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
                   >
-                    <img
-                      src={media.url}
-                      alt={`Foto ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {isPlaceholderUrl(media.url) ? (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+                        Sem foto
+                      </div>
+                    ) : (
+                      <img
+                        src={media.url}
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
 
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
                       <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">

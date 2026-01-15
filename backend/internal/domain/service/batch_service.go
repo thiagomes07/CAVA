@@ -26,6 +26,9 @@ type BatchService interface {
 	// UpdateStatus atualiza apenas o status do lote
 	UpdateStatus(ctx context.Context, id string, status entity.BatchStatus) (*entity.Batch, error)
 
+	// UpdateAvailability ajusta disponibilidade/estado por quantidade
+	UpdateAvailability(ctx context.Context, id string, status entity.BatchStatus, fromStatus *entity.BatchStatus, quantity int) (*entity.Batch, error)
+
 	// CheckAvailability verifica se lote está disponível (tem chapas disponíveis)
 	CheckAvailability(ctx context.Context, id string) (bool, error)
 

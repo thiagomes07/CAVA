@@ -139,6 +139,9 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		Thickness:      input.Thickness,
 		QuantitySlabs:  input.QuantitySlabs,
 		AvailableSlabs: input.QuantitySlabs, // Inicialmente todas as chapas estão disponíveis
+		ReservedSlabs:  0,
+		SoldSlabs:      0,
+		InactiveSlabs:  0,
 		IndustryPrice:  input.IndustryPrice,
 		PriceUnit:      priceUnit,
 		OriginQuarry:   input.OriginQuarry,
@@ -310,21 +313,13 @@ func (s *batchService) Update(ctx context.Context, id string, input entity.Updat
 			return nil, domainErrors.ValidationError("Quantidade de chapas deve ser maior que 0")
 		}
 		// Ajustar available_slabs proporcionalmente se quantity_slabs mudar
-		oldQuantity := batch.QuantitySlabs
 		newQuantity := *input.QuantitySlabs
-		if newQuantity < batch.QuantitySlabs-batch.AvailableSlabs {
-			return nil, domainErrors.ValidationError("Quantidade não pode ser menor que chapas já reservadas/vendidas")
+		unavailable := batch.ReservedSlabs + batch.SoldSlabs + batch.InactiveSlabs
+		if newQuantity < unavailable {
+			return nil, domainErrors.ValidationError("Quantidade não pode ser menor que chapas já reservadas/vendidas/inativas")
 		}
-		// Ajustar available_slabs se aumentar a quantidade
-		if newQuantity > oldQuantity {
-			batch.AvailableSlabs += (newQuantity - oldQuantity)
-		} else if newQuantity < oldQuantity {
-			// Se diminuir, reduz das disponíveis
-			reduction := oldQuantity - newQuantity
-			if batch.AvailableSlabs >= reduction {
-				batch.AvailableSlabs -= reduction
-			}
-		}
+		// Recalcular disponíveis com base na nova quantidade
+		batch.AvailableSlabs = newQuantity - unavailable
 		batch.QuantitySlabs = *input.QuantitySlabs
 		dimensionsChanged = true
 	}
@@ -397,6 +392,144 @@ func (s *batchService) UpdateStatus(ctx context.Context, id string, status entit
 	return s.GetByID(ctx, id)
 }
 
+func (s *batchService) UpdateAvailability(ctx context.Context, id string, status entity.BatchStatus, fromStatus *entity.BatchStatus, quantity int) (*entity.Batch, error) {
+	if !status.IsValid() {
+		return nil, domainErrors.ValidationError("Status inválido")
+	}
+	if fromStatus != nil && !fromStatus.IsValid() {
+		return nil, domainErrors.ValidationError("Status de origem inválido")
+	}
+	if quantity <= 0 {
+		return nil, domainErrors.ValidationError("Quantidade deve ser maior que 0")
+	}
+
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	newAvailable := batch.AvailableSlabs
+	newReserved := batch.ReservedSlabs
+	newSold := batch.SoldSlabs
+	newInactive := batch.InactiveSlabs
+
+	if fromStatus != nil {
+		origin := *fromStatus
+		if origin == status {
+			return nil, domainErrors.ValidationError("Origem e destino são iguais")
+		}
+
+		getCount := func(st entity.BatchStatus) int {
+			switch st {
+			case entity.BatchStatusDisponivel:
+				return newAvailable
+			case entity.BatchStatusReservado:
+				return newReserved
+			case entity.BatchStatusVendido:
+				return newSold
+			case entity.BatchStatusInativo:
+				return newInactive
+			default:
+				return 0
+			}
+		}
+
+		if quantity > getCount(origin) {
+			return nil, domainErrors.ValidationError("Quantidade excede chapas na origem")
+		}
+
+		switch origin {
+		case entity.BatchStatusDisponivel:
+			newAvailable -= quantity
+		case entity.BatchStatusReservado:
+			newReserved -= quantity
+		case entity.BatchStatusVendido:
+			newSold -= quantity
+		case entity.BatchStatusInativo:
+			newInactive -= quantity
+		}
+
+		switch status {
+		case entity.BatchStatusDisponivel:
+			newAvailable += quantity
+		case entity.BatchStatusReservado:
+			newReserved += quantity
+		case entity.BatchStatusVendido:
+			newSold += quantity
+		case entity.BatchStatusInativo:
+			newInactive += quantity
+		}
+	} else if status == entity.BatchStatusDisponivel {
+		totalNonAvailable := batch.ReservedSlabs + batch.SoldSlabs + batch.InactiveSlabs
+		if totalNonAvailable <= 0 {
+			return nil, domainErrors.ValidationError("Não há chapas indisponíveis para liberar")
+		}
+		if quantity > totalNonAvailable {
+			return nil, domainErrors.ValidationError("Quantidade excede chapas indisponíveis")
+		}
+		newAvailable = batch.AvailableSlabs + quantity
+		remaining := quantity
+		if remaining > 0 {
+			take := minInt(remaining, newInactive)
+			newInactive -= take
+			remaining -= take
+		}
+		if remaining > 0 {
+			take := minInt(remaining, newReserved)
+			newReserved -= take
+			remaining -= take
+		}
+		if remaining > 0 {
+			take := minInt(remaining, newSold)
+			newSold -= take
+			remaining -= take
+		}
+	} else {
+		if quantity > batch.AvailableSlabs {
+			return nil, domainErrors.ValidationError("Quantidade excede chapas disponíveis")
+		}
+		newAvailable = batch.AvailableSlabs - quantity
+		switch status {
+		case entity.BatchStatusReservado:
+			newReserved += quantity
+		case entity.BatchStatusVendido:
+			newSold += quantity
+		case entity.BatchStatusInativo:
+			newInactive += quantity
+		}
+	}
+
+	newStatus := deriveBatchStatus(newAvailable, newReserved, newSold, newInactive)
+
+	if err := s.batchRepo.UpdateSlabCounts(ctx, nil, id, newAvailable, newReserved, newSold, newInactive); err != nil {
+		s.logger.Error("erro ao ajustar chapas do lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	if newStatus != batch.Status {
+		if err := s.batchRepo.UpdateStatus(ctx, nil, id, newStatus); err != nil {
+			s.logger.Error("erro ao ajustar status do lote",
+				zap.String("batchId", id),
+				zap.String("status", string(newStatus)),
+				zap.Error(err),
+			)
+			return nil, err
+		}
+	}
+
+	s.logger.Info("lote ajustado por quantidade",
+		zap.String("batchId", id),
+		zap.String("status", string(status)),
+		zap.Int("quantity", quantity),
+		zap.Int("availableSlabs", newAvailable),
+	)
+
+	return s.GetByID(ctx, id)
+}
+
 func (s *batchService) CheckAvailability(ctx context.Context, id string) (bool, error) {
 	batch, err := s.batchRepo.FindByID(ctx, id)
 	if err != nil {
@@ -446,6 +579,29 @@ func (s *batchService) AddMedias(ctx context.Context, batchID string, medias []e
 	)
 
 	return nil
+}
+
+func minInt(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func deriveBatchStatus(available, reserved, sold, inactive int) entity.BatchStatus {
+	if available > 0 {
+		return entity.BatchStatusDisponivel
+	}
+	if reserved > 0 {
+		return entity.BatchStatusReservado
+	}
+	if sold > 0 {
+		return entity.BatchStatusVendido
+	}
+	if inactive > 0 {
+		return entity.BatchStatusInativo
+	}
+	return entity.BatchStatusDisponivel
 }
 
 func (s *batchService) RemoveMedia(ctx context.Context, batchID, mediaID string) error {

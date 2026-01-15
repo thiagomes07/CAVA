@@ -20,6 +20,7 @@ import {
 import { CSS } from '@dnd-kit/utilities';
 import { Upload, X, GripVertical, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 export interface MediaFile {
   id: string;
@@ -74,11 +75,17 @@ function SortableImage({ media, onRemove, disabled, isFirst }: SortableImageProp
       )}
     >
       {/* Image */}
-      <img
-        src={media.url}
-        alt="Preview"
-        className="w-full h-full object-cover"
-      />
+      {isPlaceholderUrl(media.url) ? (
+        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+          Sem foto
+        </div>
+      ) : (
+        <img
+          src={media.url}
+          alt="Preview"
+          className="w-full h-full object-cover"
+        />
+      )}
 
       {/* Overlay with controls */}
       <div

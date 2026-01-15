@@ -79,6 +79,9 @@ export interface Batch {
   thickness: number;
   quantitySlabs: number;
   availableSlabs: number;
+  reservedSlabs: number;
+  soldSlabs: number;
+  inactiveSlabs: number;
   totalArea: number;
   industryPrice: number;
   priceUnit: PriceUnit;

@@ -213,6 +213,24 @@ func (r *productRepository) CountBatchesByProductID(ctx context.Context, product
 	return count, nil
 }
 
+func (r *productRepository) CountBlockingBatchesByProductID(ctx context.Context, productID string) (int, error) {
+	query := `
+		SELECT COUNT(*) 
+		FROM batches 
+		WHERE product_id = $1 
+		  AND is_active = TRUE
+		  AND status NOT IN ('VENDIDO', 'INATIVO')
+	`
+
+	var count int
+	err := r.db.QueryRowContext(ctx, query, productID).Scan(&count)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return count, nil
+}
+
 func (r *productRepository) ExistsBySKU(ctx context.Context, industryID, sku string) (bool, error) {
 	query := `
 		SELECT EXISTS(

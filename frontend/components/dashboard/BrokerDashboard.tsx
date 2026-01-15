@@ -17,6 +17,7 @@ import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { SharedInventoryBatch, Sale } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface BrokerMetrics {
   availableBatches: number;
@@ -248,7 +249,7 @@ export function BrokerDashboard() {
                   className="flex items-center gap-4 p-4 border border-slate-200 rounded-sm hover:border-obsidian transition-colors cursor-pointer"
                   onClick={() => router.push('/shared-inventory')}
                 >
-                  {shared.batch.medias?.[0] && (
+                  {shared.batch.medias?.[0] && !isPlaceholderUrl(shared.batch.medias[0].url) && (
                     <img
                       src={shared.batch.medias[0].url}
                       alt={shared.batch.batchCode}

@@ -20,6 +20,7 @@ import type { Product } from '@/lib/types';
 import type { ProductFilter } from '@/lib/schemas/product.schema';
 import { materialTypes } from '@/lib/schemas/product.schema';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 export default function CatalogPage() {
   const router = useRouter();
@@ -228,6 +229,8 @@ function ProductCard({ product, onView, onEdit, translations }: ProductCardProps
   const [isHovered, setIsHovered] = useState(false);
   // A capa é a primeira mídia (já ordenada por displayOrder no backend)
   const coverImage = product.medias?.[0];
+  const coverUrl = coverImage?.url;
+  const shouldRenderCover = !!coverUrl && !isPlaceholderUrl(coverUrl);
 
   return (
     <div
@@ -237,10 +240,10 @@ function ProductCard({ product, onView, onEdit, translations }: ProductCardProps
     >
       {/* Image */}
       <div className="relative aspect-[4/3] bg-slate-200 overflow-hidden">
-        {coverImage ? (
+        {shouldRenderCover ? (
           <div
             className="absolute inset-0 bg-cover bg-center transition-transform duration-500 group-hover:scale-105"
-            style={{ backgroundImage: `url(${coverImage.url})` }}
+            style={{ backgroundImage: `url(${coverUrl})` }}
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">

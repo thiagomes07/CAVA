@@ -15,6 +15,7 @@ import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 export default function SharedInventoryPage() {
   const router = useRouter();
@@ -88,7 +89,7 @@ export default function SharedInventoryPage() {
                     <TableRow key={share.id}>
                       <TableCell>
                         <div className="w-20 h-20 rounded-sm overflow-hidden bg-slate-100">
-                          {cover ? (
+                          {cover && !isPlaceholderUrl(cover.url) ? (
                             <img
                               src={cover.url}
                               alt={batch?.batchCode}

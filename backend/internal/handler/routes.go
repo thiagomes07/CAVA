@@ -185,6 +185,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/check-availability", h.Batch.CheckAvailability)
 				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.Batch.Update)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.Batch.UpdateStatus)
+				r.With(m.RBAC.RequireAdmin).Patch("/{id}/availability", h.Batch.UpdateAvailability)
 			})
 
 			// ----------------------------------------

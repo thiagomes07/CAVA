@@ -11,7 +11,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
 import { LoadingState } from '@/components/shared/LoadingState';
-import { apiClient } from '@/lib/api/client';
+import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { editBatchSchema, type EditBatchInput } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
@@ -19,8 +19,9 @@ import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from 
 
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Batch, Media, PriceUnit } from '@/lib/types';
+import type { Batch, Media, PriceUnit, BatchStatus } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface UploadedMedia {
   file: File;
@@ -42,6 +43,11 @@ export default function EditBatchPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [calculatedArea, setCalculatedArea] = useState<number>(0);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusQuantityInput, setStatusQuantityInput] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<BatchStatus | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<BatchStatus>('DISPONIVEL');
+  const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
 
   const {
     register,
@@ -60,6 +66,32 @@ export default function EditBatchPage() {
   const quantitySlabs = watch('quantitySlabs');
   const priceUnit = watch('priceUnit') || 'M2';
   const industryPrice = watch('industryPrice');
+
+  const statusLabels: Record<BatchStatus, string> = {
+    DISPONIVEL: 'Disponível',
+    RESERVADO: 'Reservado',
+    VENDIDO: 'Vendido',
+    INATIVO: 'Inativo',
+  };
+
+  const getMaxForSource = (source: BatchStatus) => {
+    if (!batch) return 0;
+    switch (source) {
+    case 'DISPONIVEL':
+      return batch.availableSlabs;
+    case 'RESERVADO':
+      return batch.reservedSlabs ?? 0;
+    case 'VENDIDO':
+      return batch.soldSlabs ?? 0;
+    case 'INATIVO':
+      return batch.inactiveSlabs ?? 0;
+    default:
+      return 0;
+    }
+  };
+
+  const parsedStatusQuantity = statusQuantityInput === '' ? 0 : Number(statusQuantityInput);
+  const isQuantityValid = Number.isFinite(parsedStatusQuantity) && parsedStatusQuantity > 0;
 
   useEffect(() => {
     fetchBatch();
@@ -230,7 +262,24 @@ export default function EditBatchPage() {
         );
       }
 
-      // 4. Atualizar dados do lote (apenas campos válidos do UpdateBatchInput)
+      // 4. Atualizar status do lote (se selecionado)
+      if (selectedStatus) {
+        if (sourceStatus === selectedStatus) {
+          error('Selecione um destino diferente da origem');
+          return;
+        }
+        const maxAllowed = getMaxForSource(sourceStatus);
+        if (maxAllowed <= 0 || !isQuantityValid || parsedStatusQuantity > maxAllowed) {
+          error('Ajuste a quantidade/status antes de salvar');
+          return;
+        }
+        const statusUpdated = await handleUpdateStatus(selectedStatus);
+        if (!statusUpdated) {
+          return;
+        }
+      }
+
+      // 5. Atualizar dados do lote (apenas campos válidos do UpdateBatchInput)
       const updatePayload: EditBatchInput = {
         batchCode: data.batchCode,
         height: data.height,
@@ -250,6 +299,60 @@ export default function EditBatchPage() {
       error('Erro ao atualizar lote');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleUpdateStatus = async (status: BatchStatus): Promise<boolean> => {
+    if (sourceStatus === status) {
+      error('Selecione um destino diferente da origem');
+      return false;
+    }
+    const maxAllowed = getMaxForSource(sourceStatus);
+    if (maxAllowed <= 0) { 
+      error('Não há chapas suficientes para essa ação');
+      return false;
+    }
+    if (!isQuantityValid) {
+      error('Informe uma quantidade válida de chapas');
+      return false;
+    }
+    if (parsedStatusQuantity > maxAllowed) {
+      error(`Quantidade máxima para ${statusLabels[status]} é ${maxAllowed}`);
+      return false;
+    }
+    try {
+      setIsUpdatingStatus(true);
+      const updated = await apiClient.patch<Batch>(`/batches/${batchId}/availability`, {
+        status,
+        fromStatus: sourceStatus,
+        quantity: parsedStatusQuantity,
+      });
+      setBatch(updated);
+      setSelectedStatus(null);
+      setStatusQuantityInput('');
+      setStatusUpdatedAt(Date.now());
+      success('Status do lote atualizado');
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error('Erro ao atualizar status do lote');
+      }
+      return false;
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleApplyStatus = async () => {
+    if (!selectedStatus) {
+      error('Selecione um status para atualizar');
+      return;
+    }
+    const statusUpdated = await handleUpdateStatus(selectedStatus);
+    if (!statusUpdated) {
+      return;
     }
   };
 
@@ -319,21 +422,21 @@ export default function EditBatchPage() {
               </h2>
 
               <div className="flex items-center gap-4 p-4 bg-mineral rounded-sm">
-                {batch.product.medias?.[0] && (
+                {batch.product.medias?.[0] && !isPlaceholderUrl(batch.product.medias[0].url) ? (
                   <img
                     src={batch.product.medias[0].url}
                     alt={batch.product.name}
                     className="w-20 h-20 rounded-sm object-cover"
                   />
-                )}
+                ) : null}
                 <div>
-                  <p 
+                  <p
                     className="font-semibold text-obsidian"
                     title={batch.product.name}
                   >
                     {truncateText(batch.product.name, TRUNCATION_LIMITS.PRODUCT_NAME)}
                   </p>
-                  <p 
+                  <p
                     className="text-sm text-slate-500"
                     title={`${batch.product.material} • ${batch.product.finish}`}
                   >
@@ -346,6 +449,197 @@ export default function EditBatchPage() {
               </p>
             </Card>
           )}
+
+          {/* Status do Lote */}
+          <Card>
+            <h2 className="text-lg font-semibold text-obsidian mb-6">
+              Status do Lote
+            </h2>
+
+            <div className="space-y-3">
+                <Input
+                type="text"
+                inputMode="numeric"
+                label="Quantidade de chapas"
+                value={statusQuantityInput}
+                onChange={(e) => {
+                  const next = e.target.value.replace(/\D/g, '');
+                  setStatusQuantityInput(next);
+                  setStatusUpdatedAt(null);
+                }}
+                disabled={isSubmitting || isUpdatingStatus}
+              />
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Mover de</p>
+                <div className="flex flex-wrap gap-2">
+                  {([
+                    { value: 'DISPONIVEL', label: 'Disponível' },
+                    { value: 'RESERVADO', label: 'Reservado' },
+                    { value: 'VENDIDO', label: 'Vendido' },
+                    { value: 'INATIVO', label: 'Inativo' },
+                  ] as { value: BatchStatus; label: string }[]).map((option) => (
+                    <button
+                      key={`from-${option.value}`}
+                      type="button"
+                      onClick={() => setSourceStatus(option.value)}
+                      className={cn(
+                        'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                        sourceStatus === option.value
+                          ? 'bg-obsidian text-white'
+                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      )}
+                      disabled={isSubmitting || isUpdatingStatus}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-1">
+                <p className="text-xs text-slate-500">Para</p>
+                <div className="flex flex-wrap gap-2">
+                {([
+                  { value: 'DISPONIVEL', label: 'Disponível' },
+                  { value: 'RESERVADO', label: 'Reservado' },
+                  { value: 'VENDIDO', label: 'Vendido' },
+                  { value: 'INATIVO', label: 'Inativo' },
+                ] as { value: BatchStatus; label: string }[]).map((option) => (
+                  (() => {
+                    const maxAllowed = getMaxForSource(sourceStatus);
+                    const isDisabled =
+                      isSubmitting ||
+                      isUpdatingStatus ||
+                      sourceStatus === option.value ||
+                      maxAllowed <= 0 ||
+                      !isQuantityValid ||
+                      parsedStatusQuantity > maxAllowed;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() =>
+                          setSelectedStatus((prev) => (prev === option.value ? null : option.value))
+                        }
+                        className={cn(
+                          'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                          selectedStatus === option.value
+                            ? 'bg-obsidian text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isDisabled}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })()
+                ))}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleApplyStatus}
+                  loading={isUpdatingStatus}
+                  disabled={
+                    isSubmitting ||
+                    isUpdatingStatus ||
+                    !selectedStatus ||
+                    !isQuantityValid ||
+                    selectedStatus === sourceStatus
+                  }
+                >
+                  ATUALIZAR STATUS
+                </Button>
+                {selectedStatus && (
+                  <span className="text-xs text-slate-500">
+                    {statusLabels[sourceStatus]} → {statusLabels[selectedStatus]}
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-slate-500">
+                Informe a quantidade de chapas e escolha o status para ajustar o estoque.
+              </p>
+              {batch && (
+                <div className="space-y-2">
+                  <p className="text-xs text-slate-500">
+                    Disponíveis: {batch.availableSlabs} • Total: {batch.quantitySlabs}
+                  </p>
+                  {
+                    (() => {
+                      const now = Date.now();
+                      const recent = statusUpdatedAt && now - statusUpdatedAt < 5000;
+                      if (recent) {
+                        return (
+                          <p className="text-xs text-emerald-600">Status atualizado</p>
+                        );
+                      }
+
+                      if (statusQuantityInput === '') {
+                        return null;
+                      }
+
+                      if (isQuantityValid) {
+                        return (
+                          <p className="text-xs text-slate-500">Quantidade válida: {parsedStatusQuantity}</p>
+                        );
+                      }
+
+                      return (
+                        <p className="text-xs text-rose-600">Quantidade inválida</p>
+                      );
+                    })()
+                  }
+                  <div className="space-y-2">
+                    <div className="h-4 w-full rounded-full overflow-hidden bg-slate-100 flex">
+                      {batch.availableSlabs > 0 && (
+                        <div
+                          className="bg-emerald-500"
+                          style={{ width: `${(batch.availableSlabs / Math.max(batch.quantitySlabs, 1)) * 100}%` }}
+                        />
+                      )}
+                      {(batch.reservedSlabs ?? 0) > 0 && (
+                        <div
+                          className="bg-amber-500"
+                          style={{ width: `${((batch.reservedSlabs ?? 0) / Math.max(batch.quantitySlabs, 1)) * 100}%` }}
+                        />
+                      )}
+                      {(batch.soldSlabs ?? 0) > 0 && (
+                        <div
+                          className="bg-blue-500"
+                          style={{ width: `${((batch.soldSlabs ?? 0) / Math.max(batch.quantitySlabs, 1)) * 100}%` }}
+                        />
+                      )}
+                      {(batch.inactiveSlabs ?? 0) > 0 && (
+                        <div
+                          className="bg-slate-400"
+                          style={{ width: `${((batch.inactiveSlabs ?? 0) / Math.max(batch.quantitySlabs, 1)) * 100}%` }}
+                        />
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-600">
+                      <div className="flex flex-col gap-1">
+                        <span>Disponíveis: {batch.availableSlabs}</span>
+                        <span className="h-1.5 w-10 rounded-full bg-emerald-500" aria-hidden="true" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span>Reservadas: {batch.reservedSlabs ?? 0}</span>
+                        <span className="h-1.5 w-10 rounded-full bg-amber-500" aria-hidden="true" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span>Vendidas: {batch.soldSlabs ?? 0}</span>
+                        <span className="h-1.5 w-10 rounded-full bg-blue-500" aria-hidden="true" />
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span>Inativas: {batch.inactiveSlabs ?? 0}</span>
+                        <span className="h-1.5 w-10 rounded-full bg-slate-400" aria-hidden="true" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </Card>
 
           {/* Identificação */}
           <Card>
@@ -561,11 +855,17 @@ export default function EditBatchPage() {
                     key={media.id}
                     className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
                   >
-                    <img
-                      src={media.url}
-                      alt={`Foto ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
+                    {isPlaceholderUrl(media.url) ? (
+                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+                        Sem foto
+                      </div>
+                    ) : (
+                      <img
+                        src={media.url}
+                        alt={`Foto ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    )}
 
                     <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
                       <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">

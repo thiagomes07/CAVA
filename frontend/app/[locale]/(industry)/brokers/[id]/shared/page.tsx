@@ -29,6 +29,7 @@ import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { User, Batch, SharedInventoryBatch } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 
 export default function BrokerSharedInventoryPage() {
   const router = useRouter();
@@ -364,7 +365,7 @@ export default function BrokerSharedInventoryPage() {
                       )}
                     >
                       <div className="flex items-center gap-4">
-                        {batch.medias?.[0] && (
+                        {batch.medias?.[0] && !isPlaceholderUrl(batch.medias[0].url) && (
                           <img
                             src={batch.medias[0].url}
                             alt={batch.batchCode}
@@ -402,7 +403,7 @@ export default function BrokerSharedInventoryPage() {
                     Lote Selecionado
                   </p>
                   <div className="flex items-center gap-4">
-                    {selectedBatch.medias?.[0] && (
+                    {selectedBatch.medias?.[0] && !isPlaceholderUrl(selectedBatch.medias[0].url) && (
                       <img
                         src={selectedBatch.medias[0].url}
                         alt={selectedBatch.batchCode}

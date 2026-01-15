@@ -42,6 +42,9 @@ type BatchRepository interface {
 	// UpdateAvailableSlabs atualiza a quantidade de chapas disponíveis
 	UpdateAvailableSlabs(ctx context.Context, tx *sql.Tx, id string, availableSlabs int) error
 
+	// UpdateSlabCounts atualiza a distribuição de chapas
+	UpdateSlabCounts(ctx context.Context, tx *sql.Tx, id string, available, reserved, sold, inactive int) error
+
 	// DecrementAvailableSlabs decrementa a quantidade de chapas disponíveis
 	DecrementAvailableSlabs(ctx context.Context, tx *sql.Tx, id string, quantity int) error
 
