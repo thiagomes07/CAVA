@@ -103,9 +103,9 @@ services:
       APP_PORT: 3001
       
       # URLs
-      FRONTEND_URL: http://localhost # Valid for Nginx access
-      PUBLIC_LINK_BASE_URL: http://localhost
-      ALLOWED_ORIGINS: http://localhost,http://localhost:3000
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost} # Valid for Nginx access
+      PUBLIC_LINK_BASE_URL: ${FRONTEND_URL:-http://localhost}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost,http://localhost:3000}
 
     depends_on:
       postgres:
@@ -129,12 +129,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost/api
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
     container_name: cava-frontend
     restart: unless-stopped
     environment:
       # Client-side API URL (Browser -> Nginx -> API)
-      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost/api}
       # Server-side API URL (Container -> Container)
       INTERNAL_API_URL: http://api:3001
       
