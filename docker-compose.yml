@@ -1,0 +1,171 @@
+version: '3.8'
+
+services:
+  # =============================================
+  # POSTGRESQL
+  # =============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cava-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: cava_user
+      POSTGRES_PASSWORD: cava_password_dev
+      POSTGRES_DB: cava_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cava_user -d cava_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =============================================
+  # MINIO (S3-Compatible Storage)
+  # =============================================
+  minio:
+    image: minio/minio:latest
+    container_name: cava-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    ports:
+      - "9000:9000"  # API
+      - "9001:9001"  # Console Web
+    volumes:
+      - minio-data:/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 20s
+
+  # =============================================
+  # MINIO INIT (Auto-create buckets)
+  # =============================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: cava-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Waiting for MinIO...';
+      sleep 5;
+      mc alias set minio http://minio:9000 minio_access_key minio_secret_key;
+      mc mb --ignore-existing minio/cava-media;
+      mc anonymous set download minio/cava-media;
+      echo 'Bucket created successfully!';
+      exit 0;
+      "
+    networks:
+      - cava-network
+
+  # =============================================
+  # BACKEND API
+  # =============================================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cava-api
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env.example
+    environment:
+      # Database connection
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: cava_user
+      DB_PASSWORD: cava_password_dev
+      DB_NAME: cava_db
+      
+      # Storage connection
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: minio_access_key
+      STORAGE_SECRET_KEY: minio_secret_key
+      STORAGE_BUCKET_NAME: cava-media
+      STORAGE_PUBLIC_URL: http://localhost:9000/cava-media # Or actual domain if using Nginx for MinIO
+
+      # App Config
+      APP_HOST: 0.0.0.0
+      APP_PORT: 3001
+      
+      # URLs
+      FRONTEND_URL: http://localhost # Valid for Nginx access
+      PUBLIC_LINK_BASE_URL: http://localhost
+      ALLOWED_ORIGINS: http://localhost,http://localhost:3000
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================
+  # FRONTEND (Next.js)
+  # =============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost/api
+    container_name: cava-frontend
+    restart: unless-stopped
+    environment:
+      # Client-side API URL (Browser -> Nginx -> API)
+      NEXT_PUBLIC_API_URL: http://localhost/api
+      # Server-side API URL (Container -> Container)
+      INTERNAL_API_URL: http://api:3001
+      
+      NODE_ENV: production
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      - cava-network
+
+  # =============================================
+  # NGINX (Reverse Proxy)
+  # =============================================
+  nginx:
+    image: nginx:alpine
+    container_name: cava-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - cava-network
+
+networks:
+  cava-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  minio-data:

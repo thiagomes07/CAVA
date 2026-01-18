@@ -29,7 +29,10 @@ class ApiClient {
   private failedQueue: QueueEntry[] = [];
 
   constructor() {
+    // INTERNAL_API_URL is used for server-side requests (SSR) within the Docker network
+    // NEXT_PUBLIC_API_URL / NEXT_PUBLIC_API_BASE is for client-side requests
     this.baseURL =
+      process.env.INTERNAL_API_URL ||
       process.env.NEXT_PUBLIC_API_URL ||
       process.env.NEXT_PUBLIC_API_BASE ||
       'http://localhost:3001/api';
@@ -58,9 +61,11 @@ class ApiClient {
    */
   async ensureCsrfToken(): Promise<void> {
     if (this.getCsrfToken()) return;
-    
+
     // Fazer uma requisição GET para obter o cookie CSRF
-    await fetch(`${this.baseURL.replace('/api', '')}/health`, {
+    // Se baseURL for http://localhost/api, isso chama http://localhost/api/health
+    // O Nginx reescreve /api/health -> /health no backend
+    await fetch(`${this.baseURL}/health`, {
       method: 'GET',
       credentials: 'include',
     });

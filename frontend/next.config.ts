@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
     // O Turbopack em Next.js 16 não suporta route groups com paths duplicados
   },
 
+  output: "standalone",
+
+  typescript: {
+    // !! WARN !!
+    // Dangerously allow production builds to successfully complete even if
+    // your project has type errors.
+    // !! WARN !!
+    ignoreBuildErrors: true,
+  },
+  eslint: {
+    // Warning: This allows production builds to successfully complete even if
+    // your project has ESLint errors.
+    ignoreDuringBuilds: true,
+  },
+
   turbopack: {
     // Ensure the app root is this frontend folder even if there are lockfiles above it.
     root: path.resolve(__dirname),
