@@ -62,6 +62,15 @@ func ValidationError(message string) *AppError {
 	return NewValidationError(message, nil)
 }
 
+// NewBadRequestError cria um erro de requisição inválida genérico
+func NewBadRequestError(message string) *AppError {
+	return &AppError{
+		Code:       "BAD_REQUEST",
+		Message:    message,
+		StatusCode: http.StatusBadRequest,
+	}
+}
+
 // =============================================
 // ERROS DE NOT FOUND
 // =============================================
