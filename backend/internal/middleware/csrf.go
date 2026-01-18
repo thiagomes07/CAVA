@@ -44,6 +44,14 @@ func (m *CSRFMiddleware) SetCSRFCookie(next http.Handler) http.Handler {
 				return
 			}
 
+			// Determinar SameSite mode baseado em Secure
+			// Se Secure=true (HTTPS), pode usar Strict
+			// Se Secure=false (HTTP), usar Lax para permitir navegação
+			sameSite := http.SameSiteLaxMode
+			if m.cookieSecure {
+				sameSite = http.SameSiteStrictMode
+			}
+
 			// Setar cookie
 			http.SetCookie(w, &http.Cookie{
 				Name:     "csrf_token",
@@ -53,7 +61,7 @@ func (m *CSRFMiddleware) SetCSRFCookie(next http.Handler) http.Handler {
 				MaxAge:   86400, // 24 horas
 				Secure:   m.cookieSecure,
 				HttpOnly: false, // Precisa ser acessível via JS
-				SameSite: http.SameSiteStrictMode,
+				SameSite: sameSite,
 			})
 
 			m.logger.Debug("csrf token gerado")
