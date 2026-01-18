@@ -52,17 +52,24 @@ func (m *CSRFMiddleware) SetCSRFCookie(next http.Handler) http.Handler {
 				sameSite = http.SameSiteStrictMode
 			}
 
-			// Setar cookie
-			http.SetCookie(w, &http.Cookie{
+			// Criar cookie
+			cookie := &http.Cookie{
 				Name:     "csrf_token",
 				Value:    token,
 				Path:     "/",
-				Domain:   m.cookieDomain,
 				MaxAge:   86400, // 24 horas
 				Secure:   m.cookieSecure,
 				HttpOnly: false, // Precisa ser acessível via JS
 				SameSite: sameSite,
-			})
+			}
+
+			// Só definir Domain se não estiver vazio
+			if m.cookieDomain != "" {
+				cookie.Domain = m.cookieDomain
+			}
+
+			// Setar cookie
+			http.SetCookie(w, cookie)
 
 			m.logger.Debug("csrf token gerado")
 		}
