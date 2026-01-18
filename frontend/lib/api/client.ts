@@ -63,12 +63,21 @@ class ApiClient {
     if (this.getCsrfToken()) return;
 
     // Fazer uma requisição GET para obter o cookie CSRF
-    // Se baseURL for http://localhost/api, isso chama http://localhost/api/health
-    // O Nginx reescreve /api/health -> /health no backend
-    await fetch(`${this.baseURL}/health`, {
+    // Usa /health que está fora do /api (evita duplicação de prefixo)
+    const healthUrl = this.baseURL.replace('/api', '/health');
+    
+    await fetch(healthUrl, {
       method: 'GET',
       credentials: 'include',
     });
+
+    // Aguardar um pouco para garantir que o cookie foi salvo
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    // Verificar se o cookie foi realmente definido
+    if (!this.getCsrfToken()) {
+      throw new Error('CSRF token ausente. Recarregue a página para continuar.');
+    }
   }
 
   private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
