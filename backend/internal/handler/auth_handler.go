@@ -174,12 +174,12 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Name:     "access_token",
 		Value:    accessToken,
 		Path:     "/",
-		Domain:   h.cookieDomain,
+		Domain:   h.cookieDomain, // Vazio para funcionar com IP
 		MaxAge:   int(h.accessTTL.Seconds()),
 		Expires:  time.Now().Add(h.accessTTL),
-		Secure:   h.cookieSecure,
+		Secure:   h.cookieSecure, // false para HTTP
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode, // Lax permite navegação normal
 	})
 
 	// Refresh token - 7 dias
@@ -187,12 +187,12 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Name:     "refresh_token",
 		Value:    refreshToken,
 		Path:     "/",
-		Domain:   h.cookieDomain,
+		Domain:   h.cookieDomain, // Vazio para funcionar com IP
 		MaxAge:   int(h.refreshTTL.Seconds()),
 		Expires:  time.Now().Add(h.refreshTTL),
-		Secure:   h.cookieSecure,
+		Secure:   h.cookieSecure, // false para HTTP
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode, // Lax permite navegação normal
 	})
 }
 
@@ -208,7 +208,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Limpar refresh token
@@ -221,7 +221,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 

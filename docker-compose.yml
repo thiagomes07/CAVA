@@ -102,6 +102,10 @@ services:
       APP_HOST: 0.0.0.0
       APP_PORT: 3001
       
+      # Cookies (empty domain works with IPs)
+      COOKIE_SECURE: "false"
+      COOKIE_DOMAIN: ""
+      
       # URLs
       FRONTEND_URL: http://3.91.67.124 # Valid for Nginx access
       PUBLIC_LINK_BASE_URL: http://3.91.67.124

@@ -6,7 +6,7 @@ const setReadableAuthCookies = (user: User | null) => {
   if (typeof document === 'undefined') return;
 
   const secureFlag = window.location.protocol === 'https:' ? '; Secure' : '';
-  const base = `; Path=/; SameSite=Strict${secureFlag}`;
+  const base = `; Path=/; SameSite=Lax${secureFlag}`; // Lax ao invés de Strict
 
   if (user?.role) {
     document.cookie = `user_role=${encodeURIComponent(user.role)}${base}`;
