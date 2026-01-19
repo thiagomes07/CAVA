@@ -193,6 +193,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/batches", func(r chi.Router) {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Batch.List)
 				r.With(m.RBAC.RequireAdmin).Post("/", h.Batch.Create)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/sell", h.Batch.Sell)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Batch.GetByID)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/status", h.Batch.CheckStatus)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/check-availability", h.Batch.CheckAvailability)
@@ -279,6 +280,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.SalesHistory.List)
 				r.With(m.RBAC.RequireIndustryUser).Get("/summary", h.SalesHistory.GetSummary)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.SalesHistory.GetByID)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.SalesHistory.Delete)
 			})
 
 			// Broker sales

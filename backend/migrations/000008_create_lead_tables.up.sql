@@ -14,7 +14,9 @@ CREATE TABLE clientes (
     status cliente_status_type DEFAULT 'NOVO',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    last_interaction TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    last_interaction TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Unique constraint: nome único por contato
+    UNIQUE (name, contact)
 );
 
 -- Índices para clientes

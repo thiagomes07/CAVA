@@ -4,29 +4,58 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Package, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { useToast } from '@/lib/hooks/useToast';
+import { apiClient, ApiError } from '@/lib/api/client';
+import { cn } from '@/lib/utils/cn';
+import {
+  ArrowLeft,
+  Upload,
+  X,
+  Package,
+  ArrowUp,
+  ArrowDown,
+  Trash2,
+  Calendar,
+  AlertTriangle,
+  Receipt,
+  Download,
+  FileText
+} from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
-import { LoadingState } from '@/components/shared/LoadingState';
-import { apiClient, ApiError } from '@/lib/api/client';
-import { useToast } from '@/lib/hooks/useToast';
-import { editBatchSchema, type EditBatchInput } from '@/lib/schemas/batch.schema';
-import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
-import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import { Label } from '@/components/ui/label';
+import {
+  Modal,
+  ModalContent,
+  ModalDescription,
+  ModalFooter,
+  ModalHeader,
+  ModalTitle,
+} from '@/components/ui/modal';
 
+import { editBatchSchema, type EditBatchInput } from '@/lib/schemas/batch.schema';
+import type { Batch, Media, BatchStatus, Sale, PriceUnit } from '@/lib/types';
+
+import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import { isPlaceholderUrl } from '@/lib/utils/media';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Batch, Media, PriceUnit, BatchStatus } from '@/lib/types';
-import { cn } from '@/lib/utils/cn';
-import { isPlaceholderUrl } from '@/lib/utils/media';
+import { LoadingState } from '@/components/shared/LoadingState';
+
+import { SellBatchModal } from './components/SellBatchModal';
 
 interface UploadedMedia {
   file: File;
   preview: string;
 }
+
+
 
 export default function EditBatchPage() {
   const router = useRouter();
@@ -41,6 +70,7 @@ export default function EditBatchPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showSellModal, setShowSellModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [calculatedArea, setCalculatedArea] = useState<number>(0);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
@@ -48,6 +78,7 @@ export default function EditBatchPage() {
   const [selectedStatus, setSelectedStatus] = useState<BatchStatus | null>(null);
   const [sourceStatus, setSourceStatus] = useState<BatchStatus>('DISPONIVEL');
   const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
+  const [industryPriceDisplay, setIndustryPriceDisplay] = useState<string>('');
 
   const {
     register,
@@ -77,16 +108,16 @@ export default function EditBatchPage() {
   const getMaxForSource = (source: BatchStatus) => {
     if (!batch) return 0;
     switch (source) {
-    case 'DISPONIVEL':
-      return batch.availableSlabs;
-    case 'RESERVADO':
-      return batch.reservedSlabs ?? 0;
-    case 'VENDIDO':
-      return batch.soldSlabs ?? 0;
-    case 'INATIVO':
-      return batch.inactiveSlabs ?? 0;
-    default:
-      return 0;
+      case 'DISPONIVEL':
+        return batch.availableSlabs;
+      case 'RESERVADO':
+        return batch.reservedSlabs ?? 0;
+      case 'VENDIDO':
+        return batch.soldSlabs ?? 0;
+      case 'INATIVO':
+        return batch.inactiveSlabs ?? 0;
+      default:
+        return 0;
     }
   };
 
@@ -123,6 +154,8 @@ export default function EditBatchPage() {
         priceUnit: data.priceUnit || 'M2',
         originQuarry: data.originQuarry || '',
       });
+      // Initialize price display with formatted value
+      setIndustryPriceDisplay(formatCurrency(data.industryPrice));
     } catch (err) {
       error('Erro ao carregar lote');
       router.push('/inventory');
@@ -308,7 +341,7 @@ export default function EditBatchPage() {
       return false;
     }
     const maxAllowed = getMaxForSource(sourceStatus);
-    if (maxAllowed <= 0) { 
+    if (maxAllowed <= 0) {
       error('Não há chapas suficientes para essa ação');
       return false;
     }
@@ -350,6 +383,13 @@ export default function EditBatchPage() {
       error('Selecione um status para atualizar');
       return;
     }
+
+    // Intercept 'VENDIDO' status to open the modal
+    if (selectedStatus === 'VENDIDO') {
+      setShowSellModal(true);
+      return;
+    }
+
     const statusUpdated = await handleUpdateStatus(selectedStatus);
     if (!statusUpdated) {
       return;
@@ -457,7 +497,7 @@ export default function EditBatchPage() {
             </h2>
 
             <div className="space-y-3">
-                <Input
+              <Input
                 type="text"
                 inputMode="numeric"
                 label="Quantidade de chapas"
@@ -498,41 +538,39 @@ export default function EditBatchPage() {
               <div className="space-y-1">
                 <p className="text-xs text-slate-500">Para</p>
                 <div className="flex flex-wrap gap-2">
-                {([
-                  { value: 'DISPONIVEL', label: 'Disponível' },
-                  { value: 'RESERVADO', label: 'Reservado' },
-                  { value: 'VENDIDO', label: 'Vendido' },
-                  { value: 'INATIVO', label: 'Inativo' },
-                ] as { value: BatchStatus; label: string }[]).map((option) => (
-                  (() => {
-                    const maxAllowed = getMaxForSource(sourceStatus);
-                    const isDisabled =
-                      isSubmitting ||
-                      isUpdatingStatus ||
-                      sourceStatus === option.value ||
-                      maxAllowed <= 0 ||
-                      !isQuantityValid ||
-                      parsedStatusQuantity > maxAllowed;
-                    return (
-                      <button
-                        key={option.value}
-                        type="button"
-                        onClick={() =>
-                          setSelectedStatus((prev) => (prev === option.value ? null : option.value))
-                        }
-                        className={cn(
-                          'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
-                          selectedStatus === option.value
-                            ? 'bg-obsidian text-white'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        )}
-                        disabled={isDisabled}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })()
-                ))}
+                  {([
+                    { value: 'DISPONIVEL', label: 'Disponível' },
+                    { value: 'RESERVADO', label: 'Reservado' },
+                    { value: 'VENDIDO', label: 'Vendido' },
+                    { value: 'INATIVO', label: 'Inativo' },
+                  ] as { value: BatchStatus; label: string }[]).map((option) => (
+                    (() => {
+                      const maxAllowed = getMaxForSource(sourceStatus);
+                      const isDisabled =
+                        isSubmitting ||
+                        isUpdatingStatus ||
+                        sourceStatus === option.value ||
+                        maxAllowed <= 0;
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() =>
+                            setSelectedStatus((prev) => (prev === option.value ? null : option.value))
+                          }
+                          className={cn(
+                            'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                            selectedStatus === option.value
+                              ? 'bg-obsidian text-white'
+                              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                          )}
+                          disabled={isDisabled}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })()
+                  ))}
                 </div>
               </div>
               <div className="flex items-center gap-3">
@@ -545,7 +583,7 @@ export default function EditBatchPage() {
                     isSubmitting ||
                     isUpdatingStatus ||
                     !selectedStatus ||
-                    !isQuantityValid ||
+                    (selectedStatus !== 'VENDIDO' && !isQuantityValid) ||
                     selectedStatus === sourceStatus
                   }
                 >
@@ -775,15 +813,27 @@ export default function EditBatchPage() {
                 </p>
               </div>
 
-              <Input
-                {...register('industryPrice', { valueAsNumber: true })}
-                type="number"
-                step="0.01"
-                label={`Preço Base Indústria (R$/${getPriceUnitLabel(priceUnit as PriceUnit)})`}
-                helperText="Este é o preço de repasse para brokers"
-                error={errors.industryPrice?.message}
-                disabled={isSubmitting}
-              />
+              <div className="space-y-1">
+                <label className="block text-sm font-medium text-slate-700">
+                  {`Preço Base Indústria (R$/${getPriceUnitLabel(priceUnit as PriceUnit)})`}
+                </label>
+                <Input
+                  type="text"
+                  value={industryPriceDisplay}
+                  onChange={(e) => {
+                    const rawValue = e.target.value.replace(/\D/g, "");
+                    const numericValue = parseInt(rawValue, 10) / 100 || 0;
+                    setIndustryPriceDisplay(formatCurrency(numericValue));
+                    setValue('industryPrice', numericValue, { shouldValidate: true });
+                  }}
+                  placeholder="R$ 0,00"
+                  disabled={isSubmitting}
+                />
+                <p className="text-xs text-slate-500">Este é o preço de repasse para brokers</p>
+                {errors.industryPrice && (
+                  <p className="text-sm text-red-500">{errors.industryPrice.message}</p>
+                )}
+              </div>
 
               {/* Preço Total Calculado */}
               {calculatedArea > 0 && industryPrice > 0 && (
@@ -1002,6 +1052,23 @@ export default function EditBatchPage() {
           </div>
         </div>
       </form>
+
+      {/* Sell Batch Modal */}
+      {showSellModal && batch && (
+        <SellBatchModal
+          batch={batch}
+          quantitySlabs={parsedStatusQuantity}
+          sourceStatus={sourceStatus}
+          isOpen={showSellModal}
+          onClose={() => setShowSellModal(false)}
+          onSuccess={() => {
+            fetchBatch();
+            setShowSellModal(false);
+            setSelectedStatus(null);
+            setStatusQuantityInput('');
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)}>

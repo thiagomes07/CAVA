@@ -22,7 +22,7 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 	query := `
 		INSERT INTO clientes (
 			id, sales_link_id, name, contact, message, marketing_opt_in, status
-		) VALUES ($1, NULLIF($2, ''), $3, $4, $5, $6, $7)
+		) VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE $2::uuid END, $3, $4, $5, $6, $7)
 		RETURNING created_at, updated_at, last_interaction
 	`
 

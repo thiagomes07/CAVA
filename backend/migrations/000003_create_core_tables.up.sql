@@ -37,7 +37,9 @@ CREATE TABLE users (
     role user_role_type NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Unique constraint: nome único por indústria
+    UNIQUE (name, industry_id)
 );
 
 -- Índices para users

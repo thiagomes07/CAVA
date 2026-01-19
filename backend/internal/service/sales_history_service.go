@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	domainErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
@@ -9,11 +10,17 @@ import (
 	"go.uber.org/zap"
 )
 
+type SalesHistoryDB interface {
+	BeginTx(ctx context.Context) (*sql.Tx, error)
+	ExecuteInTx(ctx context.Context, fn func(*sql.Tx) error) error
+}
+
 type salesHistoryService struct {
 	salesRepo   repository.SalesHistoryRepository
 	batchRepo   repository.BatchRepository
 	userRepo    repository.UserRepository
 	clienteRepo repository.ClienteRepository
+	db          SalesHistoryDB
 	logger      *zap.Logger
 }
 
@@ -22,6 +29,7 @@ func NewSalesHistoryService(
 	batchRepo repository.BatchRepository,
 	userRepo repository.UserRepository,
 	clienteRepo repository.ClienteRepository,
+	db SalesHistoryDB,
 	logger *zap.Logger,
 ) *salesHistoryService {
 	return &salesHistoryService{
@@ -29,6 +37,7 @@ func NewSalesHistoryService(
 		batchRepo:   batchRepo,
 		userRepo:    userRepo,
 		clienteRepo: clienteRepo,
+		db:          db,
 		logger:      logger,
 	}
 }
@@ -62,12 +71,16 @@ func (s *salesHistoryService) RegisterSale(ctx context.Context, input entity.Cre
 	}
 
 	// Validar que vendedor existe
-	seller, err := s.userRepo.FindByID(ctx, input.SoldByUserID)
-	if err != nil {
-		return nil, err
-	}
-	if !seller.IsActive {
-		return nil, domainErrors.ValidationError("Vendedor inativo")
+	if input.SoldByUserID != nil {
+		seller, err := s.userRepo.FindByID(ctx, *input.SoldByUserID)
+		if err != nil {
+			return nil, err
+		}
+		if !seller.IsActive {
+			return nil, domainErrors.ValidationError("Vendedor inativo")
+		}
+	} else if input.SellerName == "" {
+		return nil, domainErrors.ValidationError("Vendedor deve ser informado (ID do usuário ou Nome personalizado)")
 	}
 
 	// Validar cliente (se fornecido)
@@ -84,7 +97,7 @@ func (s *salesHistoryService) RegisterSale(ctx context.Context, input entity.Cre
 
 	s.logger.Info("venda registrada",
 		zap.String("batchId", input.BatchID),
-		zap.String("sellerId", input.SoldByUserID),
+		zap.Any("sellerId", input.SoldByUserID),
 		zap.Float64("salePrice", input.SalePrice),
 	)
 
@@ -203,8 +216,8 @@ func (s *salesHistoryService) populateSaleData(ctx context.Context, sale *entity
 	}
 
 	// Buscar vendedor
-	if sale.SoldByUserID != "" {
-		seller, err := s.userRepo.FindByID(ctx, sale.SoldByUserID)
+	if sale.SoldByUserID != nil && *sale.SoldByUserID != "" {
+		seller, err := s.userRepo.FindByID(ctx, *sale.SoldByUserID)
 		if err != nil {
 			return err
 		}
@@ -227,3 +240,58 @@ func (s *salesHistoryService) populateSaleData(ctx context.Context, sale *entity
 
 	return nil
 }
+
+func (s *salesHistoryService) Delete(ctx context.Context, id string) error {
+	return s.db.ExecuteInTx(ctx, func(tx *sql.Tx) error {
+		// 1. Buscar venda (para saber qtos itens restaurar)
+		sale, err := s.salesRepo.FindByID(ctx, id)
+		if err != nil {
+			return err
+		}
+
+		// 2. Lock no Batch para atualização segura
+		batch, err := s.batchRepo.FindByIDForUpdate(ctx, tx, sale.BatchID)
+		if err != nil {
+			return err
+		}
+
+		// 3. Restaurar contadores
+		newAvailable := batch.AvailableSlabs + sale.QuantitySlabsSold
+		newSold := batch.SoldSlabs - sale.QuantitySlabsSold
+		if newSold < 0 {
+			s.logger.Warn("inconsistência detectada: quantidade vendida ficaria negativa",
+				zap.String("batchId", batch.ID),
+				zap.Int("currentSold", batch.SoldSlabs),
+				zap.Int("returning", sale.QuantitySlabsSold),
+			)
+			newSold = 0
+		}
+
+		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, batch.ID, newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs); err != nil {
+			return err
+		}
+
+		// 4. Atualizar Status do Lote
+		newStatus := deriveBatchStatus(newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs)
+		if newStatus != batch.Status {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, batch.ID, newStatus); err != nil {
+				return err
+			}
+		}
+
+		// 5. Deletar registro de venda
+		if err := s.salesRepo.Delete(ctx, tx, id); err != nil {
+			return err
+		}
+
+		s.logger.Info("venda desfeita e estoque restaurado",
+			zap.String("saleId", id),
+			zap.String("batchId", batch.ID),
+			zap.Int("restoredSlabs", sale.QuantitySlabsSold),
+		)
+
+		return nil
+	})
+}
+
+

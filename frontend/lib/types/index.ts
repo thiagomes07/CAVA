@@ -4,19 +4,19 @@ export type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO';
 
 export type PriceUnit = 'M2' | 'FT2';
 
-export type MaterialType = 
-  | 'GRANITO' 
-  | 'MARMORE' 
-  | 'QUARTZITO' 
-  | 'LIMESTONE' 
-  | 'TRAVERTINO' 
+export type MaterialType =
+  | 'GRANITO'
+  | 'MARMORE'
+  | 'QUARTZITO'
+  | 'LIMESTONE'
+  | 'TRAVERTINO'
   | 'OUTROS';
 
-export type FinishType = 
-  | 'POLIDO' 
-  | 'LEVIGADO' 
-  | 'BRUTO' 
-  | 'APICOADO' 
+export type FinishType =
+  | 'POLIDO'
+  | 'LEVIGADO'
+  | 'BRUTO'
+  | 'APICOADO'
   | 'FLAMEADO';
 
 export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO';
@@ -160,7 +160,8 @@ export interface Reservation {
 export interface Sale {
   id: string;
   batchId: string;
-  soldByUserId: string;
+  soldByUserId?: string;
+  sellerName?: string;
   clienteId?: string;
   customerName: string;
   customerContact: string;

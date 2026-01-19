@@ -248,6 +248,30 @@ func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool,
 	return exists, nil
 }
 
+func (r *userRepository) ExistsByNameInIndustry(ctx context.Context, name string, industryID string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(name) = LOWER($1) AND industry_id = $2)`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, name, industryID).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
+func (r *userRepository) ExistsByNameGlobally(ctx context.Context, name string) (bool, error) {
+	query := `SELECT EXISTS(SELECT 1 FROM users WHERE LOWER(name) = LOWER($1))`
+
+	var exists bool
+	err := r.db.QueryRowContext(ctx, query, name).Scan(&exists)
+	if err != nil {
+		return false, errors.DatabaseError(err)
+	}
+
+	return exists, nil
+}
+
 func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]entity.User, error) {
 	query := `
 		SELECT id, industry_id, name, email, phone, role, 

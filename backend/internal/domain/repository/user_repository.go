@@ -38,6 +38,12 @@ type UserRepository interface {
 	// ExistsByEmail verifica se o email já está cadastrado
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 
+	// ExistsByNameInIndustry verifica se o nome já está cadastrado na indústria
+	ExistsByNameInIndustry(ctx context.Context, name string, industryID string) (bool, error)
+
+	// ExistsByNameGlobally verifica se o nome já está cadastrado globalmente
+	ExistsByNameGlobally(ctx context.Context, name string) (bool, error)
+
 	// List lista todos os usuários com filtros opcionais
 	List(ctx context.Context, role *entity.UserRole) ([]entity.User, error)
 
