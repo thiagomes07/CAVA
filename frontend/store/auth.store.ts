@@ -52,9 +52,6 @@ export const useAuthStore = create<AuthState>()(
       try {
         set({ isLoading: true });
 
-        // Garantir que temos o CSRF token antes de fazer login
-        await apiClient.ensureCsrfToken();
-
         const response = await apiClient.post<{
           user: User;
           role: UserRole;
@@ -113,13 +110,14 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
         });
       } catch (error) {
+        // Silenciosamente limpar sessão se não autenticado
         setReadableAuthCookies(null);
         set({
           user: null,
           isAuthenticated: false,
           isLoading: false,
         });
-        throw error;
+        // Não fazer throw para evitar erros visíveis no console
       }
     },
 

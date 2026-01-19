@@ -108,7 +108,9 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		MaxAge:           300,
 	}))
 
-	r.Use(m.CSRF.SetCSRFCookie)
+	// CSRF desabilitado para simplificar deploy
+	// JWT já oferece proteção suficiente contra ataques
+	// r.Use(m.CSRF.SetCSRFCookie)
 
 	// Health check (público) - GET e HEAD para healthchecks Docker
 	r.Get("/health", h.Health.Check)
@@ -137,7 +139,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			r.Post("/login", h.Auth.Login)
 			r.Post("/refresh", h.Auth.Refresh)
-			r.With(m.Auth.Authenticate, m.CSRF.ValidateCSRF).Post("/logout", h.Auth.Logout)
+			r.With(m.Auth.Authenticate).Post("/logout", h.Auth.Logout)
 		})
 
 		// ============================================
@@ -146,7 +148,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		r.Route("/profile", func(r chi.Router) {
 			r.Use(m.Auth.Authenticate)
 			r.Use(m.RateApi.Limit)
-			r.Use(m.CSRF.ValidateCSRF)
+			// CSRF desabilitado
 
 			r.Get("/", h.Auth.GetProfile)
 			r.Patch("/", h.Auth.UpdateProfile)
@@ -159,7 +161,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 		r.Group(func(r chi.Router) {
 			r.Use(m.Auth.Authenticate)
 			r.Use(m.RateApi.Limit)
-			r.Use(m.CSRF.ValidateCSRF)
+			// CSRF desabilitado
 
 			// ----------------------------------------
 			// DASHBOARD

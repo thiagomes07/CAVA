@@ -22,14 +22,25 @@ export function useAuth() {
   useEffect(() => {
     let isMounted = true;
 
-    // Only attempt refresh once per mount when loading
+    // Only attempt refresh once per mount when loading and not on login page
     if (isLoading && !hasAttemptedRefresh.current) {
       hasAttemptedRefresh.current = true;
-      refreshSession().catch(() => {
-        if (isMounted) {
-          setUser(null);
-        }
-      });
+      
+      // Não tentar refresh se estiver em rotas públicas
+      const isPublicRoute = typeof window !== 'undefined' && 
+        (window.location.pathname.startsWith('/login') || 
+         window.location.pathname.startsWith('/public'));
+      
+      if (!isPublicRoute) {
+        refreshSession().catch(() => {
+          if (isMounted) {
+            setUser(null);
+          }
+        });
+      } else {
+        // Se for rota pública, apenas marca como não carregando
+        setUser(null);
+      }
     }
 
     return () => {

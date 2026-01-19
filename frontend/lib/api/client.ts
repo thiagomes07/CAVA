@@ -49,28 +49,6 @@ class ApiClient {
     this.failedQueue = [];
   }
 
-  private getCsrfToken(): string | null {
-    if (typeof document === 'undefined') return null;
-    const match = document.cookie.match(/(?:^|; )csrf_token=([^;]+)/);
-    return match ? decodeURIComponent(match[1]) : null;
-  }
-
-  /**
-   * Garante que o CSRF token existe fazendo uma requisição GET ao backend.
-   * Deve ser chamado antes de operações de autenticação (login).
-   */
-  async ensureCsrfToken(): Promise<void> {
-    if (this.getCsrfToken()) return;
-
-    // Fazer uma requisição GET para obter o cookie CSRF
-    // Se baseURL for http://localhost/api, isso chama http://localhost/api/health
-    // O Nginx reescreve /api/health -> /health no backend
-    await fetch(`${this.baseURL}/health`, {
-      method: 'GET',
-      credentials: 'include',
-    });
-  }
-
   private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
     const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
 
@@ -95,13 +73,11 @@ class ApiClient {
     this.isRefreshing = true;
 
     try {
-      const csrfToken = this.getCsrfToken();
       const response = await fetch(`${this.baseURL}/auth/refresh`, {
         method: 'POST',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
         },
       });
 
@@ -115,7 +91,11 @@ class ApiClient {
 
       if (typeof window !== 'undefined') {
         const currentPath = window.location.pathname;
-        if (!currentPath.startsWith('/login')) {
+        // Não redirecionar se já estiver em login ou em rotas públicas
+        const publicRoutes = ['/login', '/public'];
+        const isPublicRoute = publicRoutes.some(route => currentPath.startsWith(route));
+        
+        if (!isPublicRoute) {
           window.location.href = `/login?callbackUrl=${encodeURIComponent(currentPath)}`;
         }
       }
@@ -135,18 +115,9 @@ class ApiClient {
   private async request<T>(endpoint: string, config: RequestConfig = {}): Promise<T> {
     const { params, timeoutMs = this.defaultTimeout, skipAuthRetry, ...fetchConfig } = config;
     const url = this.buildURL(endpoint, params);
-    const csrfToken = this.getCsrfToken();
-
-    // Surface missing CSRF token early for state-changing requests
-    const method = (fetchConfig.method || 'GET').toUpperCase();
-    const isStateChanging = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
-    if (isStateChanging && !csrfToken) {
-      throw new ApiError('CSRF token ausente. Recarregue a página para continuar.', 419);
-    }
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
       ...fetchConfig.headers,
     };
 

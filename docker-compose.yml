@@ -96,16 +96,16 @@ services:
       STORAGE_ACCESS_KEY: minio_access_key
       STORAGE_SECRET_KEY: minio_secret_key
       STORAGE_BUCKET_NAME: cava-media
-      STORAGE_PUBLIC_URL: http://localhost:9000/cava-media # Or actual domain if using Nginx for MinIO
+      STORAGE_PUBLIC_URL: http://3.91.67.124:9000/cava-media # Or actual domain if using Nginx for MinIO
 
       # App Config
       APP_HOST: 0.0.0.0
       APP_PORT: 3001
       
       # URLs
-      FRONTEND_URL: http://localhost # Valid for Nginx access
-      PUBLIC_LINK_BASE_URL: http://localhost
-      ALLOWED_ORIGINS: http://localhost,http://localhost:3000
+      FRONTEND_URL: http://3.91.67.124 # Valid for Nginx access
+      PUBLIC_LINK_BASE_URL: http://3.91.67.124
+      ALLOWED_ORIGINS: http://3.91.67.124,http://3.91.67.124:3000
 
     depends_on:
       postgres:
@@ -129,12 +129,12 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: http://localhost/api
+        NEXT_PUBLIC_API_URL: http://3.91.67.124/api
     container_name: cava-frontend
     restart: unless-stopped
     environment:
       # Client-side API URL (Browser -> Nginx -> API)
-      NEXT_PUBLIC_API_URL: http://localhost/api
+      NEXT_PUBLIC_API_URL: http://3.91.67.124/api
       # Server-side API URL (Container -> Container)
       INTERNAL_API_URL: http://api:3001
       
