@@ -52,8 +52,8 @@ func (h *PublicHandler) GetLinkBySlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buscar link
-	link, err := h.salesLinkService.GetBySlug(r.Context(), slug)
+	// Buscar link com dados públicos sanitizados
+	publicLink, err := h.salesLinkService.GetPublicBySlug(r.Context(), slug)
 	if err != nil {
 		h.logger.Warn("link não encontrado",
 			zap.String("slug", slug),
@@ -63,36 +63,23 @@ func (h *PublicHandler) GetLinkBySlug(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Verificar se está ativo e não expirado
-	if !link.IsActive {
-		response.NotFound(w, "Link não encontrado")
-		return
-	}
-
-	if link.IsExpired() {
-		response.NotFound(w, "Link expirado")
-		return
-	}
-
-	// Incrementar contador de visualizações (async, não bloquear resposta)
-	// Usar contexto independente porque o contexto da request será cancelado
-	go func(linkID string) {
+	// Incrementar contador de visualizações (async)
+	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
-		if err := h.salesLinkService.IncrementViews(ctx, linkID); err != nil {
-			h.logger.Error("erro ao incrementar views",
-				zap.String("linkId", linkID),
-				zap.Error(err),
-			)
+
+		// Buscar o link completo para obter o ID
+		link, err := h.salesLinkService.GetBySlug(ctx, slug)
+		if err == nil {
+			if err := h.salesLinkService.IncrementViews(ctx, link.ID); err != nil {
+				h.logger.Error("erro ao incrementar views", zap.Error(err))
+			}
 		}
-	}(link.ID)
+	}()
 
-	h.logger.Debug("link público acessado",
-		zap.String("slug", slug),
-		zap.String("linkId", link.ID),
-	)
+	h.logger.Debug("link público acessado", zap.String("slug", slug))
 
-	response.OK(w, link)
+	response.OK(w, publicLink)
 }
 
 // CaptureClienteInterest godoc

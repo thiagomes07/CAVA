@@ -370,6 +370,7 @@ func initServices(
 		repos.SalesLink,
 		repos.Batch,
 		repos.Product,
+		repos.Media,
 		repos.User,
 		cfg.App.PublicLinkBaseURL,
 		logger,

@@ -19,6 +19,7 @@ type salesLinkService struct {
 	linkRepo    repository.SalesLinkRepository
 	batchRepo   repository.BatchRepository
 	productRepo repository.ProductRepository
+	mediaRepo   repository.MediaRepository
 	userRepo    repository.UserRepository
 	baseURL     string
 	logger      *zap.Logger
@@ -28,6 +29,7 @@ func NewSalesLinkService(
 	linkRepo repository.SalesLinkRepository,
 	batchRepo repository.BatchRepository,
 	productRepo repository.ProductRepository,
+	mediaRepo repository.MediaRepository,
 	userRepo repository.UserRepository,
 	baseURL string,
 	logger *zap.Logger,
@@ -36,6 +38,7 @@ func NewSalesLinkService(
 		linkRepo:    linkRepo,
 		batchRepo:   batchRepo,
 		productRepo: productRepo,
+		mediaRepo:   mediaRepo,
 		userRepo:    userRepo,
 		baseURL:     baseURL,
 		logger:      logger,
@@ -180,6 +183,85 @@ func (s *salesLinkService) GetBySlug(ctx context.Context, slug string) (*entity.
 	}
 
 	return link, nil
+}
+
+func (s *salesLinkService) GetPublicBySlug(ctx context.Context, slug string) (*entity.PublicSalesLink, error) {
+	link, err := s.linkRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	if !link.IsActive {
+		return nil, domainErrors.NewNotFoundError("Link de venda")
+	}
+
+	if link.IsExpired() {
+		return nil, domainErrors.NewNotFoundError("Link de venda")
+	}
+
+	result := &entity.PublicSalesLink{
+		ShowPrice: link.ShowPrice,
+	}
+
+	if link.Title != nil {
+		result.Title = *link.Title
+	}
+	if link.CustomMessage != nil {
+		result.CustomMessage = *link.CustomMessage
+	}
+	if link.ShowPrice && link.DisplayPrice != nil {
+		result.DisplayPrice = link.DisplayPrice
+	}
+
+	// Buscar batch com mídias
+	if link.BatchID != nil {
+		batch, err := s.batchRepo.FindByID(ctx, *link.BatchID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar batch", zap.Error(err))
+		} else {
+			medias, _ := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+			publicBatch := &entity.PublicBatch{
+				BatchCode:    batch.BatchCode,
+				Height:       batch.Height,
+				Width:        batch.Width,
+				Thickness:    batch.Thickness,
+				TotalArea:    batch.TotalArea,
+				OriginQuarry: batch.OriginQuarry,
+				Medias:       medias,
+			}
+
+			// Buscar produto relacionado ao batch
+			if batch.ProductID != "" {
+				product, err := s.productRepo.FindByID(ctx, batch.ProductID)
+				if err == nil {
+					publicBatch.ProductName = product.Name
+					publicBatch.Material = string(product.Material)
+					publicBatch.Finish = string(product.Finish)
+				}
+			}
+
+			result.Batch = publicBatch
+		}
+	}
+
+	// Buscar produto (se não for lote)
+	if link.ProductID != nil && link.BatchID == nil {
+		product, err := s.productRepo.FindByID(ctx, *link.ProductID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar produto", zap.Error(err))
+		} else {
+			medias, _ := s.mediaRepo.FindProductMedias(ctx, product.ID)
+			result.Product = &entity.PublicProduct{
+				Name:        product.Name,
+				Material:    string(product.Material),
+				Finish:      string(product.Finish),
+				Description: product.Description,
+				Medias:      medias,
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (s *salesLinkService) List(ctx context.Context, filters entity.SalesLinkFilters) (*entity.SalesLinkListResponse, error) {

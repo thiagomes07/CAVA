@@ -16,6 +16,9 @@ type SalesLinkService interface {
 	// GetBySlug busca link por slug (para landing page pública)
 	GetBySlug(ctx context.Context, slug string) (*entity.SalesLink, error)
 
+	// GetPublicBySlug busca link por slug com dados sanitizados para exibição pública
+	GetPublicBySlug(ctx context.Context, slug string) (*entity.PublicSalesLink, error)
+
 	// List lista links com filtros
 	List(ctx context.Context, filters entity.SalesLinkFilters) (*entity.SalesLinkListResponse, error)
 
