@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Package, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, X, Package, Trash2, Archive, ArrowUp, ArrowDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -41,7 +41,9 @@ export default function EditBatchPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
   const [calculatedArea, setCalculatedArea] = useState<number>(0);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusQuantityInput, setStatusQuantityInput] = useState<string>('');
@@ -356,14 +358,27 @@ export default function EditBatchPage() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleArchive = async () => {
     try {
-      setIsDeleting(true);
-      await apiClient.patch(`/batches/${batchId}/status`, { status: 'INATIVO' });
+      setIsArchiving(true);
+      await apiClient.post(`/batches/${batchId}/archive`);
       success('Lote arquivado com sucesso');
       router.push('/inventory');
     } catch (err) {
       error('Erro ao arquivar lote');
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    try {
+      setIsDeleting(true);
+      await apiClient.delete(`/batches/${batchId}`);
+      success('Lote deletado com sucesso');
+      router.push('/inventory');
+    } catch (err) {
+      error('Erro ao deletar lote');
     } finally {
       setIsDeleting(false);
     }
@@ -400,14 +415,24 @@ export default function EditBatchPage() {
             <p className="text-sm text-slate-500 font-mono">{batch.batchCode}</p>
           </div>
 
-          <Button
-            variant="destructive"
-            onClick={() => setShowDeleteModal(true)}
-            disabled={isSubmitting || batch.status === 'VENDIDO'}
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Arquivar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setShowArchiveModal(true)}
+              disabled={isSubmitting || batch.status === 'VENDIDO'}
+            >
+              <Archive className="w-4 h-4 mr-2" />
+              Arquivar
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setShowDeleteModal(true)}
+              disabled={isSubmitting || batch.status === 'VENDIDO'}
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Deletar
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1003,8 +1028,8 @@ export default function EditBatchPage() {
         </div>
       </form>
 
-      {/* Delete Confirmation Modal */}
-      <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
+      {/* Archive Confirmation Modal */}
+      <Modal open={showArchiveModal} onClose={() => setShowArchiveModal(false)}>
         <ModalHeader>
           <ModalTitle>Arquivar Lote</ModalTitle>
         </ModalHeader>
@@ -1014,7 +1039,39 @@ export default function EditBatchPage() {
             <strong className="font-mono" title={batch.batchCode}>&quot;{truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}&quot;</strong>?
           </p>
           <p className="text-amber-600 text-sm mt-4">
-            O lote será marcado como inativo e não aparecerá mais nas listagens.
+            O lote será marcado como inativo e não aparecerá mais nas listagens, mas poderá ser restaurado depois.
+          </p>
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => setShowArchiveModal(false)}
+            disabled={isArchiving}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleArchive}
+            loading={isArchiving}
+          >
+            ARQUIVAR
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)}>
+        <ModalHeader>
+          <ModalTitle>Deletar Lote</ModalTitle>
+        </ModalHeader>
+        <ModalContent>
+          <p className="text-slate-600">
+            Tem certeza que deseja deletar o lote{' '}
+            <strong className="font-mono" title={batch.batchCode}>&quot;{truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}&quot;</strong>?
+          </p>
+          <p className="text-rose-600 text-sm mt-4">
+            Esta ação não pode ser desfeita. O lote será removido permanentemente do sistema.
           </p>
         </ModalContent>
         <ModalFooter>
@@ -1030,7 +1087,7 @@ export default function EditBatchPage() {
             onClick={handleDelete}
             loading={isDeleting}
           >
-            ARQUIVAR
+            DELETAR
           </Button>
         </ModalFooter>
       </Modal>

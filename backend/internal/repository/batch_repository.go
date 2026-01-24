@@ -52,7 +52,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE id = $1
 	`
@@ -64,7 +64,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 		&batch.AvailableSlabs, &batch.ReservedSlabs, &batch.SoldSlabs, &batch.InactiveSlabs,
 		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit,
 		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive,
-		&batch.CreatedAt, &batch.UpdatedAt,
+		&batch.CreatedAt, &batch.UpdatedAt, &batch.DeletedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -82,7 +82,7 @@ func (r *batchRepository) FindByIDForUpdate(ctx context.Context, tx *sql.Tx, id 
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE id = $1
 		FOR UPDATE
@@ -95,7 +95,7 @@ func (r *batchRepository) FindByIDForUpdate(ctx context.Context, tx *sql.Tx, id 
 		&batch.AvailableSlabs, &batch.ReservedSlabs, &batch.SoldSlabs, &batch.InactiveSlabs,
 		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit,
 		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive,
-		&batch.CreatedAt, &batch.UpdatedAt,
+		&batch.CreatedAt, &batch.UpdatedAt, &batch.DeletedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -113,9 +113,9 @@ func (r *batchRepository) FindByProductID(ctx context.Context, productID string)
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
-		WHERE product_id = $1 AND is_active = TRUE
+		WHERE product_id = $1 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY entry_date DESC
 	`
 
@@ -133,9 +133,9 @@ func (r *batchRepository) FindByStatus(ctx context.Context, industryID string, s
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
-		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE
+		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY entry_date DESC
 	`
 
@@ -153,9 +153,9 @@ func (r *batchRepository) FindAvailable(ctx context.Context, industryID string) 
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
-		WHERE industry_id = $1 AND status = 'DISPONIVEL' AND is_active = TRUE AND available_slabs > 0
+		WHERE industry_id = $1 AND status = 'DISPONIVEL' AND is_active = TRUE AND available_slabs > 0 AND deleted_at IS NULL
 		ORDER BY entry_date DESC
 	`
 
@@ -173,9 +173,9 @@ func (r *batchRepository) FindByCode(ctx context.Context, industryID, code strin
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at
+		       entry_date, status, is_active, created_at, updated_at, deleted_at
 		FROM batches
-		WHERE industry_id = $1 AND batch_code ILIKE $2 AND is_active = TRUE
+		WHERE industry_id = $1 AND batch_code ILIKE $2 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY batch_code
 	`
 
@@ -195,9 +195,23 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 	query := psql.Select(
 		"id", "product_id", "industry_id", "batch_code", "height", "width",
 		"thickness", "quantity_slabs", "available_slabs", "reserved_slabs", "sold_slabs", "inactive_slabs", "net_area", "industry_price", "price_unit",
-		"origin_quarry", "entry_date", "status", "is_active", "created_at", "updated_at",
+		"origin_quarry", "entry_date", "status", "is_active", "created_at", "updated_at", "deleted_at",
 	).From("batches").
-		Where(sq.Eq{"industry_id": industryID, "is_active": true})
+		Where(sq.Eq{"industry_id": industryID})
+
+	// Filtro de deletados
+	if filters.OnlyDeleted {
+		query = query.Where("deleted_at IS NOT NULL")
+	} else if !filters.IncludeDeleted {
+		query = query.Where("deleted_at IS NULL")
+	}
+
+	// Filtro de arquivados
+	if filters.OnlyArchived {
+		query = query.Where(sq.Eq{"is_active": false})
+	} else if !filters.IncludeArchived {
+		query = query.Where(sq.Eq{"is_active": true})
+	}
 
 	// Filtros
 	if filters.ProductID != nil {
@@ -221,7 +235,19 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 
 	// Contar total
 	countQuery := psql.Select("COUNT(*)").From("batches").
-		Where(sq.Eq{"industry_id": industryID, "is_active": true})
+		Where(sq.Eq{"industry_id": industryID})
+
+	if filters.OnlyDeleted {
+		countQuery = countQuery.Where("deleted_at IS NOT NULL")
+	} else if !filters.IncludeDeleted {
+		countQuery = countQuery.Where("deleted_at IS NULL")
+	}
+
+	if filters.OnlyArchived {
+		countQuery = countQuery.Where(sq.Eq{"is_active": false})
+	} else if !filters.IncludeArchived {
+		countQuery = countQuery.Where(sq.Eq{"is_active": true})
+	}
 
 	if filters.ProductID != nil {
 		countQuery = countQuery.Where(sq.Eq{"product_id": *filters.ProductID})
@@ -526,11 +552,83 @@ func (r *batchRepository) scanBatches(rows *sql.Rows) ([]entity.Batch, error) {
 			&b.Height, &b.Width, &b.Thickness, &b.QuantitySlabs,
 			&b.AvailableSlabs, &b.ReservedSlabs, &b.SoldSlabs, &b.InactiveSlabs, &b.TotalArea, &b.IndustryPrice, &b.PriceUnit,
 			&b.OriginQuarry, &b.EntryDate, &b.Status, &b.IsActive,
-			&b.CreatedAt, &b.UpdatedAt,
+			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
 		batches = append(batches, b)
 	}
 	return batches, nil
+}
+
+func (r *batchRepository) Archive(ctx context.Context, id string) error {
+	query := `
+		UPDATE batches
+		SET is_active = FALSE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Lote")
+	}
+
+	return nil
+}
+
+func (r *batchRepository) Restore(ctx context.Context, id string) error {
+	query := `
+		UPDATE batches
+		SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Lote")
+	}
+
+	return nil
+}
+
+func (r *batchRepository) Delete(ctx context.Context, id string) error {
+	query := `
+		UPDATE batches
+		SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Lote")
+	}
+
+	return nil
 }

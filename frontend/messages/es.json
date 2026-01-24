@@ -176,7 +176,19 @@
     "edit": "Editar",
     "viewDetails": "Ver detalles",
     "loadError": "Error al cargar inventario",
-    "productsError": "Error al cargar productos"
+    "productsError": "Error al cargar productos",
+    "archive": "Archivar",
+    "restore": "Restaurar",
+    "delete": "Eliminar",
+    "showArchived": "Ver Archivados",
+    "showActive": "Ver Activos",
+    "archiveError": "Error al archivar lote",
+    "restoreError": "Error al restaurar lote",
+    "deleteError": "Error al eliminar lote",
+    "deleteConfirmTitle": "Eliminar Lote",
+    "deleteConfirmMessage": "¿Está seguro de que desea eliminar este lote?",
+    "deleteConfirmWarning": "Esta acción no se puede deshacer. El lote será eliminado permanentemente.",
+    "cancel": "Cancelar"
   },
   "catalog": {
     "title": "Catálogo",

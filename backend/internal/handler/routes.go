@@ -199,6 +199,9 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.Batch.Update)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.Batch.UpdateStatus)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/availability", h.Batch.UpdateAvailability)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/archive", h.Batch.Archive)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/restore", h.Batch.Restore)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.Batch.Delete)
 			})
 
 			// ----------------------------------------

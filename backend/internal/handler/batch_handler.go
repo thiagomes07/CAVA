@@ -87,6 +87,14 @@ func (h *BatchHandler) List(w http.ResponseWriter, r *http.Request) {
 		filters.NoStock = true
 	}
 
+	if includeArchived := r.URL.Query().Get("includeArchived"); includeArchived == "true" {
+		filters.IncludeArchived = true
+	}
+
+	if onlyArchived := r.URL.Query().Get("onlyArchived"); onlyArchived == "true" {
+		filters.OnlyArchived = true
+	}
+
 	if page := r.URL.Query().Get("page"); page != "" {
 		if p, err := strconv.Atoi(page); err == nil && p > 0 {
 			filters.Page = p
@@ -442,4 +450,88 @@ func (h *BatchHandler) CheckAvailability(w http.ResponseWriter, r *http.Request)
 		"availableSlabs":    batch.AvailableSlabs,
 		"totalSlabs":        batch.QuantitySlabs,
 	})
+}
+
+// Archive godoc
+// @Summary Arquiva um lote
+// @Description Arquiva um lote (soft delete)
+// @Tags batches
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Success 200 {object} map[string]bool
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id}/archive [post]
+func (h *BatchHandler) Archive(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	if err := h.batchService.Archive(r.Context(), id); err != nil {
+		h.logger.Error("erro ao arquivar lote",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, map[string]bool{"archived": true})
+}
+
+// Restore godoc
+// @Summary Restaura um lote arquivado
+// @Description Restaura um lote que foi arquivado
+// @Tags batches
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Success 200 {object} map[string]bool
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id}/restore [post]
+func (h *BatchHandler) Restore(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	if err := h.batchService.Restore(r.Context(), id); err != nil {
+		h.logger.Error("erro ao restaurar lote",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, map[string]bool{"restored": true})
+}
+
+// Delete godoc
+// @Summary Deleta permanentemente um lote
+// @Description Remove permanentemente um lote do sistema
+// @Tags batches
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Success 200 {object} map[string]bool
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id} [delete]
+func (h *BatchHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	if err := h.batchService.Delete(r.Context(), id); err != nil {
+		h.logger.Error("erro ao deletar lote",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, map[string]bool{"deleted": true})
 }

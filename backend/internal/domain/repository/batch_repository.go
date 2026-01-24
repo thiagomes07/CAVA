@@ -56,4 +56,13 @@ type BatchRepository interface {
 
 	// ExistsByCode verifica se o código de lote já existe na indústria
 	ExistsByCode(ctx context.Context, industryID, code string) (bool, error)
+
+	// Archive arquiva um lote (soft delete)
+	Archive(ctx context.Context, id string) error
+
+	// Restore restaura um lote arquivado
+	Restore(ctx context.Context, id string) error
+
+	// Delete remove permanentemente um lote
+	Delete(ctx context.Context, id string) error
 }

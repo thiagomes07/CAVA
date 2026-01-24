@@ -43,4 +43,13 @@ type BatchService interface {
 
 	// RemoveMedia remove mídia do lote
 	RemoveMedia(ctx context.Context, batchID, mediaID string) error
+
+	// Archive arquiva um lote (soft delete)
+	Archive(ctx context.Context, id string) error
+
+	// Restore restaura um lote arquivado
+	Restore(ctx context.Context, id string) error
+
+	// Delete remove permanentemente um lote
+	Delete(ctx context.Context, id string) error
 }

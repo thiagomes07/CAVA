@@ -3,11 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Plus, Search, Edit2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Search, Edit2, ArrowUpDown, ArrowUp, ArrowDown, Archive, RotateCcw, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
+import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
@@ -49,8 +50,12 @@ export default function InventoryPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
+  const [showArchived, setShowArchived] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [batchToDelete, setBatchToDelete] = useState<Batch | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  const [filters, setFilters] = useState<BatchFilter & { availability?: string; sortBy?: string; sortDir?: string }>({
+  const [filters, setFilters] = useState<BatchFilter & { availability?: string; sortBy?: string; sortDir?: string; onlyArchived?: boolean }>({
     productId: searchParams.get('productId') || '',
     status: (searchParams.get('status') as BatchStatus) || '',
     code: searchParams.get('code') || '',
@@ -154,8 +159,54 @@ export default function InventoryPage() {
       sortDir: 'desc',
       page: 1,
       limit: 50,
+      onlyArchived: false,
     });
+    setShowArchived(false);
     router.push('/inventory');
+  };
+
+  const handleToggleArchived = () => {
+    const newShowArchived = !showArchived;
+    setShowArchived(newShowArchived);
+    setFilters({ ...filters, onlyArchived: newShowArchived, page: 1 });
+  };
+
+  const handleArchive = async (batchId: string) => {
+    try {
+      await apiClient.post(`/batches/${batchId}/archive`);
+      fetchBatches();
+    } catch (err) {
+      error(t('archiveError'));
+    }
+  };
+
+  const handleRestore = async (batchId: string) => {
+    try {
+      await apiClient.post(`/batches/${batchId}/restore`);
+      fetchBatches();
+    } catch (err) {
+      error(t('restoreError'));
+    }
+  };
+
+  const openDeleteModal = (batch: Batch) => {
+    setBatchToDelete(batch);
+    setDeleteModalOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!batchToDelete) return;
+    try {
+      setIsDeleting(true);
+      await apiClient.delete(`/batches/${batchToDelete.id}`);
+      setDeleteModalOpen(false);
+      setBatchToDelete(null);
+      fetchBatches();
+    } catch (err) {
+      error(t('deleteError'));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const hasFilters = filters.productId || filters.status || filters.code || filters.availability || filters.sortBy;
@@ -174,15 +225,26 @@ export default function InventoryPage() {
               {t('subtitle')}
             </p>
           </div>
-          {canEdit && (
-            <Button
-              variant="primary"
-              onClick={() => router.push('/inventory/new')}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              {t('newBatch')}
-            </Button>
-          )}
+          <div className="flex items-center gap-3">
+            {canEdit && (
+              <Button
+                variant={showArchived ? 'primary' : 'secondary'}
+                onClick={handleToggleArchived}
+              >
+                <Archive className="w-4 h-4 mr-2" />
+                {showArchived ? t('showActive') : t('showArchived')}
+              </Button>
+            )}
+            {canEdit && !showArchived && (
+              <Button
+                variant="primary"
+                onClick={() => router.push('/inventory/new')}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {t('newBatch')}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -425,6 +487,30 @@ export default function InventoryPage() {
                             >
                               <Edit2 className="w-4 h-4 text-slate-600" />
                             </button>
+                            {batch.isActive ? (
+                              <button
+                                onClick={() => handleArchive(batch.id)}
+                                className="p-2 hover:bg-amber-50 rounded-sm transition-colors"
+                                title={t('archive')}
+                              >
+                                <Archive className="w-4 h-4 text-amber-600" />
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleRestore(batch.id)}
+                                className="p-2 hover:bg-emerald-50 rounded-sm transition-colors"
+                                title={t('restore')}
+                              >
+                                <RotateCcw className="w-4 h-4 text-emerald-600" />
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openDeleteModal(batch)}
+                              className="p-2 hover:bg-rose-50 rounded-sm transition-colors"
+                              title={t('delete')}
+                            >
+                              <Trash2 className="w-4 h-4 text-rose-600" />
+                            </button>
                           </div>
                         </TableCell>
                       )}
@@ -444,6 +530,40 @@ export default function InventoryPage() {
           </>
         )}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <Modal open={deleteModalOpen} onClose={() => setDeleteModalOpen(false)}>
+        <ModalHeader>
+          <ModalTitle>{t('deleteConfirmTitle')}</ModalTitle>
+        </ModalHeader>
+        <ModalContent>
+          <p className="text-slate-600">
+            {t('deleteConfirmMessage')}{' '}
+            {batchToDelete && (
+              <strong className="font-mono">&quot;{batchToDelete.batchCode}&quot;</strong>
+            )}
+          </p>
+          <p className="text-rose-600 text-sm mt-4">
+            {t('deleteConfirmWarning')}
+          </p>
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => setDeleteModalOpen(false)}
+            disabled={isDeleting}
+          >
+            {t('cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={handleDelete}
+            loading={isDeleting}
+          >
+            {t('delete').toUpperCase()}
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

@@ -628,3 +628,60 @@ func (s *batchService) RemoveMedia(ctx context.Context, batchID, mediaID string)
 
 	return nil
 }
+
+func (s *batchService) Archive(ctx context.Context, id string) error {
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if !batch.IsActive {
+		return domainErrors.ValidationError("Lote já está arquivado")
+	}
+
+	if err := s.batchRepo.Archive(ctx, id); err != nil {
+		s.logger.Error("erro ao arquivar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote arquivado", zap.String("batchId", id))
+	return nil
+}
+
+func (s *batchService) Restore(ctx context.Context, id string) error {
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if batch.IsActive {
+		return domainErrors.ValidationError("Lote não está arquivado")
+	}
+
+	if err := s.batchRepo.Restore(ctx, id); err != nil {
+		s.logger.Error("erro ao restaurar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote restaurado", zap.String("batchId", id))
+	return nil
+}
+
+func (s *batchService) Delete(ctx context.Context, id string) error {
+	if err := s.batchRepo.Delete(ctx, id); err != nil {
+		s.logger.Error("erro ao deletar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote deletado permanentemente", zap.String("batchId", id))
+	return nil
+}
