@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -370,6 +370,7 @@ func initServices(
 		repos.SalesLink,
 		repos.Batch,
 		repos.Product,
+		repos.User,
 		cfg.App.PublicLinkBaseURL,
 		logger,
 	)

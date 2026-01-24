@@ -80,11 +80,12 @@ type UpdateSalesLinkInput struct {
 
 // SalesLinkFilters representa os filtros para busca de links
 type SalesLinkFilters struct {
-	Type   *LinkType `json:"type,omitempty"`
-	Status *string   `json:"status,omitempty"` // ATIVO, EXPIRADO
-	Search *string   `json:"search,omitempty"` // Busca por title ou slug
-	Page   int       `json:"page" validate:"min=1"`
-	Limit  int       `json:"limit" validate:"min=1,max=100"`
+	CreatedByUserID *string   `json:"createdByUserId,omitempty"`
+	Type            *LinkType `json:"type,omitempty"`
+	Status          *string   `json:"status,omitempty"` // ATIVO, EXPIRADO
+	Search          *string   `json:"search,omitempty"` // Busca por title ou slug
+	Page            int       `json:"page" validate:"min=1"`
+	Limit           int       `json:"limit" validate:"min=1,max=100"`
 }
 
 // SalesLinkListResponse representa a resposta de listagem de links

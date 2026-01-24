@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Plus, Search, Copy, Edit2, Archive, Eye, Users, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,10 +21,10 @@ import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import type { SalesLink, LinkType } from '@/lib/types';
 import type { LinkFilter } from '@/lib/schemas/link.schema';
-import { linkTypes } from '@/lib/schemas/link.schema';
 import { cn } from '@/lib/utils/cn';
 
 export default function LinksManagementPage() {
+  const locale = useLocale();
   const router = useRouter();
   const { success, error } = useToast();
   const t = useTranslations('links');
@@ -70,7 +70,7 @@ export default function LinksManagementPage() {
 
   const handleCopyLink = async (link: SalesLink) => {
     try {
-      const fullUrl = `${window.location.origin}/${link.slugToken}`;
+      const fullUrl = `${window.location.origin}/${locale}/${link.slugToken}`;
       await navigator.clipboard.writeText(fullUrl);
       success(t('linkCopied'));
     } catch (err) {
@@ -141,7 +141,7 @@ export default function LinksManagementPage() {
           </div>
           <Button
             variant="primary"
-            onClick={() => router.push('/links/new')}
+            onClick={() => router.push(`/${locale}/links/new`)}
           >
             <Plus className="w-4 h-4 mr-2" />
             {t('newLink')}
@@ -224,7 +224,7 @@ export default function LinksManagementPage() {
                 : t('emptyDescription')
             }
             actionLabel={hasFilters ? tCommon('clearFilters') : t('newLink')}
-            onAction={hasFilters ? handleClearFilters : () => router.push('/links/new')}
+            onAction={hasFilters ? handleClearFilters : () => router.push(`/${locale}/links/new`)}
           />
         ) : (
           <>
@@ -239,6 +239,7 @@ export default function LinksManagementPage() {
                     <TableHead>{t('views')}</TableHead>
                     <TableHead>{t('clientes')}</TableHead>
                     <TableHead>{t('status')}</TableHead>
+                    <TableHead>{t('createdBy')}</TableHead>
                     <TableHead>{t('createdAt')}</TableHead>
                     <TableHead>{t('actions')}</TableHead>
                   </TableRow>
@@ -267,7 +268,7 @@ export default function LinksManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p 
+                            <p
                               className="font-medium text-obsidian mb-1"
                               title={link.title || link.batch?.product?.name || link.product?.name || t('untitledLink')}
                             >
@@ -277,11 +278,11 @@ export default function LinksManagementPage() {
                               )}
                             </p>
                             <button
-                              onClick={() => window.open(`/${link.slugToken}`, '_blank')}
+                              onClick={() => window.open(`/${locale}/${link.slugToken}`, '_blank')}
                               className="text-xs text-blue-600 hover:underline font-mono"
-                              title={`/${link.slugToken}`}
+                              title={`/${locale}/${link.slugToken}`}
                             >
-                              /{truncateText(link.slugToken, TRUNCATION_LIMITS.SLUG)}
+                              /{locale}/{truncateText(link.slugToken, TRUNCATION_LIMITS.SLUG)}
                             </button>
                           </div>
                         </TableCell>
@@ -308,7 +309,7 @@ export default function LinksManagementPage() {
                         </TableCell>
                         <TableCell>
                           <button
-                            onClick={() => router.push(`/clientes?linkId=${link.id}`)}
+                            onClick={() => router.push(`/${locale}/clientes?linkId=${link.id}`)}
                             className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
                           >
                             <Users className="w-4 h-4" />
@@ -319,12 +320,24 @@ export default function LinksManagementPage() {
                           <Badge variant={status.variant}>{status.label}</Badge>
                         </TableCell>
                         <TableCell>
+                          <span className="text-sm text-slate-600">
+                            {link.createdBy?.name || '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
                           <span className="text-sm text-slate-500">
                             {formatDate(link.createdAt)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => window.open(`/${locale}/${link.slugToken}`, '_blank')}
+                              className="p-2 hover:bg-blue-50 rounded-sm transition-colors"
+                              title="Preview"
+                            >
+                              <ExternalLink className="w-4 h-4 text-blue-600" />
+                            </button>
                             <button
                               onClick={() => handleCopyLink(link)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
@@ -333,7 +346,7 @@ export default function LinksManagementPage() {
                               <Copy className="w-4 h-4 text-slate-600" />
                             </button>
                             <button
-                              onClick={() => router.push(`/links/${link.id}`)}
+                              onClick={() => router.push(`/${locale}/links/${link.id}/edit`)}
                               className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
                               title={t('edit')}
                             >
@@ -413,7 +426,7 @@ export default function LinksManagementPage() {
                 </p>
                 <div className="flex items-center gap-2">
                   <Input
-                    value={`${window.location.origin}/${selectedLink.slugToken}`}
+                    value={`${window.location.origin}/${locale}/${selectedLink.slugToken}`}
                     readOnly
                     className="flex-1 font-mono text-sm"
                   />

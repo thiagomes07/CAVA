@@ -19,6 +19,7 @@ type salesLinkService struct {
 	linkRepo    repository.SalesLinkRepository
 	batchRepo   repository.BatchRepository
 	productRepo repository.ProductRepository
+	userRepo    repository.UserRepository
 	baseURL     string
 	logger      *zap.Logger
 }
@@ -27,6 +28,7 @@ func NewSalesLinkService(
 	linkRepo repository.SalesLinkRepository,
 	batchRepo repository.BatchRepository,
 	productRepo repository.ProductRepository,
+	userRepo repository.UserRepository,
 	baseURL string,
 	logger *zap.Logger,
 ) *salesLinkService {
@@ -34,6 +36,7 @@ func NewSalesLinkService(
 		linkRepo:    linkRepo,
 		batchRepo:   batchRepo,
 		productRepo: productRepo,
+		userRepo:    userRepo,
 		baseURL:     baseURL,
 		logger:      logger,
 	}
@@ -308,7 +311,7 @@ func (s *salesLinkService) IncrementViews(ctx context.Context, id string) error 
 }
 
 func (s *salesLinkService) GenerateFullURL(slug string) string {
-	return s.baseURL + "/" + slug
+	return s.baseURL + "/pt/" + slug
 }
 
 // validateSlugFormat valida o formato do slug
@@ -396,6 +399,18 @@ func (s *salesLinkService) populateLinkData(ctx context.Context, link *entity.Sa
 			return err
 		}
 		link.Product = product
+	}
+
+	if link.CreatedByUserID != "" {
+		user, err := s.userRepo.FindByID(ctx, link.CreatedByUserID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar usuário criador do link",
+				zap.String("userId", link.CreatedByUserID),
+				zap.Error(err),
+			)
+		} else {
+			link.CreatedBy = user
+		}
 	}
 
 	return nil

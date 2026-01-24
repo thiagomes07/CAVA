@@ -24,10 +24,12 @@ import { QRCodeCanvas } from 'qrcode.react';
 import type { Batch, Product, LinkType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
+import { useLocale } from 'next-intl';
 
 type WizardStep = 'content' | 'pricing' | 'config';
 
 export default function CreateSalesLinkPage() {
+  const locale = useLocale();
   const router = useRouter();
   const { success, error } = useToast();
   const { user, isBroker } = useAuth();
@@ -203,12 +205,19 @@ export default function CreateSalesLinkPage() {
         }
       }
 
+      // Converter data para RFC3339 se fornecida
+      const payload = { ...data };
+      if (payload.expiresAt) {
+        const date = new Date(payload.expiresAt);
+        payload.expiresAt = date.toISOString();
+      }
+
       const response = await apiClient.post<{ id: string; fullUrl: string }>(
         '/sales-links',
-        data
+        payload
       );
 
-      const fullUrl = response.fullUrl || `${window.location.origin}/${data.slugToken}`;
+      const fullUrl = response.fullUrl || `${window.location.origin}/${locale}/${data.slugToken}`;
       setGeneratedLink(fullUrl);
       setShowSuccessModal(true);
 
@@ -670,7 +679,7 @@ export default function CreateSalesLinkPage() {
                   />
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-xs text-slate-500">
-                      Preview: {window.location.origin}/{slugToken}
+                      Preview: {typeof window !== 'undefined' ? `${window.location.origin}/${locale}/${slugToken || 'seu-link'}` : ''}
                     </p>
                     <button
                       type="button"
@@ -792,7 +801,7 @@ export default function CreateSalesLinkPage() {
           </Button>
           <Button
             variant="primary"
-            onClick={() => router.push('/links')}
+            onClick={() => router.push(`/${locale}/links`)}
           >
             Ver Meus Links
           </Button>

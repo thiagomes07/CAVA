@@ -35,7 +35,7 @@ func NewSalesLinkHandler(
 
 // List godoc
 // @Summary Lista links de venda
-// @Description Lista links de venda com filtros e paginação
+// @Description Lista links de venda com filtros e paginação. Cada usuário só vê seus próprios links.
 // @Tags sales-links
 // @Produce json
 // @Param type query string false "Filtrar por tipo"
@@ -46,10 +46,17 @@ func NewSalesLinkHandler(
 // @Success 200 {object} entity.SalesLinkListResponse
 // @Router /api/sales-links [get]
 func (h *SalesLinkHandler) List(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
 	// Extrair filtros da query string
 	filters := entity.SalesLinkFilters{
-		Page:  1,
-		Limit: 25,
+		CreatedByUserID: &userID,
+		Page:            1,
+		Limit:           25,
 	}
 
 	if linkType := r.URL.Query().Get("type"); linkType != "" {
