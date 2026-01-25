@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -15,21 +16,24 @@ import (
 
 // BatchHandler gerencia requisições de lotes
 type BatchHandler struct {
-	batchService service.BatchService
-	validator    *validator.Validator
-	logger       *zap.Logger
+	batchService         service.BatchService
+	sharedInventoryService service.SharedInventoryService
+	validator            *validator.Validator
+	logger               *zap.Logger
 }
 
 // NewBatchHandler cria uma nova instância de BatchHandler
 func NewBatchHandler(
 	batchService service.BatchService,
+	sharedInventoryService service.SharedInventoryService,
 	validator *validator.Validator,
 	logger *zap.Logger,
 ) *BatchHandler {
 	return &BatchHandler{
-		batchService: batchService,
-		validator:    validator,
-		logger:       logger,
+		batchService:         batchService,
+		sharedInventoryService: sharedInventoryService,
+		validator:            validator,
+		logger:               logger,
 	}
 }
 
@@ -47,6 +51,88 @@ func NewBatchHandler(
 // @Success 200 {object} entity.BatchListResponse
 // @Router /api/batches [get]
 func (h *BatchHandler) List(w http.ResponseWriter, r *http.Request) {
+	// Obter role do usuário
+	userRole := entity.UserRole(middleware.GetUserRole(r.Context()))
+	userID := middleware.GetUserID(r.Context())
+
+	// Se for BROKER ou VENDEDOR_INTERNO, retornar apenas lotes compartilhados
+	if userRole == entity.RoleBroker || userRole == entity.RoleVendedorInterno {
+		// Extrair filtros da query string para shared inventory
+		sharedFilters := entity.SharedInventoryFilters{}
+
+		if status := r.URL.Query().Get("status"); status != "" {
+			sharedFilters.Status = status
+		}
+
+		if limit := r.URL.Query().Get("limit"); limit != "" {
+			if l, err := strconv.Atoi(limit); err == nil && l > 0 && l <= 100 {
+				sharedFilters.Limit = l
+			}
+		}
+
+		// Buscar lotes compartilhados
+		sharedBatches, err := h.sharedInventoryService.GetUserInventory(r.Context(), userID, sharedFilters)
+		if err != nil {
+			h.logger.Error("erro ao listar lotes compartilhados",
+				zap.String("userId", userID),
+				zap.Error(err),
+			)
+			response.HandleError(w, err)
+			return
+		}
+
+		// Converter SharedInventoryBatch[] para Batch[]
+		batches := make([]entity.Batch, 0, len(sharedBatches))
+		for _, shared := range sharedBatches {
+			if shared.Batch != nil {
+				batches = append(batches, *shared.Batch)
+			}
+		}
+
+		// Aplicar filtros adicionais (código, produto, etc) se necessário
+		if code := r.URL.Query().Get("code"); code != "" {
+			filtered := make([]entity.Batch, 0)
+			codeLower := strings.ToLower(code)
+			for _, batch := range batches {
+				if strings.Contains(strings.ToLower(batch.BatchCode), codeLower) {
+					filtered = append(filtered, batch)
+				}
+			}
+			batches = filtered
+		}
+
+		if productID := r.URL.Query().Get("productId"); productID != "" {
+			filtered := make([]entity.Batch, 0)
+			for _, batch := range batches {
+				if batch.ProductID == productID {
+					filtered = append(filtered, batch)
+				}
+			}
+			batches = filtered
+		}
+
+		// Aplicar filtro de disponibilidade
+		if onlyWithAvailable := r.URL.Query().Get("onlyWithAvailable"); onlyWithAvailable == "true" {
+			filtered := make([]entity.Batch, 0)
+			for _, batch := range batches {
+				if batch.AvailableSlabs > 0 {
+					filtered = append(filtered, batch)
+				}
+			}
+			batches = filtered
+		}
+
+		result := &entity.BatchListResponse{
+			Batches: batches,
+			Total:   len(batches),
+			Page:    1,
+		}
+
+		response.OK(w, result)
+		return
+	}
+
+	// Para ADMIN_INDUSTRIA, usar lógica normal
 	// Obter industryID do contexto
 	industryID := middleware.GetIndustryID(r.Context())
 	if industryID == "" {
@@ -149,6 +235,30 @@ func (h *BatchHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 	if id == "" {
 		response.BadRequest(w, "ID do lote é obrigatório", nil)
 		return
+	}
+
+	// Obter role do usuário
+	userRole := entity.UserRole(middleware.GetUserRole(r.Context()))
+	userID := middleware.GetUserID(r.Context())
+
+	// Se for BROKER ou VENDEDOR_INTERNO, verificar se o lote foi compartilhado
+	if userRole == entity.RoleBroker || userRole == entity.RoleVendedorInterno {
+		// Verificar se o lote está compartilhado com este usuário
+		exists, err := h.sharedInventoryService.ExistsForUser(r.Context(), id, userID)
+		if err != nil {
+			h.logger.Error("erro ao verificar compartilhamento",
+				zap.String("batchId", id),
+				zap.String("userId", userID),
+				zap.Error(err),
+			)
+			response.HandleError(w, err)
+			return
+		}
+
+		if !exists {
+			response.Forbidden(w, "Você não tem acesso a este lote")
+			return
+		}
 	}
 
 	batch, err := h.batchService.GetByID(r.Context(), id)

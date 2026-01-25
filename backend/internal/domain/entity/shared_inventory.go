@@ -4,24 +4,24 @@ import (
 	"time"
 )
 
-// SharedInventoryBatch representa um lote compartilhado com um broker
+// SharedInventoryBatch representa um lote compartilhado com um broker ou vendedor interno
 type SharedInventoryBatch struct {
 	ID                  string    `json:"id"`
 	BatchID             string    `json:"batchId"`
-	BrokerUserID        string    `json:"brokerUserId"`
+	SharedWithUserID    string    `json:"sharedWithUserId"` // Broker ou Vendedor Interno
 	IndustryOwnerID     string    `json:"industryOwnerId"`
 	NegotiatedPrice     *float64  `json:"negotiatedPrice,omitempty"`
 	NegotiatedPriceUnit PriceUnit `json:"negotiatedPriceUnit"` // Unidade do preço negociado
 	SharedAt            time.Time `json:"sharedAt"`
 	IsActive            bool      `json:"isActive"`
 	Batch               *Batch    `json:"batch,omitempty"`  // Populated quando necessário
-	Broker              *User     `json:"broker,omitempty"` // Populated quando necessário
+	SharedWith          *User     `json:"sharedWith,omitempty"` // Populated quando necessário (broker ou vendedor)
 }
 
 // CreateSharedInventoryInput representa os dados para compartilhar um lote
 type CreateSharedInventoryInput struct {
 	BatchID             string    `json:"batchId" validate:"required,uuid"`
-	BrokerUserID        string    `json:"brokerUserId" validate:"required,uuid"`
+	SharedWithUserID    string    `json:"sharedWithUserId" validate:"required,uuid"` // Broker ou Vendedor Interno
 	NegotiatedPrice     *float64  `json:"negotiatedPrice,omitempty" validate:"omitempty,gt=0"`
 	NegotiatedPriceUnit PriceUnit `json:"negotiatedPriceUnit,omitempty" validate:"omitempty,oneof=M2 FT2"`
 }
@@ -36,7 +36,7 @@ type UpdateNegotiatedPriceInput struct {
 type SharedCatalogPermission struct {
 	ID            string    `json:"id"`
 	IndustryID    string    `json:"industryId"`
-	BrokerUserID  string    `json:"brokerUserId"`
+	SharedWithUserID string `json:"sharedWithUserId"` // Broker ou Vendedor Interno
 	CanShowPrices bool      `json:"canShowPrices"`
 	GrantedAt     time.Time `json:"grantedAt"`
 	IsActive      bool      `json:"isActive"`
@@ -44,8 +44,8 @@ type SharedCatalogPermission struct {
 
 // CreateSharedCatalogInput representa os dados para compartilhar o catálogo
 type CreateSharedCatalogInput struct {
-	BrokerUserID  string `json:"brokerUserId" validate:"required,uuid"`
-	CanShowPrices bool   `json:"canShowPrices"`
+	SharedWithUserID string `json:"sharedWithUserId" validate:"required,uuid"` // Broker ou Vendedor Interno
+	CanShowPrices    bool   `json:"canShowPrices"`
 }
 
 // SharedInventoryFilters representa os filtros para inventário compartilhado

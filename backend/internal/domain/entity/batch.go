@@ -114,6 +114,7 @@ type Batch struct {
 	EntryDate      time.Time   `json:"entryDate"`
 	Status         BatchStatus `json:"status"`
 	IsActive       bool        `json:"isActive"`
+	IsPublic       bool        `json:"isPublic"` // visível na página pública do depósito
 	Medias         []Media     `json:"medias,omitempty"`
 	Product        *Product    `json:"product,omitempty"` // Populated quando necessário
 	CreatedAt      time.Time   `json:"createdAt"`
@@ -199,6 +200,7 @@ type UpdateBatchInput struct {
 	IndustryPrice *float64   `json:"industryPrice,omitempty" validate:"omitempty,gt=0"`
 	PriceUnit     *PriceUnit `json:"priceUnit,omitempty" validate:"omitempty,oneof=M2 FT2"`
 	OriginQuarry  *string    `json:"originQuarry,omitempty" validate:"omitempty,max=100"`
+	IsPublic      *bool      `json:"isPublic,omitempty"`
 }
 
 // UpdateBatchStatusInput representa os dados para atualizar o status de um lote

@@ -13,6 +13,11 @@ type Industry struct {
 	ContactEmail string    `json:"contactEmail"`
 	ContactPhone *string   `json:"contactPhone,omitempty"`
 	PolicyTerms  *string   `json:"policyTerms,omitempty"`
+	City         *string   `json:"city,omitempty"`
+	State        *string   `json:"state,omitempty"`
+	BannerURL    *string   `json:"bannerUrl,omitempty"`
+	LogoURL      *string   `json:"logoUrl,omitempty"`
+	IsPublic     bool      `json:"isPublic"`
 	CreatedAt    time.Time `json:"createdAt"`
 	UpdatedAt    time.Time `json:"updatedAt"`
 }
@@ -33,4 +38,26 @@ type UpdateIndustryInput struct {
 	ContactEmail *string `json:"contactEmail,omitempty" validate:"omitempty,email"`
 	ContactPhone *string `json:"contactPhone,omitempty" validate:"omitempty,min=10,max=11"`
 	PolicyTerms  *string `json:"policyTerms,omitempty" validate:"omitempty,max=5000"`
+	City         *string `json:"city,omitempty" validate:"omitempty,max=100"`
+	State        *string `json:"state,omitempty" validate:"omitempty,len=2"`
+	BannerURL    *string `json:"bannerUrl,omitempty" validate:"omitempty,url,max=500"`
+	LogoURL      *string `json:"logoUrl,omitempty" validate:"omitempty,url,max=500"`
+	IsPublic     *bool   `json:"isPublic,omitempty"`
+}
+
+// PublicDeposit representa dados sanitizados de um depósito para exibição pública
+type PublicDeposit struct {
+	Name      string  `json:"name"`
+	Slug      string  `json:"slug"`
+	City      *string `json:"city,omitempty"`
+	State     *string `json:"state,omitempty"`
+	BannerURL *string `json:"bannerUrl,omitempty"`
+	LogoURL   *string `json:"logoUrl,omitempty"`
+	Preview   []Media `json:"preview"` // até 4 fotos de lotes públicos
+}
+
+// PublicDepositListResponse representa a resposta de listagem de depósitos públicos
+type PublicDepositListResponse struct {
+	Deposits []PublicDeposit `json:"deposits"`
+	Total    int             `json:"total"`
 }

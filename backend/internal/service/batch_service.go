@@ -148,6 +148,7 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		EntryDate:      entryDate,
 		Status:         entity.BatchStatusDisponivel,
 		IsActive:       true,
+		IsPublic:       false, // Por padrão, lotes não são públicos
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}
@@ -340,6 +341,10 @@ func (s *batchService) Update(ctx context.Context, id string, input entity.Updat
 
 	if input.OriginQuarry != nil {
 		batch.OriginQuarry = input.OriginQuarry
+	}
+
+	if input.IsPublic != nil {
+		batch.IsPublic = *input.IsPublic
 	}
 
 	// Recalcular área se dimensões mudaram

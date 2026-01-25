@@ -139,13 +139,22 @@ export default function LinksManagementPage() {
               {t('subtitle')}
             </p>
           </div>
-          <Button
-            variant="primary"
-            onClick={() => router.push(`/${locale}/links/new`)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t('newLink')}
-          </Button>
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => router.push(`/${locale}/catalogos/new`)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Novo Catálogo
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => router.push(`/${locale}/links/new`)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t('newLink')}
+            </Button>
+          </div>
         </div>
       </div>
 

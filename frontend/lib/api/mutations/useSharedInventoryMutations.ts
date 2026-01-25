@@ -4,7 +4,7 @@ import { sharedInventoryKeys } from '@/lib/api/queries/useSharedInventory';
 
 interface ShareBatchInput {
   batchId: string;
-  brokerUserId: string;
+  sharedWithUserId: string; // Broker ou Vendedor Interno
   negotiatedPrice?: number;
 }
 

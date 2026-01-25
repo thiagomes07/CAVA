@@ -123,6 +123,8 @@ type PublicBatch struct {
 	ProductName  string   `json:"productName,omitempty"`
 	Material     string   `json:"material,omitempty"`
 	Finish       string   `json:"finish,omitempty"`
+	IndustryID   string   `json:"industryId,omitempty"`
+	IndustryName string   `json:"industryName,omitempty"`
 }
 
 // PublicProduct representa dados seguros de um produto para exibição pública

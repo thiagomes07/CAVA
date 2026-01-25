@@ -65,4 +65,7 @@ type BatchRepository interface {
 
 	// Delete remove permanentemente um lote
 	Delete(ctx context.Context, id string) error
+
+	// FindPublicBatchesByIndustrySlug busca lotes públicos de um depósito por slug
+	FindPublicBatchesByIndustrySlug(ctx context.Context, slug string) ([]entity.PublicBatch, error)
 }

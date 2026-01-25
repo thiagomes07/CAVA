@@ -9,7 +9,7 @@ import { routing, locales, defaultLocale, type Locale } from '@/i18n/routing';
 const authRoutes = ['/login'];
 
 // Prefixos de rotas públicas
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy'];
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo'];
 
 // Prefixos reservados (rotas internas) derivados do mapa de permissões
 const reservedPrefixes = Array.from(
@@ -72,13 +72,16 @@ function isPublicRoute(pathname: string): boolean {
   if (isAuthRoute(pathname)) return true;
   if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
 
-  // Rotas públicas de landing page: /[slug]
+  // Rotas públicas de landing page: /[slug] ou /catalogo/[slug]
   const segments = pathname.split('/').filter(Boolean);
   if (segments.length === 1) {
     const top = `/${segments[0]}`;
     const isReserved = [...reservedPrefixes, '/api'].some((p) => top === p || top.startsWith(`${p}/`));
     if (!isReserved) return true;
   }
+  
+  // Rotas de catálogo público: /catalogo/[slug]
+  if (pathname.startsWith('/catalogo/')) return true;
 
   return false;
 }

@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "CAVA Stone Platform",
+    "appName": "CAVA",
     "loading": "Loading...",
     "save": "Save",
     "cancel": "Cancel",
@@ -41,10 +41,10 @@
     "price": "Price",
     "total": "Total",
     "quantity": "Quantity",
-    "poweredBy": "Powered by CAVA Stone Platform"
+    "poweredBy": "Powered by CAVA"
   },
   "metadata": {
-    "title": "CAVA Stone Platform",
+    "title": "CAVA",
     "description": "Premium platform for ornamental stone management",
     "keywords": "ornamental stones, marble, granite, quartzite, luxury"
   },
@@ -95,6 +95,7 @@
     "sharedInventory": "Shared Inventory",
     "sales": "Sales",
     "links": "Links",
+    "catalogos": "Catalogs",
     "clientes": "Clientes",
     "brokers": "Partners",
     "team": "Team",

@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"github.com/thiagomes07/CAVA/backend/pkg/validator"
@@ -17,6 +18,8 @@ import (
 type PublicHandler struct {
 	salesLinkService service.SalesLinkService
 	clienteService   service.ClienteService
+	industryRepo     repository.IndustryRepository
+	batchRepo        repository.BatchRepository
 	validator        *validator.Validator
 	logger           *zap.Logger
 }
@@ -25,12 +28,16 @@ type PublicHandler struct {
 func NewPublicHandler(
 	salesLinkService service.SalesLinkService,
 	clienteService service.ClienteService,
+	industryRepo repository.IndustryRepository,
+	batchRepo repository.BatchRepository,
 	validator *validator.Validator,
 	logger *zap.Logger,
 ) *PublicHandler {
 	return &PublicHandler{
 		salesLinkService: salesLinkService,
 		clienteService:   clienteService,
+		industryRepo:     industryRepo,
+		batchRepo:        batchRepo,
 		validator:        validator,
 		logger:           logger,
 	}
@@ -126,4 +133,90 @@ func (h *PublicHandler) CaptureClienteInterest(w http.ResponseWriter, r *http.Re
 	)
 
 	response.Created(w, entity.CreateClienteResponse{Success: true})
+}
+
+// ListPublicDeposits godoc
+// @Summary Lista depósitos públicos
+// @Description Retorna lista de depósitos públicos com preview de fotos
+// @Tags public
+// @Produce json
+// @Param search query string false "Busca por nome, cidade ou estado"
+// @Success 200 {object} entity.PublicDepositListResponse
+// @Router /api/public/deposits [get]
+func (h *PublicHandler) ListPublicDeposits(w http.ResponseWriter, r *http.Request) {
+	search := r.URL.Query().Get("search")
+	var searchPtr *string
+	if search != "" {
+		searchPtr = &search
+	}
+
+	deposits, err := h.industryRepo.FindPublicDeposits(r.Context(), searchPtr)
+	if err != nil {
+		h.logger.Error("erro ao buscar depósitos públicos", zap.Error(err))
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, entity.PublicDepositListResponse{
+		Deposits: deposits,
+		Total:    len(deposits),
+	})
+}
+
+// GetPublicDepositBySlug godoc
+// @Summary Busca depósito público por slug
+// @Description Retorna dados de um depósito público
+// @Tags public
+// @Produce json
+// @Param slug path string true "Slug do depósito"
+// @Success 200 {object} entity.PublicDeposit
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/public/deposits/{slug} [get]
+func (h *PublicHandler) GetPublicDepositBySlug(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.BadRequest(w, "Slug é obrigatório", nil)
+		return
+	}
+
+	deposit, err := h.industryRepo.FindPublicDepositBySlug(r.Context(), slug)
+	if err != nil {
+		h.logger.Warn("depósito não encontrado",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, deposit)
+}
+
+// GetPublicDepositBatches godoc
+// @Summary Lista lotes públicos de um depósito
+// @Description Retorna lotes públicos de um depósito por slug
+// @Tags public
+// @Produce json
+// @Param slug path string true "Slug do depósito"
+// @Success 200 {array} entity.PublicBatch
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/public/deposits/{slug}/batches [get]
+func (h *PublicHandler) GetPublicDepositBatches(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	if slug == "" {
+		response.BadRequest(w, "Slug é obrigatório", nil)
+		return
+	}
+
+	batches, err := h.batchRepo.FindPublicBatchesByIndustrySlug(r.Context(), slug)
+	if err != nil {
+		h.logger.Error("erro ao buscar lotes públicos",
+			zap.String("slug", slug),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, batches)
 }

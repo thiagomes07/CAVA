@@ -159,7 +159,6 @@ export default function PublicLinkPage() {
           <div>
             <h1 className="font-serif text-xl tracking-wider">CAVA</h1>
           </div>
-          <p className="text-xs text-slate-400 tracking-widest uppercase hidden sm:block">Premium Stones</p>
         </div>
       </header>
 

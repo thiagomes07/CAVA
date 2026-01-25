@@ -82,7 +82,7 @@ export default function NotFound() {
         <div className="mt-16 pt-8 border-t border-slate-200">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="w-6 h-6 bg-obsidian rounded-sm" />
-            <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
+            <span className="font-serif text-sm text-slate-400">CAVA</span>
           </div>
           <p className="text-xs text-slate-400">
             {t.platform}

@@ -160,7 +160,7 @@ func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]
 			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
 		FROM users u
 		LEFT JOIN shared_inventory_batches sib 
-			ON u.id = sib.broker_user_id 
+			ON u.id = sib.shared_with_user_id 
 			AND sib.industry_owner_id = $1
 			AND sib.is_active = TRUE
 		WHERE u.role = 'BROKER'

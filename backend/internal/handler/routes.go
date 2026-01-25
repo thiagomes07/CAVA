@@ -23,11 +23,13 @@ type Handler struct {
 	Reservation     *ReservationHandler
 	Dashboard       *DashboardHandler
 	SalesLink       *SalesLinkHandler
+	CatalogLink     *CatalogLinkHandler
 	Cliente         *ClienteHandler
 	SalesHistory    *SalesHistoryHandler
 	SharedInventory *SharedInventoryHandler
 	Upload          *UploadHandler
 	Public          *PublicHandler
+	Industry        *IndustryHandler
 	Health          *HealthHandler
 }
 
@@ -52,11 +54,14 @@ type Services struct {
 	Reservation     service.ReservationService
 	Dashboard       service.DashboardService
 	SalesLink       service.SalesLinkService
+	CatalogLink     service.CatalogLinkService
 	Cliente         service.ClienteService
 	SalesHistory    service.SalesHistoryService
 	SharedInventory service.SharedInventoryService
 	Storage         service.StorageService
 	MediaRepo       repository.MediaRepository
+	IndustryRepo    repository.IndustryRepository
+	BatchRepo       repository.BatchRepository
 }
 
 // NewHandler cria uma nova instância de Handler com todos os handlers
@@ -65,15 +70,17 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Auth:            NewAuthHandler(services.Auth, services.User, cfg.Validator, cfg.Logger, cfg.CookieDomain, cfg.CookieSecure, cfg.AccessTokenTTL, cfg.RefreshTokenTTL),
 		User:            NewUserHandler(services.User, cfg.Validator, cfg.Logger),
 		Product:         NewProductHandler(services.Product, cfg.Validator, cfg.Logger),
-		Batch:           NewBatchHandler(services.Batch, cfg.Validator, cfg.Logger),
+		Batch:           NewBatchHandler(services.Batch, services.SharedInventory, cfg.Validator, cfg.Logger),
 		Reservation:     NewReservationHandler(services.Reservation, cfg.Validator, cfg.Logger),
 		Dashboard:       NewDashboardHandler(services.Dashboard, cfg.Logger),
 		SalesLink:       NewSalesLinkHandler(services.SalesLink, cfg.Validator, cfg.Logger),
+		CatalogLink:     NewCatalogLinkHandler(services.CatalogLink, cfg.Validator, cfg.Logger),
 		Cliente:         NewClienteHandler(services.Cliente, cfg.Validator, cfg.Logger),
 		SalesHistory:    NewSalesHistoryHandler(services.SalesHistory, cfg.Validator, cfg.Logger),
 		SharedInventory: NewSharedInventoryHandler(services.SharedInventory, cfg.Validator, cfg.Logger),
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
-		Public:          NewPublicHandler(services.SalesLink, services.Cliente, cfg.Validator, cfg.Logger),
+		Public:          NewPublicHandler(services.SalesLink, services.Cliente, services.IndustryRepo, services.BatchRepo, cfg.Validator, cfg.Logger),
+		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -127,6 +134,9 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			// Captura de clientes
 			r.Post("/clientes/interest", h.Public.CaptureClienteInterest)
+
+			// Catálogo público
+			r.Get("/catalogo/{slug}", h.CatalogLink.GetPublicBySlug)
 		})
 
 		// ============================================
@@ -191,9 +201,10 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// BATCHES
 			// ----------------------------------------
 			r.Route("/batches", func(r chi.Router) {
-				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Batch.List)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/", h.Batch.List)
 				r.With(m.RBAC.RequireAdmin).Post("/", h.Batch.Create)
-				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Batch.GetByID)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}", h.Batch.GetByID)
+				r.With(m.RBAC.RequireAdmin).Get("/{batchId}/shared", h.SharedInventory.GetSharedBatchesByBatchID)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/status", h.Batch.CheckStatus)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/check-availability", h.Batch.CheckAvailability)
 				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.Batch.Update)
@@ -225,6 +236,14 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.User.UpdateStatus)
 				r.With(m.RBAC.RequireAdmin).Post("/{id}/resend-invite", h.User.ResendInvite)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/email", h.User.UpdateEmail)
+			})
+
+			// ----------------------------------------
+			// INDUSTRY (Depósito)
+			// ----------------------------------------
+			r.Route("/industry", func(r chi.Router) {
+				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Industry.GetMyIndustry)
+				r.With(m.RBAC.RequireAdmin).Patch("/", h.Industry.UpdateMyIndustry)
 			})
 
 			// ----------------------------------------
@@ -262,6 +281,18 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.SalesLink.GetByID)
 				r.With(m.RBAC.RequireAnyAuthenticated).Patch("/{id}", h.SalesLink.Update)
 				r.With(m.RBAC.RequireAnyAuthenticated).Delete("/{id}", h.SalesLink.Delete)
+			})
+
+			// ----------------------------------------
+			// CATALOG LINKS
+			// ----------------------------------------
+			r.Route("/catalog-links", func(r chi.Router) {
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/", h.CatalogLink.List)
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/validate-slug", h.CatalogLink.ValidateSlug)
+				r.With(m.RBAC.RequireAnyAuthenticated).Post("/", h.CatalogLink.Create)
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.CatalogLink.GetByID)
+				r.With(m.RBAC.RequireAnyAuthenticated).Patch("/{id}", h.CatalogLink.Update)
+				r.With(m.RBAC.RequireAnyAuthenticated).Delete("/{id}", h.CatalogLink.Delete)
 			})
 
 			// ----------------------------------------

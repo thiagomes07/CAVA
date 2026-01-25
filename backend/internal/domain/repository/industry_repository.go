@@ -30,4 +30,10 @@ type IndustryRepository interface {
 
 	// List lista todas as indústrias
 	List(ctx context.Context) ([]entity.Industry, error)
+
+	// FindPublicDeposits busca depósitos públicos com preview de fotos
+	FindPublicDeposits(ctx context.Context, search *string) ([]entity.PublicDeposit, error)
+
+	// FindPublicDepositBySlug busca um depósito público por slug
+	FindPublicDepositBySlug(ctx context.Context, slug string) (*entity.PublicDeposit, error)
 }

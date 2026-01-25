@@ -23,8 +23,8 @@ func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error
 		INSERT INTO batches (
 			id, product_id, industry_id, batch_code, height, width, thickness,
 			quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-			industry_price, price_unit, origin_quarry, entry_date, status
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+			industry_price, price_unit, origin_quarry, entry_date, status, is_public
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 		RETURNING created_at, updated_at, net_area
 	`
 
@@ -32,7 +32,7 @@ func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error
 		batch.ID, batch.ProductID, batch.IndustryID, batch.BatchCode,
 		batch.Height, batch.Width, batch.Thickness, batch.QuantitySlabs,
 		batch.AvailableSlabs, batch.ReservedSlabs, batch.SoldSlabs, batch.InactiveSlabs,
-		batch.IndustryPrice, batch.PriceUnit, batch.OriginQuarry, batch.EntryDate, batch.Status,
+		batch.IndustryPrice, batch.PriceUnit, batch.OriginQuarry, batch.EntryDate, batch.Status, batch.IsPublic,
 	).Scan(&batch.CreatedAt, &batch.UpdatedAt, &batch.TotalArea)
 
 	if err != nil {
@@ -52,7 +52,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE id = $1
 	`
@@ -63,7 +63,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 		&batch.Height, &batch.Width, &batch.Thickness, &batch.QuantitySlabs,
 		&batch.AvailableSlabs, &batch.ReservedSlabs, &batch.SoldSlabs, &batch.InactiveSlabs,
 		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit,
-		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive,
+		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive, &batch.IsPublic,
 		&batch.CreatedAt, &batch.UpdatedAt, &batch.DeletedAt,
 	)
 
@@ -82,7 +82,7 @@ func (r *batchRepository) FindByIDForUpdate(ctx context.Context, tx *sql.Tx, id 
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE id = $1
 		FOR UPDATE
@@ -94,7 +94,7 @@ func (r *batchRepository) FindByIDForUpdate(ctx context.Context, tx *sql.Tx, id 
 		&batch.Height, &batch.Width, &batch.Thickness, &batch.QuantitySlabs,
 		&batch.AvailableSlabs, &batch.ReservedSlabs, &batch.SoldSlabs, &batch.InactiveSlabs,
 		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit,
-		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive,
+		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive, &batch.IsPublic,
 		&batch.CreatedAt, &batch.UpdatedAt, &batch.DeletedAt,
 	)
 
@@ -113,7 +113,7 @@ func (r *batchRepository) FindByProductID(ctx context.Context, productID string)
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE product_id = $1 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY entry_date DESC
@@ -133,7 +133,7 @@ func (r *batchRepository) FindByStatus(ctx context.Context, industryID string, s
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY entry_date DESC
@@ -153,7 +153,7 @@ func (r *batchRepository) FindAvailable(ctx context.Context, industryID string) 
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND status = 'DISPONIVEL' AND is_active = TRUE AND available_slabs > 0 AND deleted_at IS NULL
 		ORDER BY entry_date DESC
@@ -173,7 +173,7 @@ func (r *batchRepository) FindByCode(ctx context.Context, industryID, code strin
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
 		       net_area, industry_price, price_unit, origin_quarry, 
-		       entry_date, status, is_active, created_at, updated_at, deleted_at
+		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND batch_code ILIKE $2 AND is_active = TRUE AND deleted_at IS NULL
 		ORDER BY batch_code
@@ -195,7 +195,7 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 	query := psql.Select(
 		"id", "product_id", "industry_id", "batch_code", "height", "width",
 		"thickness", "quantity_slabs", "available_slabs", "reserved_slabs", "sold_slabs", "inactive_slabs", "net_area", "industry_price", "price_unit",
-		"origin_quarry", "entry_date", "status", "is_active", "created_at", "updated_at", "deleted_at",
+		"origin_quarry", "entry_date", "status", "is_active", "is_public", "created_at", "updated_at", "deleted_at",
 	).From("batches").
 		Where(sq.Eq{"industry_id": industryID})
 
@@ -328,15 +328,15 @@ func (r *batchRepository) Update(ctx context.Context, batch *entity.Batch) error
 		UPDATE batches
 		SET batch_code = $1, height = $2, width = $3, thickness = $4,
 		    quantity_slabs = $5, available_slabs = $6, industry_price = $7, price_unit = $8,
-		    origin_quarry = $9, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $10
+		    origin_quarry = $9, is_public = $10, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $11
 		RETURNING updated_at, net_area
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		batch.BatchCode, batch.Height, batch.Width, batch.Thickness,
 		batch.QuantitySlabs, batch.AvailableSlabs, batch.IndustryPrice, batch.PriceUnit,
-		batch.OriginQuarry, batch.ID,
+		batch.OriginQuarry, batch.IsPublic, batch.ID,
 	).Scan(&batch.UpdatedAt, &batch.TotalArea)
 
 	if err == sql.ErrNoRows {
@@ -551,7 +551,7 @@ func (r *batchRepository) scanBatches(rows *sql.Rows) ([]entity.Batch, error) {
 			&b.ID, &b.ProductID, &b.IndustryID, &b.BatchCode,
 			&b.Height, &b.Width, &b.Thickness, &b.QuantitySlabs,
 			&b.AvailableSlabs, &b.ReservedSlabs, &b.SoldSlabs, &b.InactiveSlabs, &b.TotalArea, &b.IndustryPrice, &b.PriceUnit,
-			&b.OriginQuarry, &b.EntryDate, &b.Status, &b.IsActive,
+			&b.OriginQuarry, &b.EntryDate, &b.Status, &b.IsActive, &b.IsPublic,
 			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
@@ -631,4 +631,85 @@ func (r *batchRepository) Delete(ctx context.Context, id string) error {
 	}
 
 	return nil
+}
+
+func (r *batchRepository) FindPublicBatchesByIndustrySlug(ctx context.Context, slug string) ([]entity.PublicBatch, error) {
+	query := `
+		SELECT b.batch_code, b.height, b.width, b.thickness, b.net_area, b.origin_quarry,
+		       p.name, p.material, p.finish
+		FROM batches b
+		INNER JOIN industries i ON b.industry_id = i.id
+		LEFT JOIN products p ON b.product_id = p.id
+		WHERE i.slug = $1
+			AND b.is_public = TRUE
+			AND b.deleted_at IS NULL
+			AND b.is_active = TRUE
+		ORDER BY b.entry_date DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, slug)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	batches := []entity.PublicBatch{}
+	batchMap := make(map[string]*entity.PublicBatch)
+
+	for rows.Next() {
+		var pb entity.PublicBatch
+		var productName, material, finish sql.NullString
+
+		if err := rows.Scan(
+			&pb.BatchCode, &pb.Height, &pb.Width, &pb.Thickness, &pb.TotalArea, &pb.OriginQuarry,
+			&productName, &material, &finish,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+
+		if productName.Valid {
+			pb.ProductName = productName.String
+		}
+		if material.Valid {
+			pb.Material = material.String
+		}
+		if finish.Valid {
+			pb.Finish = finish.String
+		}
+
+		batches = append(batches, pb)
+		batchMap[pb.BatchCode] = &batches[len(batches)-1]
+	}
+
+	// Buscar mídias para cada lote
+	if len(batches) > 0 {
+		batchCodes := make([]string, 0, len(batches))
+		for _, b := range batches {
+			batchCodes = append(batchCodes, b.BatchCode)
+		}
+
+		mediaQuery := `
+			SELECT b.batch_code, bm.id, bm.url, bm.display_order
+			FROM batch_medias bm
+			INNER JOIN batches b ON bm.batch_id = b.id
+			WHERE b.batch_code = ANY($1::text[])
+			ORDER BY b.batch_code, bm.display_order, bm.created_at
+		`
+
+		mediaRows, err := r.db.QueryContext(ctx, mediaQuery, pq.Array(batchCodes))
+		if err == nil {
+			defer mediaRows.Close()
+			for mediaRows.Next() {
+				var batchCode string
+				var media entity.Media
+				if err := mediaRows.Scan(&batchCode, &media.ID, &media.URL, &media.DisplayOrder); err == nil {
+					if pb, ok := batchMap[batchCode]; ok {
+						pb.Medias = append(pb.Medias, media)
+					}
+				}
+			}
+		}
+	}
+
+	return batches, nil
 }

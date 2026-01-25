@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Package, Trash2, Archive, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, X, Package, Trash2, Archive, ArrowUp, ArrowDown, Share2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -16,10 +16,12 @@ import { useToast } from '@/lib/hooks/useToast';
 import { editBatchSchema, type EditBatchInput } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
 import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import { formatDate } from '@/lib/utils/formatDate';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Batch, Media, PriceUnit, BatchStatus } from '@/lib/types';
+import type { Batch, Media, PriceUnit, BatchStatus, User, SharedInventoryBatch } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
@@ -50,6 +52,12 @@ export default function EditBatchPage() {
   const [selectedStatus, setSelectedStatus] = useState<BatchStatus | null>(null);
   const [sourceStatus, setSourceStatus] = useState<BatchStatus>('DISPONIVEL');
   const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
+  const [sharedBatches, setSharedBatches] = useState<SharedInventoryBatch[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<User[]>([]);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
+  const [negotiatedPrice, setNegotiatedPrice] = useState<string>('');
+  const [isSharing, setIsSharing] = useState(false);
 
   const {
     register,
@@ -97,7 +105,63 @@ export default function EditBatchPage() {
 
   useEffect(() => {
     fetchBatch();
+    fetchSharedBatches();
+    fetchAvailableUsers();
   }, [batchId]);
+
+  const fetchSharedBatches = async () => {
+    if (!batchId) return;
+    try {
+      const data = await apiClient.get<SharedInventoryBatch[]>(`/batches/${batchId}/shared`);
+      setSharedBatches(data);
+    } catch (err) {
+      // Ignorar erro se endpoint não existir ainda
+    }
+  };
+
+  const fetchAvailableUsers = async () => {
+    try {
+      const [brokers, sellers] = await Promise.all([
+        apiClient.get<User[]>('/brokers'),
+        apiClient.get<User[]>('/users', { params: { role: 'VENDEDOR_INTERNO' } }),
+      ]);
+      setAvailableUsers([...brokers, ...sellers]);
+    } catch (err) {
+      // Ignorar erro
+    }
+  };
+
+  const handleShareBatch = async () => {
+    if (!selectedUserId || !batchId) return;
+    try {
+      setIsSharing(true);
+      await apiClient.post('/shared-inventory-batches', {
+        batchId,
+        sharedWithUserId: selectedUserId,
+        negotiatedPrice: negotiatedPrice ? parseFloat(negotiatedPrice) : undefined,
+      });
+      success('Lote compartilhado com sucesso');
+      setShowShareModal(false);
+      setSelectedUserId('');
+      setNegotiatedPrice('');
+      await fetchSharedBatches();
+      await fetchBatch();
+    } catch (err) {
+      error('Erro ao compartilhar lote');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const handleRemoveShare = async (shareId: string) => {
+    try {
+      await apiClient.delete(`/shared-inventory-batches/${shareId}`);
+      success('Compartilhamento removido');
+      await fetchSharedBatches();
+    } catch (err) {
+      error('Erro ao remover compartilhamento');
+    }
+  };
 
   useEffect(() => {
     if (height && width && quantitySlabs) {
@@ -686,7 +750,99 @@ export default function EditBatchPage() {
                 error={errors.originQuarry?.message}
                 disabled={isSubmitting}
               />
+
+              <div className="flex items-center justify-between p-4 bg-slate-50 rounded-sm">
+                <div>
+                  <p className="font-medium text-obsidian">Visível no catálogo público</p>
+                  <p className="text-sm text-slate-500">
+                    Este lote aparecerá na página pública do depósito
+                  </p>
+                </div>
+                  <input
+                  type="checkbox"
+                  defaultChecked={batch.isPublic || false}
+                  onChange={async (e) => {
+                    try {
+                      const updatePayload: any = {
+                        batchCode: batch.batchCode,
+                        height: batch.height,
+                        width: batch.width,
+                        thickness: batch.thickness,
+                        quantitySlabs: batch.quantitySlabs,
+                        industryPrice: batch.industryPrice,
+                        priceUnit: batch.priceUnit,
+                        originQuarry: batch.originQuarry,
+                        isPublic: e.target.checked,
+                      };
+                      await apiClient.put(`/batches/${batchId}`, updatePayload);
+                      await fetchBatch();
+                    } catch (err) {
+                      error('Erro ao atualizar visibilidade');
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="w-5 h-5 rounded border-slate-300"
+                />
+              </div>
             </div>
+          </Card>
+
+          {/* Compartilhamento */}
+          <Card>
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-lg font-semibold text-obsidian">
+                Compartilhamento
+              </h2>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setShowShareModal(true)}
+                disabled={isSubmitting}
+              >
+                <UserPlus className="w-4 h-4 mr-2" />
+                Compartilhar
+              </Button>
+            </div>
+
+            {sharedBatches.length === 0 ? (
+              <div className="text-center py-8 text-slate-500">
+                <Share2 className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                <p className="text-sm">Nenhum compartilhamento ativo</p>
+                <p className="text-xs mt-1">Compartilhe este lote com brokers ou vendedores</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {sharedBatches.map((shared) => (
+                  <div
+                    key={shared.id}
+                    className="flex items-center justify-between p-4 bg-slate-50 rounded-sm border border-slate-200"
+                  >
+                    <div className="flex-1">
+                      <p className="font-medium text-obsidian">
+                        {shared.sharedWith?.name || 'Usuário'}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {shared.sharedWith?.role === 'BROKER' ? 'Broker' : 'Vendedor Interno'} •{' '}
+                        {formatDate(shared.sharedAt)}
+                      </p>
+                      {shared.negotiatedPrice && (
+                        <p className="text-xs text-slate-600 mt-1">
+                          Preço negociado: {formatCurrency(shared.negotiatedPrice)}/{shared.negotiatedPriceUnit || 'M2'}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => handleRemoveShare(shared.id)}
+                      className="text-rose-600 hover:text-rose-700"
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </Card>
 
           {/* Dimensões Físicas */}
@@ -1088,6 +1244,78 @@ export default function EditBatchPage() {
             loading={isDeleting}
           >
             DELETAR
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Share Batch Modal */}
+      <Modal open={showShareModal} onClose={() => setShowShareModal(false)}>
+        <ModalHeader>
+          <ModalTitle>Compartilhar Lote</ModalTitle>
+        </ModalHeader>
+        <ModalContent>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Selecionar Broker ou Vendedor
+              </label>
+              <select
+                value={selectedUserId}
+                onChange={(e) => setSelectedUserId(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-obsidian/20 focus:border-obsidian"
+              >
+                <option value="">Selecione...</option>
+                {availableUsers
+                  .filter((user) => !sharedBatches.some((s) => s.sharedWithUserId === user.id))
+                  .map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name} ({user.role === 'BROKER' ? 'Broker' : 'Vendedor Interno'})
+                    </option>
+                  ))}
+              </select>
+              {availableUsers.filter((user) => !sharedBatches.some((s) => s.sharedWithUserId === user.id)).length === 0 && (
+                <p className="text-xs text-slate-500 mt-1">
+                  Todos os brokers e vendedores já têm acesso a este lote
+                </p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Preço Negociado (Opcional)
+              </label>
+              <Input
+                type="number"
+                step="0.01"
+                value={negotiatedPrice}
+                onChange={(e) => setNegotiatedPrice(e.target.value)}
+                placeholder={batch ? `${formatCurrency(batch.industryPrice)}/${batch.priceUnit}` : ''}
+              />
+              <p className="text-xs text-slate-500 mt-1">
+                Deixe em branco para usar o preço padrão do lote
+              </p>
+            </div>
+          </div>
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setShowShareModal(false);
+              setSelectedUserId('');
+              setNegotiatedPrice('');
+            }}
+            disabled={isSharing}
+          >
+            Cancelar
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleShareBatch}
+            loading={isSharing}
+            disabled={!selectedUserId}
+          >
+            COMPARTILHAR
           </Button>
         </ModalFooter>
       </Modal>

@@ -18,7 +18,8 @@ import {
   ChevronRight,
   LogOut,
   ChevronUp,
-  User
+  User,
+  BookOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -70,6 +71,12 @@ const industryMenuItems: MenuItem[] = [
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
   },
   {
+    label: 'navigation.catalogos',
+    href: '/catalogos',
+    icon: BookOpen,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
     label: 'navigation.clientes',
     href: '/clientes',
     icon: Inbox,
@@ -106,6 +113,12 @@ const brokerMenuItems: MenuItem[] = [
     label: 'navigation.links',
     href: '/links',
     icon: Link2,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'navigation.catalogos',
+    href: '/catalogos',
+    icon: BookOpen,
     roles: ['BROKER'],
   },
   {

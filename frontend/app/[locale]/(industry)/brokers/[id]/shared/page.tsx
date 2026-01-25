@@ -94,7 +94,7 @@ export default function BrokerSharedInventoryPage() {
 
       await apiClient.post('/shared-inventory-batches', {
         batchId: selectedBatch.id,
-        brokerUserId: brokerId,
+        sharedWithUserId: brokerId,
         negotiatedPrice: data.negotiatedPrice || selectedBatch.industryPrice,
       });
 
@@ -123,7 +123,7 @@ export default function BrokerSharedInventoryPage() {
     try {
       if (newValue) {
         await apiClient.post('/shared-catalog-permissions', {
-          brokerUserId: brokerId,
+          sharedWithUserId: brokerId,
         });
         success('Acesso ao catálogo concedido');
       } else {

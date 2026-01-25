@@ -19,14 +19,15 @@ func NewIndustryRepository(db *DB) *industryRepository {
 
 func (r *industryRepository) Create(ctx context.Context, industry *entity.Industry) error {
 	query := `
-		INSERT INTO industries (id, name, cnpj, slug, contact_email, contact_phone, policy_terms)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO industries (id, name, cnpj, slug, contact_email, contact_phone, policy_terms, city, state, banner_url, logo_url, is_public)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 		RETURNING created_at, updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		industry.ID, industry.Name, industry.CNPJ, industry.Slug,
 		industry.ContactEmail, industry.ContactPhone, industry.PolicyTerms,
+		industry.City, industry.State, industry.BannerURL, industry.LogoURL, industry.IsPublic,
 	).Scan(&industry.CreatedAt, &industry.UpdatedAt)
 
 	if err != nil {
@@ -49,7 +50,7 @@ func (r *industryRepository) Create(ctx context.Context, industry *entity.Indust
 func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
-		       policy_terms, created_at, updated_at
+		       policy_terms, city, state, banner_url, logo_url, is_public, created_at, updated_at
 		FROM industries
 		WHERE id = $1
 	`
@@ -58,6 +59,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.IsPublic,
 		&industry.CreatedAt, &industry.UpdatedAt,
 	)
 
@@ -74,7 +76,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
-		       policy_terms, created_at, updated_at
+		       policy_terms, city, state, banner_url, logo_url, is_public, created_at, updated_at
 		FROM industries
 		WHERE slug = $1
 	`
@@ -83,6 +85,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 	err := r.db.QueryRowContext(ctx, query, slug).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.IsPublic,
 		&industry.CreatedAt, &industry.UpdatedAt,
 	)
 
@@ -99,7 +102,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
-		       policy_terms, created_at, updated_at
+		       policy_terms, city, state, banner_url, logo_url, is_public, created_at, updated_at
 		FROM industries
 		WHERE cnpj = $1
 	`
@@ -108,6 +111,7 @@ func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*enti
 	err := r.db.QueryRowContext(ctx, query, cnpj).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.PolicyTerms,
+		&industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.IsPublic,
 		&industry.CreatedAt, &industry.UpdatedAt,
 	)
 
@@ -125,14 +129,16 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 	query := `
 		UPDATE industries
 		SET name = $1, contact_email = $2, contact_phone = $3, 
-		    policy_terms = $4, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $5
+		    policy_terms = $4, city = $5, state = $6, banner_url = $7, 
+		    logo_url = $8, is_public = $9, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $10
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		industry.Name, industry.ContactEmail, industry.ContactPhone,
-		industry.PolicyTerms, industry.ID,
+		industry.PolicyTerms, industry.City, industry.State, industry.BannerURL,
+		industry.LogoURL, industry.IsPublic, industry.ID,
 	).Scan(&industry.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -172,7 +178,7 @@ func (r *industryRepository) ExistsByCNPJ(ctx context.Context, cnpj string) (boo
 func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, 
-		       policy_terms, created_at, updated_at
+		       policy_terms, city, state, banner_url, logo_url, is_public, created_at, updated_at
 		FROM industries
 		ORDER BY name
 	`
@@ -189,6 +195,7 @@ func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error
 		if err := rows.Scan(
 			&ind.ID, &ind.Name, &ind.CNPJ, &ind.Slug,
 			&ind.ContactEmail, &ind.ContactPhone, &ind.PolicyTerms,
+			&ind.City, &ind.State, &ind.BannerURL, &ind.LogoURL, &ind.IsPublic,
 			&ind.CreatedAt, &ind.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
@@ -197,4 +204,118 @@ func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error
 	}
 
 	return industries, nil
+}
+
+func (r *industryRepository) FindPublicDeposits(ctx context.Context, search *string) ([]entity.PublicDeposit, error) {
+	query := `
+		SELECT DISTINCT
+			i.name, i.slug, i.city, i.state, i.banner_url, i.logo_url
+		FROM industries i
+		WHERE i.is_public = TRUE
+	`
+
+	args := []interface{}{}
+
+	if search != nil && *search != "" {
+		query += ` AND (
+			i.name ILIKE $1 OR
+			i.city ILIKE $1 OR
+			i.state ILIKE $1
+		)`
+		searchTerm := "%" + *search + "%"
+		args = append(args, searchTerm)
+	}
+
+	query += ` ORDER BY i.name`
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	deposits := []entity.PublicDeposit{}
+	for rows.Next() {
+		var dep entity.PublicDeposit
+		if err := rows.Scan(
+			&dep.Name, &dep.Slug, &dep.City, &dep.State, &dep.BannerURL, &dep.LogoURL,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+
+		// Buscar preview de fotos (até 4) de lotes públicos deste depósito
+		previewQuery := `
+			SELECT bm.id, bm.url, bm.display_order
+			FROM batch_medias bm
+			INNER JOIN batches b ON bm.batch_id = b.id
+			WHERE b.industry_id = (SELECT id FROM industries WHERE slug = $1)
+				AND b.is_public = TRUE
+				AND b.deleted_at IS NULL
+				AND b.is_active = TRUE
+			ORDER BY bm.display_order, bm.created_at
+			LIMIT 4
+		`
+
+		previewRows, err := r.db.QueryContext(ctx, previewQuery, dep.Slug)
+		if err == nil {
+			defer previewRows.Close()
+			for previewRows.Next() {
+				var media entity.Media
+				if err := previewRows.Scan(&media.ID, &media.URL, &media.DisplayOrder); err == nil {
+					dep.Preview = append(dep.Preview, media)
+				}
+			}
+		}
+
+		deposits = append(deposits, dep)
+	}
+
+	return deposits, nil
+}
+
+func (r *industryRepository) FindPublicDepositBySlug(ctx context.Context, slug string) (*entity.PublicDeposit, error) {
+	query := `
+		SELECT name, slug, city, state, banner_url, logo_url
+		FROM industries
+		WHERE slug = $1 AND is_public = TRUE
+	`
+
+	deposit := &entity.PublicDeposit{}
+	err := r.db.QueryRowContext(ctx, query, slug).Scan(
+		&deposit.Name, &deposit.Slug, &deposit.City, &deposit.State,
+		&deposit.BannerURL, &deposit.LogoURL,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Depósito")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	// Buscar preview de fotos
+	previewQuery := `
+		SELECT bm.id, bm.url, bm.display_order
+		FROM batch_medias bm
+		INNER JOIN batches b ON bm.batch_id = b.id
+		WHERE b.industry_id = (SELECT id FROM industries WHERE slug = $1)
+			AND b.is_public = TRUE
+			AND b.deleted_at IS NULL
+			AND b.is_active = TRUE
+		ORDER BY bm.display_order, bm.created_at
+		LIMIT 4
+	`
+
+	previewRows, err := r.db.QueryContext(ctx, previewQuery, slug)
+	if err == nil {
+		defer previewRows.Close()
+		for previewRows.Next() {
+			var media entity.Media
+			if err := previewRows.Scan(&media.ID, &media.URL, &media.DisplayOrder); err == nil {
+				deposit.Preview = append(deposit.Preview, media)
+			}
+		}
+	}
+
+	return deposit, nil
 }

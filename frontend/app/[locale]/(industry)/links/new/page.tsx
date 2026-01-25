@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
-import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
+import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
@@ -21,7 +21,7 @@ import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { nanoid } from 'nanoid';
 import { QRCodeCanvas } from 'qrcode.react';
-import type { Batch, Product, LinkType } from '@/lib/types';
+import type { Batch, Product, LinkType, SharedInventoryBatch } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { useLocale } from 'next-intl';
@@ -101,12 +101,25 @@ export default function CreateSalesLinkPage() {
       setIsLoadingContent(true);
 
       if (linkType === 'LOTE_UNICO') {
-        const endpoint = isBroker() ? '/broker/shared-inventory' : '/batches';
-        const data = await apiClient.get<{ batches?: Batch[]; data?: Batch[] }>(
-          endpoint,
-          { params: { status: 'DISPONIVEL', limit: 1000 } }
-        );
-        setAvailableBatches(data.batches || data.data || []);
+        if (isBroker()) {
+          // Para brokers, buscar inventário compartilhado
+          const data = await apiClient.get<SharedInventoryBatch[]>(
+            '/broker/shared-inventory',
+            { params: { status: 'DISPONIVEL', limit: 1000 } }
+          );
+          // Extrair batches do array de SharedInventoryBatch
+          const batches = data
+            .map((shared) => shared.batch)
+            .filter((batch): batch is Batch => batch !== null && batch !== undefined && batch.status === 'DISPONIVEL');
+          setAvailableBatches(batches);
+        } else {
+          // Para admins, buscar batches normalmente
+          const data = await apiClient.get<{ batches?: Batch[]; data?: Batch[] }>(
+            '/batches',
+            { params: { status: 'DISPONIVEL', limit: 1000 } }
+          );
+          setAvailableBatches(data.batches || data.data || []);
+        }
       } else if (linkType === 'PRODUTO_GERAL') {
         const data = await apiClient.get<{ products: Product[] }>('/products', {
           params: { includeInactive: false, limit: 1000 },
@@ -454,10 +467,19 @@ export default function CreateSalesLinkPage() {
                                 >
                                   {truncateText(batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                                 </p>
-                                <p className="text-xs text-slate-500">
-                                  {formatArea(batch.totalArea)} •{' '}
-                                  {formatCurrency(batch.industryPrice)}
-                                </p>
+                                <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
+                                  <span>{formatArea(batch.totalArea)}</span>
+                                  <span>•</span>
+                                  <span>{formatCurrency(batch.industryPrice)}</span>
+                                  {batch.availableSlabs !== undefined && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="text-emerald-600 font-medium">
+                                        {batch.availableSlabs} {batch.availableSlabs === 1 ? 'chapa disponível' : 'chapas disponíveis'}
+                                      </span>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                               {selectedBatch?.id === batch.id && (
                                 <Check className="w-5 h-5 text-blue-600" />
@@ -754,7 +776,8 @@ export default function CreateSalesLinkPage() {
       </form>
 
       {/* Success Modal */}
-      <Modal open={showSuccessModal} onClose={() => {}}>
+      <Modal open={showSuccessModal} onClose={() => setShowSuccessModal(false)}>
+        <ModalClose onClose={() => setShowSuccessModal(false)} />
         <ModalHeader>
           <ModalTitle>Link Criado com Sucesso! 🎉</ModalTitle>
         </ModalHeader>
