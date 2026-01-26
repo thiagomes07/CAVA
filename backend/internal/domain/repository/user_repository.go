@@ -55,4 +55,23 @@ type UserRepository interface {
 
 	// SetFirstLoginAt define a data do primeiro login
 	SetFirstLoginAt(ctx context.Context, id string) error
+
+	// =============================================
+	// PASSWORD RESET TOKENS
+	// =============================================
+
+	// CreatePasswordResetToken cria um novo token de recuperação de senha
+	CreatePasswordResetToken(ctx context.Context, token *entity.PasswordResetToken) error
+
+	// GetPasswordResetToken busca token por email e hash do código
+	GetPasswordResetToken(ctx context.Context, userID, tokenHash string) (*entity.PasswordResetToken, error)
+
+	// GetValidPasswordResetToken busca token válido (não usado e não expirado) por email e código
+	GetValidPasswordResetToken(ctx context.Context, email, code string) (*entity.PasswordResetToken, error)
+
+	// MarkPasswordResetTokenUsed marca o token como utilizado
+	MarkPasswordResetTokenUsed(ctx context.Context, tokenID string) error
+
+	// InvalidatePasswordResetTokens invalida todos os tokens ativos de um usuário
+	InvalidatePasswordResetTokens(ctx context.Context, userID string) error
 }

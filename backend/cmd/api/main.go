@@ -342,6 +342,8 @@ func initServices(
 		tokenManager,
 		hasher,
 		logger,
+		emailSender,
+		cfg.Server.FrontendURL,
 	)
 
 	// User Service

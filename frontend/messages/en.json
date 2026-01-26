@@ -62,7 +62,22 @@
     "invalidCredentials": "Invalid email or password",
     "termsNotice": "By continuing, you agree to our Terms of Use and Privacy Policy",
     "heroTitle": "Transform stones into works of art",
-    "heroSubtitle": "The complete platform for ornamental stone management"
+    "heroSubtitle": "The complete platform for ornamental stone management",
+    "forgotPasswordTitle": "Reset Password",
+    "forgotPasswordSubtitle": "We will send a verification code to your email",
+    "sendCode": "Send Code",
+    "codeSent": "Code sent to {email}",
+    "enterCode": "Enter the Code",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "New Password",
+    "confirmNewPasswordLabel": "Confirm New Password",
+    "resetPassword": "Reset Password",
+    "passwordResetSuccess": "Password changed successfully!",
+    "passwordResetSuccessDescription": "Your password has been updated. You can now log in with your new password.",
+    "invalidCode": "Invalid or expired code",
+    "codeExpired": "Code expired. Please request a new one.",
+    "backToLogin": "Back to Login",
+    "sendNewCode": "Didn't receive it? Send new code"
   },
   "errors": {
     "generic": "Something went wrong",

@@ -62,7 +62,22 @@
     "invalidCredentials": "Email ou senha incorretos",
     "termsNotice": "Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade",
     "heroTitle": "Transforme pedras em obras de arte",
-    "heroSubtitle": "A plataforma completa para gestão de pedras ornamentais"
+    "heroSubtitle": "A plataforma completa para gestão de pedras ornamentais",
+    "forgotPasswordTitle": "Recuperar Senha",
+    "forgotPasswordSubtitle": "Enviaremos um código de verificação para seu email",
+    "sendCode": "Enviar Código",
+    "codeSent": "Código enviado para {email}",
+    "enterCode": "Digite o Código",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "Nova Senha",
+    "confirmNewPasswordLabel": "Confirmar Nova Senha",
+    "resetPassword": "Redefinir Senha",
+    "passwordResetSuccess": "Senha alterada com sucesso!",
+    "passwordResetSuccessDescription": "Sua senha foi atualizada. Agora você pode fazer login com sua nova senha.",
+    "invalidCode": "Código inválido ou expirado",
+    "codeExpired": "Código expirado. Solicite um novo.",
+    "backToLogin": "Voltar ao Login",
+    "sendNewCode": "Não recebeu? Enviar novo código"
   },
   "errors": {
     "generic": "Algo deu errado",

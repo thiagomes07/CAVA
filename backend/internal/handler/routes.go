@@ -138,6 +138,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			r.Post("/login", h.Auth.Login)
 			r.Post("/refresh", h.Auth.Refresh)
+			r.Post("/forgot-password", h.Auth.ForgotPassword)
+			r.Post("/reset-password", h.Auth.ResetPassword)
 			r.With(m.Auth.Authenticate, m.CSRF.ValidateCSRF).Post("/logout", h.Auth.Logout)
 		})
 
