@@ -107,6 +107,16 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		return nil, domainErrors.EmailExistsError(input.Email)
 	}
 
+	// Verificar se nome já existe na indústria
+	nameExists, err := s.userRepo.ExistsByNameInIndustry(ctx, input.Name, industryID)
+	if err != nil {
+		s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if nameExists {
+		return nil, domainErrors.ValidationError("Já existe um usuário com este nome nesta indústria")
+	}
+
 	// Gerar senha temporária
 	temporaryPassword := s.generateTemporaryPassword()
 
@@ -300,6 +310,16 @@ func (s *userService) InviteBroker(ctx context.Context, industryID string, input
 	}
 	if exists {
 		return nil, domainErrors.EmailExistsError(input.Email)
+	}
+
+	// Verificar se nome já existe globalmente (brokers não têm industry_id)
+	nameExists, err := s.userRepo.ExistsByNameGlobally(ctx, input.Name)
+	if err != nil {
+		s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if nameExists {
+		return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
 	}
 
 	// Gerar senha temporária

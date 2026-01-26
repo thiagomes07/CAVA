@@ -38,4 +38,7 @@ type SalesHistoryRepository interface {
 
 	// SumMonthlyCommission soma comissões do mês atual (para broker)
 	SumMonthlyCommission(ctx context.Context, brokerID string, month time.Time) (float64, error)
+
+	// Delete remove um registro de venda
+	Delete(ctx context.Context, tx *sql.Tx, id string) error
 }

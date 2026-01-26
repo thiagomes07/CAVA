@@ -342,6 +342,9 @@ func initServices(
 		repos.Batch,
 		repos.Product,
 		repos.Media,
+		repos.SalesHistory,
+		repos.Cliente,
+		repos.DB,
 		logger,
 	)
 
@@ -389,6 +392,7 @@ func initServices(
 		repos.Batch,
 		repos.User,
 		repos.Cliente,
+		repos.DB,
 		logger,
 	)
 

@@ -19,6 +19,9 @@ type SalesHistoryService interface {
 	// GetSummary calcula sumário de vendas (total, comissões, ticket médio)
 	GetSummary(ctx context.Context, filters entity.SaleSummaryFilters) (*entity.SaleSummary, error)
 
-	// GetBrokerSales busca vendas do broker
+	// GetBrokerSales busca vendas de um broker
 	GetBrokerSales(ctx context.Context, brokerID string, limit int) ([]entity.Sale, error)
+
+	// Delete remove um registro de venda (undo)
+	Delete(ctx context.Context, id string) error
 }

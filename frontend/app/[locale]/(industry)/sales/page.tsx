@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Download, FileText, Receipt } from 'lucide-react';
+import { Download, FileText, Receipt, Trash2 } from 'lucide-react';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -298,7 +299,7 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span 
+                          <span
                             className="font-mono text-sm text-slate-600"
                             title={sale.batch?.batchCode}
                           >
@@ -306,7 +307,7 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span 
+                          <span
                             className="text-slate-600"
                             title={sale.customerName}
                           >
@@ -314,11 +315,11 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span 
+                          <span
                             className="text-slate-600"
-                            title={sale.soldBy?.name}
+                            title={sale.soldBy?.name || sale.sellerName}
                           >
-                            {truncateText(sale.soldBy?.name, TRUNCATION_LIMITS.SELLER_NAME) || '-'}
+                            {truncateText(sale.soldBy?.name || sale.sellerName, TRUNCATION_LIMITS.SELLER_NAME) || '-'}
                           </span>
                         </TableCell>
                         <TableCell>
@@ -368,7 +369,7 @@ export default function SalesHistoryPage() {
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                     {t('product')}
                                   </p>
-                                  <p 
+                                  <p
                                     className="text-sm font-medium text-obsidian"
                                     title={sale.batch?.product?.name}
                                   >
@@ -379,7 +380,7 @@ export default function SalesHistoryPage() {
                                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                     {t('customerContact')}
                                   </p>
-                                  <p 
+                                  <p
                                     className="text-sm text-slate-600"
                                     title={sale.customerContact}
                                   >
@@ -391,7 +392,7 @@ export default function SalesHistoryPage() {
                                     <p className="text-xs uppercase tracking-widest text-slate-500 mb-1">
                                       {t('notes')}
                                     </p>
-                                    <p 
+                                    <p
                                       className="text-sm text-slate-600"
                                       title={sale.notes}
                                     >
