@@ -268,3 +268,50 @@ func (h *ClienteHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, cliente)
 }
+
+// SendLinks godoc
+// @Summary Envia links de lotes para clientes
+// @Description Envia email com links de lotes para clientes selecionados
+// @Tags clientes
+// @Accept json
+// @Produce json
+// @Param body body entity.SendLinksToClientesInput true "IDs de clientes e links"
+// @Success 200 {object} entity.SendLinksResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 500 {object} response.ErrorResponse
+// @Router /api/clientes/send-links [post]
+func (h *ClienteHandler) SendLinks(w http.ResponseWriter, r *http.Request) {
+	var input entity.SendLinksToClientesInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Enviar links
+	result, err := h.clienteService.SendLinksToClientes(r.Context(), input)
+	if err != nil {
+		h.logger.Error("erro ao enviar links para clientes",
+			zap.Int("totalClientes", len(input.ClienteIDs)),
+			zap.Int("totalLinks", len(input.SalesLinkIDs)),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("links enviados para clientes",
+		zap.Int("totalSent", result.TotalSent),
+		zap.Int("totalFailed", result.TotalFailed),
+		zap.Int("totalSkipped", result.TotalSkipped),
+	)
+
+	response.OK(w, result)
+}

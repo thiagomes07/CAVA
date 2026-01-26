@@ -3,31 +3,39 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	domainErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
+	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/pkg/password"
 	"go.uber.org/zap"
 )
 
 type userService struct {
-	userRepo repository.UserRepository
-	hasher   *password.Hasher
-	logger   *zap.Logger
+	userRepo    repository.UserRepository
+	hasher      *password.Hasher
+	emailSender domainService.EmailSender
+	frontendURL string
+	logger      *zap.Logger
 }
 
 func NewUserService(
 	userRepo repository.UserRepository,
 	hasher *password.Hasher,
+	emailSender domainService.EmailSender,
+	frontendURL string,
 	logger *zap.Logger,
 ) *userService {
 	return &userService{
-		userRepo: userRepo,
-		hasher:   hasher,
-		logger:   logger,
+		userRepo:    userRepo,
+		hasher:      hasher,
+		emailSender: emailSender,
+		frontendURL: frontendURL,
+		logger:      logger,
 	}
 }
 
@@ -161,11 +169,15 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		zap.Bool("isAdmin", input.IsAdmin),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	s.logger.Warn("senha temporária gerada para "+roleDesc+" (deve ser enviada por email)",
-		zap.String("userId", user.ID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, roleDesc); err != nil {
+		// Log do erro, mas não falha a operação - usuário foi criado
+		s.logger.Error("erro ao enviar email de convite",
+			zap.String("userId", user.ID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -360,12 +372,15 @@ func (s *userService) InviteBroker(ctx context.Context, industryID string, input
 		zap.String("invitedBy", industryID),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	// Por enquanto, apenas log
-	s.logger.Warn("senha temporária gerada (deve ser enviada por email)",
-		zap.String("brokerId", user.ID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, "broker"); err != nil {
+		// Log do erro, mas não falha a operação - usuário foi criado
+		s.logger.Error("erro ao enviar email de convite para broker",
+			zap.String("brokerId", user.ID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -446,11 +461,15 @@ func (s *userService) ResendInvite(ctx context.Context, userID string, newEmail 
 		zap.String("email", user.Email),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	s.logger.Warn("senha temporária gerada para reenvio (deve ser enviada por email)",
-		zap.String("userId", userID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com nova senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, "usuário"); err != nil {
+		// Log do erro, mas não falha a operação
+		s.logger.Error("erro ao reenviar email de convite",
+			zap.String("userId", userID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -539,4 +558,95 @@ func (s *userService) generateTemporaryPassword() string {
 	}
 
 	return string(password)
+}
+
+// sendInviteEmail envia email de convite com senha temporária
+func (s *userService) sendInviteEmail(ctx context.Context, email, name, temporaryPassword, roleDesc string) error {
+	// Se não houver email sender configurado, apenas log
+	if s.emailSender == nil {
+		s.logger.Warn("email sender não configurado - convite não enviado",
+			zap.String("email", email),
+			zap.String("temporaryPassword", temporaryPassword),
+		)
+		return nil
+	}
+
+	loginURL := s.frontendURL + "/login"
+
+	// Montar HTML do email
+	htmlBody := fmt.Sprintf(`
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+        .container { background-color: #fff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header { text-align: center; margin-bottom: 30px; }
+        .logo { font-size: 28px; font-weight: bold; color: #2563eb; }
+        .button { display: inline-block; padding: 14px 28px; background-color: #2563eb; color: #fff !important; text-decoration: none; border-radius: 6px; font-weight: 600; }
+        .credentials { background-color: #f0f9ff; padding: 20px; border-radius: 6px; border-left: 4px solid #2563eb; margin: 20px 0; }
+        .footer { text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">CAVA</div>
+        </div>
+        <h1>Bem-vindo ao CAVA, %s! 🎉</h1>
+        <p>Você foi convidado como <strong>%s</strong> para acessar a plataforma CAVA.</p>
+        <div class="credentials">
+            <p><strong>Seus dados de acesso:</strong></p>
+            <p>📧 Email: <strong>%s</strong></p>
+            <p>🔑 Senha temporária: <strong>%s</strong></p>
+        </div>
+        <p>⚠️ <strong>Importante:</strong> Por segurança, você deverá alterar sua senha no primeiro acesso.</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="%s" class="button">Acessar CAVA</a>
+        </div>
+        <div class="footer">
+            <p>Se você não esperava este email, por favor ignore.</p>
+        </div>
+    </div>
+</body>
+</html>
+`, name, roleDesc, email, temporaryPassword, loginURL)
+
+	// Versão texto plano
+	textBody := fmt.Sprintf(`Bem-vindo ao CAVA, %s!
+
+Você foi convidado como %s para acessar a plataforma CAVA.
+
+Seus dados de acesso:
+- Email: %s
+- Senha temporária: %s
+
+IMPORTANTE: Por segurança, você deverá alterar sua senha no primeiro acesso.
+
+Acesse: %s
+
+---
+Se você não esperava este email, por favor ignore.
+`, name, roleDesc, email, temporaryPassword, loginURL)
+
+	// Enviar email
+	msg := domainService.EmailMessage{
+		To:       email,
+		Subject:  "Convite para acessar CAVA",
+		HTMLBody: htmlBody,
+		TextBody: textBody,
+	}
+
+	if err := s.emailSender.Send(ctx, msg); err != nil {
+		return fmt.Errorf("falha ao enviar email de convite: %w", err)
+	}
+
+	s.logger.Info("email de convite enviado com sucesso",
+		zap.String("email", email),
+		zap.String("roleDesc", roleDesc),
+	)
+
+	return nil
 }
