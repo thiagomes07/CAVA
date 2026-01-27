@@ -198,3 +198,27 @@ export interface Activity {
   action: 'RESERVADO' | 'VENDIDO' | 'COMPARTILHADO' | 'CRIADO';
   date: string;
 }
+
+// Tipos para envio de links para clientes
+export interface SendLinksInput {
+  clienteIds: string[];
+  salesLinkIds: string[];
+  customMessage?: string;
+}
+
+export interface SendLinkResult {
+  clienteId: string;
+  clienteName: string;
+  email: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface SendLinksResponse {
+  totalClientes: number;
+  totalSent: number;
+  totalFailed: number;
+  totalSkipped: number;
+  results: SendLinkResult[];
+  linksIncluded: number;
+}

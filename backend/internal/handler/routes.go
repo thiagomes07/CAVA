@@ -56,6 +56,7 @@ type Services struct {
 	SalesHistory    service.SalesHistoryService
 	SharedInventory service.SharedInventoryService
 	Storage         service.StorageService
+	Email           service.EmailSender
 	MediaRepo       repository.MediaRepository
 }
 
@@ -137,6 +138,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			r.Post("/login", h.Auth.Login)
 			r.Post("/refresh", h.Auth.Refresh)
+			r.Post("/forgot-password", h.Auth.ForgotPassword)
+			r.Post("/reset-password", h.Auth.ResetPassword)
 			r.With(m.Auth.Authenticate, m.CSRF.ValidateCSRF).Post("/logout", h.Auth.Logout)
 		})
 
@@ -268,6 +271,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/clientes", func(r chi.Router) {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Cliente.List)
 				r.With(m.RBAC.RequireIndustryUser).Post("/", h.Cliente.Create)
+				r.With(m.RBAC.RequireIndustryUser).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Cliente.GetByID)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Cliente.GetInteractions)
 				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Cliente.UpdateStatus)

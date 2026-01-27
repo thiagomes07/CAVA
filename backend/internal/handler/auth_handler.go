@@ -344,3 +344,87 @@ func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, map[string]bool{"success": true})
 }
+
+// ForgotPassword godoc
+// @Summary Solicita recuperação de senha
+// @Description Envia código de verificação por email
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body entity.ForgotPasswordInput true "Email do usuário"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Router /api/auth/forgot-password [post]
+func (h *AuthHandler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
+	var input entity.ForgotPasswordInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Executar forgot password (sempre retorna sucesso para segurança)
+	if err := h.authService.ForgotPassword(r.Context(), input.Email); err != nil {
+		h.logger.Error("erro ao processar forgot password",
+			zap.String("email", input.Email),
+			zap.Error(err),
+		)
+		// Ainda retorna sucesso para não revelar se email existe
+	}
+
+	h.logger.Debug("forgot password processado",
+		zap.String("email", input.Email),
+	)
+
+	// Sempre retorna sucesso para não revelar se email existe
+	response.OK(w, map[string]bool{"success": true})
+}
+
+// ResetPassword godoc
+// @Summary Redefine senha com código de verificação
+// @Description Valida código e atualiza senha do usuário
+// @Tags auth
+// @Accept json
+// @Produce json
+// @Param body body entity.ResetPasswordInput true "Email, código e nova senha"
+// @Success 200 {object} map[string]bool
+// @Failure 400 {object} response.ErrorResponse
+// @Router /api/auth/reset-password [post]
+func (h *AuthHandler) ResetPassword(w http.ResponseWriter, r *http.Request) {
+	var input entity.ResetPasswordInput
+
+	// Parse JSON body
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Executar reset password
+	if err := h.authService.ResetPassword(r.Context(), input.Email, input.Code, input.NewPassword); err != nil {
+		h.logger.Warn("falha no reset password",
+			zap.String("email", input.Email),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("senha redefinida com sucesso",
+		zap.String("email", input.Email),
+	)
+
+	response.OK(w, map[string]bool{"success": true})
+}

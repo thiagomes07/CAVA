@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api/client';
-import { clienteKeys } from '@/lib/api/queries/useClientes';
-import type { Cliente } from '@/lib/types';
+import { clienteKeys } from '@/lib/api/queries/useLeads';
+import type { Cliente, SendLinksInput, SendLinksResponse } from '@/lib/types';
 import type { ClienteCaptureInput } from '@/lib/schemas/link.schema';
 
 export function useCreateCliente() {
@@ -27,6 +27,23 @@ export function useUpdateClienteStatus() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: clienteKeys.all });
       queryClient.invalidateQueries({ queryKey: clienteKeys.detail(id) });
+    },
+  });
+}
+
+export function useSendLinksToClientes() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: SendLinksInput) => {
+      const response = await apiClient.post<SendLinksResponse>(
+        '/clientes/send-links',
+        data
+      );
+      return response;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: clienteKeys.all });
     },
   });
 }

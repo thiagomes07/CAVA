@@ -25,4 +25,9 @@ type ClienteService interface {
 
 	// GetInteractions busca interações do cliente
 	GetInteractions(ctx context.Context, clienteID string) ([]entity.ClienteInteraction, error)
+
+	// SendLinksToClientes envia links de lotes para clientes selecionados via email
+	// Apenas clientes com email válido como contato receberão o email
+	SendLinksToClientes(ctx context.Context, input entity.SendLinksToClientesInput) (*entity.SendLinksResponse, error)
 }
+

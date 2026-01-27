@@ -50,10 +50,14 @@ export default function LoginPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Watch email field to pass to forgot-password
+  const emailValue = watch('email');
 
   const onSubmit = async (data: LoginInput) => {
     try {
@@ -149,6 +153,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <button
                 type="button"
+                onClick={() => router.push(`/forgot-password${emailValue ? `?email=${encodeURIComponent(emailValue)}` : ''}`)}
                 className="text-sm text-slate-500 hover:text-obsidian transition-colors"
               >
                 {t('forgotPassword')}

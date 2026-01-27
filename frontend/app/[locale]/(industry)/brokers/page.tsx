@@ -132,6 +132,9 @@ export default function BrokersManagementPage() {
     } catch (err) {
       if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
         error(t('emailAlreadyExists'));
+      } else if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.message) {
+        // Exibe a mensagem específica do backend (ex: "Já existe um usuário com este nome")
+        error(err.message);
       } else {
         error(t('inviteError'));
       }
@@ -166,7 +169,7 @@ export default function BrokersManagementPage() {
 
     try {
       setIsSubmitting(true);
-      
+
       const payload: { newEmail?: string } = {};
       if (data.changeEmail && data.newEmail && data.newEmail.trim() !== '') {
         payload.newEmail = data.newEmail.trim();
@@ -187,6 +190,9 @@ export default function BrokersManagementPage() {
         }
       } else if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
         error(t('emailAlreadyExists'));
+      } else if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.message) {
+        // Exibe a mensagem específica do backend
+        error(err.message);
       } else {
         error(t('resendError'));
       }
@@ -251,7 +257,7 @@ export default function BrokersManagementPage() {
                   <TableRow key={broker.id}>
                     <TableCell>
                       <div>
-                        <p 
+                        <p
                           className="font-medium text-obsidian"
                           title={broker.name}
                         >
@@ -265,7 +271,7 @@ export default function BrokersManagementPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-slate-400" />
-                        <span 
+                        <span
                           className="text-sm text-slate-600"
                           title={broker.email}
                         >

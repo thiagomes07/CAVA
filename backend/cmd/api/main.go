@@ -17,6 +17,7 @@ import (
 	domainRepo "github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/internal/handler"
+	"github.com/thiagomes07/CAVA/backend/internal/infra/email"
 	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/internal/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/service"
@@ -127,6 +128,25 @@ func main() {
 	v := validator.New()
 
 	// ============================================
+	// 5.1 INICIALIZAR EMAIL SENDER
+	// ============================================
+	// O email sender é agnóstico ao ambiente: usa SES com IAM Role em produção
+	// ou Console/Mock em desenvolvimento (configurável via USE_SES)
+	emailSender, err := email.NewEmailSender(context.Background(), cfg, logger)
+	if err != nil {
+		logger.Warn("falha ao inicializar email sender - emails desabilitados", zap.Error(err))
+		// Em dev, podemos continuar sem email sender
+		if !cfg.IsDevelopment() {
+			logger.Fatal("email sender é obrigatório em produção", zap.Error(err))
+		}
+	} else {
+		logger.Info("email sender inicializado",
+			zap.Bool("use_ses", cfg.Email.UseSES),
+			zap.String("sender_email", cfg.Email.SenderEmail),
+		)
+	}
+
+	// ============================================
 	// 6. INICIALIZAR REPOSITORIES
 	// ============================================
 	repos := initRepositories(db)
@@ -136,7 +156,7 @@ func main() {
 	// ============================================
 	// 7. INICIALIZAR SERVICES
 	// ============================================
-	services := initServices(repos, tokenManager, hasher, s3Adapter, cfg, logger)
+	services := initServices(repos, tokenManager, hasher, s3Adapter, emailSender, cfg, logger)
 
 	logger.Info("services inicializados")
 
@@ -311,6 +331,7 @@ func initServices(
 	tokenManager *jwt.TokenManager,
 	hasher *password.Hasher,
 	s3Adapter *storage.S3Adapter,
+	emailSender domainService.EmailSender,
 	cfg *config.Config,
 	logger *zap.Logger,
 ) handler.Services {
@@ -321,12 +342,16 @@ func initServices(
 		tokenManager,
 		hasher,
 		logger,
+		emailSender,
+		cfg.Server.FrontendURL,
 	)
 
 	// User Service
 	userService := service.NewUserService(
 		repos.User,
 		hasher,
+		emailSender,
+		cfg.Server.FrontendURL,
 		logger,
 	)
 
@@ -383,6 +408,8 @@ func initServices(
 		repos.ClienteInteraction,
 		repos.SalesLink,
 		newDBExecutorAdapter(repos.DB),
+		emailSender,
+		cfg.Server.FrontendURL,
 		logger,
 	)
 
@@ -423,6 +450,7 @@ func initServices(
 		SalesHistory:    salesHistoryService,
 		SharedInventory: sharedInventoryService,
 		Storage:         storageService,
+		Email:           emailSender,
 		MediaRepo:       repos.Media,
 	}
 }

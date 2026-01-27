@@ -62,7 +62,22 @@
     "invalidCredentials": "Email o contraseña incorrectos",
     "termsNotice": "Al continuar, aceptas nuestros Términos de Uso y Política de Privacidad",
     "heroTitle": "Transforma piedras en obras de arte",
-    "heroSubtitle": "La plataforma completa para gestión de piedras ornamentales"
+    "heroSubtitle": "La plataforma completa para gestión de piedras ornamentales",
+    "forgotPasswordTitle": "Recuperar Contraseña",
+    "forgotPasswordSubtitle": "Enviaremos un código de verificación a tu email",
+    "sendCode": "Enviar Código",
+    "codeSent": "Código enviado a {email}",
+    "enterCode": "Ingresa el Código",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "Nueva Contraseña",
+    "confirmNewPasswordLabel": "Confirmar Nueva Contraseña",
+    "resetPassword": "Restablecer Contraseña",
+    "passwordResetSuccess": "¡Contraseña cambiada exitosamente!",
+    "passwordResetSuccessDescription": "Tu contraseña ha sido actualizada. Ahora puedes iniciar sesión con tu nueva contraseña.",
+    "invalidCode": "Código inválido o expirado",
+    "codeExpired": "Código expirado. Solicita uno nuevo.",
+    "backToLogin": "Volver al Inicio de Sesión",
+    "sendNewCode": "¿No lo recibiste? Enviar nuevo código"
   },
   "errors": {
     "generic": "Algo salió mal",
@@ -288,7 +303,25 @@
     "contactAlreadyExists": "Ya existe un cliente con este contacto",
     "createError": "Error al crear cliente",
     "manuallyCreated": "Creado manualmente",
-    "manuallyCreatedDescription": "Este cliente fue registrado directamente en el sistema"
+    "manuallyCreatedDescription": "Este cliente fue registrado directamente en el sistema",
+    "sendLinks": "ENVIAR ENLACES",
+    "sendLinksTitle": "Enviar Enlaces a Clientes",
+    "selectedClients": "{count} cliente(s) seleccionado(s)",
+    "selectLinksToSend": "Seleccione los enlaces que desea enviar",
+    "noLinksSelected": "Seleccione al menos un enlace",
+    "noClientsSelected": "Seleccione al menos un cliente",
+    "customMessage": "Mensaje personalizado (opcional)",
+    "customMessagePlaceholder": "Escriba un mensaje para acompañar los enlaces...",
+    "sending": "Enviando...",
+    "sendLinksButton": "ENVIAR ENLACES",
+    "sendSuccess": "¡{sent} email(s) enviado(s) exitosamente!",
+    "sendPartialSuccess": "{sent} enviado(s), {failed} falla(s), {skipped} ignorado(s)",
+    "sendError": "Error al enviar enlaces",
+    "invalidEmail": "Email inválido",
+    "selectAll": "Seleccionar todos",
+    "deselectAll": "Limpiar selección",
+    "onlyEmailClients": "Solo clientes con email válido recibirán",
+    "activeLinksOnly": "Enlaces activos"
   },
   "links": {
     "title": "Mis Enlaces de Venta",
@@ -439,7 +472,13 @@
     "invalidWhatsapp": "WhatsApp inválido",
     "currentPasswordRequired": "Contraseña actual es obligatoria",
     "newPasswordRequired": "Nueva contraseña es obligatoria",
-    "invalidContact": "Email o teléfono inválido"
+    "invalidContact": "Email o teléfono inválido",
+    "passwordRequirements": "Requisitos de la contraseña:",
+    "passwordMinLengthReq": "Mínimo de 8 caracteres",
+    "passwordUppercaseReq": "Al menos una letra mayúscula",
+    "passwordNumberReq": "Al menos un número",
+    "passwordMatchReq": "Las contraseñas coinciden",
+    "passwordStrong": "¡Contraseña segura!"
   },
   "language": {
     "select": "Seleccionar idioma",
@@ -491,8 +530,7 @@
     "inviteResent": "Invitación reenviada exitosamente",
     "cannotResendAfterLogin": "No se puede reenviar invitación a usuario que ya accedió al sistema",
     "resendError": "Error al reenviar invitación",
-    "newEmail": "Nuevo Email",
-    "emailAlreadyExists": "Este email ya está registrado en el sistema"
+    "newEmail": "Nuevo Email"
   },
   "brokers": {
     "title": "Socios (Brokers)",
@@ -529,8 +567,7 @@
     "inviteResent": "Invitación reenviada exitosamente",
     "cannotResendAfterLogin": "No se puede reenviar invitación a broker que ya accedió al sistema",
     "resendError": "Error al reenviar invitación",
-    "newEmail": "Nuevo Email",
-    "emailAlreadyExists": "Este email ya está registrado en el sistema"
+    "newEmail": "Nuevo Email"
   },
   "sharedInventory": {
     "title": "Inventario Compartido",

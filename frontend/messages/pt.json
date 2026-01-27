@@ -62,7 +62,22 @@
     "invalidCredentials": "Email ou senha incorretos",
     "termsNotice": "Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade",
     "heroTitle": "Transforme pedras em obras de arte",
-    "heroSubtitle": "A plataforma completa para gestão de pedras ornamentais"
+    "heroSubtitle": "A plataforma completa para gestão de pedras ornamentais",
+    "forgotPasswordTitle": "Recuperar Senha",
+    "forgotPasswordSubtitle": "Enviaremos um código de verificação para seu email",
+    "sendCode": "Enviar Código",
+    "codeSent": "Código enviado para {email}",
+    "enterCode": "Digite o Código",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "Nova Senha",
+    "confirmNewPasswordLabel": "Confirmar Nova Senha",
+    "resetPassword": "Redefinir Senha",
+    "passwordResetSuccess": "Senha alterada com sucesso!",
+    "passwordResetSuccessDescription": "Sua senha foi atualizada. Agora você pode fazer login com sua nova senha.",
+    "invalidCode": "Código inválido ou expirado",
+    "codeExpired": "Código expirado. Solicite um novo.",
+    "backToLogin": "Voltar ao Login",
+    "sendNewCode": "Não recebeu? Enviar novo código"
   },
   "errors": {
     "generic": "Algo deu errado",
@@ -288,7 +303,25 @@
     "contactAlreadyExists": "Já existe um cliente com este contato",
     "createError": "Erro ao criar cliente",
     "manuallyCreated": "Criado manualmente",
-    "manuallyCreatedDescription": "Este cliente foi cadastrado diretamente no sistema"
+    "manuallyCreatedDescription": "Este cliente foi cadastrado diretamente no sistema",
+    "sendLinks": "ENVIAR LINKS",
+    "sendLinksTitle": "Enviar Links para Clientes",
+    "selectedClients": "{count} cliente(s) selecionado(s)",
+    "selectLinksToSend": "Selecione os links que deseja enviar",
+    "noLinksSelected": "Selecione pelo menos um link",
+    "noClientsSelected": "Selecione pelo menos um cliente",
+    "customMessage": "Mensagem personalizada (opcional)",
+    "customMessagePlaceholder": "Escreva uma mensagem para acompanhar os links...",
+    "sending": "Enviando...",
+    "sendLinksButton": "ENVIAR LINKS",
+    "sendSuccess": "{sent} email(s) enviado(s) com sucesso!",
+    "sendPartialSuccess": "{sent} enviado(s), {failed} falha(s), {skipped} ignorado(s)",
+    "sendError": "Erro ao enviar links",
+    "invalidEmail": "Email inválido",
+    "selectAll": "Selecionar todos",
+    "deselectAll": "Limpar seleção",
+    "onlyEmailClients": "Apenas clientes com email válido receberão",
+    "activeLinksOnly": "Links ativos"
   },
   "links": {
     "title": "Meus Links de Venda",
@@ -439,7 +472,13 @@
     "invalidWhatsapp": "WhatsApp inválido",
     "currentPasswordRequired": "Senha atual é obrigatória",
     "newPasswordRequired": "Nova senha é obrigatória",
-    "invalidContact": "Email ou telefone inválido"
+    "invalidContact": "Email ou telefone inválido",
+    "passwordRequirements": "Requisitos da senha:",
+    "passwordMinLengthReq": "Mínimo de 8 caracteres",
+    "passwordUppercaseReq": "Pelo menos uma letra maiúscula",
+    "passwordNumberReq": "Pelo menos um número",
+    "passwordMatchReq": "As senhas coincidem",
+    "passwordStrong": "Senha segura!"
   },
   "language": {
     "select": "Selecionar idioma",
@@ -491,8 +530,7 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para usuário que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email",
-    "emailAlreadyExists": "Este email já está cadastrado no sistema"
+    "newEmail": "Novo Email"
   },
   "brokers": {
     "title": "Parceiros (Brokers)",
@@ -529,8 +567,7 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para broker que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email",
-    "emailAlreadyExists": "Este email já está cadastrado no sistema"
+    "newEmail": "Novo Email"
   },
   "sharedInventory": {
     "title": "Estoque Compartilhado",

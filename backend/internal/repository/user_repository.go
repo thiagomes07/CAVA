@@ -413,3 +413,116 @@ func (r *userRepository) SetFirstLoginAt(ctx context.Context, id string) error {
 
 	return nil
 }
+
+// =============================================
+// PASSWORD RESET TOKENS
+// =============================================
+
+func (r *userRepository) CreatePasswordResetToken(ctx context.Context, token *entity.PasswordResetToken) error {
+	query := `
+		INSERT INTO password_reset_tokens (id, user_id, token_hash, code, expires_at)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at
+	`
+
+	err := r.db.QueryRowContext(ctx, query,
+		token.ID, token.UserID, token.TokenHash, token.Code, token.ExpiresAt,
+	).Scan(&token.CreatedAt)
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
+func (r *userRepository) GetPasswordResetToken(ctx context.Context, userID, tokenHash string) (*entity.PasswordResetToken, error) {
+	query := `
+		SELECT id, user_id, token_hash, code, expires_at, used_at, created_at
+		FROM password_reset_tokens
+		WHERE user_id = $1 AND token_hash = $2
+	`
+
+	token := &entity.PasswordResetToken{}
+	err := r.db.QueryRowContext(ctx, query, userID, tokenHash).Scan(
+		&token.ID, &token.UserID, &token.TokenHash, &token.Code,
+		&token.ExpiresAt, &token.UsedAt, &token.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Token de recuperação")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return token, nil
+}
+
+func (r *userRepository) GetValidPasswordResetToken(ctx context.Context, email, code string) (*entity.PasswordResetToken, error) {
+	query := `
+		SELECT prt.id, prt.user_id, prt.token_hash, prt.code, prt.expires_at, prt.used_at, prt.created_at
+		FROM password_reset_tokens prt
+		INNER JOIN users u ON u.id = prt.user_id
+		WHERE u.email = $1 
+		  AND prt.code = $2
+		  AND prt.used_at IS NULL
+		  AND prt.expires_at > NOW()
+		ORDER BY prt.created_at DESC
+		LIMIT 1
+	`
+
+	token := &entity.PasswordResetToken{}
+	err := r.db.QueryRowContext(ctx, query, email, code).Scan(
+		&token.ID, &token.UserID, &token.TokenHash, &token.Code,
+		&token.ExpiresAt, &token.UsedAt, &token.CreatedAt,
+	)
+
+	if err == sql.ErrNoRows {
+		return nil, errors.NewNotFoundError("Token de recuperação")
+	}
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+
+	return token, nil
+}
+
+func (r *userRepository) MarkPasswordResetTokenUsed(ctx context.Context, tokenID string) error {
+	query := `
+		UPDATE password_reset_tokens
+		SET used_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := r.db.ExecContext(ctx, query, tokenID)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Token de recuperação")
+	}
+
+	return nil
+}
+
+func (r *userRepository) InvalidatePasswordResetTokens(ctx context.Context, userID string) error {
+	query := `
+		UPDATE password_reset_tokens
+		SET used_at = NOW()
+		WHERE user_id = $1 AND used_at IS NULL
+	`
+
+	_, err := r.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}

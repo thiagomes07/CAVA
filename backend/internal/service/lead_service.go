@@ -2,12 +2,16 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"net/mail"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	domainErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
+	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	infraEmail "github.com/thiagomes07/CAVA/backend/internal/infra/email"
 	"go.uber.org/zap"
 )
 
@@ -16,6 +20,8 @@ type clienteService struct {
 	interactionRepo repository.ClienteInteractionRepository
 	linkRepo        repository.SalesLinkRepository
 	db              DatabaseExecutor
+	emailSender     domainService.EmailSender
+	frontendURL     string
 	logger          *zap.Logger
 }
 
@@ -29,6 +35,8 @@ func NewClienteService(
 	interactionRepo repository.ClienteInteractionRepository,
 	linkRepo repository.SalesLinkRepository,
 	db DatabaseExecutor,
+	emailSender domainService.EmailSender,
+	frontendURL string,
 	logger *zap.Logger,
 ) *clienteService {
 	return &clienteService{
@@ -36,6 +44,8 @@ func NewClienteService(
 		interactionRepo: interactionRepo,
 		linkRepo:        linkRepo,
 		db:              db,
+		emailSender:     emailSender,
+		frontendURL:     frontendURL,
 		logger:          logger,
 	}
 }
@@ -285,4 +295,169 @@ func isNotFoundError(err error) bool {
 		return appErr.Code == "NOT_FOUND"
 	}
 	return false
+}
+
+// SendLinksToClientes envia links de lotes para clientes selecionados via email
+func (s *clienteService) SendLinksToClientes(ctx context.Context, input entity.SendLinksToClientesInput) (*entity.SendLinksResponse, error) {
+	// Validar que temos email sender configurado
+	if s.emailSender == nil {
+		return nil, domainErrors.NewInternalError("Serviço de email não configurado", nil)
+	}
+
+	// Buscar todos os clientes
+	var clientes []*entity.Cliente
+	for _, clienteID := range input.ClienteIDs {
+		cliente, err := s.clienteRepo.FindByID(ctx, clienteID)
+		if err != nil {
+			s.logger.Warn("cliente não encontrado para envio",
+				zap.String("clienteId", clienteID),
+				zap.Error(err),
+			)
+			continue
+		}
+		clientes = append(clientes, cliente)
+	}
+
+	if len(clientes) == 0 {
+		return nil, domainErrors.NewValidationError("Nenhum cliente válido encontrado", nil)
+	}
+
+	// Buscar todos os links
+	var links []*entity.SalesLink
+	for _, linkID := range input.SalesLinkIDs {
+		link, err := s.linkRepo.FindByID(ctx, linkID)
+		if err != nil {
+			s.logger.Warn("link não encontrado para envio",
+				zap.String("linkId", linkID),
+				zap.Error(err),
+			)
+			continue
+		}
+		// Só incluir links ativos e não expirados
+		if link.IsActive && !link.IsExpired() {
+			links = append(links, link)
+		}
+	}
+
+	if len(links) == 0 {
+		return nil, domainErrors.NewValidationError("Nenhum link válido encontrado (verifique se estão ativos e não expirados)", nil)
+	}
+
+	// Preparar resposta
+	response := &entity.SendLinksResponse{
+		TotalClientes: len(clientes),
+		LinksIncluded: len(links),
+		Results:       make([]entity.SendLinkResult, 0, len(clientes)),
+	}
+
+	// Enviar para cada cliente
+	for _, cliente := range clientes {
+		result := entity.SendLinkResult{
+			ClienteID:   cliente.ID,
+			ClienteName: cliente.Name,
+			Email:       cliente.Contact,
+		}
+
+		// Validar se o contato é um email válido
+		if !isValidEmail(cliente.Contact) {
+			result.Success = false
+			result.Error = "Contato não é um email válido"
+			response.TotalSkipped++
+			response.Results = append(response.Results, result)
+			continue
+		}
+
+		// Montar e enviar email
+		err := s.sendLinksEmail(ctx, cliente, links, input.CustomMessage)
+		if err != nil {
+			result.Success = false
+			result.Error = err.Error()
+			response.TotalFailed++
+			s.logger.Error("erro ao enviar email para cliente",
+				zap.String("clienteId", cliente.ID),
+				zap.String("email", cliente.Contact),
+				zap.Error(err),
+			)
+		} else {
+			result.Success = true
+			response.TotalSent++
+			s.logger.Info("email enviado para cliente com sucesso",
+				zap.String("clienteId", cliente.ID),
+				zap.String("email", cliente.Contact),
+				zap.Int("linksCount", len(links)),
+			)
+		}
+
+		response.Results = append(response.Results, result)
+	}
+
+	return response, nil
+}
+
+// isValidEmail verifica se uma string é um email válido
+func isValidEmail(email string) bool {
+	_, err := mail.ParseAddress(email)
+	return err == nil
+}
+
+// sendLinksEmail envia email com os links para um cliente
+func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cliente, links []*entity.SalesLink, customMessage *string) error {
+	// Converter links para o formato do template
+	offerLinks := make([]infraEmail.OfferLink, 0, len(links))
+
+	for _, link := range links {
+		// URL completa do link
+		linkURL := fmt.Sprintf("%s/l/%s", s.frontendURL, link.SlugToken)
+
+		// Título do link
+		title := "Lote disponível"
+		if link.Title != nil && *link.Title != "" {
+			title = *link.Title
+		}
+
+		// Preço (se mostrar)
+		price := ""
+		if link.ShowPrice && link.DisplayPrice != nil {
+			price = fmt.Sprintf("R$ %.2f", *link.DisplayPrice)
+		}
+
+		// Descrição do link
+		description := ""
+		if link.CustomMessage != nil && *link.CustomMessage != "" {
+			description = *link.CustomMessage
+		}
+
+		offerLinks = append(offerLinks, infraEmail.OfferLink{
+			Title:       title,
+			Description: description,
+			Price:       price,
+			URL:         linkURL,
+		})
+	}
+
+	// Mensagem personalizada do vendedor
+	customMsg := ""
+	if customMessage != nil && *customMessage != "" {
+		customMsg = *customMessage
+	}
+
+	// Usar template padronizado
+	htmlBody, textBody, err := infraEmail.RenderOffersEmail(infraEmail.OffersEmailData{
+		ClienteName:   cliente.Name,
+		CustomMessage: customMsg,
+		Links:         offerLinks,
+	})
+	if err != nil {
+		return fmt.Errorf("falha ao renderizar email de ofertas: %w", err)
+	}
+
+	// Enviar email
+	msg := domainService.EmailMessage{
+		To:       cliente.Contact,
+		Subject:  "Ofertas Especiais para você - CAVA Stone Platform",
+		HTMLBody: htmlBody,
+		TextBody: textBody,
+	}
+
+	return s.emailSender.Send(ctx, msg)
 }
