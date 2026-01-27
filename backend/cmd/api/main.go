@@ -452,6 +452,7 @@ func initServices(
 		Storage:         storageService,
 		Email:           emailSender,
 		MediaRepo:       repos.Media,
+		IndustryRepo:    repos.Industry,
 	}
 }
 

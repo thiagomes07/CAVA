@@ -29,6 +29,7 @@ type Handler struct {
 	Upload          *UploadHandler
 	Public          *PublicHandler
 	Health          *HealthHandler
+	Industry        *IndustryHandler
 }
 
 // Config contém as configurações para os handlers
@@ -58,6 +59,7 @@ type Services struct {
 	Storage         service.StorageService
 	Email           service.EmailSender
 	MediaRepo       repository.MediaRepository
+	IndustryRepo    repository.IndustryRepository
 }
 
 // NewHandler cria uma nova instância de Handler com todos os handlers
@@ -75,6 +77,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		SharedInventory: NewSharedInventoryHandler(services.SharedInventory, cfg.Validator, cfg.Logger),
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
 		Public:          NewPublicHandler(services.SalesLink, services.Cliente, cfg.Validator, cfg.Logger),
+		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -296,6 +299,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/upload", func(r chi.Router) {
 				r.With(m.RBAC.RequireAdmin).Post("/product-medias", h.Upload.UploadProductMedias)
 				r.With(m.RBAC.RequireAdmin).Post("/batch-medias", h.Upload.UploadBatchMedias)
+				r.With(m.RBAC.RequireAdmin).Post("/industry-logo", h.Upload.UploadIndustryLogo)
 			})
 
 			// Delete medias
@@ -305,6 +309,15 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Update media order
 			r.With(m.RBAC.RequireAdmin).Patch("/product-medias/order", h.Upload.UpdateProductMediasOrder)
 			r.With(m.RBAC.RequireAdmin).Patch("/batch-medias/order", h.Upload.UpdateBatchMediasOrder)
+
+			// ----------------------------------------
+			// INDUSTRY CONFIG
+			// ----------------------------------------
+			r.Route("/industry-config", func(r chi.Router) {
+				r.With(m.RBAC.RequireAdmin).Get("/", h.Industry.GetConfig)
+				r.With(m.RBAC.RequireAdmin).Patch("/", h.Industry.UpdateConfig)
+				r.With(m.RBAC.RequireAdmin).Delete("/logo", h.Industry.DeleteLogo)
+			})
 		})
 	})
 

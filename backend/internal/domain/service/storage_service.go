@@ -16,6 +16,9 @@ type StorageService interface {
 	// UploadBatchMedia faz upload de mídia de lote
 	UploadBatchMedia(ctx context.Context, batchID string, reader io.Reader, filename, contentType string, size int64) (string, error)
 
+	// UploadIndustryLogo faz upload da logo da indústria
+	UploadIndustryLogo(ctx context.Context, industryID string, reader io.Reader, filename, contentType string, size int64) (string, error)
+
 	// DeleteFile deleta um arquivo
 	DeleteFile(ctx context.Context, bucket, key string) error
 

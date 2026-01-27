@@ -38,11 +38,21 @@ export interface User {
 export interface Industry {
   id: string;
   name: string;
-  cnpj?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  isActive: boolean;
+  cnpj: string;
+  slug: string;
+  contactEmail: string;
+  contactPhone?: string;
+  whatsapp?: string;
+  description?: string;
+  logoUrl?: string;
+  addressCountry?: string;
+  addressState?: string;
+  addressCity?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressZipCode?: string;
+  policyTerms?: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
