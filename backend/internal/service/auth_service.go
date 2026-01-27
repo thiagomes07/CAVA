@@ -448,6 +448,7 @@ func (s *authService) ForgotPassword(ctx context.Context, emailAddr string) erro
 	resetURL := fmt.Sprintf("%s/forgot-password?email=%s&code=%s", s.frontendURL, emailAddr, code)
 	htmlBody, textBody, err := email.RenderPasswordResetEmail(email.PasswordResetData{
 		UserName:  user.Name,
+		Code:      code,
 		ResetURL:  resetURL,
 		ExpiresIn: "15 minutos",
 	})

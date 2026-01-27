@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/mail"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -12,6 +11,7 @@ import (
 	domainErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	infraEmail "github.com/thiagomes07/CAVA/backend/internal/infra/email"
 	"go.uber.org/zap"
 )
 
@@ -402,11 +402,10 @@ func isValidEmail(email string) bool {
 
 // sendLinksEmail envia email com os links para um cliente
 func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cliente, links []*entity.SalesLink, customMessage *string) error {
-	// Construir cards HTML para cada link
-	var linksHTML strings.Builder
-	var linksText strings.Builder
+	// Converter links para o formato do template
+	offerLinks := make([]infraEmail.OfferLink, 0, len(links))
 
-	for i, link := range links {
+	for _, link := range links {
 		// URL completa do link
 		linkURL := fmt.Sprintf("%s/l/%s", s.frontendURL, link.SlugToken)
 
@@ -417,93 +416,45 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 		}
 
 		// Preço (se mostrar)
-		priceHTML := ""
-		priceText := ""
+		price := ""
 		if link.ShowPrice && link.DisplayPrice != nil {
-			priceHTML = fmt.Sprintf(`<p style="font-size: 20px; color: #059669; font-weight: bold; margin: 10px 0;">R$ %.2f</p>`, *link.DisplayPrice)
-			priceText = fmt.Sprintf("Preço: R$ %.2f\n", *link.DisplayPrice)
+			price = fmt.Sprintf("R$ %.2f", *link.DisplayPrice)
 		}
 
-		// Mensagem customizada do link
-		descHTML := ""
-		descText := ""
+		// Descrição do link
+		description := ""
 		if link.CustomMessage != nil && *link.CustomMessage != "" {
-			descHTML = fmt.Sprintf(`<p style="color: #6b7280; margin: 10px 0;">%s</p>`, *link.CustomMessage)
-			descText = *link.CustomMessage + "\n"
+			description = *link.CustomMessage
 		}
 
-		// Card HTML
-		linksHTML.WriteString(fmt.Sprintf(`
-        <div style="background-color: #f9fafb; border-radius: 8px; padding: 20px; margin: 15px 0; border: 1px solid #e5e7eb;">
-            <h3 style="margin: 0 0 10px 0; color: #1f2937;">%s</h3>
-            %s
-            %s
-            <a href="%s" style="display: inline-block; padding: 12px 24px; background-color: #2563eb; color: #fff !important; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">Ver Detalhes</a>
-        </div>
-        `, title, descHTML, priceHTML, linkURL))
-
-		// Versão texto
-		linksText.WriteString(fmt.Sprintf("\n%d. %s\n%s%sLink: %s\n", i+1, title, descText, priceText, linkURL))
+		offerLinks = append(offerLinks, infraEmail.OfferLink{
+			Title:       title,
+			Description: description,
+			Price:       price,
+			URL:         linkURL,
+		})
 	}
 
 	// Mensagem personalizada do vendedor
-	customMsgHTML := ""
-	customMsgText := ""
+	customMsg := ""
 	if customMessage != nil && *customMessage != "" {
-		customMsgHTML = fmt.Sprintf(`
-        <div style="background-color: #eff6ff; padding: 15px; border-radius: 6px; border-left: 4px solid #2563eb; margin: 20px 0;">
-            <p style="margin: 0; color: #1e40af;">💬 %s</p>
-        </div>
-        `, *customMessage)
-		customMsgText = fmt.Sprintf("\nMensagem do vendedor: %s\n", *customMessage)
+		customMsg = *customMessage
 	}
 
-	// HTML completo
-	htmlBody := fmt.Sprintf(`
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
-        .container { background-color: #fff; border-radius: 8px; padding: 40px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .header { text-align: center; margin-bottom: 30px; }
-        .logo { font-size: 28px; font-weight: bold; color: #2563eb; }
-        .footer { text-align: center; font-size: 12px; color: #666; margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">CAVA</div>
-        </div>
-        <h1 style="color: #1f2937;">Olá, %s! 👋</h1>
-        <p>Temos algumas ofertas especiais que podem te interessar:</p>
-        %s
-        %s
-        <div class="footer">
-            <p>Este email foi enviado pela plataforma CAVA.</p>
-            <p>Se você não deseja mais receber estas mensagens, por favor entre em contato.</p>
-        </div>
-    </div>
-</body>
-</html>
-`, cliente.Name, customMsgHTML, linksHTML.String())
-
-	// Texto plano
-	textBody := fmt.Sprintf(`Olá, %s!
-
-Temos algumas ofertas especiais que podem te interessar:
-%s%s
----
-Este email foi enviado pela plataforma CAVA.
-`, cliente.Name, customMsgText, linksText.String())
+	// Usar template padronizado
+	htmlBody, textBody, err := infraEmail.RenderOffersEmail(infraEmail.OffersEmailData{
+		ClienteName:   cliente.Name,
+		CustomMessage: customMsg,
+		Links:         offerLinks,
+	})
+	if err != nil {
+		return fmt.Errorf("falha ao renderizar email de ofertas: %w", err)
+	}
 
 	// Enviar email
 	msg := domainService.EmailMessage{
 		To:       cliente.Contact,
-		Subject:  "Ofertas especiais para você - CAVA",
+		Subject:  "Ofertas Especiais para você - CAVA Stone Platform",
 		HTMLBody: htmlBody,
 		TextBody: textBody,
 	}

@@ -472,7 +472,13 @@
     "invalidWhatsapp": "WhatsApp inválido",
     "currentPasswordRequired": "Contraseña actual es obligatoria",
     "newPasswordRequired": "Nueva contraseña es obligatoria",
-    "invalidContact": "Email o teléfono inválido"
+    "invalidContact": "Email o teléfono inválido",
+    "passwordRequirements": "Requisitos de la contraseña:",
+    "passwordMinLengthReq": "Mínimo de 8 caracteres",
+    "passwordUppercaseReq": "Al menos una letra mayúscula",
+    "passwordNumberReq": "Al menos un número",
+    "passwordMatchReq": "Las contraseñas coinciden",
+    "passwordStrong": "¡Contraseña segura!"
   },
   "language": {
     "select": "Seleccionar idioma",
@@ -524,8 +530,7 @@
     "inviteResent": "Invitación reenviada exitosamente",
     "cannotResendAfterLogin": "No se puede reenviar invitación a usuario que ya accedió al sistema",
     "resendError": "Error al reenviar invitación",
-    "newEmail": "Nuevo Email",
-    "emailAlreadyExists": "Este email ya está registrado en el sistema"
+    "newEmail": "Nuevo Email"
   },
   "brokers": {
     "title": "Socios (Brokers)",
@@ -562,8 +567,7 @@
     "inviteResent": "Invitación reenviada exitosamente",
     "cannotResendAfterLogin": "No se puede reenviar invitación a broker que ya accedió al sistema",
     "resendError": "Error al reenviar invitación",
-    "newEmail": "Nuevo Email",
-    "emailAlreadyExists": "Este email ya está registrado en el sistema"
+    "newEmail": "Nuevo Email"
   },
   "sharedInventory": {
     "title": "Inventario Compartido",

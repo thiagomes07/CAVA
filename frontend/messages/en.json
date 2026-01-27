@@ -472,7 +472,13 @@
     "invalidWhatsapp": "Invalid WhatsApp number",
     "currentPasswordRequired": "Current password is required",
     "newPasswordRequired": "New password is required",
-    "invalidContact": "Invalid email or phone"
+    "invalidContact": "Invalid email or phone",
+    "passwordRequirements": "Password requirements:",
+    "passwordMinLengthReq": "At least 8 characters",
+    "passwordUppercaseReq": "At least one uppercase letter",
+    "passwordNumberReq": "At least one number",
+    "passwordMatchReq": "Passwords match",
+    "passwordStrong": "Strong password!"
   },
   "language": {
     "select": "Select language",
@@ -524,8 +530,7 @@
     "inviteResent": "Invite resent successfully",
     "cannotResendAfterLogin": "Cannot resend invite to user who has already accessed the system",
     "resendError": "Error resending invite",
-    "newEmail": "New Email",
-    "emailAlreadyExists": "This email is already registered in the system"
+    "newEmail": "New Email"
   },
   "brokers": {
     "title": "Partners (Brokers)",
@@ -562,8 +567,7 @@
     "inviteResent": "Invite resent successfully",
     "cannotResendAfterLogin": "Cannot resend invite to broker who has already accessed the system",
     "resendError": "Error resending invite",
-    "newEmail": "New Email",
-    "emailAlreadyExists": "This email is already registered in the system"
+    "newEmail": "New Email"
   },
   "sharedInventory": {
     "title": "Shared Inventory",

@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Mail, Lock, Eye, EyeOff, ArrowLeft, KeyRound, CheckCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, ArrowLeft, KeyRound, CheckCircle, Check, X } from 'lucide-react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,15 +14,19 @@ import { useToast } from '@/lib/hooks/useToast';
 import { useForgotPassword, useResetPassword } from '@/lib/api/mutations/useAuthMutations';
 import Link from 'next/link';
 
-// Schemas
+// Schemas - Password schema matches backend validation: min 8 chars, 1 uppercase, 1 number
 const forgotPasswordSchema = z.object({
   email: z.string().email('Email inválido'),
 });
 
 const resetPasswordSchema = z.object({
   code: z.string().length(6, 'Código deve ter 6 dígitos'),
-  newPassword: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
-  confirmPassword: z.string().min(8, 'Confirme a senha'),
+  newPassword: z
+    .string()
+    .min(8, 'Senha deve ter pelo menos 8 caracteres')
+    .regex(/[A-Z]/, 'Senha deve conter pelo menos uma letra maiúscula')
+    .regex(/[0-9]/, 'Senha deve conter pelo menos um número'),
+  confirmPassword: z.string().min(1, 'Confirme a senha'),
 }).refine((data) => data.newPassword === data.confirmPassword, {
   message: 'Senhas não conferem',
   path: ['confirmPassword'],
@@ -33,10 +37,90 @@ type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 
 type Step = 'email' | 'code' | 'success';
 
+// Password requirements checker (must match backend validation)
+interface PasswordRequirements {
+  minLength: boolean;
+  hasUppercase: boolean;
+  hasNumber: boolean;
+}
+
+function checkPasswordRequirements(password: string): PasswordRequirements {
+  return {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+  };
+}
+
+// Component for password strength indicator
+function PasswordRequirementsIndicator({
+  password,
+  confirmPassword,
+  t
+}: {
+  password: string;
+  confirmPassword: string;
+  t: (key: string) => string;
+}) {
+  const requirements = checkPasswordRequirements(password);
+  const allMet = requirements.minLength && requirements.hasUppercase && requirements.hasNumber;
+  const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
+
+  // Only show if user started typing
+  if (!password) return null;
+
+  return (
+    <div className="bg-slate-50 rounded-lg p-4 space-y-2 mb-4">
+      <p className="text-xs font-medium text-slate-600 mb-2">{t('passwordRequirements')}</p>
+
+      <RequirementItem
+        met={requirements.minLength}
+        label={t('passwordMinLengthReq')}
+      />
+      <RequirementItem
+        met={requirements.hasUppercase}
+        label={t('passwordUppercaseReq')}
+      />
+      <RequirementItem
+        met={requirements.hasNumber}
+        label={t('passwordNumberReq')}
+      />
+
+      {confirmPassword.length > 0 && (
+        <RequirementItem
+          met={passwordsMatch}
+          label={t('passwordMatchReq')}
+        />
+      )}
+
+      {allMet && passwordsMatch && (
+        <div className="flex items-center gap-2 text-green-600 pt-2 border-t border-slate-200 mt-2">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-xs font-medium">{t('passwordStrong')}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function RequirementItem({ met, label }: { met: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-slate-400'}`}>
+      {met ? (
+        <Check className="w-3.5 h-3.5" />
+      ) : (
+        <X className="w-3.5 h-3.5" />
+      )}
+      <span>{label}</span>
+    </div>
+  );
+}
+
 export default function ForgotPasswordPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const t = useTranslations('auth');
+  const tValidation = useTranslations('validation');
 
   // Get email from query params (passed from login page)
   const initialEmail = searchParams.get('email') || '';
@@ -66,8 +150,18 @@ export default function ForgotPasswordPage() {
 
   const resetForm = useForm<ResetPasswordInput>({
     resolver: zodResolver(resetPasswordSchema),
-    defaultValues: { code: initialCode },
+    defaultValues: { code: initialCode, newPassword: '', confirmPassword: '' },
+    mode: 'onChange', // Enable real-time validation
   });
+
+  // Watch password fields for real-time feedback
+  const watchedPassword = resetForm.watch('newPassword') || '';
+  const watchedConfirmPassword = resetForm.watch('confirmPassword') || '';
+
+  // Check if all requirements are met
+  const requirements = useMemo(() => checkPasswordRequirements(watchedPassword), [watchedPassword]);
+  const allRequirementsMet = requirements.minLength && requirements.hasUppercase && requirements.hasNumber;
+  const passwordsMatch = watchedPassword === watchedConfirmPassword && watchedConfirmPassword.length > 0;
 
   const onSubmitEmail = async (data: ForgotPasswordInput) => {
     try {
@@ -115,7 +209,7 @@ export default function ForgotPasswordPage() {
           </div>
 
           {/* Back to Login */}
-          <Link 
+          <Link
             href="/login"
             className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-obsidian transition-colors mb-6"
           >
@@ -144,6 +238,7 @@ export default function ForgotPasswordPage() {
                     error={emailForm.formState.errors.email?.message}
                     disabled={forgotPasswordMutation.isPending}
                     className="pl-12"
+                    autoComplete="email"
                   />
                   <Mail className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
                 </div>
@@ -173,22 +268,44 @@ export default function ForgotPasswordPage() {
                 </p>
               </div>
 
-              <form onSubmit={resetForm.handleSubmit(onSubmitReset)} className="space-y-6">
-                {/* Code Input */}
+              {/* 
+                Using a form without autocomplete to prevent browser password managers 
+                from treating the verification code as username 
+              */}
+              <form
+                onSubmit={resetForm.handleSubmit(onSubmitReset)}
+                className="space-y-6"
+                autoComplete="off"
+              >
+                {/* Hidden username field to satisfy browser's password manager - uses email */}
+                <input
+                  type="text"
+                  name="email"
+                  value={email}
+                  readOnly
+                  autoComplete="username"
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-hidden="true"
+                />
+
+                {/* Code Input - marked as one-time-code to prevent being treated as username */}
                 <div className="relative">
                   <Input
                     {...resetForm.register('code')}
                     type="text"
+                    inputMode="numeric"
                     placeholder={t('codePlaceholder')}
                     error={resetForm.formState.errors.code?.message}
                     disabled={resetPasswordMutation.isPending}
                     className="pl-12 text-center text-2xl tracking-[0.5em] font-mono"
                     maxLength={6}
+                    autoComplete="one-time-code"
                   />
                   <KeyRound className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
                 </div>
 
-                {/* New Password */}
+                {/* New Password - using new-password autocomplete to trigger password manager correctly */}
                 <div className="relative">
                   <Input
                     {...resetForm.register('newPassword')}
@@ -197,12 +314,14 @@ export default function ForgotPasswordPage() {
                     error={resetForm.formState.errors.newPassword?.message}
                     disabled={resetPasswordMutation.isPending}
                     className="pl-12 pr-12"
+                    autoComplete="new-password"
                   />
                   <Lock className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-4 top-[14px] text-slate-400 hover:text-slate-600 transition-colors"
+                    tabIndex={-1}
                   >
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
@@ -217,22 +336,32 @@ export default function ForgotPasswordPage() {
                     error={resetForm.formState.errors.confirmPassword?.message}
                     disabled={resetPasswordMutation.isPending}
                     className="pl-12 pr-12"
+                    autoComplete="new-password"
                   />
                   <Lock className="absolute left-4 top-[14px] w-5 h-5 text-slate-400" />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-4 top-[14px] text-slate-400 hover:text-slate-600 transition-colors"
+                    tabIndex={-1}
                   >
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+
+                {/* Password Requirements Indicator - below confirm password field */}
+                <PasswordRequirementsIndicator
+                  password={watchedPassword}
+                  confirmPassword={watchedConfirmPassword}
+                  t={tValidation}
+                />
 
                 <Button
                   type="submit"
                   variant="primary"
                   size="lg"
                   loading={resetPasswordMutation.isPending}
+                  disabled={!allRequirementsMet || !passwordsMatch}
                   className="w-full"
                 >
                   {t('resetPassword')}
