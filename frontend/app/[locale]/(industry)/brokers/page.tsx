@@ -292,15 +292,15 @@ export default function BrokersManagementPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      {broker.phone ? (
+                      {broker.whatsapp || broker.phone ? (
                         <a
-                          href={`https://wa.me/${broker.phone.replace(/\D/g, '')}`}
+                          href={`https://wa.me/55${(broker.whatsapp || broker.phone!).replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-2 text-sm text-emerald-600 hover:text-emerald-700 transition-colors"
                         >
                           <MessageCircle className="w-4 h-4" />
-                          {tCommon('seeDetails')}
+                          {formatPhone(broker.whatsapp || broker.phone!)}
                         </a>
                       ) : (
                         <span className="text-slate-400">-</span>

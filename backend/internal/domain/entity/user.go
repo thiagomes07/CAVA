@@ -30,6 +30,7 @@ type User struct {
 	Email        string     `json:"email"`
 	Password     string     `json:"-"` // Nunca serializar senha
 	Phone        *string    `json:"phone,omitempty"`
+	Whatsapp     *string    `json:"whatsapp,omitempty"`
 	Role         UserRole   `json:"role"`
 	IsActive     bool       `json:"isActive"`
 	FirstLoginAt *time.Time `json:"firstLoginAt,omitempty"` // NULL = nunca logou
@@ -44,6 +45,7 @@ type CreateUserInput struct {
 	Email      string   `json:"email" validate:"required,email"`
 	Password   string   `json:"password" validate:"required,min=8"`
 	Phone      *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp   *string  `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 	Role       UserRole `json:"role" validate:"required,oneof=ADMIN_INDUSTRIA VENDEDOR_INTERNO BROKER"`
 }
 
@@ -58,8 +60,9 @@ type CreateSellerInput struct {
 
 // UpdateUserInput representa os dados para atualizar um usuário
 type UpdateUserInput struct {
-	Name  *string `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
-	Phone *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Name     *string `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+	Phone    *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 }
 
 // UpdateUserStatusInput representa os dados para atualizar status do usuário

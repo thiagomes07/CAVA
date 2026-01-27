@@ -166,7 +166,7 @@ export default function ProfilePage() {
       resetProfile({
         name: data.name,
         phone: data.phone ? formatPhoneInput(data.phone) : '',
-        whatsapp: '', // Backend does not support whatsapp yet
+        whatsapp: data.whatsapp ? formatPhoneInput(data.whatsapp) : '',
       });
     } catch {
       error(t('loadError'));

@@ -326,8 +326,7 @@ func (s *authService) ChangePassword(ctx context.Context, userID string, input e
 	}
 
 	// Atualizar senha
-	user.Password = hashedPassword
-	if err := s.userRepo.Update(ctx, user); err != nil {
+	if err := s.userRepo.UpdatePassword(ctx, userID, hashedPassword); err != nil {
 		s.logger.Error("erro ao atualizar senha", zap.Error(err))
 		return err
 	}

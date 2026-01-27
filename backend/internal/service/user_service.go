@@ -270,6 +270,10 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 		user.Phone = input.Phone
 	}
 
+	if input.Whatsapp != nil {
+		user.Whatsapp = input.Whatsapp
+	}
+
 	user.UpdatedAt = time.Now()
 
 	// Salvar alterações
