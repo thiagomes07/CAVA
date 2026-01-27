@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { User, Lock, Save, CheckCircle } from 'lucide-react';
+import { User, Lock, Save, CheckCircle, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -30,6 +30,13 @@ const updateProfileSchema = z.object({
       (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
       'Telefone inválido'
     ),
+  whatsapp: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'WhatsApp inválido'
+    ),
 });
 
 // Schema para alteração de senha
@@ -47,12 +54,57 @@ const changePasswordSchema = z.object({
   path: ['confirmNewPassword'],
 });
 
+function checkPasswordRequirements(password: string) {
+  return {
+    minLength: password.length >= 8,
+    hasUppercase: /[A-Z]/.test(password),
+    hasNumber: /[0-9]/.test(password),
+  };
+}
+
+function RequirementItem({ met, label }: { met: boolean; label: string }) {
+  return (
+    <div className={`flex items-center gap-2 text-xs ${met ? 'text-green-600' : 'text-slate-400'}`}>
+      {met ? <Check className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function PasswordRequirementsIndicator({ password, confirmPassword, t }: { password: string; confirmPassword: string; t: any }) {
+  if (!password) return null;
+  const requirements = checkPasswordRequirements(password);
+  const allMet = requirements.minLength && requirements.hasUppercase && requirements.hasNumber;
+  const passwordsMatch = password.length > 0 && confirmPassword.length > 0 && password === confirmPassword;
+  const isStrong = allMet && passwordsMatch;
+
+  return (
+    <div className="bg-slate-50 rounded-lg p-4 space-y-2 mb-4 transition-all animate-in fade-in slide-in-from-top-2">
+      <p className="text-xs font-medium text-slate-600 mb-2">{t('passwordRequirements')}</p>
+      <RequirementItem met={requirements.minLength} label={t('passwordMinLengthReq')} />
+      <RequirementItem met={requirements.hasUppercase} label={t('passwordUppercaseReq')} />
+      <RequirementItem met={requirements.hasNumber} label={t('passwordNumberReq')} />
+      {confirmPassword.length > 0 && (
+        <RequirementItem met={passwordsMatch} label={t('passwordMatchReq')} />
+      )}
+      {isStrong && (
+        <div className="flex items-center gap-2 text-green-600 pt-2 border-t border-slate-200 mt-2">
+          <CheckCircle className="w-4 h-4" />
+          <span className="text-xs font-medium">{t('passwordStrong')}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 export default function ProfilePage() {
   const { success, error } = useToast();
+
   const t = useTranslations('profile');
+  const tValidation = useTranslations('validation');
 
   const { user: authUser, setUser } = useAuthStore();
 
@@ -61,6 +113,9 @@ export default function ProfilePage() {
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Form para perfil
   const {
@@ -73,10 +128,16 @@ export default function ProfilePage() {
     resolver: zodResolver(updateProfileSchema),
   });
 
-  const { field: phoneField } = useController({ 
-    name: 'phone', 
-    control: profileControl, 
-    defaultValue: '' 
+  const { field: phoneField } = useController({
+    name: 'phone',
+    control: profileControl,
+    defaultValue: ''
+  });
+
+  const { field: whatsappField } = useController({
+    name: 'whatsapp',
+    control: profileControl,
+    defaultValue: ''
   });
 
   // Form para senha
@@ -85,9 +146,13 @@ export default function ProfilePage() {
     handleSubmit: handlePasswordSubmit,
     formState: { errors: passwordErrors },
     reset: resetPassword,
+    watch: watchPassword,
   } = useForm<ChangePasswordInput>({
     resolver: zodResolver(changePasswordSchema),
   });
+
+  const watchedNewPassword = watchPassword('newPassword') || '';
+  const watchedConfirmNewPassword = watchPassword('confirmNewPassword') || '';
 
   useEffect(() => {
     fetchProfile();
@@ -100,11 +165,9 @@ export default function ProfilePage() {
       setProfile(data);
       resetProfile({
         name: data.name,
-        phone: data.phone || '',
+        phone: data.phone ? formatPhoneInput(data.phone) : '',
+        whatsapp: '', // Backend does not support whatsapp yet
       });
-      if (data.phone) {
-        phoneField.onChange(formatPhoneInput(data.phone));
-      }
     } catch {
       error(t('loadError'));
     } finally {
@@ -116,13 +179,15 @@ export default function ProfilePage() {
     try {
       setIsUpdatingProfile(true);
 
+      // Note: Backend ignores 'whatsapp' if not supported, but we send it.
       const updatedUser = await apiClient.patch<UserType>('/profile', {
         name: data.name,
         phone: sanitizePhone(data.phone) || null,
+        whatsapp: sanitizePhone(data.whatsapp) || null,
       });
 
       setProfile(updatedUser);
-      
+
       // Atualizar store de autenticação
       if (authUser) {
         setUser({
@@ -133,8 +198,12 @@ export default function ProfilePage() {
       }
 
       success(t('profileUpdated'));
-    } catch {
-      error(t('profileUpdateError'));
+    } catch (err) {
+      if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.message) {
+        error(err.message);
+      } else {
+        error(t('profileUpdateError'));
+      }
     } finally {
       setIsUpdatingProfile(false);
     }
@@ -152,7 +221,7 @@ export default function ProfilePage() {
       resetPassword();
       setPasswordChanged(true);
       success(t('passwordChanged'));
-      
+
       // Resetar flag após 3 segundos
       setTimeout(() => setPasswordChanged(false), 3000);
     } catch (err) {
@@ -189,7 +258,7 @@ export default function ProfilePage() {
       </div>
 
       {/* Content */}
-      <div className="px-8 py-8 max-w-3xl">
+      <div className="px-8 py-8 max-w-3xl mx-auto">
         <div className="space-y-8">
           {/* Informações Pessoais */}
           <Card>
@@ -230,6 +299,15 @@ export default function ProfilePage() {
                   disabled={isUpdatingProfile}
                 />
 
+                <Input
+                  value={whatsappField.value}
+                  onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                  label="WhatsApp"
+                  placeholder="(11) 98765-4321"
+                  error={profileErrors.whatsapp?.message}
+                  disabled={isUpdatingProfile}
+                />
+
                 <div className="flex justify-end">
                   <Button
                     type="submit"
@@ -259,32 +337,64 @@ export default function ProfilePage() {
             </CardHeader>
             <CardContent>
               <form onSubmit={handlePasswordSubmit(onChangePassword)} className="space-y-6">
-                <Input
-                  {...registerPassword('currentPassword')}
-                  type="password"
-                  label={t('currentPassword')}
-                  placeholder="••••••••"
-                  error={passwordErrors.currentPassword?.message}
-                  disabled={isChangingPassword}
-                />
+                <div className="relative">
+                  <Input
+                    {...registerPassword('currentPassword')}
+                    type={showCurrentPassword ? 'text' : 'password'}
+                    label={t('currentPassword')}
+                    placeholder="••••••••"
+                    error={passwordErrors.currentPassword?.message}
+                    disabled={isChangingPassword}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    className="absolute right-3 top-[34px] text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showCurrentPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
 
-                <Input
-                  {...registerPassword('newPassword')}
-                  type="password"
-                  label={t('newPassword')}
-                  placeholder="••••••••"
-                  helperText="Mínimo 8 caracteres, 1 maiúscula e 1 número"
-                  error={passwordErrors.newPassword?.message}
-                  disabled={isChangingPassword}
-                />
+                <div className="relative">
+                  <Input
+                    {...registerPassword('newPassword')}
+                    type={showNewPassword ? 'text' : 'password'}
+                    label={t('newPassword')}
+                    placeholder="••••••••"
+                    error={passwordErrors.newPassword?.message}
+                    disabled={isChangingPassword}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-[34px] text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
 
-                <Input
-                  {...registerPassword('confirmNewPassword')}
-                  type="password"
-                  label={t('confirmNewPassword')}
-                  placeholder="••••••••"
-                  error={passwordErrors.confirmNewPassword?.message}
-                  disabled={isChangingPassword}
+                <div className="relative">
+                  <Input
+                    {...registerPassword('confirmNewPassword')}
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    label={t('confirmNewPassword')}
+                    placeholder="••••••••"
+                    error={passwordErrors.confirmNewPassword?.message}
+                    disabled={isChangingPassword}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-[34px] text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  </button>
+                </div>
+
+                <PasswordRequirementsIndicator
+                  password={watchedNewPassword}
+                  confirmPassword={watchedConfirmNewPassword}
+                  t={tValidation}
                 />
 
                 <div className="flex justify-end items-center gap-4">

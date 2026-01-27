@@ -246,9 +246,26 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 	}
 
 	// Atualizar campos
-	if input.Name != nil {
+	if input.Name != nil && *input.Name != user.Name {
+		// Verificar se novo nome já existe
+		var nameExists bool
+		if user.IndustryID != nil {
+			nameExists, err = s.userRepo.ExistsByNameInIndustry(ctx, *input.Name, *user.IndustryID)
+		} else {
+			nameExists, err = s.userRepo.ExistsByNameGlobally(ctx, *input.Name)
+		}
+
+		if err != nil {
+			s.logger.Error("erro ao verificar duplicidade de nome", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+		if nameExists {
+			return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
+		}
+
 		user.Name = *input.Name
 	}
+
 	if input.Phone != nil {
 		user.Phone = input.Phone
 	}
