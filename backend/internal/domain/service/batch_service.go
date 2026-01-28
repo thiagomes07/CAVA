@@ -52,4 +52,7 @@ type BatchService interface {
 
 	// Delete remove permanentemente um lote
 	Delete(ctx context.Context, id string) error
+
+	// Sell registra uma venda manual de itens do lote
+	Sell(ctx context.Context, userID string, input entity.CreateSaleInput) (*entity.Batch, error)
 }

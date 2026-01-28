@@ -8,7 +8,8 @@ import (
 type Sale struct {
 	ID                string    `json:"id"`
 	BatchID           string    `json:"batchId"`
-	SoldByUserID      string    `json:"soldByUserId"`
+	SoldByUserID      *string   `json:"soldByUserId,omitempty"`
+	SellerName        string    `json:"sellerName"`        // Nome do vendedor (sistema ou custom)
 	IndustryID        string    `json:"industryId"`
 	ClienteID         *string   `json:"clienteId,omitempty"`
 	CustomerName      string    `json:"customerName"`
@@ -32,7 +33,8 @@ type Sale struct {
 // CreateSaleInput representa os dados para registrar uma venda
 type CreateSaleInput struct {
 	BatchID           string    `json:"batchId" validate:"required,uuid"`
-	SoldByUserID      string    `json:"soldByUserId" validate:"required,uuid"`
+	SoldByUserID      *string   `json:"soldByUserId,omitempty" validate:"omitempty,uuid"`
+	SellerName        string    `json:"sellerName" validate:"required"`
 	IndustryID        string    `json:"industryId" validate:"required,uuid"`
 	ClienteID         *string   `json:"clienteId,omitempty" validate:"omitempty,uuid"`
 	CustomerName      string    `json:"customerName" validate:"required,min=2,max=255"`
@@ -44,8 +46,17 @@ type CreateSaleInput struct {
 	SalePrice         float64   `json:"salePrice" validate:"required,gt=0"`
 	BrokerCommission  float64   `json:"brokerCommission" validate:"gte=0"`
 	NetIndustryValue  float64   `json:"netIndustryValue" validate:"required,gt=0"`
-	InvoiceURL        *string   `json:"invoiceUrl,omitempty" validate:"omitempty,url"`
-	Notes             *string   `json:"notes,omitempty" validate:"omitempty,max=1000"`
+	InvoiceURL        *string                 `json:"invoiceUrl,omitempty" validate:"omitempty,url"`
+	Notes             *string                 `json:"notes,omitempty" validate:"omitempty,max=1000"`
+	NewClient         *CreateSaleClientInput  `json:"newClient,omitempty"` // Para criar cliente inline
+}
+
+// CreateSaleClientInput representa os dados para criar cliente inline (renamed to avoid conflict)
+type CreateSaleClientInput struct {
+	Name    string `json:"name" validate:"required,min=2,max=255"`
+	Phone   string `json:"phone" validate:"required,min=10"`
+	Email   string `json:"email,omitempty" validate:"omitempty,email"`
+	Address string `json:"address,omitempty"`
 }
 
 // SaleFilters representa os filtros para busca de vendas

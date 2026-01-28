@@ -10,6 +10,7 @@ import (
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"go.uber.org/zap"
 )
@@ -587,4 +588,86 @@ func (h *UploadHandler) UpdateProductMediasOrder(w http.ResponseWriter, r *http.
 	)
 
 	response.OK(w, map[string]bool{"success": true})
+}
+
+// UploadIndustryLogo godoc
+// @Summary Faz upload de logo da indústria
+// @Description Faz upload da logo da indústria (Admin only)
+// @Tags uploads
+// @Accept multipart/form-data
+// @Produce json
+// @Param logo formData file true "Arquivo da logo"
+// @Success 201 {object} entity.UploadMediaResponse
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 401 {object} response.ErrorResponse
+// @Router /api/upload/industry-logo [post]
+func (h *UploadHandler) UploadIndustryLogo(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	industryID := middleware.GetIndustryID(ctx)
+
+	if industryID == "" {
+		response.Unauthorized(w, "Usuário não possui indústria associada")
+		return
+	}
+
+	// Limitar tamanho do request (2MB)
+	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+
+	// Parse multipart form
+	if err := r.ParseMultipartForm(2 << 20); err != nil {
+		h.logger.Error("erro ao parsear multipart form",
+			zap.Error(err),
+		)
+		response.BadRequest(w, "Arquivo muito grande. Máximo 2MB", nil)
+		return
+	}
+
+	// Obter arquivo
+	file, header, err := r.FormFile("logo")
+	if err != nil {
+		response.BadRequest(w, "Arquivo 'logo' é obrigatório", nil)
+		return
+	}
+	defer file.Close()
+
+	// Sanitizar nome do arquivo
+	safeFilename := sanitizeUploadFilename(header.Filename)
+
+	// Validar extensão
+	if !isAllowedExtension(safeFilename) {
+		response.BadRequest(w, "Extensão de arquivo inválida. Use .jpg, .jpeg, .png ou .webp", nil)
+		return
+	}
+
+	// Validar Content-Type
+	contentType := header.Header.Get("Content-Type")
+	if !h.storageService.ValidateFileType(contentType, allowedContentTypes) {
+		response.BadRequest(w, "Formato inválido. Use JPEG, PNG ou WebP", nil)
+		return
+	}
+
+	// Fazer upload
+	url, err := h.storageService.UploadIndustryLogo(
+		ctx,
+		industryID,
+		file,
+		safeFilename,
+		contentType,
+		header.Size,
+	)
+	if err != nil {
+		h.logger.Error("erro ao fazer upload da logo",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("logo da indústria enviada",
+		zap.String("industryId", industryID),
+		zap.String("url", url),
+	)
+
+	response.Created(w, entity.UploadMediaResponse{URLs: []string{url}})
 }

@@ -1,7 +1,6 @@
 'use client';
 
-import { forwardRef, type InputHTMLAttributes, type ChangeEvent, type ReactNode } from 'react';
-import InputMask from 'react-input-mask';
+import { forwardRef, type InputHTMLAttributes, type ChangeEvent, useEffect, useState, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
 
 export interface MaskedInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
@@ -11,16 +10,85 @@ export interface MaskedInputProps extends Omit<InputHTMLAttributes<HTMLInputElem
   mask: string;
   maskChar?: string;
   onChange?: (value: string, rawValue: string) => void;
+  value?: string;
+}
+
+// Simple masking implementation to replace react-input-mask
+const formatValue = (value: string, mask: string): string => {
+  if (!value) return '';
+
+  let i = 0; // index in mask
+  let j = 0; // index in value
+  let result = '';
+
+  const valueChars = value.replace(/[^a-zA-Z0-9]/g, ''); // Crude strip, refined below based on mask type
+
+  while (i < mask.length) {
+    const maskChar = mask[i];
+
+    if (j >= valueChars.length) break;
+
+    if (maskChar === '9') {
+      // Expect digit
+      if (/\d/.test(valueChars[j])) {
+        result += valueChars[j];
+        j++;
+        i++;
+      } else {
+        // Skip invalid char in value
+        j++;
+      }
+    } else if (maskChar === 'a') {
+      // Expect letter
+      if (/[a-zA-Z]/.test(valueChars[j])) {
+        result += valueChars[j];
+        j++;
+        i++;
+      } else {
+        j++;
+      }
+    } else {
+      // Static char
+      result += maskChar;
+      i++;
+      // If value matches static char, advance value index too
+      if (valueChars[j] === maskChar) {
+        j++;
+      }
+    }
+  }
+
+  return result;
+};
+
+// Strip mask characters to get raw value
+const getRawValue = (value: string, mask: string): string => {
+  // This is a simplification. For complex masks it might need better logic.
+  // But typically we just want the alphanumeric content.
+  return value.replace(/[^a-zA-Z0-9]/g, '');
 }
 
 const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
-  ({ className, label, error, helperText, mask, maskChar = '_', id, onChange, ...props }, ref) => {
+  ({ className, label, error, helperText, mask, maskChar = '_', id, onChange, value: propValue, placeholder, ...props }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
 
+    // Internal state for uncontrolled usage or to manage display value
+    const [displayValue, setDisplayValue] = useState(propValue || '');
+
+    useEffect(() => {
+      if (propValue !== undefined) {
+        // Re-format incoming value to ensure mask consistency
+        setDisplayValue(formatValue(propValue.toString(), mask));
+      }
+    }, [propValue, mask]);
+
     const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
-      const rawValue = value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-      onChange?.(value, rawValue);
+      const val = e.target.value;
+      const masked = formatValue(val, mask);
+      const raw = getRawValue(masked, mask); // Extract raw from the masked result to be sure
+
+      setDisplayValue(masked);
+      onChange?.(masked, raw);
     };
 
     const inputClassName = cn(
@@ -46,21 +114,15 @@ const MaskedInput = forwardRef<HTMLInputElement, MaskedInputProps>(
             {label}
           </label>
         )}
-        <InputMask
-          mask={mask}
-          maskChar={maskChar}
+        <input
+          ref={ref}
+          id={inputId}
+          value={displayValue}
           onChange={handleChange}
+          placeholder={placeholder}
+          className={inputClassName}
           {...props}
-        >
-          {((inputProps: InputHTMLAttributes<HTMLInputElement>): ReactNode => (
-            <input
-              {...inputProps}
-              ref={ref}
-              id={inputId}
-              className={inputClassName}
-            />
-          )) as unknown as undefined}
-        </InputMask>
+        />
         {error && (
           <p className="mt-1 text-xs text-rose-600">{error}</p>
         )}
@@ -175,7 +237,6 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
       const pasted = e.clipboardData.getData('text');
       const numericValue = parseCurrency(pasted);
       onChange?.(numericValue);
-      // Prevent raw pasted text; we re-render formatted value instead
       e.preventDefault();
     };
 

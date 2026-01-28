@@ -77,13 +77,12 @@ type ServerConfig struct {
 	RateLimitAuthenticatedRPM int
 }
 
-// EmailConfig contém configurações de email (opcional para MVP)
+// EmailConfig contém configurações de email (Amazon SES)
 type EmailConfig struct {
-	SMTPHost     string
-	SMTPPort     int
-	SMTPUser     string
-	SMTPPassword string
-	EmailFrom    string
+	UseSES      bool   // Se true, usa SES; se false, usa console/mock para dev
+	SESRegion   string // Região AWS do SES (ex: us-east-1, sa-east-1)
+	SenderEmail string // Email verificado no SES (obrigatório se UseSES=true)
+	SenderName  string // Nome exibido como remetente (ex: "CAVA")
 }
 
 // Load carrega as configurações das variáveis de ambiente
@@ -267,14 +266,13 @@ func loadServerConfig() ServerConfig {
 	}
 }
 
-// loadEmailConfig carrega configurações de email
+// loadEmailConfig carrega configurações de email (Amazon SES)
 func loadEmailConfig() EmailConfig {
 	return EmailConfig{
-		SMTPHost:     getEnv("SMTP_HOST", ""),
-		SMTPPort:     getEnvAsInt("SMTP_PORT", 587),
-		SMTPUser:     getEnv("SMTP_USER", ""),
-		SMTPPassword: getEnv("SMTP_PASSWORD", ""),
-		EmailFrom:    getEnv("EMAIL_FROM", "noreply@cava.com.br"),
+		UseSES:      getEnvAsBool("USE_SES", false),
+		SESRegion:   getEnv("SES_REGION", "us-east-1"),
+		SenderEmail: getEnv("SES_SENDER_EMAIL", ""),
+		SenderName:  getEnv("SES_SENDER_NAME", "CAVA"),
 	}
 }
 

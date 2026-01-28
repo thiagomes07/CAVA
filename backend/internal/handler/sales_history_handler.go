@@ -200,3 +200,32 @@ func (h *SalesHistoryHandler) GetBrokerSales(w http.ResponseWriter, r *http.Requ
 
 	response.OK(w, sales)
 }
+
+// Delete godoc
+// @Summary Remove um registro de venda (undo)
+// @Description Remove um registro de venda e restaura o estoque
+// @Tags sales-history
+// @Accept json
+// @Produce json
+// @Param id path string true "ID da venda"
+// @Success 204 "No Content"
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/sales-history/{id} [delete]
+func (h *SalesHistoryHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID da venda é obrigatório", nil)
+		return
+	}
+
+	if err := h.salesHistoryService.Delete(r.Context(), id); err != nil {
+		h.logger.Error("erro ao remover venda",
+			zap.String("saleId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.NoContent(w)
+}

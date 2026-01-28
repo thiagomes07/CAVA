@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Plus, Mail, Phone, Link2, Receipt, UserX, Shield, RefreshCw, Clock } from 'lucide-react';
+import { Plus, Mail, Phone, Link2, Receipt, UserX, Shield, RefreshCw, Clock, MessageCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -124,7 +124,7 @@ export default function TeamManagementPage() {
         apiClient.get<User[]>('/users', { params: { role: 'ADMIN_INDUSTRIA' } }),
       ]);
       // Combinar e ordenar por nome
-      const combined = [...vendedores, ...admins].sort((a, b) => 
+      const combined = [...vendedores, ...admins].sort((a, b) =>
         a.name.localeCompare(b.name)
       );
       setSellers(combined);
@@ -153,6 +153,9 @@ export default function TeamManagementPage() {
     } catch (err) {
       if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
         error(t('emailAlreadyExists'));
+      } else if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.message) {
+        // Exibe a mensagem específica do backend (ex: "Já existe um usuário com este nome")
+        error(err.message);
       } else {
         error(t('sellerCreateError'));
       }
@@ -199,7 +202,7 @@ export default function TeamManagementPage() {
 
     try {
       setIsSubmitting(true);
-      
+
       const payload: { newEmail?: string } = {};
       if (data.changeEmail && data.newEmail && data.newEmail.trim() !== '') {
         payload.newEmail = data.newEmail.trim();
@@ -220,6 +223,9 @@ export default function TeamManagementPage() {
         }
       } else if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
         error(t('emailAlreadyExists'));
+      } else if (err instanceof ApiError && err.code === 'VALIDATION_ERROR' && err.message) {
+        // Exibe a mensagem específica do backend
+        error(err.message);
       } else {
         error(t('resendError'));
       }
@@ -273,6 +279,7 @@ export default function TeamManagementPage() {
                   <TableHead>{tCommon('name')}</TableHead>
                   <TableHead>{tCommon('email')}</TableHead>
                   <TableHead>{tCommon('phone')}</TableHead>
+                  <TableHead>WhatsApp</TableHead>
                   <TableHead>{t('linksCreated')}</TableHead>
                   <TableHead>{t('salesCount')}</TableHead>
                   <TableHead>{tCommon('status')}</TableHead>
@@ -286,7 +293,7 @@ export default function TeamManagementPage() {
                       <div className="flex items-center gap-2">
                         <div>
                           <div className="flex items-center gap-2">
-                            <p 
+                            <p
                               className="font-medium text-obsidian"
                               title={seller.name}
                             >
@@ -308,7 +315,7 @@ export default function TeamManagementPage() {
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <Mail className="w-4 h-4 text-slate-400" />
-                        <span 
+                        <span
                           className="text-sm text-slate-600"
                           title={seller.email}
                         >
@@ -324,6 +331,23 @@ export default function TeamManagementPage() {
                             {formatPhone(seller.phone)}
                           </span>
                         </div>
+                      ) : (
+                        <span className="text-slate-400">-</span>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {seller.whatsapp ? (
+                        <a
+                          href={`https://wa.me/55${seller.whatsapp.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 group"
+                        >
+                          <MessageCircle className="w-4 h-4 text-emerald-500 group-hover:text-emerald-600" />
+                          <span className="text-sm text-slate-600 group-hover:text-emerald-700 transition-colors">
+                            {formatPhone(seller.whatsapp)}
+                          </span>
+                        </a>
                       ) : (
                         <span className="text-slate-400">-</span>
                       )}
@@ -543,6 +567,6 @@ export default function TeamManagementPage() {
           </ModalFooter>
         </form>
       </Modal>
-    </div>
+    </div >
   );
 }

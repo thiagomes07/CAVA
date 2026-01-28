@@ -3,31 +3,40 @@ package service
 import (
 	"context"
 	"crypto/rand"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	domainErrors "github.com/thiagomes07/CAVA/backend/internal/domain/errors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
+	domainService "github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	infraEmail "github.com/thiagomes07/CAVA/backend/internal/infra/email"
 	"github.com/thiagomes07/CAVA/backend/pkg/password"
 	"go.uber.org/zap"
 )
 
 type userService struct {
-	userRepo repository.UserRepository
-	hasher   *password.Hasher
-	logger   *zap.Logger
+	userRepo    repository.UserRepository
+	hasher      *password.Hasher
+	emailSender domainService.EmailSender
+	frontendURL string
+	logger      *zap.Logger
 }
 
 func NewUserService(
 	userRepo repository.UserRepository,
 	hasher *password.Hasher,
+	emailSender domainService.EmailSender,
+	frontendURL string,
 	logger *zap.Logger,
 ) *userService {
 	return &userService{
-		userRepo: userRepo,
-		hasher:   hasher,
-		logger:   logger,
+		userRepo:    userRepo,
+		hasher:      hasher,
+		emailSender: emailSender,
+		frontendURL: frontendURL,
+		logger:      logger,
 	}
 }
 
@@ -107,6 +116,16 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		return nil, domainErrors.EmailExistsError(input.Email)
 	}
 
+	// Verificar se nome já existe na indústria
+	nameExists, err := s.userRepo.ExistsByNameInIndustry(ctx, input.Name, industryID)
+	if err != nil {
+		s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if nameExists {
+		return nil, domainErrors.ValidationError("Já existe um usuário com este nome nesta indústria")
+	}
+
 	// Gerar senha temporária
 	temporaryPassword := s.generateTemporaryPassword()
 
@@ -151,11 +170,15 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		zap.Bool("isAdmin", input.IsAdmin),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	s.logger.Warn("senha temporária gerada para "+roleDesc+" (deve ser enviada por email)",
-		zap.String("userId", user.ID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, roleDesc); err != nil {
+		// Log do erro, mas não falha a operação - usuário foi criado
+		s.logger.Error("erro ao enviar email de convite",
+			zap.String("userId", user.ID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -223,11 +246,32 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 	}
 
 	// Atualizar campos
-	if input.Name != nil {
+	if input.Name != nil && *input.Name != user.Name {
+		// Verificar se novo nome já existe
+		var nameExists bool
+		if user.IndustryID != nil {
+			nameExists, err = s.userRepo.ExistsByNameInIndustry(ctx, *input.Name, *user.IndustryID)
+		} else {
+			nameExists, err = s.userRepo.ExistsByNameGlobally(ctx, *input.Name)
+		}
+
+		if err != nil {
+			s.logger.Error("erro ao verificar duplicidade de nome", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+		if nameExists {
+			return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
+		}
+
 		user.Name = *input.Name
 	}
+
 	if input.Phone != nil {
 		user.Phone = input.Phone
+	}
+
+	if input.Whatsapp != nil {
+		user.Whatsapp = input.Whatsapp
 	}
 
 	user.UpdatedAt = time.Now()
@@ -302,6 +346,16 @@ func (s *userService) InviteBroker(ctx context.Context, industryID string, input
 		return nil, domainErrors.EmailExistsError(input.Email)
 	}
 
+	// Verificar se nome já existe globalmente (brokers não têm industry_id)
+	nameExists, err := s.userRepo.ExistsByNameGlobally(ctx, input.Name)
+	if err != nil {
+		s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+	if nameExists {
+		return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
+	}
+
 	// Gerar senha temporária
 	temporaryPassword := s.generateTemporaryPassword()
 
@@ -340,12 +394,15 @@ func (s *userService) InviteBroker(ctx context.Context, industryID string, input
 		zap.String("invitedBy", industryID),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	// Por enquanto, apenas log
-	s.logger.Warn("senha temporária gerada (deve ser enviada por email)",
-		zap.String("brokerId", user.ID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, "broker"); err != nil {
+		// Log do erro, mas não falha a operação - usuário foi criado
+		s.logger.Error("erro ao enviar email de convite para broker",
+			zap.String("brokerId", user.ID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -426,11 +483,15 @@ func (s *userService) ResendInvite(ctx context.Context, userID string, newEmail 
 		zap.String("email", user.Email),
 	)
 
-	// Nota: Aqui seria enviado email com a senha temporária
-	s.logger.Warn("senha temporária gerada para reenvio (deve ser enviada por email)",
-		zap.String("userId", userID),
-		zap.String("temporaryPassword", temporaryPassword),
-	)
+	// Enviar email com nova senha temporária
+	if err := s.sendInviteEmail(ctx, user.Email, user.Name, temporaryPassword, "usuário"); err != nil {
+		// Log do erro, mas não falha a operação
+		s.logger.Error("erro ao reenviar email de convite",
+			zap.String("userId", userID),
+			zap.String("email", user.Email),
+			zap.Error(err),
+		)
+	}
 
 	return user, nil
 }
@@ -519,4 +580,67 @@ func (s *userService) generateTemporaryPassword() string {
 	}
 
 	return string(password)
+}
+
+// sendInviteEmail envia email de convite com senha temporária
+func (s *userService) sendInviteEmail(ctx context.Context, email, name, temporaryPassword, roleDesc string) error {
+	// Se não houver email sender configurado, apenas log
+	if s.emailSender == nil {
+		s.logger.Warn("email sender não configurado - convite não enviado",
+			zap.String("email", email),
+			zap.String("temporaryPassword", temporaryPassword),
+		)
+		return nil
+	}
+
+	loginURL := s.frontendURL + "/login"
+
+	// Mapear roleDesc para descrição amigável
+	roleDescription := s.getRoleDescription(roleDesc)
+
+	// Usar template padronizado
+	htmlBody, textBody, err := infraEmail.RenderInviteEmail(infraEmail.InviteEmailData{
+		UserName:          name,
+		RoleDescription:   roleDescription,
+		Email:             email,
+		TemporaryPassword: temporaryPassword,
+		LoginURL:          loginURL,
+	})
+	if err != nil {
+		s.logger.Error("erro ao renderizar template de convite", zap.Error(err))
+		return fmt.Errorf("falha ao renderizar email de convite: %w", err)
+	}
+
+	// Enviar email
+	msg := domainService.EmailMessage{
+		To:       email,
+		Subject:  "Convite para acessar CAVA - Stone Platform",
+		HTMLBody: htmlBody,
+		TextBody: textBody,
+	}
+
+	if err := s.emailSender.Send(ctx, msg); err != nil {
+		return fmt.Errorf("falha ao enviar email de convite: %w", err)
+	}
+
+	s.logger.Info("email de convite enviado com sucesso",
+		zap.String("email", email),
+		zap.String("roleDesc", roleDesc),
+	)
+
+	return nil
+}
+
+// getRoleDescription converte role técnico para descrição amigável
+func (s *userService) getRoleDescription(roleDesc string) string {
+	switch roleDesc {
+	case "broker":
+		return "Vendedor Parceiro"
+	case "admin":
+		return "Administrador"
+	case "vendedor interno":
+		return "Vendedor Interno"
+	default:
+		return "Usuário"
+	}
 }

@@ -4,19 +4,19 @@ export type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO';
 
 export type PriceUnit = 'M2' | 'FT2';
 
-export type MaterialType = 
-  | 'GRANITO' 
-  | 'MARMORE' 
-  | 'QUARTZITO' 
-  | 'LIMESTONE' 
-  | 'TRAVERTINO' 
+export type MaterialType =
+  | 'GRANITO'
+  | 'MARMORE'
+  | 'QUARTZITO'
+  | 'LIMESTONE'
+  | 'TRAVERTINO'
   | 'OUTROS';
 
-export type FinishType = 
-  | 'POLIDO' 
-  | 'LEVIGADO' 
-  | 'BRUTO' 
-  | 'APICOADO' 
+export type FinishType =
+  | 'POLIDO'
+  | 'LEVIGADO'
+  | 'BRUTO'
+  | 'APICOADO'
   | 'FLAMEADO';
 
 export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO';
@@ -26,6 +26,7 @@ export interface User {
   name: string;
   email: string;
   phone?: string;
+  whatsapp?: string;
   role: UserRole;
   industryId?: string;
   isActive: boolean;
@@ -37,11 +38,21 @@ export interface User {
 export interface Industry {
   id: string;
   name: string;
-  cnpj?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
-  isActive: boolean;
+  cnpj: string;
+  slug: string;
+  contactEmail: string;
+  contactPhone?: string;
+  whatsapp?: string;
+  description?: string;
+  logoUrl?: string;
+  addressCountry?: string;
+  addressState?: string;
+  addressCity?: string;
+  addressStreet?: string;
+  addressNumber?: string;
+  addressZipCode?: string;
+  policyTerms?: string;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -162,7 +173,8 @@ export interface Reservation {
 export interface Sale {
   id: string;
   batchId: string;
-  soldByUserId: string;
+  soldByUserId?: string;
+  sellerName?: string;
   clienteId?: string;
   customerName: string;
   customerContact: string;
@@ -198,4 +210,28 @@ export interface Activity {
   sellerName: string;
   action: 'RESERVADO' | 'VENDIDO' | 'COMPARTILHADO' | 'CRIADO';
   date: string;
+}
+
+// Tipos para envio de links para clientes
+export interface SendLinksInput {
+  clienteIds: string[];
+  salesLinkIds: string[];
+  customMessage?: string;
+}
+
+export interface SendLinkResult {
+  clienteId: string;
+  clienteName: string;
+  email: string;
+  success: boolean;
+  error?: string;
+}
+
+export interface SendLinksResponse {
+  totalClientes: number;
+  totalSent: number;
+  totalFailed: number;
+  totalSkipped: number;
+  results: SendLinkResult[];
+  linksIncluded: number;
 }

@@ -291,3 +291,41 @@ func DatabaseError(err error) *AppError {
 func StorageError(err error) *AppError {
 	return NewInternalError("Erro ao acessar storage", err)
 }
+
+// =============================================
+// ERROS DE EMAIL
+// =============================================
+
+// EmailSendError cria um erro genérico de envio de email
+func EmailSendError(err error) *AppError {
+	return NewInternalError("Erro ao enviar email", err)
+}
+
+// EmailQuotaExceededError cria um erro de limite de envio excedido
+func EmailQuotaExceededError() *AppError {
+	return &AppError{
+		Code:       "EMAIL_QUOTA_EXCEEDED",
+		Message:    "Limite de envio de emails excedido. Tente novamente mais tarde",
+		StatusCode: http.StatusTooManyRequests,
+	}
+}
+
+// EmailNotVerifiedError cria um erro de email não verificado (sandbox SES)
+func EmailNotVerifiedError(email string) *AppError {
+	return &AppError{
+		Code:       "EMAIL_NOT_VERIFIED",
+		Message:    "Email de destino não verificado no serviço de email",
+		Details:    map[string]interface{}{"email": email},
+		StatusCode: http.StatusBadRequest,
+	}
+}
+
+// EmailCredentialsError cria um erro de credenciais de email inválidas
+func EmailCredentialsError(err error) *AppError {
+	return &AppError{
+		Code:       "EMAIL_CREDENTIALS_ERROR",
+		Message:    "Erro de configuração do serviço de email",
+		StatusCode: http.StatusInternalServerError,
+		Err:        err,
+	}
+}

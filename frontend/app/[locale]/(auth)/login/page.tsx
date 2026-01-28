@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,15 +35,29 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
 
   const login = useAuthStore((state) => state.login);
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const { success, error } = useToast();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      const callbackUrl = searchParams.get('callbackUrl');
+      const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
+      router.replace(redirectTo);
+    }
+  }, [isAuthenticated, router, searchParams, getDashboardRoute]);
 
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors },
   } = useForm<LoginInput>({
     resolver: zodResolver(loginSchema),
   });
+
+  // Watch email field to pass to forgot-password
+  const emailValue = watch('email');
 
   const onSubmit = async (data: LoginInput) => {
     try {
@@ -54,7 +68,7 @@ export default function LoginPage() {
       // Obter o nome do usuário do store após o login
       const user = useAuthStore.getState().user;
       const userName = user?.name?.split(' ')[0] || 'usuário';
-      
+
       success(t('welcomeBack', { name: userName }));
 
       // Use callback URL if provided, otherwise use role-based dashboard
@@ -139,6 +153,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <button
                 type="button"
+                onClick={() => router.push(`/forgot-password${emailValue ? `?email=${encodeURIComponent(emailValue)}` : ''}`)}
                 className="text-sm text-slate-500 hover:text-obsidian transition-colors"
               >
                 {t('forgotPassword')}

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus } from 'lucide-react';
+import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -22,7 +22,8 @@ import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Cliente, SalesLink } from '@/lib/types';
+import { useSendLinksToClientes } from '@/lib/api/mutations/useLeadMutations';
+import type { Cliente, SalesLink, SendLinksResponse } from '@/lib/types';
 import type { ClienteFilter } from '@/lib/schemas/lead.schema';
 import { clienteStatuses } from '@/lib/schemas/lead.schema';
 import { cn } from '@/lib/utils/cn';
@@ -51,8 +52,17 @@ export default function ClientesManagementPage() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showSendLinksModal, setShowSendLinksModal] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Selection state
+  const [selectedClienteIds, setSelectedClienteIds] = useState<Set<string>>(new Set());
+  const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
+  const [customMessage, setCustomMessage] = useState('');
+
+  // Send links mutation
+  const sendLinksMutation = useSendLinksToClientes();
 
   const {
     register,
@@ -116,25 +126,107 @@ export default function ClientesManagementPage() {
     fetchSalesLinks();
   }, []);
 
-  // Run fetch when filters change. Depending on the `fetchClientes` callback
-  // identity can lead to re-runs if its dependencies are unstable, so
-  // depend directly on `filters` which is the authoritative trigger.
   useEffect(() => {
     fetchClientes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
+  // Filter active links only
+  const activeLinks = useMemo(() => {
+    return salesLinks.filter(link => link.isActive && (!link.expiresAt || new Date(link.expiresAt) > new Date()));
+  }, [salesLinks]);
+
+  // Check if client has valid email
+  const isValidEmail = (contact: string) => contact.includes('@');
+
+  // Selection handlers
+  const handleSelectCliente = (clienteId: string, checked: boolean) => {
+    const newSet = new Set(selectedClienteIds);
+    if (checked) {
+      newSet.add(clienteId);
+    } else {
+      newSet.delete(clienteId);
+    }
+    setSelectedClienteIds(newSet);
+  };
+
+  const handleSelectAllClientes = () => {
+    if (selectedClienteIds.size === clientes.length) {
+      setSelectedClienteIds(new Set());
+    } else {
+      setSelectedClienteIds(new Set(clientes.map(c => c.id)));
+    }
+  };
+
+  const handleSelectLink = (linkId: string, checked: boolean) => {
+    const newSet = new Set(selectedLinkIds);
+    if (checked) {
+      newSet.add(linkId);
+    } else {
+      newSet.delete(linkId);
+    }
+    setSelectedLinkIds(newSet);
+  };
+
+  const handleOpenSendLinksModal = () => {
+    if (selectedClienteIds.size === 0) {
+      error(t('noClientsSelected'));
+      return;
+    }
+    setSelectedLinkIds(new Set());
+    setCustomMessage('');
+    setShowSendLinksModal(true);
+  };
+
+  const handleSendLinks = async () => {
+    if (selectedLinkIds.size === 0) {
+      error(t('noLinksSelected'));
+      return;
+    }
+
+    try {
+      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
+        clienteIds: Array.from(selectedClienteIds),
+        salesLinkIds: Array.from(selectedLinkIds),
+        customMessage: customMessage || undefined,
+      });
+
+      // Show appropriate message based on results
+      if (result.totalFailed === 0 && result.totalSkipped === 0) {
+        success(t('sendSuccess', { sent: result.totalSent }));
+      } else {
+        success(t('sendPartialSuccess', {
+          sent: result.totalSent,
+          failed: result.totalFailed,
+          skipped: result.totalSkipped,
+        }));
+      }
+
+      setShowSendLinksModal(false);
+      setSelectedClienteIds(new Set());
+      setSelectedLinkIds(new Set());
+      setCustomMessage('');
+      fetchClientes();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error(t('sendError'));
+      }
+    }
+  };
+
   const handleUpdateStatus = async (clienteId: string, newStatus: typeof clienteStatuses[number]) => {
     try {
       setIsUpdatingStatus(true);
-      
+
       await apiClient.patch(`/clientes/${clienteId}/status`, {
         status: newStatus,
       });
 
       success(t('statusUpdated'));
       fetchClientes();
-      
+
       if (selectedCliente?.id === clienteId) {
         setSelectedCliente({ ...selectedCliente, status: newStatus });
       }
@@ -218,6 +310,16 @@ export default function ClientesManagementPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {selectedClienteIds.size > 0 && (
+              <Button
+                variant="primary"
+                onClick={handleOpenSendLinksModal}
+                className="bg-emerald-600 hover:bg-emerald-700"
+              >
+                <Send className="w-4 h-4 mr-2" />
+                {t('sendLinks')} ({selectedClienteIds.size})
+              </Button>
+            )}
             <Button variant="primary" onClick={() => setShowCreateModal(true)}>
               <Plus className="w-4 h-4 mr-2" />
               {t('addCliente')}
@@ -229,6 +331,23 @@ export default function ClientesManagementPage() {
           </div>
         </div>
       </div>
+
+      {/* Selection indicator */}
+      {selectedClienteIds.size > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200 px-8 py-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm text-blue-700">
+              {t('selectedClients', { count: selectedClienteIds.size })}
+            </p>
+            <button
+              onClick={() => setSelectedClienteIds(new Set())}
+              className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+            >
+              {t('deselectAll')}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="px-8 py-6">
@@ -326,6 +445,13 @@ export default function ClientesManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        id="select-all"
+                        checked={selectedClienteIds.size === clientes.length && clientes.length > 0}
+                        onChange={handleSelectAllClientes}
+                      />
+                    </TableHead>
                     <TableHead>{t('name')}</TableHead>
                     <TableHead>{t('contact')}</TableHead>
                     <TableHead>{t('origin')}</TableHead>
@@ -340,17 +466,28 @@ export default function ClientesManagementPage() {
                 <TableBody>
                   {clientes.map((cliente) => {
                     const isEmail = cliente.contact.includes('@');
-                    
+                    const isSelected = selectedClienteIds.has(cliente.id);
+
                     return (
-                      <TableRow 
+                      <TableRow
                         key={cliente.id}
-                        className="cursor-pointer"
+                        className={cn(
+                          "cursor-pointer transition-colors",
+                          isSelected && "bg-blue-50"
+                        )}
                         onClick={() => handleViewDetails(cliente)}
                       >
+                        <TableCell onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                          <Checkbox
+                            id={`select-${cliente.id}`}
+                            checked={isSelected}
+                            onChange={(e) => handleSelectCliente(cliente.id, e.target.checked)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
-                            <span 
+                            <span
                               className="font-medium text-obsidian"
                               title={cliente.name}
                             >
@@ -377,7 +514,7 @@ export default function ClientesManagementPage() {
                         </TableCell>
                         <TableCell>
                           <div>
-                            <p 
+                            <p
                               className="text-sm text-slate-600"
                               title={cliente.salesLink?.title || cliente.salesLink?.slugToken}
                             >
@@ -394,14 +531,14 @@ export default function ClientesManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span 
+                          <span
                             className="text-sm text-slate-600"
                             title={cliente.salesLink?.batch?.product?.name || cliente.salesLink?.product?.name || 'Catálogo'}
                           >
                             {truncateText(
                               cliente.salesLink?.batch?.product?.name ||
-                                cliente.salesLink?.product?.name ||
-                                'Catálogo',
+                              cliente.salesLink?.product?.name ||
+                              'Catálogo',
                               TRUNCATION_LIMITS.PRODUCT_NAME_SHORT
                             )}
                           </span>
@@ -512,7 +649,7 @@ export default function ClientesManagementPage() {
                         <p className="font-medium text-obsidian">{selectedCliente.contact}</p>
                         <button
                           onClick={() => handleCopyContact(selectedCliente.contact)}
-                          className="text-blue-600 hover:text-blue-700"
+                          className="text-blue-600 hover:text-blue-700 cursor-pointer"
                         >
                           <Copy className="w-4 h-4" />
                         </button>
@@ -708,6 +845,121 @@ export default function ClientesManagementPage() {
             </Button>
           </ModalFooter>
         </form>
+      </Modal>
+
+      {/* Send Links Modal */}
+      <Modal open={showSendLinksModal} onClose={() => setShowSendLinksModal(false)}>
+        <ModalClose onClose={() => setShowSendLinksModal(false)} />
+        <ModalHeader>
+          <ModalTitle>{t('sendLinksTitle')}</ModalTitle>
+        </ModalHeader>
+        <ModalContent>
+          <div className="space-y-6">
+            {/* Selected clients info */}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
+              <p className="text-sm font-medium text-blue-900 mb-2">
+                {t('selectedClients', { count: selectedClienteIds.size })}
+              </p>
+              <p className="text-xs text-blue-700">
+                {t('onlyEmailClients')}
+              </p>
+            </div>
+
+            {/* Links selection */}
+            <div>
+              <p className="text-sm font-medium text-obsidian mb-3">
+                {t('selectLinksToSend')} *
+              </p>
+              <p className="text-xs text-slate-500 mb-3">
+                {t('activeLinksOnly')}
+              </p>
+              <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-sm p-3">
+                {activeLinks.length === 0 ? (
+                  <p className="text-sm text-slate-500 text-center py-4">
+                    {t('noLinksSelected')}
+                  </p>
+                ) : (
+                  activeLinks.map((link) => (
+                    <div
+                      key={link.id}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-sm border cursor-pointer transition-all",
+                        selectedLinkIds.has(link.id)
+                          ? "bg-blue-50 border-blue-300"
+                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"
+                      )}
+                      onClick={() => handleSelectLink(link.id, !selectedLinkIds.has(link.id))}
+                    >
+                      <Checkbox
+                        id={`link-${link.id}`}
+                        checked={selectedLinkIds.has(link.id)}
+                        onChange={(e) => handleSelectLink(link.id, e.target.checked)}
+                      />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-obsidian truncate">
+                          {link.title || link.slugToken}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {link.linkType.replace('_', ' ')} • /{link.slugToken}
+                        </p>
+                      </div>
+                      {link.displayPrice && link.showPrice && (
+                        <Badge variant="default">
+                          R$ {link.displayPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </Badge>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Custom message */}
+            <div>
+              <label className="block text-sm font-medium text-obsidian mb-2">
+                {t('customMessage')}
+              </label>
+              <textarea
+                value={customMessage}
+                onChange={(e) => setCustomMessage(e.target.value)}
+                placeholder={t('customMessagePlaceholder')}
+                rows={3}
+                className={cn(
+                  'w-full px-4 py-3 rounded-sm border bg-porcelain text-obsidian border-slate-200',
+                  'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+                  'resize-none'
+                )}
+              />
+            </div>
+          </div>
+        </ModalContent>
+        <ModalFooter>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => setShowSendLinksModal(false)}
+          >
+            {tCommon('cancel')}
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSendLinks}
+            disabled={sendLinksMutation.isPending || selectedLinkIds.size === 0}
+            className="bg-emerald-600 hover:bg-emerald-700"
+          >
+            {sendLinksMutation.isPending ? (
+              <>
+                <span className="animate-spin mr-2">⏳</span>
+                {t('sending')}
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4 mr-2" />
+                {t('sendLinksButton')}
+              </>
+            )}
+          </Button>
+        </ModalFooter>
       </Modal>
     </div>
   );

@@ -305,7 +305,8 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 		sale = &entity.Sale{
 			ID:                uuid.New().String(),
 			BatchID:           reservation.BatchID,
-			SoldByUserID:      userID,
+			SoldByUserID:      &userID,
+			SellerName:        "", // Default
 			IndustryID:        batch.IndustryID,
 			ClienteID:         reservation.ClienteID,
 			CustomerName:      "", // Será preenchido com dados do cliente ou input

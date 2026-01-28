@@ -31,6 +31,7 @@ type Handler struct {
 	Public          *PublicHandler
 	Industry        *IndustryHandler
 	Health          *HealthHandler
+	Industry        *IndustryHandler
 }
 
 // Config contém as configurações para os handlers
@@ -59,6 +60,7 @@ type Services struct {
 	SalesHistory    service.SalesHistoryService
 	SharedInventory service.SharedInventoryService
 	Storage         service.StorageService
+	Email           service.EmailSender
 	MediaRepo       repository.MediaRepository
 	IndustryRepo    repository.IndustryRepository
 	BatchRepo       repository.BatchRepository
@@ -147,6 +149,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			r.Post("/login", h.Auth.Login)
 			r.Post("/refresh", h.Auth.Refresh)
+			r.Post("/forgot-password", h.Auth.ForgotPassword)
+			r.Post("/reset-password", h.Auth.ResetPassword)
 			r.With(m.Auth.Authenticate, m.CSRF.ValidateCSRF).Post("/logout", h.Auth.Logout)
 		})
 
@@ -203,6 +207,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/batches", func(r chi.Router) {
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/", h.Batch.List)
 				r.With(m.RBAC.RequireAdmin).Post("/", h.Batch.Create)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/sell", h.Batch.Sell)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}", h.Batch.GetByID)
 				r.With(m.RBAC.RequireAdmin).Get("/{batchId}/shared", h.SharedInventory.GetSharedBatchesByBatchID)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/{id}/status", h.Batch.CheckStatus)
@@ -301,6 +306,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/clientes", func(r chi.Router) {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Cliente.List)
 				r.With(m.RBAC.RequireIndustryUser).Post("/", h.Cliente.Create)
+				r.With(m.RBAC.RequireIndustryUser).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Cliente.GetByID)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Cliente.GetInteractions)
 				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Cliente.UpdateStatus)
@@ -313,6 +319,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireIndustryUser).Get("/", h.SalesHistory.List)
 				r.With(m.RBAC.RequireIndustryUser).Get("/summary", h.SalesHistory.GetSummary)
 				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.SalesHistory.GetByID)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.SalesHistory.Delete)
 			})
 
 			// Broker sales
@@ -324,6 +331,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/upload", func(r chi.Router) {
 				r.With(m.RBAC.RequireAdmin).Post("/product-medias", h.Upload.UploadProductMedias)
 				r.With(m.RBAC.RequireAdmin).Post("/batch-medias", h.Upload.UploadBatchMedias)
+				r.With(m.RBAC.RequireAdmin).Post("/industry-logo", h.Upload.UploadIndustryLogo)
 			})
 
 			// Delete medias
@@ -333,6 +341,15 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Update media order
 			r.With(m.RBAC.RequireAdmin).Patch("/product-medias/order", h.Upload.UpdateProductMediasOrder)
 			r.With(m.RBAC.RequireAdmin).Patch("/batch-medias/order", h.Upload.UpdateBatchMediasOrder)
+
+			// ----------------------------------------
+			// INDUSTRY CONFIG
+			// ----------------------------------------
+			r.Route("/industry-config", func(r chi.Router) {
+				r.With(m.RBAC.RequireAdmin).Get("/", h.Industry.GetConfig)
+				r.With(m.RBAC.RequireAdmin).Patch("/", h.Industry.UpdateConfig)
+				r.With(m.RBAC.RequireAdmin).Delete("/logo", h.Industry.DeleteLogo)
+			})
 		})
 	})
 

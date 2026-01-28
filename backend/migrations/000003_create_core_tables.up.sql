@@ -11,7 +11,16 @@ CREATE TABLE industries (
     slug VARCHAR(100) NOT NULL UNIQUE,
     contact_email VARCHAR(255) NOT NULL,
     contact_phone VARCHAR(50),
-    policy_terms TEXT,
+    whatsapp VARCHAR(20),
+    description TEXT,
+    logo_url VARCHAR(500),
+    address_country VARCHAR(100),
+    address_state VARCHAR(100),
+    address_city VARCHAR(255),
+    address_street VARCHAR(255),
+    address_number VARCHAR(50),
+    address_zip_code VARCHAR(20),
+    address_zip_code VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -24,7 +33,7 @@ CREATE INDEX idx_industries_cnpj ON industries(cnpj);
 COMMENT ON TABLE industries IS 'Indústrias cadastradas no sistema';
 COMMENT ON COLUMN industries.slug IS 'Slug único para URLs (ex: pedras-sul)';
 COMMENT ON COLUMN industries.cnpj IS 'CNPJ da indústria (apenas dígitos)';
-COMMENT ON COLUMN industries.policy_terms IS 'Termos e políticas de venda da indústria';
+
 
 -- Tabela: Usuários
 CREATE TABLE users (
@@ -37,7 +46,9 @@ CREATE TABLE users (
     role user_role_type NOT NULL,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    -- Unique constraint: nome único por indústria
+    UNIQUE (name, industry_id)
 );
 
 -- Índices para users

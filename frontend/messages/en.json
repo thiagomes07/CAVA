@@ -62,7 +62,22 @@
     "invalidCredentials": "Invalid email or password",
     "termsNotice": "By continuing, you agree to our Terms of Use and Privacy Policy",
     "heroTitle": "Transform stones into works of art",
-    "heroSubtitle": "The complete platform for ornamental stone management"
+    "heroSubtitle": "The complete platform for ornamental stone management",
+    "forgotPasswordTitle": "Reset Password",
+    "forgotPasswordSubtitle": "We will send a verification code to your email",
+    "sendCode": "Send Code",
+    "codeSent": "Code sent to {email}",
+    "enterCode": "Enter the Code",
+    "codePlaceholder": "000000",
+    "newPasswordLabel": "New Password",
+    "confirmNewPasswordLabel": "Confirm New Password",
+    "resetPassword": "Reset Password",
+    "passwordResetSuccess": "Password changed successfully!",
+    "passwordResetSuccessDescription": "Your password has been updated. You can now log in with your new password.",
+    "invalidCode": "Invalid or expired code",
+    "codeExpired": "Code expired. Please request a new one.",
+    "backToLogin": "Back to Login",
+    "sendNewCode": "Didn't receive it? Send new code"
   },
   "errors": {
     "generic": "Something went wrong",
@@ -301,7 +316,25 @@
     "contactAlreadyExists": "A cliente with this contact already exists",
     "createError": "Error creating cliente",
     "manuallyCreated": "Manually created",
-    "manuallyCreatedDescription": "This cliente was registered directly in the system"
+    "manuallyCreatedDescription": "This cliente was registered directly in the system",
+    "sendLinks": "SEND LINKS",
+    "sendLinksTitle": "Send Links to Clientes",
+    "selectedClients": "{count} cliente(s) selected",
+    "selectLinksToSend": "Select the links you want to send",
+    "noLinksSelected": "Select at least one link",
+    "noClientsSelected": "Select at least one cliente",
+    "customMessage": "Custom message (optional)",
+    "customMessagePlaceholder": "Write a message to accompany the links...",
+    "sending": "Sending...",
+    "sendLinksButton": "SEND LINKS",
+    "sendSuccess": "{sent} email(s) sent successfully!",
+    "sendPartialSuccess": "{sent} sent, {failed} failed, {skipped} skipped",
+    "sendError": "Error sending links",
+    "invalidEmail": "Invalid email",
+    "selectAll": "Select all",
+    "deselectAll": "Clear selection",
+    "onlyEmailClients": "Only clientes with valid email will receive",
+    "activeLinksOnly": "Active links"
   },
   "links": {
     "title": "My Sales Links",
@@ -453,7 +486,13 @@
     "invalidWhatsapp": "Invalid WhatsApp number",
     "currentPasswordRequired": "Current password is required",
     "newPasswordRequired": "New password is required",
-    "invalidContact": "Invalid email or phone"
+    "invalidContact": "Invalid email or phone",
+    "passwordRequirements": "Password requirements:",
+    "passwordMinLengthReq": "At least 8 characters",
+    "passwordUppercaseReq": "At least one uppercase letter",
+    "passwordNumberReq": "At least one number",
+    "passwordMatchReq": "Passwords match",
+    "passwordStrong": "Strong password!"
   },
   "language": {
     "select": "Select language",
@@ -505,8 +544,7 @@
     "inviteResent": "Invite resent successfully",
     "cannotResendAfterLogin": "Cannot resend invite to user who has already accessed the system",
     "resendError": "Error resending invite",
-    "newEmail": "New Email",
-    "emailAlreadyExists": "This email is already registered in the system"
+    "newEmail": "New Email"
   },
   "brokers": {
     "title": "Partners (Brokers)",
@@ -543,8 +581,7 @@
     "inviteResent": "Invite resent successfully",
     "cannotResendAfterLogin": "Cannot resend invite to broker who has already accessed the system",
     "resendError": "Error resending invite",
-    "newEmail": "New Email",
-    "emailAlreadyExists": "This email is already registered in the system"
+    "newEmail": "New Email"
   },
   "sharedInventory": {
     "title": "Shared Inventory",
@@ -578,5 +615,39 @@
     "passwordChangeError": "Error changing password",
     "incorrectPassword": "Incorrect current password",
     "loadError": "Error loading profile"
+  },
+  "industryConfig": {
+    "title": "Industry Configuration",
+    "subtitle": "Manage your company data, contact info and address.",
+    "identity": "Identity",
+    "identityDesc": "Basic company information",
+    "visualIdentity": "Visual Identity",
+    "visualIdentityDesc": "Define your company logo and description.",
+    "contact": "Contact",
+    "address": "Address",
+    "logo": "Logo",
+    "logoUploadError": "Error uploading logo",
+    "logoDeleted": "Logo removed successfully",
+    "logoDeleteError": "Error removing logo",
+    "companyName": "Company Name",
+    "cnpj": "Tax ID (CNPJ)",
+    "businessId": "Business ID / Tax ID",
+    "cnpjReadOnly": "CNPJ cannot be changed.",
+    "description": "Description",
+    "descriptionPlaceholder": "Describe your company...",
+    "email": "Contact Email",
+    "whatsapp": "WhatsApp",
+    "phone": "Phone",
+    "country": "Country",
+    "selectCountry": "Select country",
+    "state": "State",
+    "selectState": "Select state",
+    "city": "City",
+    "selectCity": "Select city",
+    "zipCode": "Zip Code",
+    "street": "Street",
+    "number": "Number",
+    "success": "Data updated successfully",
+    "error": "Error updating data"
   }
 }

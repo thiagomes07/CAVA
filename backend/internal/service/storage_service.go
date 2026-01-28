@@ -111,6 +111,24 @@ func (s *storageService) UploadBatchMedia(ctx context.Context, batchID string, r
 	return s.UploadFile(ctx, s.bucketName, key, reader, contentType, size)
 }
 
+func (s *storageService) UploadIndustryLogo(ctx context.Context, industryID string, reader io.Reader, filename, contentType string, size int64) (string, error) {
+	// Validar tipo de arquivo
+	allowedTypes := []string{"image/jpeg", "image/png", "image/webp"}
+	if !s.ValidateFileType(contentType, allowedTypes) {
+		return "", domainErrors.ValidationError("Apenas imagens são permitidas para a logo")
+	}
+
+	// Validar tamanho (2MB máximo para logo)
+	if !s.ValidateFileSize(size, 2*1024*1024) {
+		return "", domainErrors.ValidationError("Imagem muito grande. Tamanho máximo: 2MB")
+	}
+
+	// Gerar key única
+	key := s.generateIndustryLogoKey(industryID, filename)
+
+	return s.UploadFile(ctx, s.bucketName, key, reader, contentType, size)
+}
+
 func (s *storageService) DeleteFile(ctx context.Context, bucket, key string) error {
 	if err := s.adapter.DeleteFile(ctx, bucket, key); err != nil {
 		s.logger.Error("erro ao deletar arquivo",
@@ -175,7 +193,7 @@ func (s *storageService) generateProductMediaKey(productID, filename string) str
 	timestamp := time.Now().Unix()
 	uniqueID := uuid.New().String()[:8] // Primeiros 8 caracteres do UUID
 	sanitized := sanitizeFilename(filename)
-	
+
 	return fmt.Sprintf("products/%s/%d_%s_%s", productID, timestamp, uniqueID, sanitized)
 }
 
@@ -185,8 +203,17 @@ func (s *storageService) generateBatchMediaKey(batchID, filename string) string 
 	timestamp := time.Now().Unix()
 	uniqueID := uuid.New().String()[:8]
 	sanitized := sanitizeFilename(filename)
-	
+
 	return fmt.Sprintf("batches/%s/%d_%s_%s", batchID, timestamp, uniqueID, sanitized)
+}
+
+// generateIndustryLogoKey gera a key para logo da indústria
+// Formato: industries/{industryID}/logo_{timestamp}_{filename}
+func (s *storageService) generateIndustryLogoKey(industryID, filename string) string {
+	timestamp := time.Now().Unix()
+	sanitized := sanitizeFilename(filename)
+
+	return fmt.Sprintf("industries/%s/logo_%d_%s", industryID, timestamp, sanitized)
 }
 
 // sanitizeFilename remove caracteres inválidos e normaliza o nome do arquivo
@@ -194,7 +221,7 @@ func sanitizeFilename(filename string) string {
 	// Extrair extensão
 	ext := filepath.Ext(filename)
 	name := strings.TrimSuffix(filename, ext)
-	
+
 	// Remover caracteres especiais
 	replacer := strings.NewReplacer(
 		" ", "-",
@@ -222,22 +249,22 @@ func sanitizeFilename(filename string) string {
 		"ú", "u",
 	)
 	name = replacer.Replace(name)
-	
+
 	// Converter para lowercase
 	name = strings.ToLower(name)
-	
+
 	// Remover múltiplos hífens consecutivos
 	for strings.Contains(name, "--") {
 		name = strings.ReplaceAll(name, "--", "-")
 	}
-	
+
 	// Remover hífens no início e fim
 	name = strings.Trim(name, "-")
-	
+
 	// Limitar tamanho do nome
 	if len(name) > 50 {
 		name = name[:50]
 	}
-	
+
 	return name + ext
 }

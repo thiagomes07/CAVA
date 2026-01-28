@@ -562,6 +562,62 @@ func (h *BatchHandler) CheckAvailability(w http.ResponseWriter, r *http.Request)
 	})
 }
 
+// Sell godoc
+// @Summary Vende itens do lote (venda manual)
+// @Description Registra uma venda manual de itens de um lote
+// @Tags batches
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do lote"
+// @Param body body entity.CreateSaleInput true "Dados da venda"
+// @Success 200 {object} entity.Batch
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{id}/sell [post]
+func (h *BatchHandler) Sell(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	var input entity.CreateSaleInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	input.BatchID = id // Garantir consistência
+
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	batch, err := h.batchService.Sell(r.Context(), userID, input)
+	if err != nil {
+		h.logger.Error("erro ao realizar venda manual",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("venda manual realizada",
+		zap.String("batchId", id),
+		zap.String("soldBy", userID),
+	)
+
+	response.OK(w, batch)
+}
+
 // Archive godoc
 // @Summary Arquiva um lote
 // @Description Arquiva um lote (soft delete)

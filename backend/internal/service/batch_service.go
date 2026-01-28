@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,10 +12,18 @@ import (
 	"go.uber.org/zap"
 )
 
+type BatchDB interface {
+	BeginTx(ctx context.Context) (*sql.Tx, error)
+	ExecuteInTx(ctx context.Context, fn func(*sql.Tx) error) error
+}
+
 type batchService struct {
 	batchRepo   repository.BatchRepository
 	productRepo repository.ProductRepository
 	mediaRepo   repository.MediaRepository
+	salesRepo   repository.SalesHistoryRepository
+	clienteRepo repository.ClienteRepository
+	db          BatchDB
 	logger      *zap.Logger
 }
 
@@ -22,12 +31,18 @@ func NewBatchService(
 	batchRepo repository.BatchRepository,
 	productRepo repository.ProductRepository,
 	mediaRepo repository.MediaRepository,
+	salesRepo repository.SalesHistoryRepository,
+	clienteRepo repository.ClienteRepository,
+	db BatchDB,
 	logger *zap.Logger,
 ) *batchService {
 	return &batchService{
 		batchRepo:   batchRepo,
 		productRepo: productRepo,
 		mediaRepo:   mediaRepo,
+		salesRepo:   salesRepo,
+		clienteRepo: clienteRepo,
+		db:          db,
 		logger:      logger,
 	}
 }
@@ -423,6 +438,9 @@ func (s *batchService) UpdateAvailability(ctx context.Context, id string, status
 		if origin == status {
 			return nil, domainErrors.ValidationError("Origem e destino são iguais")
 		}
+		if origin == entity.BatchStatusVendido {
+			return nil, domainErrors.ValidationError("Para remover itens vendidos, utiliza a tela de Vendas para desfazer a venda.")
+		}
 
 		getCount := func(st entity.BatchStatus) int {
 			switch st {
@@ -632,6 +650,128 @@ func (s *batchService) RemoveMedia(ctx context.Context, batchID, mediaID string)
 	)
 
 	return nil
+}
+
+func (s *batchService) Sell(ctx context.Context, userID string, input entity.CreateSaleInput) (*entity.Batch, error) {
+	// Validações básicas
+	if input.QuantitySlabsSold <= 0 {
+		return nil, domainErrors.ValidationError("Quantidade vendida deve ser maior que 0")
+	}
+	if input.SalePrice <= 0 {
+		return nil, domainErrors.ValidationError("Preço de venda deve ser maior que 0")
+	}
+
+	var updatedBatch *entity.Batch
+
+	err := s.db.ExecuteInTx(ctx, func(tx *sql.Tx) error {
+		// 1. Lock no Batch
+		batch, err := s.batchRepo.FindByIDForUpdate(ctx, tx, input.BatchID)
+		if err != nil {
+			return err
+		}
+
+		// 2. Verificar disponibilidade
+		if !batch.HasAvailableSlabs(input.QuantitySlabsSold) {
+			return domainErrors.InsufficientSlabsError(input.QuantitySlabsSold, batch.AvailableSlabs)
+		}
+
+		// 3. Gerenciar Cliente (Criar Novo se necessário)
+		var clienteID *string = input.ClienteID
+		var customerName = input.CustomerName
+		var customerContact = input.CustomerContact
+
+		if input.NewClient != nil {
+			// Criar novo cliente
+			newCliente := &entity.Cliente{
+				ID:             uuid.New().String(),
+				SalesLinkID:    "", // Será convertido para NULL pelo NULLIF no repositório
+				Name:           input.NewClient.Name,
+				Contact:        input.NewClient.Phone,
+				MarketingOptIn: false,
+				Status:         entity.ClienteStatusNovo,
+				CreatedAt:      time.Now(),
+				UpdatedAt:      time.Now(),
+			}
+			if input.NewClient.Email != "" {
+				// Se houver email, poderia ser concatenado ou armazenado se houvesse campo
+			}
+
+			if err := s.clienteRepo.Create(ctx, tx, newCliente); err != nil {
+				s.logger.Error("erro ao criar cliente na venda", zap.Error(err))
+				return err
+			}
+			clienteID = &newCliente.ID
+			customerName = newCliente.Name
+			customerContact = newCliente.Contact
+		}
+
+		// 4. Criar Registro de Venda
+		// Determine SoldByUserID: use input if provided, otherwise nil (for custom seller names)
+		var soldByUserIDForSale *string = nil
+		if input.SoldByUserID != nil && *input.SoldByUserID != "" {
+			soldByUserIDForSale = input.SoldByUserID
+		}
+
+		sale := &entity.Sale{
+			ID:                uuid.New().String(),
+			BatchID:           batch.ID,
+			SoldByUserID:      soldByUserIDForSale, // Can be nil if using custom seller name
+			SellerName:        input.SellerName,
+			IndustryID:        batch.IndustryID,
+			ClienteID:         clienteID,
+			CustomerName:      customerName,
+			CustomerContact:   customerContact,
+			QuantitySlabsSold: input.QuantitySlabsSold,
+			TotalAreaSold:     input.TotalAreaSold,
+			PricePerUnit:      input.PricePerUnit,
+			PriceUnit:         input.PriceUnit,
+			SalePrice:         input.SalePrice,
+			BrokerCommission:  input.BrokerCommission,
+			NetIndustryValue:  input.NetIndustryValue,
+			InvoiceURL:        input.InvoiceURL,
+			Notes:             input.Notes,
+			SaleDate:          time.Now(),
+			CreatedAt:         time.Now(),
+		}
+
+		if err := s.salesRepo.Create(ctx, tx, sale); err != nil {
+			s.logger.Error("erro ao criar registro de venda", zap.Error(err))
+			return err
+		}
+
+		// 5. Atualizar Lote (Chapas)
+		newAvailable := batch.AvailableSlabs - input.QuantitySlabsSold
+		newSold := batch.SoldSlabs + input.QuantitySlabsSold
+
+		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, batch.ID, newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs); err != nil {
+			return err
+		}
+
+		// 6. Atualizar Status se necessário
+		newStatus := deriveBatchStatus(newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs)
+
+		if newStatus != batch.Status {
+			if err := s.batchRepo.UpdateStatus(ctx, tx, batch.ID, newStatus); err != nil {
+				return err
+			}
+		}
+
+		// Buscar lote atualizado para retorno
+		updatedBatch, err = s.batchRepo.FindByID(ctx, batch.ID)
+		if err != nil {
+			return err
+		}
+
+		s.logger.Info("venda realizada com sucesso",
+			zap.String("saleId", sale.ID),
+			zap.String("batchId", batch.ID),
+			zap.Int("quantity", input.QuantitySlabsSold),
+		)
+
+		return nil
+	})
+
+	return updatedBatch, err
 }
 
 func (s *batchService) Archive(ctx context.Context, id string) error {

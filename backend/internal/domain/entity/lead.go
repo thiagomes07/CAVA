@@ -112,3 +112,29 @@ type CreateClienteResponse struct {
 	Success bool     `json:"success"`
 	Cliente *Cliente `json:"cliente,omitempty"`
 }
+
+// SendLinksToClientesInput representa os dados para enviar links para clientes
+type SendLinksToClientesInput struct {
+	ClienteIDs    []string `json:"clienteIds" validate:"required,min=1,max=50,dive,uuid"`
+	SalesLinkIDs  []string `json:"salesLinkIds" validate:"required,min=1,max=10,dive,uuid"`
+	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
+}
+
+// SendLinkResult representa o resultado do envio para um cliente
+type SendLinkResult struct {
+	ClienteID   string `json:"clienteId"`
+	ClienteName string `json:"clienteName"`
+	Email       string `json:"email"`
+	Success     bool   `json:"success"`
+	Error       string `json:"error,omitempty"`
+}
+
+// SendLinksResponse representa a resposta do envio de links para clientes
+type SendLinksResponse struct {
+	TotalClientes  int              `json:"totalClientes"`
+	TotalSent      int              `json:"totalSent"`
+	TotalFailed    int              `json:"totalFailed"`
+	TotalSkipped   int              `json:"totalSkipped"` // Clientes sem email válido
+	Results        []SendLinkResult `json:"results"`
+	LinksIncluded  int              `json:"linksIncluded"`
+}

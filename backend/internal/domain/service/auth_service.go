@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
@@ -19,8 +20,14 @@ type AuthService interface {
 	// RefreshToken renova access token e rotaciona refresh token
 	RefreshToken(ctx context.Context, refreshToken string) (*entity.User, string, string, error)
 
-	// ChangePassword troca senha do usuário
+	// ChangePassword troca senha do usuário (requer senha atual)
 	ChangePassword(ctx context.Context, userID string, input entity.ChangePasswordInput) error
+
+	// ForgotPassword gera código de recuperação e envia por email
+	ForgotPassword(ctx context.Context, email string) error
+
+	// ResetPassword verifica código e atualiza senha
+	ResetPassword(ctx context.Context, email, code, newPassword string) error
 
 	// ValidateToken valida token JWT
 	ValidateToken(ctx context.Context, token string) (string, entity.UserRole, *string, error)

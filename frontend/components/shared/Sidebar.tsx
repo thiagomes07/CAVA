@@ -4,14 +4,14 @@ import { useMemo, useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { 
-  LayoutDashboard, 
-  Package, 
-  Layers, 
-  Users, 
-  Receipt, 
-  Link2, 
-  Inbox, 
+import {
+  LayoutDashboard,
+  Package,
+  Layers,
+  Users,
+  Receipt,
+  Link2,
+  Inbox,
   UserPlus,
   PackageOpen,
   ChevronLeft,
@@ -19,7 +19,8 @@ import {
   LogOut,
   ChevronUp,
   User,
-  BookOpen
+  BookOpen,
+  Building2
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -94,6 +95,12 @@ const industryMenuItems: MenuItem[] = [
     icon: UserPlus,
     roles: ['ADMIN_INDUSTRIA'],
   },
+  {
+    label: 'industryConfig.title',
+    href: '/industry-config',
+    icon: Building2,
+    roles: ['ADMIN_INDUSTRIA'],
+  },
 ];
 
 const brokerMenuItems: MenuItem[] = [
@@ -139,7 +146,7 @@ export function Sidebar() {
   const t = useTranslations();
   const tAuth = useTranslations('auth');
   const tRoles = useTranslations('roles');
-  
+
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -178,7 +185,7 @@ export function Sidebar() {
 
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
-    
+
     // Select menu items based on user role
     if (user.role === 'ADMIN_INDUSTRIA') {
       return industryMenuItems.filter((item) => item.roles.includes(user.role));
@@ -188,7 +195,7 @@ export function Sidebar() {
     } else if (user.role === 'BROKER') {
       return brokerMenuItems;
     }
-    
+
     return [];
   }, [user]);
 
@@ -247,7 +254,7 @@ export function Sidebar() {
               <span className="font-serif text-xl font-semibold">CAVA</span>
             )}
           </div>
-          
+
           <button
             onClick={toggleSidebar}
             className={cn(
@@ -307,7 +314,7 @@ export function Sidebar() {
           <div className="relative">
             {/* User Menu Dropdown */}
             {userMenuOpen && sidebarOpen && (
-              <div 
+              <div
                 className={cn(
                   'absolute bottom-full left-0 right-0 mb-2 rounded-sm',
                   'bg-white shadow-premium-lg border border-slate-200',
@@ -367,7 +374,7 @@ export function Sidebar() {
                   </div>
                 )}
               </Link>
-              
+
               {/* Chevron Button - Opens Dropdown */}
               {sidebarOpen && (
                 <button
@@ -382,11 +389,11 @@ export function Sidebar() {
                   aria-haspopup="true"
                   title={tAuth('logout')}
                 >
-                  <ChevronUp 
+                  <ChevronUp
                     className={cn(
                       'w-4 h-4 text-porcelain/60 transition-transform duration-200',
                       userMenuOpen && 'rotate-180'
-                    )} 
+                    )}
                   />
                 </button>
               )}
