@@ -45,7 +45,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   onRemoveShare,
   onUpdateMedia,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing'>('stock');
   const [showSellModal, setShowSellModal] = useState(false);
 
   // Form data for stock tab

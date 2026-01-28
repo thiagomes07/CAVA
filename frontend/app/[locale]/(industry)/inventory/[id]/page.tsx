@@ -95,12 +95,13 @@ export default function EditBatchPage() {
       // Upload new medias
       if (newMedias.length > 0) {
         const formData = new FormData();
+        formData.append('batchId', batchId);
         newMedias.forEach((file, index) => {
           formData.append('medias', file);
           formData.append(`displayOrders`, String(existingMedias.length + index));
         });
 
-        await apiClient.upload(`/batches/${batchId}/medias`, formData);
+        await apiClient.upload(`/upload/batch-medias`, formData);
       }
 
       success('Fotos atualizadas com sucesso');
