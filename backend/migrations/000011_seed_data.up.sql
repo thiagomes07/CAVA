@@ -12,16 +12,14 @@ BEGIN
         RETURN;
     END IF;
 
-    -- Inserir indústria demo
-    INSERT INTO industries (id, name, cnpj, slug, contact_email, contact_phone, policy_terms)
+    -- Inserir indústria demo (apenas ID para vínculo)
+    INSERT INTO industries (id, name, cnpj, slug, contact_email)
     VALUES (
         '00000000-0000-0000-0000-000000000001',
-        'Pedras Demo',
-        '00000000000100',
-        'pedras-demo',
-        'contato@pedrasdemo.com',
-        '11999999999',
-        'Termos de venda e políticas da Pedras Demo'
+        '', -- Nome vazio
+        '00000000000100', -- CNPJ placeholder (ainda unique)
+        'temp-slug', -- Slug placeholder
+        '' -- Email vazio
     );
 
     -- Inserir usuário Admin Demo

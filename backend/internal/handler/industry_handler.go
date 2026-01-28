@@ -60,13 +60,14 @@ func (h *IndustryHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, industry)
+	response.OK(w, industry)
 }
 
 // UpdateConfigInput representa os dados para atualização da configuração
 type UpdateConfigInput struct {
-	Name           *string `json:"name" validate:"omitempty,min=2,max=255"`
-	ContactEmail   *string `json:"contactEmail" validate:"omitempty,email"`
+	Name           *string `json:"name" validate:"omitempty"`
+	CNPJ           *string `json:"cnpj" validate:"omitempty"`
+	ContactEmail   *string `json:"contactEmail" validate:"omitempty"`
 	ContactPhone   *string `json:"contactPhone" validate:"omitempty,max=20"`
 	Whatsapp       *string `json:"whatsapp" validate:"omitempty,max=20"`
 	Description    *string `json:"description" validate:"omitempty,max=2000"`
@@ -105,47 +106,17 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar input
+	// Validar input (não verificamos strings vazias aqui pois queremos permitir limpeza)
 	if err := h.validator.Validate(input); err != nil {
 		response.HandleError(w, err)
 		return
 	}
 
-	// Validar que strings não são apenas espaços
-	if input.Name != nil && strings.TrimSpace(*input.Name) == "" {
-		response.BadRequest(w, "Nome não pode conter apenas espaços", nil)
-		return
-	}
-	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) == "" {
-		response.BadRequest(w, "Email não pode conter apenas espaços", nil)
-		return
-	}
-	if input.ContactPhone != nil && strings.TrimSpace(*input.ContactPhone) == "" {
-		input.ContactPhone = nil // Allow clearing
-	}
-	if input.Whatsapp != nil && strings.TrimSpace(*input.Whatsapp) == "" {
-		input.Whatsapp = nil
-	}
-	if input.Description != nil && strings.TrimSpace(*input.Description) == "" {
-		input.Description = nil
-	}
-	if input.AddressCountry != nil && strings.TrimSpace(*input.AddressCountry) == "" {
-		input.AddressCountry = nil
-	}
-	if input.AddressState != nil && strings.TrimSpace(*input.AddressState) == "" {
-		input.AddressState = nil
-	}
-	if input.AddressCity != nil && strings.TrimSpace(*input.AddressCity) == "" {
-		input.AddressCity = nil
-	}
-	if input.AddressStreet != nil && strings.TrimSpace(*input.AddressStreet) == "" {
-		input.AddressStreet = nil
-	}
-	if input.AddressNumber != nil && strings.TrimSpace(*input.AddressNumber) == "" {
-		input.AddressNumber = nil
-	}
-	if input.AddressZipCode != nil && strings.TrimSpace(*input.AddressZipCode) == "" {
-		input.AddressZipCode = nil
+	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) != "" {
+		if !strings.Contains(*input.ContactEmail, "@") {
+			response.BadRequest(w, "Email inválido", nil)
+			return
+		}
 	}
 
 	// Buscar indústria atual
@@ -161,10 +132,28 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Aplicar atualizações
 	if input.Name != nil {
-		industry.Name = strings.TrimSpace(*input.Name)
+		trimmed := strings.TrimSpace(*input.Name)
+		if trimmed == "" {
+			industry.Name = nil
+		} else {
+			industry.Name = &trimmed
+		}
+	}
+	if input.CNPJ != nil {
+		trimmed := strings.TrimSpace(*input.CNPJ)
+		if trimmed == "" {
+			industry.CNPJ = nil
+		} else {
+			industry.CNPJ = &trimmed
+		}
 	}
 	if input.ContactEmail != nil {
-		industry.ContactEmail = strings.TrimSpace(*input.ContactEmail)
+		trimmed := strings.TrimSpace(*input.ContactEmail)
+		if trimmed == "" {
+			industry.ContactEmail = nil
+		} else {
+			industry.ContactEmail = &trimmed
+		}
 	}
 	if input.ContactPhone != nil {
 		trimmed := strings.TrimSpace(*input.ContactPhone)
@@ -262,7 +251,7 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		zap.String("userId", middleware.GetUserID(ctx)),
 	)
 
-	response.JSON(w, http.StatusOK, industry)
+	response.OK(w, industry)
 }
 
 // DeleteLogo godoc
@@ -299,5 +288,5 @@ func (h *IndustryHandler) DeleteLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]bool{"deleted": true})
+	response.OK(w, map[string]bool{"deleted": true})
 }

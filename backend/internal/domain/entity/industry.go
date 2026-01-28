@@ -7,10 +7,10 @@ import (
 // Industry representa uma indústria no sistema
 type Industry struct {
 	ID             string    `json:"id"`
-	Name           string    `json:"name"`
-	CNPJ           string    `json:"cnpj"`
-	Slug           string    `json:"slug"`
-	ContactEmail   string    `json:"contactEmail"`
+	Name           *string   `json:"name,omitempty"`
+	CNPJ           *string   `json:"cnpj,omitempty"`
+	Slug           *string   `json:"slug,omitempty"`
+	ContactEmail   *string   `json:"contactEmail,omitempty"`
 	ContactPhone   *string   `json:"contactPhone,omitempty"`
 	Whatsapp       *string   `json:"whatsapp,omitempty"`
 	Description    *string   `json:"description,omitempty"`

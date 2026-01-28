@@ -20,9 +20,9 @@ import { ESTADOS_BRASIL, CIDADES_POR_ESTADO } from '@/lib/utils/brazil-locations
 import { cn } from '@/lib/utils/cn';
 
 const formSchema = z.object({
-    name: z.string().min(2, 'Nome muito curto'),
-    cnpj: z.string().min(1, 'CNPJ/identificação é obrigatória'),
-    contactEmail: z.string().email('Email inválido'),
+    name: z.string().optional(),
+    cnpj: z.string().optional(),
+    contactEmail: z.string().email('Email inválido').optional().or(z.literal('')),
     contactPhone: z.string().optional(),
     whatsapp: z.string().optional(),
     description: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
@@ -58,22 +58,30 @@ export default function IndustryConfigPage() {
             name: '',
             cnpj: '',
             contactEmail: '',
+            contactPhone: '',
+            whatsapp: '',
+            description: '',
             addressCountry: 'Brasil',
+            addressState: '',
+            addressCity: '',
+            addressStreet: '',
+            addressNumber: '',
+            addressZipCode: '',
         },
     });
 
-    const { control, handleSubmit, watch, setValue, reset, register, formState: { errors } } = form;
+    const { control, handleSubmit, watch, setValue, reset, formState: { errors, isDirty } } = form;
 
     const watchedCountry = watch('addressCountry');
     const watchedState = watch('addressState');
 
-    // Load data
+    // Populate form when industry data is available - CORRIGIDO
     useEffect(() => {
         if (industry) {
-            reset({
-                name: industry.name,
+            const formData: FormValues = {
+                name: industry.name || '',
                 cnpj: industry.cnpj || '',
-                contactEmail: industry.contactEmail,
+                contactEmail: industry.contactEmail || '',
                 contactPhone: industry.contactPhone || '',
                 whatsapp: industry.whatsapp || '',
                 description: industry.description || '',
@@ -83,16 +91,24 @@ export default function IndustryConfigPage() {
                 addressStreet: industry.addressStreet || '',
                 addressNumber: industry.addressNumber || '',
                 addressZipCode: industry.addressZipCode || '',
-            });
+            };
+
+            // Usa reset ao invés de setValue múltiplos para popular o formulário
+            // Isso garante que o estado isDirty seja resetado corretamente
+            reset(formData);
 
             if (industry.logoUrl) {
                 setPreviewLogoUrl(industry.logoUrl);
+            } else {
+                setPreviewLogoUrl('');
             }
         }
     }, [industry, reset]);
 
+    const isLogoDirty = !!selectedLogo || (previewLogoUrl !== (industry?.logoUrl || ''));
+    const hasChanges = isDirty || isLogoDirty;
+
     const handleLogoChange = (file: File) => {
-        // Create a local preview
         const objectUrl = URL.createObjectURL(file);
         setPreviewLogoUrl(objectUrl);
         setSelectedLogo(file);
@@ -103,34 +119,73 @@ export default function IndustryConfigPage() {
         setSelectedLogo(null);
     };
 
+    const handleCancel = () => {
+        if (industry) {
+            const formData: FormValues = {
+                name: industry.name || '',
+                cnpj: industry.cnpj || '',
+                contactEmail: industry.contactEmail || '',
+                contactPhone: industry.contactPhone || '',
+                whatsapp: industry.whatsapp || '',
+                description: industry.description || '',
+                addressCountry: industry.addressCountry || 'Brasil',
+                addressState: industry.addressState || '',
+                addressCity: industry.addressCity || '',
+                addressStreet: industry.addressStreet || '',
+                addressNumber: industry.addressNumber || '',
+                addressZipCode: industry.addressZipCode || '',
+            };
+
+            reset(formData);
+
+            if (industry.logoUrl) {
+                setPreviewLogoUrl(industry.logoUrl);
+            } else {
+                setPreviewLogoUrl('');
+            }
+        }
+        
+        setSelectedLogo(null);
+    };
+
     const onSubmit = async (data: FormValues) => {
         setIsUploading(true);
+        
         try {
             const payload: any = { ...data };
 
-            // Handle Logo Upload only on submit
             if (selectedLogo) {
-                // Upload new logo
                 const url = await uploadLogo.mutateAsync(selectedLogo);
                 payload.logoUrl = url;
             } else if (!previewLogoUrl && industry?.logoUrl) {
-                // Logo was removed (current empty, but existed before)
                 payload.logoUrl = '';
             } else if (previewLogoUrl && !selectedLogo) {
-                // Keep existing logo
                 payload.logoUrl = industry?.logoUrl;
             }
 
-            await updateConfig.mutateAsync(payload);
+            const updatedIndustry = await updateConfig.mutateAsync(payload);
 
-            // Refetch or invalidation is handled by mutation hook ideally, 
-            // but we reset local state to clean up
+            // Após salvar com sucesso, reseta o formulário com os novos valores
+            const formData: FormValues = {
+                name: updatedIndustry.name || '',
+                cnpj: updatedIndustry.cnpj || '',
+                contactEmail: updatedIndustry.contactEmail || '',
+                contactPhone: updatedIndustry.contactPhone || '',
+                whatsapp: updatedIndustry.whatsapp || '',
+                description: updatedIndustry.description || '',
+                addressCountry: updatedIndustry.addressCountry || 'Brasil',
+                addressState: updatedIndustry.addressState || '',
+                addressCity: updatedIndustry.addressCity || '',
+                addressStreet: updatedIndustry.addressStreet || '',
+                addressNumber: updatedIndustry.addressNumber || '',
+                addressZipCode: updatedIndustry.addressZipCode || '',
+            };
+
+            reset(formData);
             setSelectedLogo(null);
 
             success(t('success'));
         } catch (err: any) {
-            console.error(err);
-            // Better error handling for 'Entity Too Large' from nginx/backend if it still happens despite client crop
             if (err?.response?.status === 413) {
                 showError("A imagem ainda é muito grande. Tente reduzir o zoom da edição.");
             } else {
@@ -141,7 +196,6 @@ export default function IndustryConfigPage() {
         }
     };
 
-    // Helper for states/cities
     const stateOptions = ESTADOS_BRASIL.map(e => ({ label: e.nome, value: e.sigla }));
     const cityOptions = (watchedState && CIDADES_POR_ESTADO[watchedState])
         ? CIDADES_POR_ESTADO[watchedState].map(c => ({ label: c, value: c }))
@@ -163,7 +217,6 @@ export default function IndustryConfigPage() {
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-
                 {/* Identidade */}
                 <Card className="overflow-hidden">
                     <CardHeader className="bg-gradient-to-r from-slate-50 to-white border-b">
@@ -202,18 +255,22 @@ export default function IndustryConfigPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="name" className="text-sm font-medium">
                                         {t('companyName')}
-
                                     </Label>
-                                    <Input
-                                        id="name"
-                                        {...register('name')}
-                                        placeholder={t('companyName')}
-                                        className="h-11"
+                                    <Controller
+                                        name="name"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Input
+                                                {...field}
+                                                id="name"
+                                                value={field.value || ''}
+                                                placeholder={t('companyName')}
+                                                className="h-11"
+                                            />
+                                        )}
                                     />
                                     {errors.name && (
-                                        <p className="text-xs text-red-500 flex items-center gap-1">
-                                            {errors.name.message}
-                                        </p>
+                                        <p className="text-xs text-red-500">{errors.name.message}</p>
                                     )}
                                 </div>
 
@@ -222,7 +279,6 @@ export default function IndustryConfigPage() {
                                     <div className="flex items-center justify-between">
                                         <Label htmlFor="cnpj" className="text-sm font-medium">
                                             {useCNPJMask ? 'CNPJ' : t('businessId')}
-
                                         </Label>
                                         <div className="flex items-center gap-2">
                                             <button
@@ -266,7 +322,7 @@ export default function IndustryConfigPage() {
                                                 <CNPJInput
                                                     {...field}
                                                     value={field.value || ''}
-                                                    onChange={(val) => field.onChange(val)}
+                                                    onChange={(_, raw) => field.onChange(raw)}
                                                     className="h-11"
                                                 />
                                             ) : (
@@ -289,11 +345,18 @@ export default function IndustryConfigPage() {
                                     <Label htmlFor="description" className="text-sm font-medium">
                                         {t('description')}
                                     </Label>
-                                    <Textarea
-                                        id="description"
-                                        {...register('description')}
-                                        placeholder={t('descriptionPlaceholder')}
-                                        className="h-28 resize-none"
+                                    <Controller
+                                        name="description"
+                                        control={control}
+                                        render={({ field }) => (
+                                            <Textarea
+                                                {...field}
+                                                id="description"
+                                                value={field.value || ''}
+                                                placeholder={t('descriptionPlaceholder')}
+                                                className="h-28 resize-none"
+                                            />
+                                        )}
                                     />
                                     <div className="flex justify-between items-center">
                                         {errors.description && (
@@ -329,14 +392,20 @@ export default function IndustryConfigPage() {
                             <div className="space-y-2 md:col-span-2">
                                 <Label htmlFor="email" className="text-sm font-medium">
                                     {t('email')}
-
                                 </Label>
-                                <Input
-                                    id="email"
-                                    {...register('contactEmail')}
-                                    type="email"
-                                    placeholder="empresa@exemplo.com"
-                                    className="h-11"
+                                <Controller
+                                    name="contactEmail"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            id="email"
+                                            value={field.value || ''}
+                                            type="email"
+                                            placeholder="empresa@exemplo.com"
+                                            className="h-11"
+                                        />
+                                    )}
                                 />
                                 {errors.contactEmail && (
                                     <p className="text-xs text-red-500">{errors.contactEmail.message}</p>
@@ -354,7 +423,7 @@ export default function IndustryConfigPage() {
                                         <PhoneInput
                                             {...field}
                                             value={field.value || ''}
-                                            onChange={(val) => field.onChange(val)}
+                                            onChange={(_, raw) => field.onChange(raw)}
                                             className="h-11"
                                         />
                                     )}
@@ -372,7 +441,7 @@ export default function IndustryConfigPage() {
                                         <PhoneInput
                                             {...field}
                                             value={field.value || ''}
-                                            onChange={(val) => field.onChange(val)}
+                                            onChange={(_, raw) => field.onChange(raw)}
                                             className="h-11"
                                         />
                                     )}
@@ -427,7 +496,7 @@ export default function IndustryConfigPage() {
                                             <CEPInput
                                                 {...field}
                                                 value={field.value || ''}
-                                                onChange={(val) => field.onChange(val)}
+                                                onChange={(_, raw) => field.onChange(raw)}
                                                 className="h-11"
                                             />
                                         ) : (
@@ -482,11 +551,31 @@ export default function IndustryConfigPage() {
                                 <>
                                     <div className="space-y-2">
                                         <Label className="text-sm font-medium">{t('state')}</Label>
-                                        <Input {...register('addressState')} className="h-11" />
+                                        <Controller
+                                            name="addressState"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value || ''}
+                                                    className="h-11"
+                                                />
+                                            )}
+                                        />
                                     </div>
                                     <div className="space-y-2">
                                         <Label className="text-sm font-medium">{t('city')}</Label>
-                                        <Input {...register('addressCity')} className="h-11" />
+                                        <Controller
+                                            name="addressCity"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Input
+                                                    {...field}
+                                                    value={field.value || ''}
+                                                    className="h-11"
+                                                />
+                                            )}
+                                        />
                                     </div>
                                 </>
                             )}
@@ -495,11 +584,31 @@ export default function IndustryConfigPage() {
                         <div className="grid grid-cols-[1fr_auto] gap-5">
                             <div className="space-y-2">
                                 <Label className="text-sm font-medium">{t('street')}</Label>
-                                <Input {...register('addressStreet')} className="h-11" />
+                                <Controller
+                                    name="addressStreet"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            value={field.value || ''}
+                                            className="h-11"
+                                        />
+                                    )}
+                                />
                             </div>
                             <div className="space-y-2 w-32">
                                 <Label className="text-sm font-medium">{t('number')}</Label>
-                                <Input {...register('addressNumber')} className="h-11" />
+                                <Controller
+                                    name="addressNumber"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <Input
+                                            {...field}
+                                            value={field.value || ''}
+                                            className="h-11"
+                                        />
+                                    )}
+                                />
                             </div>
                         </div>
                     </CardContent>
@@ -510,14 +619,15 @@ export default function IndustryConfigPage() {
                     <Button
                         type="button"
                         variant="secondary"
-                        onClick={() => reset()}
+                        onClick={handleCancel}
                         className="min-w-[100px]"
+                        disabled={!hasChanges}
                     >
                         {tCommon('cancel')}
                     </Button>
                     <Button
                         type="submit"
-                        disabled={isUploading || updateConfig.isPending}
+                        disabled={isUploading || updateConfig.isPending || !hasChanges}
                         className="min-w-[120px]"
                     >
                         {isUploading || updateConfig.isPending ? (

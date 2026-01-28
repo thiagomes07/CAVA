@@ -6,10 +6,10 @@
 -- Tabela: Indústrias
 CREATE TABLE industries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    cnpj VARCHAR(20) NOT NULL UNIQUE,
-    slug VARCHAR(100) NOT NULL UNIQUE,
-    contact_email VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    cnpj VARCHAR(20) UNIQUE,
+    slug VARCHAR(100) UNIQUE,
+    contact_email VARCHAR(255),
     contact_phone VARCHAR(50),
     whatsapp VARCHAR(20),
     description TEXT,
@@ -19,7 +19,6 @@ CREATE TABLE industries (
     address_city VARCHAR(255),
     address_street VARCHAR(255),
     address_number VARCHAR(50),
-    address_zip_code VARCHAR(20),
     address_zip_code VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
