@@ -605,6 +605,8 @@
   "industryConfig": {
     "title": "Configuración de la Industria",
     "subtitle": "Gestione los datos de su empresa, contacto y dirección.",
+    "identity": "Identidad",
+    "identityDesc": "Información básica de la empresa",
     "visualIdentity": "Identidad Visual",
     "visualIdentityDesc": "Defina el logotipo y la descripción de su empresa.",
     "contact": "Contacto",
@@ -615,6 +617,7 @@
     "logoDeleteError": "Error al eliminar logotipo",
     "companyName": "Nombre de la Empresa",
     "cnpj": "CNPJ",
+    "businessId": "ID Empresarial",
     "cnpjReadOnly": "El CNPJ no se puede cambiar.",
     "description": "Descripción",
     "descriptionPlaceholder": "Describa su empresa...",

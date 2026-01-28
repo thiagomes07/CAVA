@@ -605,6 +605,8 @@
   "industryConfig": {
     "title": "Industry Configuration",
     "subtitle": "Manage your company data, contact info and address.",
+    "identity": "Identity",
+    "identityDesc": "Basic company information",
     "visualIdentity": "Visual Identity",
     "visualIdentityDesc": "Define your company logo and description.",
     "contact": "Contact",
@@ -615,6 +617,7 @@
     "logoDeleteError": "Error removing logo",
     "companyName": "Company Name",
     "cnpj": "Tax ID (CNPJ)",
+    "businessId": "Business ID / Tax ID",
     "cnpjReadOnly": "CNPJ cannot be changed.",
     "description": "Description",
     "descriptionPlaceholder": "Describe your company...",
