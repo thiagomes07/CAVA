@@ -13,13 +13,13 @@ import (
 )
 
 type catalogLinkService struct {
-	catalogLinkRepo repository.CatalogLinkRepository
-	batchRepo       repository.BatchRepository
-	productRepo     repository.ProductRepository
-	mediaRepo       repository.MediaRepository
-	industryRepo    repository.IndustryRepository
+	catalogLinkRepo   repository.CatalogLinkRepository
+	batchRepo         repository.BatchRepository
+	productRepo       repository.ProductRepository
+	mediaRepo         repository.MediaRepository
+	industryRepo      repository.IndustryRepository
 	publicLinkBaseURL string
-	logger          *zap.Logger
+	logger            *zap.Logger
 }
 
 func NewCatalogLinkService(
@@ -168,14 +168,19 @@ func (s *catalogLinkService) GetPublicBySlug(ctx context.Context, slug string) (
 	}
 
 	// Construir resposta pública
+	depositName := ""
+	if industry.Name != nil {
+		depositName = *industry.Name
+	}
+
 	result := &entity.PublicCatalogLink{
-		Title:        link.Title,
+		Title:         link.Title,
 		CustomMessage: link.CustomMessage,
-		DepositName:  industry.Name,
-		DepositCity:  industry.City,
-		DepositState: industry.State,
-		DepositLogo:  industry.LogoURL,
-		Batches:      []entity.PublicBatch{},
+		DepositName:   depositName,
+		DepositCity:   industry.City,
+		DepositState:  industry.State,
+		DepositLogo:   industry.LogoURL,
+		Batches:       []entity.PublicBatch{},
 	}
 
 	// Converter lotes para formato público
@@ -186,8 +191,8 @@ func (s *catalogLinkService) GetPublicBySlug(ctx context.Context, slug string) (
 		// Buscar indústria do lote
 		batchIndustry, err := s.industryRepo.FindByID(ctx, batch.IndustryID)
 		industryName := ""
-		if err == nil && batchIndustry != nil {
-			industryName = batchIndustry.Name
+		if err == nil && batchIndustry != nil && batchIndustry.Name != nil {
+			industryName = *batchIndustry.Name
 		}
 
 		publicBatch := entity.PublicBatch{
