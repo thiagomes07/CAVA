@@ -172,10 +172,10 @@ export const LinkDetailsModal: React.FC<LinkDetailsModalProps> = ({
 
         {/* Content - Two Column Layout */}
         <div className="flex-1 overflow-y-auto bg-[#FAFAFA]">
-          <div className="flex flex-col lg:flex-row h-full">
+          <div className="flex flex-col md:flex-row h-full">
             {/* Left Column - Image */}
-            <div className="lg:w-5/12 p-8 border-r border-slate-200 bg-white flex flex-col">
-              <div className="aspect-square bg-slate-100 overflow-hidden mb-8 relative group">
+            <div className="md:w-5/12 lg:w-5/12 p-4 md:p-6 lg:p-8 md:border-r border-slate-200 bg-white flex flex-col">
+              <div className="aspect-[4/3] md:aspect-square max-h-48 md:max-h-64 lg:max-h-none bg-slate-100 overflow-hidden mb-4 md:mb-6 lg:mb-8 relative group mx-auto md:mx-0 w-full">
                 {displayData.imageUrl ? (
                   <img 
                     src={displayData.imageUrl} 
@@ -198,9 +198,9 @@ export const LinkDetailsModal: React.FC<LinkDetailsModalProps> = ({
                 )}
               </div>
               
-              <div className="space-y-8 flex-1">
+              <div className="space-y-4 md:space-y-6 lg:space-y-8 flex-1">
                 <div>
-                  <h3 className="font-serif text-3xl text-obsidian mb-2">{displayData.title}</h3>
+                  <h3 className="font-serif text-xl md:text-2xl lg:text-3xl text-obsidian mb-2">{displayData.title}</h3>
                   {displayData.material && (
                     <div className="flex items-center text-xs font-bold uppercase tracking-widest text-slate-400">
                       <MapPin className="w-3 h-3 mr-2" /> {displayData.material} {displayData.finish && `• ${displayData.finish}`}
@@ -284,17 +284,17 @@ export const LinkDetailsModal: React.FC<LinkDetailsModalProps> = ({
             </div>
 
             {/* Right Column - Stats */}
-            <div className="flex-1 p-10 space-y-12 bg-[#FAFAFA]">
-              <div className="space-y-8">
+            <div className="flex-1 p-4 md:p-6 lg:p-10 space-y-6 md:space-y-8 lg:space-y-12 bg-[#FAFAFA]">
+              <div className="space-y-4 md:space-y-6 lg:space-y-8">
                 {/* Stats Row */}
-                <div className="flex justify-between items-end border-b border-slate-200 pb-8">
+                <div className="flex justify-between items-end border-b border-slate-200 pb-4 md:pb-6 lg:pb-8">
                   <div>
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">{t('views')}</p>
-                    <p className="text-4xl font-serif text-obsidian">{link.viewsCount || 0}</p>
+                    <p className="text-2xl md:text-3xl lg:text-4xl font-serif text-obsidian">{link.viewsCount || 0}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">{t('price')}</p>
-                    <p className="text-4xl font-serif text-obsidian">
+                    <p className="text-2xl md:text-3xl lg:text-4xl font-serif text-obsidian">
                       {link.showPrice && link.displayPrice 
                         ? formatCurrency(link.displayPrice, locale as 'pt' | 'en' | 'es')
                         : '-'
