@@ -60,7 +60,7 @@ func (h *IndustryHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, industry)
+	response.OK(w, industry)
 }
 
 // GetMyIndustry é um alias para compatibilidade com código legado
@@ -319,7 +319,7 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		zap.String("userId", middleware.GetUserID(ctx)),
 	)
 
-	response.JSON(w, http.StatusOK, industry)
+	response.OK(w, industry)
 }
 
 // UpdateMyIndustry é um alias para compatibilidade com código legado
@@ -361,5 +361,5 @@ func (h *IndustryHandler) DeleteLogo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.JSON(w, http.StatusOK, map[string]bool{"deleted": true})
+	response.OK(w, map[string]bool{"deleted": true})
 }

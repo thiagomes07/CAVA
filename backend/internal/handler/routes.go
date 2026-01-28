@@ -31,7 +31,6 @@ type Handler struct {
 	Public          *PublicHandler
 	Industry        *IndustryHandler
 	Health          *HealthHandler
-	Industry        *IndustryHandler
 }
 
 // Config contém as configurações para os handlers
