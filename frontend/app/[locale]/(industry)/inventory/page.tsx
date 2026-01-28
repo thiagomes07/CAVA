@@ -421,7 +421,7 @@ export default function InventoryPage() {
                       <TableCell>
                         <button
                           onClick={() => router.push(`/inventory/${batch.id}`)}
-                          className="font-mono text-sm text-obsidian hover:underline"
+                          className="font-mono text-obsidian hover:text-[#C2410C] transition-colors"
                           title={batch.batchCode}
                         >
                           {truncateText(batch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
@@ -429,14 +429,14 @@ export default function InventoryPage() {
                       </TableCell>
                       <TableCell>
                         <span 
-                          className="text-slate-600"
+                          className="font-serif text-slate-600"
                           title={batch.product?.name}
                         >
                           {truncateText(batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME) || '-'}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm text-slate-600">
+                        <span className="font-mono text-slate-500">
                           {formatDimensions(
                             batch.height,
                             batch.width,
@@ -468,48 +468,48 @@ export default function InventoryPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm text-slate-600">
+                        <span className="font-mono text-slate-500">
                           {formatArea(batch.totalArea)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-serif text-obsidian">
+                        <span className="font-serif text-obsidian tabular-nums">
                           {formatPricePerUnit(batch.industryPrice, batch.priceUnit)}
                         </span>
                       </TableCell>
                       {canEdit && (
                         <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1">
                             <button
                               onClick={() => router.push(`/inventory/${batch.id}`)}
-                              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
+                              className="p-2 text-slate-300 hover:text-[#C2410C] transition-colors"
                               title={t('edit')}
                             >
-                              <Edit2 className="w-4 h-4 text-slate-600" />
+                              <Edit2 className="w-4 h-4" />
                             </button>
                             {batch.isActive ? (
                               <button
                                 onClick={() => handleArchive(batch.id)}
-                                className="p-2 hover:bg-amber-50 rounded-sm transition-colors"
+                                className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
                                 title={t('archive')}
                               >
-                                <Archive className="w-4 h-4 text-amber-600" />
+                                <Archive className="w-4 h-4" />
                               </button>
                             ) : (
                               <button
                                 onClick={() => handleRestore(batch.id)}
-                                className="p-2 hover:bg-emerald-50 rounded-sm transition-colors"
+                                className="p-2 text-slate-300 hover:text-emerald-500 transition-colors"
                                 title={t('restore')}
                               >
-                                <RotateCcw className="w-4 h-4 text-emerald-600" />
+                                <RotateCcw className="w-4 h-4" />
                               </button>
                             )}
                             <button
                               onClick={() => openDeleteModal(batch)}
-                              className="p-2 hover:bg-rose-50 rounded-sm transition-colors"
+                              className="p-2 text-slate-300 hover:text-rose-500 transition-colors"
                               title={t('delete')}
                             >
-                              <Trash2 className="w-4 h-4 text-rose-600" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           </div>
                         </TableCell>
