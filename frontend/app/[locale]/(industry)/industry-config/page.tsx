@@ -479,6 +479,18 @@ export default function IndustryConfigPage() {
                                             options={[
                                                 { value: 'Brasil', label: 'Brasil' },
                                                 { value: 'Estados Unidos', label: 'Estados Unidos' },
+                                                { value: 'Itália', label: 'Itália' },
+                                                { value: 'China', label: 'China' },
+                                                { value: 'Índia', label: 'Índia' },
+                                                { value: 'Turquia', label: 'Turquia' },
+                                                { value: 'Espanha', label: 'Espanha' },
+                                                { value: 'Portugal', label: 'Portugal' },
+                                                { value: 'México', label: 'México' },
+                                                { value: 'Canadá', label: 'Canadá' },
+                                                { value: 'Emirados Árabes Unidos', label: 'Emirados Árabes Unidos' },
+                                                { value: 'Arábia Saudita', label: 'Arábia Saudita' },
+                                                { value: 'Catar', label: 'Catar' },
+                                                { value: 'Kuwait', label: 'Kuwait' },
                                                 { value: 'Outro', label: 'Outro' }
                                             ]}
                                         />
