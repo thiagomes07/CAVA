@@ -114,10 +114,12 @@ type Batch struct {
 	EntryDate      time.Time   `json:"entryDate"`
 	Status         BatchStatus `json:"status"`
 	IsActive       bool        `json:"isActive"`
+	IsPublic       bool        `json:"isPublic"` // visível na página pública do depósito
 	Medias         []Media     `json:"medias,omitempty"`
 	Product        *Product    `json:"product,omitempty"` // Populated quando necessário
 	CreatedAt      time.Time   `json:"createdAt"`
 	UpdatedAt      time.Time   `json:"updatedAt"`
+	DeletedAt      *time.Time  `json:"deletedAt,omitempty"` // soft delete
 }
 
 // CalculateTotalArea calcula a área total do lote
@@ -198,6 +200,7 @@ type UpdateBatchInput struct {
 	IndustryPrice *float64   `json:"industryPrice,omitempty" validate:"omitempty,gt=0"`
 	PriceUnit     *PriceUnit `json:"priceUnit,omitempty" validate:"omitempty,oneof=M2 FT2"`
 	OriginQuarry  *string    `json:"originQuarry,omitempty" validate:"omitempty,max=100"`
+	IsPublic      *bool      `json:"isPublic,omitempty"`
 }
 
 // UpdateBatchStatusInput representa os dados para atualizar o status de um lote
@@ -220,7 +223,11 @@ type BatchFilters struct {
 	OnlyWithAvailable bool         `json:"onlyWithAvailable,omitempty"` // Apenas lotes com chapas disponíveis
 	LowStock          bool         `json:"lowStock,omitempty"`          // Apenas lotes com estoque baixo (≤3)
 	NoStock           bool         `json:"noStock,omitempty"`           // Apenas lotes sem estoque
-	SortBy            string       `json:"sortBy,omitempty"`            // Campo para ordenação: batchCode, availableSlabs, totalArea, industryPrice, entryDate
+	IncludeArchived   bool         `json:"includeArchived,omitempty"`   // Incluir lotes arquivados
+	OnlyArchived      bool         `json:"onlyArchived,omitempty"`      // Apenas lotes arquivados
+	IncludeDeleted    bool         `json:"includeDeleted,omitempty"`    // Incluir lotes deletados
+	OnlyDeleted       bool         `json:"onlyDeleted,omitempty"`       // Apenas lotes deletados
+	SortBy            string       `json:"sortBy,omitempty"`            // Campo para ordenação
 	SortDir           string       `json:"sortDir,omitempty"`           // Direção: asc ou desc
 	Page              int          `json:"page" validate:"min=1"`
 	Limit             int          `json:"limit" validate:"min=1,max=100"`

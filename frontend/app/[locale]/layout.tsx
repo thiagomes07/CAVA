@@ -40,9 +40,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { locale } = await params;
   
   const titles: Record<string, string> = {
-    pt: 'CAVA Stone Platform',
-    en: 'CAVA Stone Platform',
-    es: 'CAVA Stone Platform',
+    pt: 'CAVA',
+    en: 'CAVA',
+    es: 'CAVA',
   };
 
   const descriptions: Record<string, string> = {

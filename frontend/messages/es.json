@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "CAVA Stone Platform",
+    "appName": "CAVA",
     "loading": "Cargando...",
     "save": "Guardar",
     "cancel": "Cancelar",
@@ -41,10 +41,10 @@
     "price": "Precio",
     "total": "Total",
     "quantity": "Cantidad",
-    "poweredBy": "Powered by CAVA Stone Platform"
+    "poweredBy": "Powered by CAVA"
   },
   "metadata": {
-    "title": "CAVA Stone Platform",
+    "title": "CAVA",
     "description": "Plataforma premium para gestión de piedras ornamentales",
     "keywords": "piedras ornamentales, mármoles, granitos, cuarcitas, lujo"
   },
@@ -110,6 +110,7 @@
     "sharedInventory": "Inventario Compartido",
     "sales": "Ventas",
     "links": "Enlaces",
+    "catalogos": "Catálogos",
     "clientes": "Clientes",
     "brokers": "Socios",
     "team": "Equipo",
@@ -191,7 +192,19 @@
     "edit": "Editar",
     "viewDetails": "Ver detalles",
     "loadError": "Error al cargar inventario",
-    "productsError": "Error al cargar productos"
+    "productsError": "Error al cargar productos",
+    "archive": "Archivar",
+    "restore": "Restaurar",
+    "delete": "Eliminar",
+    "showArchived": "Ver Archivados",
+    "showActive": "Ver Activos",
+    "archiveError": "Error al archivar lote",
+    "restoreError": "Error al restaurar lote",
+    "deleteError": "Error al eliminar lote",
+    "deleteConfirmTitle": "Eliminar Lote",
+    "deleteConfirmMessage": "¿Está seguro de que desea eliminar este lote?",
+    "deleteConfirmWarning": "Esta acción no se puede deshacer. El lote será eliminado permanentemente.",
+    "cancel": "Cancelar"
   },
   "catalog": {
     "title": "Catálogo",
@@ -347,6 +360,7 @@
     "views": "Visualizaciones",
     "clientes": "Clientes",
     "status": "Estado",
+    "createdBy": "Creado por",
     "createdAt": "Creado el",
     "actions": "Acciones",
     "untitledLink": "Enlace sin título",

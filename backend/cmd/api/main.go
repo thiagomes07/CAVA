@@ -1,4 +1,4 @@
-﻿package main
+package main
 
 import (
 	"context"
@@ -298,6 +298,7 @@ type Repositories struct {
 	Media              domainRepo.MediaRepository
 	Reservation        domainRepo.ReservationRepository
 	SalesLink          domainRepo.SalesLinkRepository
+	CatalogLink        domainRepo.CatalogLinkRepository
 	Cliente            domainRepo.ClienteRepository
 	ClienteInteraction domainRepo.ClienteInteractionRepository
 	SalesHistory       domainRepo.SalesHistoryRepository
@@ -316,6 +317,7 @@ func initRepositories(db *repository.DB) Repositories {
 		Media:              repository.NewMediaRepository(db),
 		Reservation:        repository.NewReservationRepository(db),
 		SalesLink:          repository.NewSalesLinkRepository(db),
+		CatalogLink:        repository.NewCatalogLinkRepository(db),
 		Cliente:            repository.NewClienteRepository(db),
 		ClienteInteraction: repository.NewClienteInteractionRepository(db),
 		SalesHistory:       repository.NewSalesHistoryRepository(db),
@@ -398,6 +400,20 @@ func initServices(
 		repos.SalesLink,
 		repos.Batch,
 		repos.Product,
+		repos.Media,
+		repos.User,
+		repos.SharedInventory,
+		cfg.App.PublicLinkBaseURL,
+		logger,
+	)
+
+	// Catalog Link Service
+	catalogLinkService := service.NewCatalogLinkService(
+		repos.CatalogLink,
+		repos.Batch,
+		repos.Product,
+		repos.Media,
+		repos.Industry,
 		cfg.App.PublicLinkBaseURL,
 		logger,
 	)
@@ -446,6 +462,7 @@ func initServices(
 		Reservation:     reservationService,
 		Dashboard:       dashboardService,
 		SalesLink:       salesLinkService,
+		CatalogLink:     catalogLinkService,
 		Cliente:         clienteService,
 		SalesHistory:    salesHistoryService,
 		SharedInventory: sharedInventoryService,
@@ -453,6 +470,7 @@ func initServices(
 		Email:           emailSender,
 		MediaRepo:       repos.Media,
 		IndustryRepo:    repos.Industry,
+		BatchRepo:       repos.Batch,
 	}
 }
 

@@ -1,14 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Link2Off, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 // Fallback not-found page for non-locale routes
 // Uses browser language detection for basic i18n
-function getTexts() {
-  const lang = typeof navigator !== 'undefined' ? navigator.language.slice(0, 2) : 'pt';
-  
+function getTexts(lang: string) {
   const texts: Record<string, { title: string; description: string; checkAddress: string; home: string; platform: string }> = {
     pt: {
       title: 'Link não encontrado',
@@ -32,13 +31,21 @@ function getTexts() {
       platform: 'Plataforma de gestión y comercialización de piedras ornamentales',
     },
   };
-  
+
   return texts[lang] || texts.pt;
 }
 
 export default function NotFound() {
   const router = useRouter();
-  const t = getTexts();
+  const [lang, setLang] = useState('pt');
+
+  useEffect(() => {
+    // Detect language only on client side after hydration
+    const browserLang = navigator.language.slice(0, 2);
+    setLang(browserLang);
+  }, []);
+
+  const t = getTexts(lang);
 
   return (
     <div className="min-h-screen bg-mineral flex items-center justify-center p-6">
@@ -75,7 +82,7 @@ export default function NotFound() {
         <div className="mt-16 pt-8 border-t border-slate-200">
           <div className="flex items-center justify-center gap-2 mb-2">
             <div className="w-6 h-6 bg-obsidian rounded-sm" />
-            <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
+            <span className="font-serif text-sm text-slate-400">CAVA</span>
           </div>
           <p className="text-xs text-slate-400">
             {t.platform}

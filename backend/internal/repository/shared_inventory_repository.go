@@ -21,13 +21,13 @@ func NewSharedInventoryRepository(db *DB) *sharedInventoryRepository {
 func (r *sharedInventoryRepository) CreateSharedBatch(ctx context.Context, shared *entity.SharedInventoryBatch) error {
 	query := `
 		INSERT INTO shared_inventory_batches (
-			id, batch_id, broker_user_id, industry_owner_id, negotiated_price
+			id, batch_id, shared_with_user_id, industry_owner_id, negotiated_price
 		) VALUES ($1, $2, $3, $4, $5)
 		RETURNING shared_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
-		shared.ID, shared.BatchID, shared.BrokerUserID,
+		shared.ID, shared.BatchID, shared.SharedWithUserID,
 		shared.IndustryOwnerID, shared.NegotiatedPrice,
 	).Scan(&shared.SharedAt)
 
@@ -43,14 +43,14 @@ func (r *sharedInventoryRepository) CreateSharedBatch(ctx context.Context, share
 	return nil
 }
 
-func (r *sharedInventoryRepository) FindByBrokerID(ctx context.Context, brokerID string, filters entity.SharedInventoryFilters) ([]entity.SharedInventoryBatch, error) {
+func (r *sharedInventoryRepository) FindByUserID(ctx context.Context, userID string, filters entity.SharedInventoryFilters) ([]entity.SharedInventoryBatch, error) {
 	query := `
-		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		SELECT id, batch_id, shared_with_user_id, industry_owner_id, 
 		       negotiated_price, shared_at, is_active
 		FROM shared_inventory_batches
-		WHERE broker_user_id = $1 AND is_active = TRUE
+		WHERE shared_with_user_id = $1 AND is_active = TRUE
 	`
-	args := []interface{}{brokerID}
+	args := []interface{}{userID}
 
 	if filters.Status != "" {
 		query += ` AND EXISTS (
@@ -83,7 +83,7 @@ func (r *sharedInventoryRepository) FindByBrokerID(ctx context.Context, brokerID
 
 func (r *sharedInventoryRepository) FindByBatchID(ctx context.Context, batchID string) ([]entity.SharedInventoryBatch, error) {
 	query := `
-		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		SELECT id, batch_id, shared_with_user_id, industry_owner_id, 
 		       negotiated_price, shared_at, is_active
 		FROM shared_inventory_batches
 		WHERE batch_id = $1 AND is_active = TRUE
@@ -101,7 +101,7 @@ func (r *sharedInventoryRepository) FindByBatchID(ctx context.Context, batchID s
 
 func (r *sharedInventoryRepository) FindByID(ctx context.Context, id string) (*entity.SharedInventoryBatch, error) {
 	query := `
-		SELECT id, batch_id, broker_user_id, industry_owner_id, 
+		SELECT id, batch_id, shared_with_user_id, industry_owner_id, 
 		       negotiated_price, shared_at, is_active
 		FROM shared_inventory_batches
 		WHERE id = $1
@@ -109,7 +109,7 @@ func (r *sharedInventoryRepository) FindByID(ctx context.Context, id string) (*e
 
 	shared := &entity.SharedInventoryBatch{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&shared.ID, &shared.BatchID, &shared.BrokerUserID,
+		&shared.ID, &shared.BatchID, &shared.SharedWithUserID,
 		&shared.IndustryOwnerID, &shared.NegotiatedPrice,
 		&shared.SharedAt, &shared.IsActive,
 	)
@@ -124,16 +124,16 @@ func (r *sharedInventoryRepository) FindByID(ctx context.Context, id string) (*e
 	return shared, nil
 }
 
-func (r *sharedInventoryRepository) ExistsForBroker(ctx context.Context, batchID, brokerID string) (bool, error) {
+func (r *sharedInventoryRepository) ExistsForUser(ctx context.Context, batchID, userID string) (bool, error) {
 	query := `
 		SELECT EXISTS(
 			SELECT 1 FROM shared_inventory_batches 
-			WHERE batch_id = $1 AND broker_user_id = $2 AND is_active = TRUE
+			WHERE batch_id = $1 AND shared_with_user_id = $2 AND is_active = TRUE
 		)
 	`
 
 	var exists bool
-	err := r.db.QueryRowContext(ctx, query, batchID, brokerID).Scan(&exists)
+	err := r.db.QueryRowContext(ctx, query, batchID, userID).Scan(&exists)
 	if err != nil {
 		return false, errors.DatabaseError(err)
 	}
@@ -185,19 +185,19 @@ func (r *sharedInventoryRepository) Delete(ctx context.Context, id string) error
 	return nil
 }
 
-func (r *sharedInventoryRepository) CountSharedBatches(ctx context.Context, brokerID string, status entity.BatchStatus) (int, error) {
+func (r *sharedInventoryRepository) CountSharedBatches(ctx context.Context, userID string, status entity.BatchStatus) (int, error) {
 	query := `
 		SELECT COUNT(DISTINCT sib.id)
 		FROM shared_inventory_batches sib
 		INNER JOIN batches b ON sib.batch_id = b.id
-		WHERE sib.broker_user_id = $1 
+		WHERE sib.shared_with_user_id = $1 
 		  AND sib.is_active = TRUE
 		  AND b.status = $2
 		  AND b.is_active = TRUE
 	`
 
 	var count int
-	err := r.db.QueryRowContext(ctx, query, brokerID, status).Scan(&count)
+	err := r.db.QueryRowContext(ctx, query, userID, status).Scan(&count)
 	if err != nil {
 		return 0, errors.DatabaseError(err)
 	}
@@ -208,14 +208,14 @@ func (r *sharedInventoryRepository) CountSharedBatches(ctx context.Context, brok
 func (r *sharedInventoryRepository) CreateCatalogPermission(ctx context.Context, permission *entity.SharedCatalogPermission) error {
 	query := `
 		INSERT INTO shared_catalog_permissions (
-			id, industry_id, broker_user_id, can_show_prices
+			id, industry_id, shared_with_user_id, can_show_prices
 		) VALUES ($1, $2, $3, $4)
 		RETURNING granted_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		permission.ID, permission.IndustryID,
-		permission.BrokerUserID, permission.CanShowPrices,
+		permission.SharedWithUserID, permission.CanShowPrices,
 	).Scan(&permission.GrantedAt)
 
 	if err != nil {
@@ -230,17 +230,17 @@ func (r *sharedInventoryRepository) CreateCatalogPermission(ctx context.Context,
 	return nil
 }
 
-func (r *sharedInventoryRepository) FindCatalogPermissionByBroker(ctx context.Context, industryID, brokerID string) (*entity.SharedCatalogPermission, error) {
+func (r *sharedInventoryRepository) FindCatalogPermissionByUser(ctx context.Context, industryID, userID string) (*entity.SharedCatalogPermission, error) {
 	query := `
-		SELECT id, industry_id, broker_user_id, can_show_prices, 
+		SELECT id, industry_id, shared_with_user_id, can_show_prices, 
 		       granted_at, is_active
 		FROM shared_catalog_permissions
-		WHERE industry_id = $1 AND broker_user_id = $2
+		WHERE industry_id = $1 AND shared_with_user_id = $2
 	`
 
 	perm := &entity.SharedCatalogPermission{}
-	err := r.db.QueryRowContext(ctx, query, industryID, brokerID).Scan(
-		&perm.ID, &perm.IndustryID, &perm.BrokerUserID,
+	err := r.db.QueryRowContext(ctx, query, industryID, userID).Scan(
+		&perm.ID, &perm.IndustryID, &perm.SharedWithUserID,
 		&perm.CanShowPrices, &perm.GrantedAt, &perm.IsActive,
 	)
 
@@ -305,7 +305,7 @@ func (r *sharedInventoryRepository) scanSharedBatches(rows *sql.Rows) ([]entity.
 	for rows.Next() {
 		var s entity.SharedInventoryBatch
 		if err := rows.Scan(
-			&s.ID, &s.BatchID, &s.BrokerUserID, &s.IndustryOwnerID,
+			&s.ID, &s.BatchID, &s.SharedWithUserID, &s.IndustryOwnerID,
 			&s.NegotiatedPrice, &s.SharedAt, &s.IsActive,
 		); err != nil {
 			return nil, errors.DatabaseError(err)

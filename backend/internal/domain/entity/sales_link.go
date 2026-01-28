@@ -80,11 +80,12 @@ type UpdateSalesLinkInput struct {
 
 // SalesLinkFilters representa os filtros para busca de links
 type SalesLinkFilters struct {
-	Type   *LinkType `json:"type,omitempty"`
-	Status *string   `json:"status,omitempty"` // ATIVO, EXPIRADO
-	Search *string   `json:"search,omitempty"` // Busca por title ou slug
-	Page   int       `json:"page" validate:"min=1"`
-	Limit  int       `json:"limit" validate:"min=1,max=100"`
+	CreatedByUserID *string   `json:"createdByUserId,omitempty"`
+	Type            *LinkType `json:"type,omitempty"`
+	Status          *string   `json:"status,omitempty"` // ATIVO, EXPIRADO
+	Search          *string   `json:"search,omitempty"` // Busca por title ou slug
+	Page            int       `json:"page" validate:"min=1"`
+	Limit           int       `json:"limit" validate:"min=1,max=100"`
 }
 
 // SalesLinkListResponse representa a resposta de listagem de links
@@ -108,4 +109,39 @@ type ValidateSlugResponse struct {
 type CreateSalesLinkResponse struct {
 	ID      string `json:"id"`
 	FullURL string `json:"fullUrl"`
+}
+
+// PublicBatch representa dados seguros de um lote para exibição pública
+type PublicBatch struct {
+	BatchCode    string   `json:"batchCode"`
+	Height       float64  `json:"height"`
+	Width        float64  `json:"width"`
+	Thickness    float64  `json:"thickness"`
+	TotalArea    float64  `json:"totalArea"`
+	OriginQuarry *string  `json:"originQuarry,omitempty"`
+	Medias       []Media  `json:"medias"`
+	ProductName  string   `json:"productName,omitempty"`
+	Material     string   `json:"material,omitempty"`
+	Finish       string   `json:"finish,omitempty"`
+	IndustryID   string   `json:"industryId,omitempty"`
+	IndustryName string   `json:"industryName,omitempty"`
+}
+
+// PublicProduct representa dados seguros de um produto para exibição pública
+type PublicProduct struct {
+	Name        string  `json:"name"`
+	Material    string  `json:"material"`
+	Finish      string  `json:"finish"`
+	Description *string `json:"description,omitempty"`
+	Medias      []Media `json:"medias"`
+}
+
+// PublicSalesLink representa dados seguros de um link para exibição pública
+type PublicSalesLink struct {
+	Title         string         `json:"title,omitempty"`
+	CustomMessage string         `json:"customMessage,omitempty"`
+	DisplayPrice  *float64       `json:"displayPrice,omitempty"`
+	ShowPrice     bool           `json:"showPrice"`
+	Batch         *PublicBatch   `json:"batch,omitempty"`
+	Product       *PublicProduct `json:"product,omitempty"`
 }

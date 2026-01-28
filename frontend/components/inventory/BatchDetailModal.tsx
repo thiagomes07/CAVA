@@ -1,0 +1,887 @@
+'use client';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import {
+  X, Layers, Settings, Save, AlertTriangle, DollarSign,
+  Share2, Archive, Trash2, Package, Eye, EyeOff, User,
+  RotateCcw, Upload, ArrowUp, ArrowDown, Receipt
+} from 'lucide-react';
+import type { Batch, Media, PriceUnit, BatchStatus, User as UserType, SharedInventoryBatch } from '@/lib/types';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { formatDate } from '@/lib/utils/formatDate';
+import { formatArea, calculateTotalArea } from '@/lib/utils/formatDimensions';
+import { calculateTotalBatchPrice, formatPricePerUnit, getPriceUnitLabel } from '@/lib/utils/priceConversion';
+import { isPlaceholderUrl } from '@/lib/utils/media';
+import { cn } from '@/lib/utils/cn';
+import { SellBatchModal } from '@/app/[locale]/(industry)/inventory/[id]/components/SellBatchModal';
+
+interface UploadedMedia {
+  file: File;
+  preview: string;
+}
+
+interface BatchDetailModalProps {
+  batch: Batch;
+  sharedBatches: SharedInventoryBatch[];
+  availableUsers: UserType[];
+  onClose: () => void;
+  onUpdate: (data: Partial<Batch>) => Promise<void>;
+  onArchive: () => Promise<void>;
+  onDelete: () => Promise<void>;
+  onShare: (userId: string, negotiatedPrice?: number) => Promise<void>;
+  onRemoveShare: (shareId: string) => Promise<void>;
+  onUpdateMedia: (existingMedias: Media[], newMedias: File[], mediasToDelete: string[]) => Promise<void>;
+}
+
+export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
+  batch,
+  sharedBatches,
+  availableUsers,
+  onClose,
+  onUpdate,
+  onArchive,
+  onDelete,
+  onShare,
+  onRemoveShare,
+  onUpdateMedia,
+}) => {
+  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing'>('stock');
+  const [showSellModal, setShowSellModal] = useState(false);
+
+  // Form data for stock tab
+  const [formData, setFormData] = useState({
+    batchCode: batch.batchCode,
+    height: batch.height,
+    width: batch.width,
+    thickness: batch.thickness,
+    quantitySlabs: batch.quantitySlabs,
+    industryPrice: batch.industryPrice,
+    priceUnit: batch.priceUnit || 'M2' as PriceUnit,
+    originQuarry: batch.originQuarry || '',
+    isPublic: batch.isPublic || false,
+  });
+
+  // Media management
+  const [existingMedias, setExistingMedias] = useState<Media[]>(batch.medias || []);
+  const [mediasToDelete, setMediasToDelete] = useState<string[]>([]);
+  const [newMedias, setNewMedias] = useState<UploadedMedia[]>([]);
+
+  // Sharing
+  const [selectedUserId, setSelectedUserId] = useState('');
+  const [negotiatedPrice, setNegotiatedPrice] = useState('');
+  const [isSharing, setIsSharing] = useState(false);
+
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setFormData({
+      batchCode: batch.batchCode,
+      height: batch.height,
+      width: batch.width,
+      thickness: batch.thickness,
+      quantitySlabs: batch.quantitySlabs,
+      industryPrice: batch.industryPrice,
+      priceUnit: batch.priceUnit || 'M2',
+      originQuarry: batch.originQuarry || '',
+      isPublic: batch.isPublic || false,
+    });
+    setExistingMedias(batch.medias || []);
+  }, [batch]);
+
+  const calculatedArea = useMemo(() => {
+    if (formData.height && formData.width && formData.quantitySlabs) {
+      return calculateTotalArea(formData.height, formData.width, formData.quantitySlabs);
+    }
+    return 0;
+  }, [formData.height, formData.width, formData.quantitySlabs]);
+
+  const totalBatchValue = useMemo(() => {
+    if (calculatedArea > 0 && formData.industryPrice > 0) {
+      return calculateTotalBatchPrice(calculatedArea, formData.industryPrice, formData.priceUnit);
+    }
+    return 0;
+  }, [calculatedArea, formData.industryPrice, formData.priceUnit]);
+
+  const handleSaveStock = async () => {
+    try {
+      setIsSaving(true);
+      await onUpdate(formData);
+
+      // Handle media updates if there are changes
+      if (mediasToDelete.length > 0 || newMedias.length > 0) {
+        await onUpdateMedia(existingMedias, newMedias.map(m => m.file), mediasToDelete);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    const totalPhotos = existingMedias.length + newMedias.length + files.length;
+
+    if (totalPhotos > 10) {
+      alert('Máximo de 10 fotos por lote');
+      return;
+    }
+
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        alert('Formato não suportado. Use JPG, PNG ou WebP');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Arquivo excede o limite de 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setNewMedias((prev) => [
+          ...prev,
+          {
+            file,
+            preview: event.target?.result as string,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveExistingMedia = (index: number) => {
+    const mediaToRemove = existingMedias[index];
+    if (mediaToRemove?.id) {
+      setMediasToDelete((prev) => [...prev, mediaToRemove.id]);
+    }
+    setExistingMedias((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleRemoveNewMedia = (index: number) => {
+    setNewMedias((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleReorderExisting = (fromIndex: number, toIndex: number) => {
+    setExistingMedias((prev) => {
+      if (toIndex < 0 || toIndex >= prev.length) return prev;
+      const updated = [...prev];
+      const [moved] = updated.splice(fromIndex, 1);
+      updated.splice(toIndex, 0, moved);
+      return updated.map((media, i) => ({ ...media, displayOrder: i }));
+    });
+  };
+
+  const handleSetExistingCover = (index: number) => {
+    setExistingMedias((prev) => {
+      if (index === 0) return prev;
+      const updated = [...prev];
+      const [cover] = updated.splice(index, 1);
+      updated.unshift(cover);
+      return updated.map((media, i) => ({ ...media, displayOrder: i }));
+    });
+  };
+
+  const handleShareBatch = async () => {
+    if (!selectedUserId) return;
+    try {
+      setIsSharing(true);
+      await onShare(selectedUserId, negotiatedPrice ? parseFloat(negotiatedPrice) : undefined);
+      setSelectedUserId('');
+      setNegotiatedPrice('');
+    } finally {
+      setIsSharing(false);
+    }
+  };
+
+  const allMedias = [...existingMedias, ...newMedias.map((_, i) => ({ id: `new-${i}`, url: '', displayOrder: existingMedias.length + i, batchId: '', createdAt: new Date() }))];
+  const coverMedia = existingMedias[0] || (newMedias[0] ? { url: newMedias[0].preview } : null);
+
+  const totalQuantity = batch.quantitySlabs;
+  const availableQty = batch.availableSlabs;
+  const reservedQty = batch.reservedSlabs ?? 0;
+  const soldQty = batch.soldSlabs ?? 0;
+  const inactiveQty = batch.inactiveSlabs ?? 0;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-[#121212]/90 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200"
+        onClick={onClose}
+      >
+        <div
+          className="bg-white rounded-sm shadow-2xl w-[95vw] h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 border border-white/10 relative"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="px-4 md:px-8 py-4 md:py-6 border-b border-[#222] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-[#121212] text-white shrink-0">
+            <div className="flex items-center gap-4">
+              <h2 className="text-lg md:text-2xl font-serif tracking-wide">{batch.product.name}</h2>
+              <div className="hidden md:flex items-center text-sm text-slate-400 mt-1 space-x-3">
+                <span className="text-xs font-bold uppercase tracking-widest border border-white/20 px-2 py-0.5 rounded-sm">
+                  LOTE: {batch.batchCode}
+                </span>
+                {batch.originQuarry && (
+                  <span className="font-light">{batch.originQuarry}</span>
+                )}
+              </div>
+            </div>
+            <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
+              <X className="w-8 h-8" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-hidden bg-[#FAFAFA] flex flex-col md:flex-row">
+            {/* Mobile Tabs */}
+            <div className="md:hidden bg-white border-b border-slate-200 px-4 pt-4 flex gap-2 overflow-x-auto sticky top-0 z-10 pb-4">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={cn(
+                  'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
+                  activeTab === 'overview'
+                    ? 'border-[#C2410C] text-[#121212]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                )}
+              >
+                <Layers className="w-3 h-3 mr-2" />
+                Visão Geral
+              </button>
+              <button
+                onClick={() => setActiveTab('stock')}
+                className={cn(
+                  'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
+                  activeTab === 'stock'
+                    ? 'border-[#C2410C] text-[#121212]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                )}
+              >
+                <Settings className="w-3 h-3 mr-2" />
+                Estoque
+              </button>
+              <button
+                onClick={() => setActiveTab('sharing')}
+                className={cn(
+                  'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
+                  activeTab === 'sharing'
+                    ? 'border-[#C2410C] text-[#121212]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                )}
+              >
+                <Share2 className="w-3 h-3 mr-2" />
+                Compartilhamentos
+                <span className="ml-2 bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full text-[10px]">{sharedBatches.length}</span>
+              </button>
+            </div>
+
+            {/* Left Column - Overview (Hidden on mobile when not active, visible on desktop) */}
+            <div className={cn(
+              'w-full md:w-1/4 border-b md:border-b-0 md:border-r border-slate-200 bg-white flex flex-col overflow-y-auto shrink-0',
+              activeTab !== 'overview' ? 'hidden md:flex' : 'flex flex-1 md:flex-initial'
+            )}>
+              <div className="p-4 md:p-6 space-y-6 md:space-y-8">
+                {/* Image */}
+                <div className="aspect-square bg-slate-100 overflow-hidden relative shadow-sm">
+                  {coverMedia && !isPlaceholderUrl(coverMedia.url) ? (
+                    <img
+                      src={coverMedia.url}
+                      alt={batch.product.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-slate-400">
+                      <Package className="w-16 h-16" />
+                    </div>
+                  )}
+                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 p-4">
+                    <p className="text-white font-mono text-sm">
+                      {batch.width}x{batch.height}x{batch.thickness} cm
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Actions */}
+                <div className="grid grid-cols-2 gap-2 md:gap-3">
+                  <button
+                    onClick={() => setShowSellModal(true)}
+                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all border bg-transparent hover:bg-slate-50 text-[#121212] border-slate-200 hover:border-[#121212]"
+                    disabled={availableQty === 0}
+                  >
+                    <Receipt className="w-3 h-3 mr-2" />
+                    Vender
+                  </button>
+                  <button
+                    onClick={onArchive}
+                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all shadow-lg bg-[#121212] hover:bg-[#C2410C] text-white border border-transparent"
+                  >
+                    <Archive className="w-3 h-3 mr-2" />
+                    Arquivar
+                  </button>
+                </div>
+
+                {/* Global Inventory */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center">
+                    <Layers className="w-3 h-3 mr-2" /> Inventário Global
+                  </h3>
+
+                  <div className="bg-[#FAFAFA] border border-slate-100 p-5 space-y-4">
+                    <div className="flex justify-between items-center border-b border-slate-100 pb-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase">Total de Chapas</span>
+                      <span className="font-serif text-lg text-[#121212]">{totalQuantity}</span>
+                    </div>
+
+                    <div className="w-full bg-slate-200 h-1 flex">
+                      <div style={{ width: `${(soldQty / totalQuantity) * 100}%` }} className="bg-emerald-600" />
+                      <div style={{ width: `${(reservedQty / totalQuantity) * 100}%` }} className="bg-amber-500" />
+                      <div style={{ width: `${(availableQty / totalQuantity) * 100}%` }} className="bg-slate-400" />
+                      <div style={{ width: `${(inactiveQty / totalQuantity) * 100}%` }} className="bg-slate-300" />
+                    </div>
+
+                    <div className="space-y-2 pt-1">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-400 uppercase tracking-wide flex items-center">
+                          <div className="w-1.5 h-1.5 bg-emerald-600 rounded-full mr-2" /> Vendidas
+                        </span>
+                        <span className="font-mono text-[#121212]">{soldQty}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-400 uppercase tracking-wide flex items-center">
+                          <div className="w-1.5 h-1.5 bg-amber-500 mr-2" /> Reservadas
+                        </span>
+                        <span className="font-mono text-[#121212] font-bold">{reservedQty}</span>
+                      </div>
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-slate-400 uppercase tracking-wide flex items-center">
+                          <div className="w-1.5 h-1.5 bg-slate-400 mr-2" /> Disponíveis
+                        </span>
+                        <span className="font-mono text-[#121212]">{availableQty}</span>
+                      </div>
+                      {inactiveQty > 0 && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-400 uppercase tracking-wide flex items-center">
+                            <div className="w-1.5 h-1.5 bg-slate-300 mr-2" /> Inativas
+                          </span>
+                          <span className="font-mono text-[#121212]">{inactiveQty}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Financials */}
+                <div className="space-y-4">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400 flex items-center">
+                    <DollarSign className="w-3 h-3 mr-2" /> Financeiro
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="p-3 bg-[#FAFAFA] border border-slate-100">
+                      <p className="text-[9px] text-slate-400 uppercase font-bold tracking-wider">Preço Base</p>
+                      <p className="text-lg font-serif text-[#121212] mt-1">
+                        {formatPricePerUnit(batch.industryPrice, batch.priceUnit)}
+                      </p>
+                    </div>
+                  </div>
+                  {calculatedArea > 0 && (
+                    <div className="p-4 bg-[#121212] text-white text-center shadow-lg">
+                      <p className="text-[9px] text-[#C2410C] uppercase font-bold tracking-[0.2em]">Valor Total</p>
+                      <p className="text-2xl font-serif mt-1">{formatCurrency(totalBatchValue)}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column */}
+            <div className={cn(
+              'flex-1 flex flex-col overflow-hidden bg-[#FAFAFA]',
+              activeTab === 'overview' ? 'hidden md:flex' : 'flex'
+            )}>
+              {/* Desktop Tabs */}
+              <div className="hidden md:flex bg-white border-b border-slate-200 px-4 md:px-8 pt-4 md:pt-6 gap-2 md:gap-8 overflow-x-auto sticky top-0 z-10">
+                <button
+                  onClick={() => setActiveTab('stock')}
+                  className={cn(
+                    'pb-4 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-b-2 whitespace-nowrap',
+                    activeTab === 'stock'
+                      ? 'border-[#C2410C] text-[#121212]'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  <Settings className="w-3 h-3 mr-2" />
+                  Estoque
+                </button>
+                <button
+                  onClick={() => setActiveTab('sharing')}
+                  className={cn(
+                    'pb-4 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-b-2 whitespace-nowrap',
+                    activeTab === 'sharing'
+                      ? 'border-[#C2410C] text-[#121212]'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  <Share2 className="w-3 h-3 mr-2" />
+                  Compartilhamentos
+                  <span className="ml-2 bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full text-[10px]">{sharedBatches.length}</span>
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4 md:p-8">
+                {/* Stock Tab */}
+                {activeTab === 'stock' && (
+                  <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="bg-[#121212] p-4 md:p-6 flex items-start gap-5 shadow-xl">
+                      <Settings className="w-6 h-6 text-[#C2410C] mt-1 flex-shrink-0" />
+                      <div>
+                        <h3 className="text-lg font-serif text-white">Configurações do Lote</h3>
+                        <p className="text-sm text-slate-400 mt-2 font-light leading-relaxed max-w-xl">
+                          Edite as informações e dimensões do lote. Gerencie fotos e visibilidade.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+                      {/* Identification & Dimensions */}
+                      <div className="space-y-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center border-b border-slate-200 pb-2">
+                          <Layers className="w-3 h-3 mr-2" /> Identificação & Dimensões
+                        </h4>
+                        <div className="space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Código do Lote</label>
+                            <input
+                              type="text"
+                              value={formData.batchCode}
+                              onChange={(e) => setFormData({ ...formData, batchCode: e.target.value })}
+                              className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-serif text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Pedreira de Origem</label>
+                            <input
+                              type="text"
+                              value={formData.originQuarry}
+                              onChange={(e) => setFormData({ ...formData, originQuarry: e.target.value })}
+                              className="w-full py-2 bg-transparent border-b border-slate-300 text-base font-mono text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                            />
+                          </div>
+                          <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Largura (cm)</label>
+                              <input
+                                type="number"
+                                value={formData.width}
+                                onChange={(e) => setFormData({ ...formData, width: parseFloat(e.target.value) || 0 })}
+                                className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-medium text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Altura (cm)</label>
+                              <input
+                                type="number"
+                                value={formData.height}
+                                onChange={(e) => setFormData({ ...formData, height: parseFloat(e.target.value) || 0 })}
+                                className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-medium text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Espessura (cm)</label>
+                              <input
+                                type="number"
+                                value={formData.thickness}
+                                onChange={(e) => setFormData({ ...formData, thickness: parseFloat(e.target.value) || 0 })}
+                                className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-medium text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Quantidade de Chapas</label>
+                            <input
+                              type="number"
+                              min={soldQty + reservedQty}
+                              value={formData.quantitySlabs}
+                              onChange={(e) => setFormData({ ...formData, quantitySlabs: parseInt(e.target.value) || 0 })}
+                              className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-serif text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                            />
+                            {calculatedArea > 0 && (
+                              <p className="text-[10px] text-slate-400 mt-1 flex items-center uppercase tracking-wider font-bold">
+                                Área Total: <span className="text-[#121212] ml-1">{formatArea(calculatedArea)}</span>
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between p-4 bg-slate-50 rounded-sm">
+                            <div>
+                              <p className="font-medium text-obsidian">Visível no catálogo público</p>
+                              <p className="text-sm text-slate-500">
+                                Este lote aparecerá na página pública do depósito
+                              </p>
+                            </div>
+                            <input
+                              type="checkbox"
+                              checked={formData.isPublic}
+                              onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
+                              className="w-5 h-5 rounded border-slate-300"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Pricing */}
+                      <div className="space-y-6">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center border-b border-slate-200 pb-2">
+                          <DollarSign className="w-3 h-3 mr-2" /> Precificação
+                        </h4>
+                        <div className="space-y-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">Unidade de Preço</label>
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, priceUnit: 'M2' })}
+                                className={cn(
+                                  'px-4 py-2 rounded-sm font-medium transition-colors',
+                                  formData.priceUnit === 'M2'
+                                    ? 'bg-obsidian text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                )}
+                              >
+                                R$/m²
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setFormData({ ...formData, priceUnit: 'FT2' })}
+                                className={cn(
+                                  'px-4 py-2 rounded-sm font-medium transition-colors',
+                                  formData.priceUnit === 'FT2'
+                                    ? 'bg-obsidian text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                )}
+                              >
+                                R$/ft²
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                              Preço Base ({getPriceUnitLabel(formData.priceUnit)})
+                            </label>
+                            <div className="relative group">
+                              <DollarSign className="absolute left-0 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                              <input
+                                type="number"
+                                min={0}
+                                value={formData.industryPrice}
+                                onChange={(e) => setFormData({ ...formData, industryPrice: parseFloat(e.target.value) || 0 })}
+                                className="w-full pl-6 py-2 bg-transparent border-b border-slate-300 text-xl font-medium text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                              />
+                            </div>
+                            <p className="text-xs text-slate-500">Este é o preço de repasse para brokers</p>
+                          </div>
+                          {totalBatchValue > 0 && (
+                            <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-sm">
+                              <Package className="w-5 h-5 text-blue-600" />
+                              <div>
+                                <p className="text-sm font-semibold text-blue-900">
+                                  Valor Total do Lote
+                                </p>
+                                <p className="text-2xl font-mono font-bold text-blue-700">
+                                  {formatCurrency(totalBatchValue)}
+                                </p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                  {formatPricePerUnit(formData.industryPrice, formData.priceUnit)} × {formatArea(calculatedArea)}
+                                </p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Photos */}
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center border-b border-slate-200 pb-2">
+                        <Upload className="w-3 h-3 mr-2" /> Fotos do Lote
+                      </h4>
+
+                      <div className="mb-6">
+                        <label
+                          htmlFor="file-upload"
+                          className={cn(
+                            'flex flex-col items-center justify-center w-full h-48',
+                            'border-2 border-dashed border-slate-300 rounded-sm',
+                            'cursor-pointer transition-colors',
+                            'hover:border-obsidian hover:bg-slate-50',
+                            allMedias.length >= 10 && 'opacity-50 cursor-not-allowed'
+                          )}
+                        >
+                          <Upload className="w-12 h-12 text-slate-400 mb-4" />
+                          <p className="text-sm text-slate-600 mb-1">
+                            Adicionar mais fotos
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {allMedias.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
+                          </p>
+                          <input
+                            id="file-upload"
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp"
+                            multiple
+                            onChange={handleFileSelect}
+                            disabled={allMedias.length >= 10}
+                            className="hidden"
+                          />
+                        </label>
+                        <p className="text-xs text-slate-500 mt-2">
+                          A primeira foto será a capa do lote
+                        </p>
+                      </div>
+
+                      {allMedias.length > 0 && (
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          {existingMedias.map((media, index) => (
+                            <div
+                              key={media.id}
+                              className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
+                            >
+                              {isPlaceholderUrl(media.url) ? (
+                                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+                                  Sem foto
+                                </div>
+                              ) : (
+                                <img
+                                  src={media.url}
+                                  alt={`Foto ${index + 1}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              )}
+
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
+                                <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReorderExisting(index, index - 1)}
+                                    className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                                    disabled={index === 0}
+                                  >
+                                    <ArrowUp className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSetExistingCover(index)}
+                                    className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
+                                    disabled={index === 0}
+                                  >
+                                    Definir capa
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleReorderExisting(index, index + 1)}
+                                    className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
+                                    disabled={index === existingMedias.length - 1}
+                                  >
+                                    <ArrowDown className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveExistingMedia(index)}
+                                    className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {index === 0 && (
+                                <div className="absolute top-2 left-2">
+                                  <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
+                                    CAPA
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+
+                          {newMedias.map((media, index) => (
+                            <div
+                              key={`new-${index}`}
+                              className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-dashed border-emerald-400 group"
+                            >
+                              <img
+                                src={media.preview}
+                                alt={`Nova foto ${index + 1}`}
+                                className="w-full h-full object-cover"
+                              />
+
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveNewMedia(index)}
+                                  className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </div>
+
+                              {existingMedias.length === 0 && index === 0 && (
+                                <div className="absolute top-2 left-2">
+                                  <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
+                                    CAPA
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="absolute top-2 right-2">
+                                <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
+                                  NOVA
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
+                      <button
+                        onClick={onDelete}
+                        className="px-6 py-3 border border-rose-500 text-rose-600 text-xs font-bold uppercase tracking-widest hover:bg-rose-50 transition-colors flex items-center"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Deletar
+                      </button>
+                      <button
+                        onClick={handleSaveStock}
+                        disabled={isSaving}
+                        className="px-8 py-3 bg-[#121212] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2410C] shadow-lg transition-all flex items-center disabled:opacity-50"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        {isSaving ? 'Salvando...' : 'Salvar Alterações'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sharing Tab */}
+                {activeTab === 'sharing' && (
+                  <div className="space-y-4">
+                    <div className="bg-white border border-slate-200 p-6 rounded-sm">
+                      <h3 className="font-bold text-[#121212] mb-4">Compartilhar com Broker/Vendedor</h3>
+                      <div className="space-y-4">
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Selecionar Broker ou Vendedor
+                          </label>
+                          <select
+                            value={selectedUserId}
+                            onChange={(e) => setSelectedUserId(e.target.value)}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-obsidian/20 focus:border-obsidian"
+                          >
+                            <option value="">Selecione...</option>
+                            {availableUsers
+                              .filter((user) => !sharedBatches.some((s) => s.sharedWithUserId === user.id))
+                              .map((user) => (
+                                <option key={user.id} value={user.id}>
+                                  {user.name} ({user.role === 'BROKER' ? 'Broker' : 'Vendedor Interno'})
+                                </option>
+                              ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-slate-700 mb-2">
+                            Preço Negociado (Opcional)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={negotiatedPrice}
+                            onChange={(e) => setNegotiatedPrice(e.target.value)}
+                            placeholder={`${formatCurrency(batch.industryPrice)}/${batch.priceUnit}`}
+                            className="w-full px-4 py-2 border border-slate-300 rounded-sm focus:outline-none focus:ring-2 focus:ring-obsidian/20 focus:border-obsidian"
+                          />
+                          <p className="text-xs text-slate-500 mt-1">
+                            Deixe em branco para usar o preço padrão do lote
+                          </p>
+                        </div>
+
+                        <button
+                          onClick={handleShareBatch}
+                          disabled={!selectedUserId || isSharing}
+                          className="w-full px-6 py-3 bg-[#121212] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2410C] shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSharing ? 'Compartilhando...' : 'Compartilhar'}
+                        </button>
+                      </div>
+                    </div>
+
+                    {sharedBatches.length === 0 ? (
+                      <div className="text-center py-20 text-slate-400 bg-white border border-dashed border-slate-200">
+                        <p className="font-serif italic">Nenhum compartilhamento ativo</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4">
+                        {sharedBatches.map((share) => {
+                          const sharedUser = availableUsers.find((u) => u.id === share.sharedWithUserId);
+                          return (
+                            <div key={share.id} className="bg-white border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between group hover:border-[#121212] transition-colors gap-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 shrink-0">
+                                  <span className="font-serif font-bold text-slate-400 text-lg">{sharedUser?.name?.[0]}</span>
+                                </div>
+                                <div>
+                                  <h3 className="font-bold text-[#121212] text-sm uppercase tracking-wide">{sharedUser?.name}</h3>
+                                  <p className="text-[10px] text-slate-400 uppercase tracking-wider mt-0.5">
+                                    Compartilhado em {formatDate(share.sharedAt)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap gap-4 md:gap-10 text-sm items-center">
+                                {share.negotiatedPrice && (
+                                  <div className="text-center">
+                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Preço Negociado</p>
+                                    <p className="font-serif text-base md:text-lg text-slate-700">{formatCurrency(share.negotiatedPrice)}</p>
+                                  </div>
+                                )}
+
+                                <div className="w-full md:w-auto">
+                                  <button
+                                    onClick={() => onRemoveShare(share.id)}
+                                    className="w-full md:w-auto flex items-center justify-center px-4 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white transition-all"
+                                  >
+                                    <Trash2 className="w-3 h-3 mr-2" />
+                                    Remover Acesso
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Sell Modal */}
+      {showSellModal && (
+        <SellBatchModal
+          batch={batch}
+          quantitySlabs={availableQty}
+          sourceStatus="DISPONIVEL"
+          isOpen={showSellModal}
+          onClose={() => setShowSellModal(false)}
+          onSuccess={() => {
+            setShowSellModal(false);
+            // Parent component should refetch batch
+          }}
+        />
+      )}
+    </>
+  );
+};

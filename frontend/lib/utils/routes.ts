@@ -24,6 +24,7 @@ export const routesByRole: RoleRouteMap = {
     '/sales',
     '/team',
     '/links',
+    '/catalogos',
     '/clientes',
   ],
   VENDEDOR_INTERNO: [
@@ -31,12 +32,14 @@ export const routesByRole: RoleRouteMap = {
     '/inventory',
     '/sales',
     '/links',
+    '/catalogos',
     '/clientes',
   ],
   BROKER: [
     '/dashboard',
     '/shared-inventory',
     '/links',
+    '/catalogos',
     '/clientes',
   ],
 };

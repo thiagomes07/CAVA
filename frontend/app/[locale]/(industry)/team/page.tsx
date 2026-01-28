@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Plus, Mail, Phone, Link2, Receipt, UserX, Shield, RefreshCw, Clock, MessageCircle } from 'lucide-react';
+import { Plus, Mail, Phone, Link2, Receipt, UserX, Shield, RefreshCw, Clock, MessageCircle, X, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -294,7 +294,7 @@ export default function TeamManagementPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <p
-                              className="font-medium text-obsidian"
+                              className="font-serif text-obsidian"
                               title={seller.name}
                             >
                               {truncateText(seller.name, TRUNCATION_LIMITS.SELLER_NAME)}
@@ -306,17 +306,17 @@ export default function TeamManagementPage() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-slate-500">
+                          <p className="text-xs text-slate-400 font-mono">
                             {t('since', { date: formatDate(seller.createdAt, 'MMM yyyy') })}
                           </p>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Mail className="w-4 h-4 text-slate-400" />
+                      <div className="flex items-center gap-2 text-slate-400 hover:text-[#C2410C] transition-colors cursor-pointer">
+                        <Mail className="w-4 h-4" />
                         <span
-                          className="text-sm text-slate-600"
+                          className="font-mono text-sm"
                           title={seller.email}
                         >
                           {truncateText(seller.email, TRUNCATION_LIMITS.EMAIL)}
@@ -325,14 +325,14 @@ export default function TeamManagementPage() {
                     </TableCell>
                     <TableCell>
                       {seller.phone ? (
-                        <div className="flex items-center gap-2">
-                          <Phone className="w-4 h-4 text-slate-400" />
-                          <span className="text-sm text-slate-600">
+                        <div className="flex items-center gap-2 text-slate-400">
+                          <Phone className="w-4 h-4" />
+                          <span className="font-mono text-sm">
                             {formatPhone(seller.phone)}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-300">-</span>
                       )}
                     </TableCell>
                     <TableCell>
@@ -341,29 +341,29 @@ export default function TeamManagementPage() {
                           href={`https://wa.me/55${seller.whatsapp.replace(/\D/g, '')}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-2 group"
+                          className="flex items-center gap-2 text-slate-400 hover:text-emerald-500 transition-colors"
                         >
-                          <MessageCircle className="w-4 h-4 text-emerald-500 group-hover:text-emerald-600" />
-                          <span className="text-sm text-slate-600 group-hover:text-emerald-700 transition-colors">
+                          <MessageCircle className="w-4 h-4" />
+                          <span className="font-mono text-sm">
                             {formatPhone(seller.whatsapp)}
                           </span>
                         </a>
                       ) : (
-                        <span className="text-slate-400">-</span>
+                        <span className="text-slate-300">-</span>
                       )}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Link2 className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm font-mono text-slate-600">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Link2 className="w-4 h-4" />
+                        <span className="font-mono">
                           0
                         </span>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Receipt className="w-4 h-4 text-slate-400" />
-                        <span className="text-sm font-mono text-slate-600">
+                      <div className="flex items-center gap-2 text-slate-400">
+                        <Receipt className="w-4 h-4" />
+                        <span className="font-mono">
                           0
                         </span>
                       </div>
@@ -385,12 +385,12 @@ export default function TeamManagementPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         {/* Reenviar convite - apenas se nunca logou */}
                         {canResendInvite(seller) && (
                           <button
                             onClick={() => handleOpenResendModal(seller)}
-                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-sm transition-colors"
+                            className="p-2 text-slate-300 hover:text-[#C2410C] transition-colors"
                             title={t('resendInvite')}
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -401,10 +401,10 @@ export default function TeamManagementPage() {
                           <button
                             onClick={() => handleToggleStatus(seller)}
                             className={cn(
-                              'p-2 rounded-sm transition-colors',
+                              'p-2 transition-colors',
                               seller.isActive
-                                ? 'hover:bg-rose-50 text-rose-600'
-                                : 'hover:bg-emerald-50 text-emerald-600'
+                                ? 'text-slate-300 hover:text-rose-500'
+                                : 'text-slate-300 hover:text-emerald-500'
                             )}
                             title={seller.isActive ? t('deactivate') : t('activate')}
                           >
@@ -422,80 +422,142 @@ export default function TeamManagementPage() {
       </div>
 
       {/* Invite Modal */}
-      <Modal open={showInviteModal} onClose={() => setShowInviteModal(false)}>
-        <ModalClose onClose={() => setShowInviteModal(false)} />
-        <ModalHeader>
-          <ModalTitle>{t('addSellerTitle')}</ModalTitle>
-        </ModalHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <ModalContent>
-            <div className="space-y-6">
-              <Input
-                {...register('name')}
-                label={t('fullName')}
-                placeholder="João Silva"
-                error={errors.name?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('email')}
-                type="email"
-                label={tCommon('email')}
-                placeholder="joao@exemplo.com"
-                helperText={t('emailHelperText')}
-                error={errors.email?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                value={phoneField.value}
-                onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
-                label={t('phoneOptional')}
-                placeholder="(11) 98765-4321"
-                error={errors.phone?.message}
-                disabled={isSubmitting}
-              />
-
-              {/* Admin Checkbox */}
-              <div className="pt-4 border-t border-slate-100">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    {...register('isAdmin')}
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-obsidian focus:ring-obsidian"
-                    disabled={isSubmitting}
-                  />
-                  <div className="flex flex-col">
-                    <span className="text-sm font-medium text-obsidian flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-amber-600" />
-                      {t('isAdmin')}
-                    </span>
-                    <span className="text-xs text-slate-500 mt-0.5">
-                      {t('isAdminDescription')}
-                    </span>
-                  </div>
-                </label>
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
+              <div>
+                <h2 className="font-serif text-xl">{t('addSellerTitle')}</h2>
+                <p className="text-xs text-white/50 mt-0.5">Adicione um novo membro à equipe</p>
               </div>
+              <button 
+                onClick={() => setShowInviteModal(false)} 
+                className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          </ModalContent>
 
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowInviteModal(false)}
-              disabled={isSubmitting}
-            >
-              {tCommon('cancel')}
-            </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              {t('createAccess')}
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
+            {/* Progress Bar */}
+            <div className="h-1 bg-[#C2410C]" />
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="px-6 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
+                {/* Name */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('fullName')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('name')}
+                    placeholder="João Silva"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.name ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {tCommon('email')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('email')}
+                    type="email"
+                    placeholder="joao@exemplo.com"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.email ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">{t('emailHelperText')}</p>
+                  {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('phoneOptional')}
+                  </label>
+                  <input
+                    value={phoneField.value}
+                    onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.phone ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
+                </div>
+
+                {/* Admin Checkbox */}
+                <div className="p-4 bg-slate-50 border border-slate-200">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      {...register('isAdmin')}
+                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
+                      disabled={isSubmitting}
+                    />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-amber-600" />
+                        {t('isAdmin')}
+                      </span>
+                      <span className="text-xs text-slate-400 mt-0.5">
+                        {t('isAdminDescription')}
+                      </span>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  disabled={isSubmitting}
+                  className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={cn(
+                    'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
+                    isSubmitting ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+                  )}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4" />
+                      {t('createAccess')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Resend Invite Confirmation Modal */}
       <Modal open={showResendModal} onClose={() => setShowResendModal(false)}>

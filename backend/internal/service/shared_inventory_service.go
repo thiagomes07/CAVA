@@ -42,26 +42,26 @@ func (s *sharedInventoryService) ShareBatch(ctx context.Context, industryID stri
 		return nil, domainErrors.ForbiddenError()
 	}
 
-	// Validar que broker existe e tem role BROKER
-	broker, err := s.userRepo.FindByID(ctx, input.BrokerUserID)
+	// Validar que usuário existe e tem role BROKER ou VENDEDOR_INTERNO
+	user, err := s.userRepo.FindByID(ctx, input.SharedWithUserID)
 	if err != nil {
 		return nil, err
 	}
-	if broker.Role != entity.RoleBroker {
-		return nil, domainErrors.ValidationError("Usuário não é um broker")
+	if user.Role != entity.RoleBroker && user.Role != entity.RoleVendedorInterno {
+		return nil, domainErrors.ValidationError("Usuário deve ser um broker ou vendedor interno")
 	}
-	if !broker.IsActive {
-		return nil, domainErrors.ValidationError("Broker inativo")
+	if !user.IsActive {
+		return nil, domainErrors.ValidationError("Usuário inativo")
 	}
 
-	// Verificar se lote já está compartilhado com este broker
-	exists, err := s.sharedRepo.ExistsForBroker(ctx, input.BatchID, input.BrokerUserID)
+	// Verificar se lote já está compartilhado com este usuário
+	exists, err := s.sharedRepo.ExistsForUser(ctx, input.BatchID, input.SharedWithUserID)
 	if err != nil {
 		s.logger.Error("erro ao verificar compartilhamento existente", zap.Error(err))
 		return nil, domainErrors.InternalError(err)
 	}
 	if exists {
-		return nil, domainErrors.NewConflictError("Lote já compartilhado com este broker")
+		return nil, domainErrors.NewConflictError("Lote já compartilhado com este usuário")
 	}
 
 	// Validar preço negociado (se fornecido)
@@ -71,19 +71,20 @@ func (s *sharedInventoryService) ShareBatch(ctx context.Context, industryID stri
 
 	// Criar compartilhamento
 	shared := &entity.SharedInventoryBatch{
-		ID:              uuid.New().String(),
-		BatchID:         input.BatchID,
-		BrokerUserID:    input.BrokerUserID,
-		IndustryOwnerID: industryID,
-		NegotiatedPrice: input.NegotiatedPrice,
-		SharedAt:        time.Now(),
-		IsActive:        true,
+		ID:                  uuid.New().String(),
+		BatchID:             input.BatchID,
+		SharedWithUserID:    input.SharedWithUserID,
+		IndustryOwnerID:     industryID,
+		NegotiatedPrice:     input.NegotiatedPrice,
+		NegotiatedPriceUnit: input.NegotiatedPriceUnit,
+		SharedAt:            time.Now(),
+		IsActive:            true,
 	}
 
 	if err := s.sharedRepo.CreateSharedBatch(ctx, shared); err != nil {
 		s.logger.Error("erro ao compartilhar lote",
 			zap.String("batchId", input.BatchID),
-			zap.String("brokerId", input.BrokerUserID),
+			zap.String("userId", input.SharedWithUserID),
 			zap.Error(err),
 		)
 		return nil, err
@@ -92,7 +93,7 @@ func (s *sharedInventoryService) ShareBatch(ctx context.Context, industryID stri
 	s.logger.Info("lote compartilhado com sucesso",
 		zap.String("sharedId", shared.ID),
 		zap.String("batchId", input.BatchID),
-		zap.String("brokerId", input.BrokerUserID),
+		zap.String("userId", input.SharedWithUserID),
 	)
 
 	return shared, nil
@@ -118,15 +119,15 @@ func (s *sharedInventoryService) RemoveSharedBatch(ctx context.Context, id strin
 	return nil
 }
 
-func (s *sharedInventoryService) UpdateNegotiatedPrice(ctx context.Context, id, brokerID string, price *float64) (*entity.SharedInventoryBatch, error) {
+func (s *sharedInventoryService) UpdateNegotiatedPrice(ctx context.Context, id, userID string, price *float64) (*entity.SharedInventoryBatch, error) {
 	// Buscar compartilhamento
 	shared, err := s.sharedRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	// Verificar se broker é o dono do compartilhamento
-	if shared.BrokerUserID != brokerID {
+	// Verificar se usuário é o dono do compartilhamento
+	if shared.SharedWithUserID != userID {
 		return nil, domainErrors.ForbiddenError()
 	}
 
@@ -146,19 +147,19 @@ func (s *sharedInventoryService) UpdateNegotiatedPrice(ctx context.Context, id, 
 
 	s.logger.Info("preço negociado atualizado",
 		zap.String("sharedId", id),
-		zap.String("brokerId", brokerID),
+		zap.String("userId", userID),
 	)
 
 	// Retornar compartilhamento atualizado
 	return s.sharedRepo.FindByID(ctx, id)
 }
 
-func (s *sharedInventoryService) GetBrokerInventory(ctx context.Context, brokerID string, filters entity.SharedInventoryFilters) ([]entity.SharedInventoryBatch, error) {
-	// Buscar inventário compartilhado do broker
-	shared, err := s.sharedRepo.FindByBrokerID(ctx, brokerID, filters)
+func (s *sharedInventoryService) GetUserInventory(ctx context.Context, userID string, filters entity.SharedInventoryFilters) ([]entity.SharedInventoryBatch, error) {
+	// Buscar inventário compartilhado do usuário (broker ou vendedor interno)
+	shared, err := s.sharedRepo.FindByUserID(ctx, userID, filters)
 	if err != nil {
-		s.logger.Error("erro ao buscar inventário do broker",
-			zap.String("brokerId", brokerID),
+		s.logger.Error("erro ao buscar inventário do usuário",
+			zap.String("userId", userID),
 			zap.Error(err),
 		)
 		return nil, err
@@ -177,16 +178,16 @@ func (s *sharedInventoryService) GetBrokerInventory(ctx context.Context, brokerI
 			shared[i].Batch = batch
 		}
 
-		// Buscar broker
-		broker, err := s.userRepo.FindByID(ctx, shared[i].BrokerUserID)
+		// Buscar usuário com quem foi compartilhado
+		user, err := s.userRepo.FindByID(ctx, shared[i].SharedWithUserID)
 		if err != nil {
-			s.logger.Warn("erro ao buscar broker",
-				zap.String("brokerId", shared[i].BrokerUserID),
+			s.logger.Warn("erro ao buscar usuário",
+				zap.String("userId", shared[i].SharedWithUserID),
 				zap.Error(err),
 			)
 		} else {
-			broker.Password = "" // Limpar senha
-			shared[i].Broker = broker
+			user.Password = "" // Limpar senha
+			shared[i].SharedWith = user
 		}
 	}
 
@@ -206,49 +207,62 @@ func (s *sharedInventoryService) GetSharedBatchesByBatchID(ctx context.Context, 
 
 	// Buscar dados relacionados
 	for i := range shared {
-		// Buscar broker
-		broker, err := s.userRepo.FindByID(ctx, shared[i].BrokerUserID)
+		// Buscar usuário com quem foi compartilhado
+		user, err := s.userRepo.FindByID(ctx, shared[i].SharedWithUserID)
 		if err != nil {
-			s.logger.Warn("erro ao buscar broker",
-				zap.String("brokerId", shared[i].BrokerUserID),
+			s.logger.Warn("erro ao buscar usuário",
+				zap.String("userId", shared[i].SharedWithUserID),
 				zap.Error(err),
 			)
 		} else {
-			broker.Password = ""
-			shared[i].Broker = broker
+			user.Password = ""
+			shared[i].SharedWith = user
 		}
 	}
 
 	return shared, nil
 }
 
+func (s *sharedInventoryService) ExistsForUser(ctx context.Context, batchID, userID string) (bool, error) {
+	exists, err := s.sharedRepo.ExistsForUser(ctx, batchID, userID)
+	if err != nil {
+		s.logger.Error("erro ao verificar compartilhamento",
+			zap.String("batchId", batchID),
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		return false, err
+	}
+	return exists, nil
+}
+
 func (s *sharedInventoryService) ShareCatalog(ctx context.Context, industryID string, input entity.CreateSharedCatalogInput) (*entity.SharedCatalogPermission, error) {
-	// Validar que broker existe e tem role BROKER
-	broker, err := s.userRepo.FindByID(ctx, input.BrokerUserID)
+	// Validar que usuário existe e tem role BROKER ou VENDEDOR_INTERNO
+	user, err := s.userRepo.FindByID(ctx, input.SharedWithUserID)
 	if err != nil {
 		return nil, err
 	}
-	if broker.Role != entity.RoleBroker {
-		return nil, domainErrors.ValidationError("Usuário não é um broker")
+	if user.Role != entity.RoleBroker && user.Role != entity.RoleVendedorInterno {
+		return nil, domainErrors.ValidationError("Usuário deve ser um broker ou vendedor interno")
 	}
-	if !broker.IsActive {
-		return nil, domainErrors.ValidationError("Broker inativo")
+	if !user.IsActive {
+		return nil, domainErrors.ValidationError("Usuário inativo")
 	}
 
 	// Criar permissão de catálogo
 	permission := &entity.SharedCatalogPermission{
-		ID:            uuid.New().String(),
-		IndustryID:    industryID,
-		BrokerUserID:  input.BrokerUserID,
-		CanShowPrices: input.CanShowPrices,
-		GrantedAt:     time.Now(),
-		IsActive:      true,
+		ID:              uuid.New().String(),
+		IndustryID:      industryID,
+		SharedWithUserID: input.SharedWithUserID,
+		CanShowPrices:   input.CanShowPrices,
+		GrantedAt:       time.Now(),
+		IsActive:        true,
 	}
 
 	if err := s.sharedRepo.CreateCatalogPermission(ctx, permission); err != nil {
 		s.logger.Error("erro ao criar permissão de catálogo",
 			zap.String("industryId", industryID),
-			zap.String("brokerId", input.BrokerUserID),
+			zap.String("userId", input.SharedWithUserID),
 			zap.Error(err),
 		)
 		return nil, err
@@ -257,15 +271,15 @@ func (s *sharedInventoryService) ShareCatalog(ctx context.Context, industryID st
 	s.logger.Info("catálogo compartilhado com sucesso",
 		zap.String("permissionId", permission.ID),
 		zap.String("industryId", industryID),
-		zap.String("brokerId", input.BrokerUserID),
+		zap.String("userId", input.SharedWithUserID),
 	)
 
 	return permission, nil
 }
 
-func (s *sharedInventoryService) RevokeCatalogAccess(ctx context.Context, industryID, brokerID string) error {
+func (s *sharedInventoryService) RevokeCatalogAccess(ctx context.Context, industryID, userID string) error {
 	// Buscar permissão
-	permission, err := s.sharedRepo.FindCatalogPermissionByBroker(ctx, industryID, brokerID)
+	permission, err := s.sharedRepo.FindCatalogPermissionByUser(ctx, industryID, userID)
 	if err != nil {
 		return err
 	}
@@ -281,7 +295,7 @@ func (s *sharedInventoryService) RevokeCatalogAccess(ctx context.Context, indust
 
 	s.logger.Info("acesso ao catálogo revogado",
 		zap.String("industryId", industryID),
-		zap.String("brokerId", brokerID),
+		zap.String("userId", userID),
 	)
 
 	return nil

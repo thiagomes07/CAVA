@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'auth' });
 
   return {
-    title: `Login | CAVA Stone Platform`,
+    title: `Login | CAVA `,
     description: t('accessAccount'),
   };
 }

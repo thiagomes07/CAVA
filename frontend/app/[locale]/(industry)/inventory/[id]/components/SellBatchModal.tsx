@@ -405,14 +405,15 @@ export function SellBatchModal({
                 <ModalHeader>
                     <ModalTitle>Confirmar Venda</ModalTitle>
                     <ModalDescription>
-                        <div className="flex items-center gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm">
-                            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                            <p className="text-sm text-amber-800">
-                                Tem certeza que quer atualizar o status de <strong>{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</strong> para vendido?
-                                Para desfazer, acesse a página de Vendas e remova a venda.
-                            </p>
-                        </div>
+                        Registre os detalhes da venda para atualizar o status das chapas.
                     </ModalDescription>
+                    <div className="flex items-center gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm">
+                        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+                        <span className="text-sm text-amber-800">
+                            Tem certeza que quer atualizar o status de <strong>{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</strong> para vendido?
+                            Para desfazer, acesse a página de Vendas e remova a venda.
+                        </span>
+                    </div>
                 </ModalHeader>
 
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">

@@ -765,87 +765,129 @@ export default function ClientesManagementPage() {
       </Modal>
 
       {/* Create Cliente Modal */}
-      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)}>
-        <ModalClose onClose={() => setShowCreateModal(false)} />
-        <ModalHeader>
-          <ModalTitle>{t('addClienteTitle')}</ModalTitle>
-        </ModalHeader>
-        <form onSubmit={handleSubmit(handleCreateCliente)}>
-          <ModalContent>
-            <div className="space-y-4">
-              {/* Name */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
               <div>
-                <label className="block text-sm font-medium text-obsidian mb-2">
-                  {t('name')} *
-                </label>
-                <Input
-                  {...register('name')}
-                  placeholder={t('namePlaceholder')}
-                  error={errors.name?.message}
-                />
+                <h2 className="font-serif text-xl">{t('addClienteTitle')}</h2>
+                <p className="text-xs text-white/50 mt-0.5">Cadastre um novo cliente manualmente</p>
               </div>
-
-              {/* Contact */}
-              <div>
-                <label className="block text-sm font-medium text-obsidian mb-2">
-                  {t('contact')} *
-                </label>
-                <Input
-                  {...register('contact')}
-                  placeholder={t('contactPlaceholder')}
-                  error={errors.contact?.message}
-                  helperText={t('contactHelperText')}
-                />
-              </div>
-
-              {/* Message */}
-              <div>
-                <label className="block text-sm font-medium text-obsidian mb-2">
-                  {t('noteOptional')}
-                </label>
-                <textarea
-                  {...register('message')}
-                  placeholder={t('notePlaceholder')}
-                  rows={3}
-                  className={cn(
-                    'w-full px-4 py-3 rounded-sm border bg-porcelain text-obsidian',
-                    'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-obsidian/20',
-                    'resize-none',
-                    errors.message ? 'border-red-500' : 'border-slate-200'
-                  )}
-                />
-                {errors.message && (
-                  <p className="mt-1 text-sm text-red-600">{errors.message.message}</p>
-                )}
-              </div>
-
-              {/* Marketing Opt-in */}
-              <Checkbox
-                id="marketingOptIn"
-                checked={watch('marketingOptIn')}
-                onChange={(e) => setValue('marketingOptIn', e.target.checked)}
-                label={t('marketingOptInLabel')}
-                description={t('marketingOptInDescription')}
-              />
+              <button 
+                onClick={() => { setShowCreateModal(false); reset(); }} 
+                className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          </ModalContent>
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => {
-                setShowCreateModal(false);
-                reset();
-              }}
-            >
-              {tCommon('cancel')}
-            </Button>
-            <Button type="submit" variant="primary" disabled={isCreating}>
-              {isCreating ? tCommon('saving') : t('createCliente')}
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
+
+            {/* Progress Bar */}
+            <div className="h-1 bg-[#C2410C]" />
+
+            <form onSubmit={handleSubmit(handleCreateCliente)}>
+              <div className="px-6 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
+                {/* Name */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('name')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('name')}
+                    placeholder={t('namePlaceholder')}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.name ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
+                </div>
+
+                {/* Contact */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('contact')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('contact')}
+                    placeholder={t('contactPlaceholder')}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.contact ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">{t('contactHelperText')}</p>
+                  {errors.contact && <p className="mt-1 text-xs text-rose-500">{errors.contact.message}</p>}
+                </div>
+
+                {/* Message */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('noteOptional')}
+                  </label>
+                  <textarea
+                    {...register('message')}
+                    placeholder={t('notePlaceholder')}
+                    rows={3}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors resize-none',
+                      errors.message ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.message && <p className="mt-1 text-xs text-rose-500">{errors.message.message}</p>}
+                </div>
+
+                {/* Marketing Opt-in */}
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-slate-400" />
+                    <div>
+                      <p className="text-sm font-medium">{t('marketingOptInLabel')}</p>
+                      <p className="text-xs text-slate-400">{t('marketingOptInDescription')}</p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    {...register('marketingOptIn')}
+                    className="h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
+                  />
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setShowCreateModal(false); reset(); }}
+                  className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className={cn(
+                    'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
+                    isCreating ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+                  )}
+                >
+                  {isCreating ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      {tCommon('saving')}
+                    </>
+                  ) : (
+                    <>
+                      <User className="w-4 h-4" />
+                      {t('createCliente')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Send Links Modal */}
       <Modal open={showSendLinksModal} onClose={() => setShowSendLinksModal(false)}>

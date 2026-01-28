@@ -322,7 +322,7 @@ export function BrokerDashboard() {
                     <TableRow key={sale.id}>
                       <TableCell>
                         <span 
-                          className="font-mono text-sm text-obsidian"
+                          className="font-mono text-obsidian"
                           title={sale.batch?.batchCode}
                         >
                           {truncateText(sale.batch?.batchCode, TRUNCATION_LIMITS.BATCH_CODE) || '-'}
@@ -330,24 +330,24 @@ export function BrokerDashboard() {
                       </TableCell>
                       <TableCell>
                         <span 
-                          className="text-slate-600"
+                          className="font-serif text-slate-600"
                           title={sale.customerName}
                         >
                           {truncateText(sale.customerName, TRUNCATION_LIMITS.CUSTOMER_NAME)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-serif text-obsidian">
+                        <span className="font-serif text-obsidian tabular-nums">
                           {formatCurrency(sale.salePrice)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-emerald-600">
+                        <span className="font-semibold text-emerald-600 tabular-nums">
                           {formatCurrency(sale.brokerCommission || 0)}
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-slate-500">
+                        <span className="text-slate-400 font-mono text-sm">
                           {formatDate(sale.saleDate)}
                         </span>
                       </TableCell>

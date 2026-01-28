@@ -1,5 +1,5 @@
-// Root layout is minimal - main layout is in [locale]/layout.tsx
-// This file exists only to provide required html/body structure for non-locale routes
+// Root layout - minimal wrapper
+// The [locale] layout provides html/body tags
 
 import "./globals.css";
 
@@ -8,7 +8,5 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  // The actual html/body with providers is in [locale]/layout.tsx
-  // This layout just passes through children for any non-matched routes
   return children;
 }

@@ -195,7 +195,7 @@ export function SellerDashboard() {
                     <TableRow key={activity.id}>
                       <TableCell>
                         <span 
-                          className="font-mono text-sm text-obsidian"
+                          className="font-mono text-obsidian"
                           title={activity.batchCode}
                         >
                           {truncateText(activity.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
@@ -203,7 +203,7 @@ export function SellerDashboard() {
                       </TableCell>
                       <TableCell>
                         <span 
-                          className="text-slate-600"
+                          className="font-serif text-slate-600"
                           title={activity.productName}
                         >
                           {truncateText(activity.productName, TRUNCATION_LIMITS.PRODUCT_NAME)}
@@ -211,7 +211,7 @@ export function SellerDashboard() {
                       </TableCell>
                       <TableCell>
                         <span 
-                          className="text-slate-600"
+                          className="text-slate-500"
                           title={activity.sellerName}
                         >
                           {truncateText(activity.sellerName, TRUNCATION_LIMITS.SELLER_NAME)}
@@ -221,7 +221,7 @@ export function SellerDashboard() {
                         <ActivityBadge action={activity.action} t={tActivities} />
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm text-slate-500">
+                        <span className="text-slate-400 font-mono text-sm">
                           {formatDate(activity.date, 'dd/MM/yyyy HH:mm')}
                         </span>
                       </TableCell>

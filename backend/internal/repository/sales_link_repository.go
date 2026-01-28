@@ -106,7 +106,8 @@ func (r *salesLinkRepository) FindBySlug(ctx context.Context, slug string) (*ent
 }
 
 func (r *salesLinkRepository) FindByCreatorID(ctx context.Context, userID string, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
-	return r.listWithFilters(ctx, &userID, filters)
+	filters.CreatedByUserID = &userID
+	return r.listWithFilters(ctx, filters)
 }
 
 func (r *salesLinkRepository) FindByType(ctx context.Context, linkType entity.LinkType) ([]entity.SalesLink, error) {
@@ -130,10 +131,10 @@ func (r *salesLinkRepository) FindByType(ctx context.Context, linkType entity.Li
 }
 
 func (r *salesLinkRepository) List(ctx context.Context, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
-	return r.listWithFilters(ctx, nil, filters)
+	return r.listWithFilters(ctx, filters)
 }
 
-func (r *salesLinkRepository) listWithFilters(ctx context.Context, userID *string, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
+func (r *salesLinkRepository) listWithFilters(ctx context.Context, filters entity.SalesLinkFilters) ([]entity.SalesLink, int, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
 	query := psql.Select(
@@ -143,8 +144,8 @@ func (r *salesLinkRepository) listWithFilters(ctx context.Context, userID *strin
 		"created_at", "updated_at",
 	).From("sales_links")
 
-	if userID != nil {
-		query = query.Where(sq.Eq{"created_by_user_id": *userID})
+	if filters.CreatedByUserID != nil {
+		query = query.Where(sq.Eq{"created_by_user_id": *filters.CreatedByUserID})
 	}
 
 	if filters.Type != nil {
@@ -173,8 +174,8 @@ func (r *salesLinkRepository) listWithFilters(ctx context.Context, userID *strin
 
 	// Count
 	countQuery := psql.Select("COUNT(*)").From("sales_links")
-	if userID != nil {
-		countQuery = countQuery.Where(sq.Eq{"created_by_user_id": *userID})
+	if filters.CreatedByUserID != nil {
+		countQuery = countQuery.Where(sq.Eq{"created_by_user_id": *filters.CreatedByUserID})
 	}
 	if filters.Type != nil {
 		countQuery = countQuery.Where(sq.Eq{"link_type": *filters.Type})

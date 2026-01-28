@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { User, Lock, Save, CheckCircle, Eye, EyeOff, Check, X } from 'lucide-react';
+import { User, Lock, Save, CheckCircle, Building2, Upload, Image, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
@@ -109,10 +109,14 @@ export default function ProfilePage() {
   const { user: authUser, setUser } = useAuthStore();
 
   const [profile, setProfile] = useState<UserType | null>(null);
+  const [industry, setIndustry] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingIndustry, setIsLoadingIndustry] = useState(true);
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [isUpdatingIndustry, setIsUpdatingIndustry] = useState(false);
   const [passwordChanged, setPasswordChanged] = useState(false);
+  const [industryError, setIndustryError] = useState<string | null>(null);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -156,7 +160,25 @@ export default function ProfilePage() {
 
   useEffect(() => {
     fetchProfile();
+    fetchIndustry();
   }, []);
+
+  const fetchIndustry = async () => {
+    try {
+      setIsLoadingIndustry(true);
+      setIndustryError(null);
+      const data = await apiClient.get('/industry');
+      setIndustry(data);
+    } catch (err: any) {
+      console.error('Erro ao buscar dados da indústria:', err);
+      const errorMessage = err?.response?.data?.message || err?.message || 'Erro ao carregar configurações do depósito';
+      setIndustryError(errorMessage);
+      // Ainda mostra a seção mesmo com erro, para permitir tentar novamente
+      setIndustry({});
+    } finally {
+      setIsLoadingIndustry(false);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -416,6 +438,137 @@ export default function ProfilePage() {
               </form>
             </CardContent>
           </Card>
+
+          {/* Configurações do Depósito */}
+          <Card>
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-slate-100 rounded-full">
+                    <Building2 className="w-5 h-5 text-obsidian" />
+                  </div>
+                  <div>
+                    <CardTitle>Configurações do Depósito</CardTitle>
+                    <CardDescription>Configure como seu depósito aparece no catálogo público</CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {isLoadingIndustry ? (
+                  <LoadingState variant="form" rows={5} />
+                ) : industryError ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-sm">
+                    <p className="text-sm text-amber-800 mb-2">{industryError}</p>
+                    <Button
+                      variant="secondary"
+                      onClick={fetchIndustry}
+                      size="sm"
+                    >
+                      Tentar Novamente
+                    </Button>
+                  </div>
+                ) : (
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    try {
+                      setIsUpdatingIndustry(true);
+                      const formData = new FormData(e.currentTarget);
+                      const updated = await apiClient.patch('/industry', {
+                        name: formData.get('name') || null,
+                        city: formData.get('city') || null,
+                        state: formData.get('state') || null,
+                        bannerUrl: formData.get('bannerUrl') || null,
+                        logoUrl: formData.get('logoUrl') || null,
+                        isPublic: formData.get('isPublic') === 'on',
+                      });
+                      setIndustry(updated);
+                      success('Configurações do depósito atualizadas');
+                    } catch (err) {
+                      error('Erro ao atualizar configurações');
+                    } finally {
+                      setIsUpdatingIndustry(false);
+                    }
+                  }}
+                  className="space-y-6"
+                >
+                  <Input
+                    name="name"
+                    label="Nome da Indústria"
+                    defaultValue={industry?.name || ''}
+                    placeholder="Nome do seu depósito"
+                    disabled={isUpdatingIndustry || isLoadingIndustry}
+                    required
+                  />
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <Input
+                      name="city"
+                      label="Cidade"
+                      defaultValue={industry?.city || ''}
+                      placeholder="São Paulo"
+                      disabled={isUpdatingIndustry || isLoadingIndustry}
+                    />
+                    <Input
+                      name="state"
+                      label="Estado (UF)"
+                      defaultValue={industry?.state || ''}
+                      placeholder="SP"
+                      maxLength={2}
+                      disabled={isUpdatingIndustry || isLoadingIndustry}
+                    />
+                  </div>
+
+                  <Input
+                    name="bannerUrl"
+                    label="URL do Banner"
+                    defaultValue={industry?.bannerUrl || ''}
+                    placeholder="https://exemplo.com/banner.jpg"
+                    type="url"
+                    disabled={isUpdatingIndustry || isLoadingIndustry}
+                    helperText="URL da imagem do banner (recomendado: 1200x300px)"
+                  />
+
+                  <Input
+                    name="logoUrl"
+                    label="URL do Logo"
+                    defaultValue={industry?.logoUrl || ''}
+                    placeholder="https://exemplo.com/logo.png"
+                    type="url"
+                    disabled={isUpdatingIndustry || isLoadingIndustry}
+                    helperText="URL da imagem do logo (recomendado: 200x200px)"
+                  />
+
+                  <div className="flex items-center justify-between p-4 bg-slate-50 rounded-sm">
+                    <div>
+                      <p className="font-medium text-obsidian">Aparecer no catálogo público</p>
+                      <p className="text-sm text-slate-500">
+                        Seu depósito será visível na busca pública de depósitos
+                      </p>
+                    </div>
+                    <input
+                      type="checkbox"
+                      name="isPublic"
+                      defaultChecked={industry?.isPublic || false}
+                      disabled={isUpdatingIndustry || isLoadingIndustry}
+                      className="w-5 h-5 rounded border-slate-300"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      loading={isUpdatingIndustry}
+                      disabled={isLoadingIndustry}
+                    >
+                      <Save className="w-4 h-4 mr-2" />
+                      Salvar Configurações
+                    </Button>
+                  </div>
+                </form>
+                )}
+              </CardContent>
+            </Card>
         </div>
       </div>
     </div>

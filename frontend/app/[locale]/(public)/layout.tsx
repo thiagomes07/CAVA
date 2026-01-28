@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const t = await getTranslations({ locale, namespace: 'metadata' });
 
   return {
-    title: 'CAVA Stone Platform',
+    title: 'CAVA',
     description: t('description'),
   };
 }
@@ -32,7 +32,7 @@ export default async function PublicLayout({ children, params }: Props) {
         <div className="container mx-auto px-6 text-center">
           <div className="flex items-center justify-center gap-2 mb-4">
             <div className="w-6 h-6 bg-obsidian rounded-sm" />
-            <span className="font-serif text-sm text-slate-400">CAVA Stone Platform</span>
+            <span className="font-serif text-sm text-slate-400">CAVA</span>
           </div>
           
           <p className="text-xs text-slate-400">

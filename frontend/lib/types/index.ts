@@ -87,6 +87,7 @@ export interface Batch {
   industryId: string;
   batchCode: string;
   height: number;
+  isPublic?: boolean;
   width: number;
   thickness: number;
   quantitySlabs: number;
@@ -101,6 +102,7 @@ export interface Batch {
   entryDate: string;
   status: BatchStatus;
   isActive: boolean;
+  isPublic?: boolean;
   medias: Media[];
   product?: Product;
   createdAt: string;
@@ -110,12 +112,12 @@ export interface Batch {
 export interface SharedInventoryBatch {
   id: string;
   batchId: string;
-  brokerUserId: string;
+  sharedWithUserId: string; // Broker ou Vendedor Interno
   negotiatedPrice?: number;
   negotiatedPriceUnit?: PriceUnit;
   sharedAt: string;
   batch: Batch;
-  broker: User;
+  sharedWith: User; // Broker ou Vendedor Interno
 }
 
 export interface SalesLink {

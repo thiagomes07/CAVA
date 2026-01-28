@@ -186,6 +186,7 @@ export const editBatchSchema = z.object({
     .string()
     .max(100, 'Nome da pedreira deve ter no máximo 100 caracteres')
     .optional(),
+  isPublic: z.boolean().optional(),
 });
 
 export type BatchInput = z.infer<typeof batchSchema>;

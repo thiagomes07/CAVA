@@ -294,13 +294,13 @@ export default function SalesHistoryPage() {
                         }
                       >
                         <TableCell>
-                          <span className="font-mono text-sm text-obsidian">
+                          <span className="font-mono text-obsidian">
                             #{sale.id.slice(0, 8)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span
-                            className="font-mono text-sm text-slate-600"
+                            className="font-mono text-slate-500"
                             title={sale.batch?.batchCode}
                           >
                             {truncateText(sale.batch?.batchCode, TRUNCATION_LIMITS.BATCH_CODE) || '-'}
@@ -308,7 +308,7 @@ export default function SalesHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <span
-                            className="text-slate-600"
+                            className="font-serif text-slate-600"
                             title={sale.customerName}
                           >
                             {truncateText(sale.customerName, TRUNCATION_LIMITS.CUSTOMER_NAME)}
@@ -316,31 +316,31 @@ export default function SalesHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <span
-                            className="text-slate-600"
+                            className="text-slate-500"
                             title={sale.soldBy?.name || sale.sellerName}
                           >
                             {truncateText(sale.soldBy?.name || sale.sellerName, TRUNCATION_LIMITS.SELLER_NAME) || '-'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-serif text-obsidian">
+                          <span className="font-serif text-obsidian tabular-nums">
                             {formatCurrency(sale.salePrice)}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-blue-600">
+                          <span className="text-[#C2410C] tabular-nums">
                             {sale.brokerCommission
                               ? formatCurrency(sale.brokerCommission)
                               : '-'}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-semibold text-emerald-600">
+                          <span className="font-semibold text-emerald-600 tabular-nums">
                             {formatCurrency(sale.netIndustryValue)}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-slate-500">
+                          <span className="text-slate-400 font-mono text-sm">
                             {formatDate(sale.saleDate)}
                           </span>
                         </TableCell>
@@ -350,10 +350,10 @@ export default function SalesHistoryPage() {
                               href={sale.invoiceUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="p-2 hover:bg-slate-100 rounded-sm inline-flex items-center transition-colors"
+                              className="p-2 text-slate-300 hover:text-[#C2410C] inline-flex items-center transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <FileText className="w-4 h-4 text-slate-600" />
+                              <FileText className="w-4 h-4" />
                             </a>
                           )}
                         </TableCell>

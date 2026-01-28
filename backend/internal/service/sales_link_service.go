@@ -16,26 +16,35 @@ import (
 var slugRegex = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
 
 type salesLinkService struct {
-	linkRepo    repository.SalesLinkRepository
-	batchRepo   repository.BatchRepository
-	productRepo repository.ProductRepository
-	baseURL     string
-	logger      *zap.Logger
+	linkRepo         repository.SalesLinkRepository
+	batchRepo        repository.BatchRepository
+	productRepo      repository.ProductRepository
+	mediaRepo        repository.MediaRepository
+	userRepo         repository.UserRepository
+	sharedInventoryRepo repository.SharedInventoryRepository
+	baseURL          string
+	logger           *zap.Logger
 }
 
 func NewSalesLinkService(
 	linkRepo repository.SalesLinkRepository,
 	batchRepo repository.BatchRepository,
 	productRepo repository.ProductRepository,
+	mediaRepo repository.MediaRepository,
+	userRepo repository.UserRepository,
+	sharedInventoryRepo repository.SharedInventoryRepository,
 	baseURL string,
 	logger *zap.Logger,
 ) *salesLinkService {
 	return &salesLinkService{
-		linkRepo:    linkRepo,
-		batchRepo:   batchRepo,
-		productRepo: productRepo,
-		baseURL:     baseURL,
-		logger:      logger,
+		linkRepo:         linkRepo,
+		batchRepo:        batchRepo,
+		productRepo:      productRepo,
+		mediaRepo:        mediaRepo,
+		userRepo:         userRepo,
+		sharedInventoryRepo: sharedInventoryRepo,
+		baseURL:          baseURL,
+		logger:           logger,
 	}
 }
 
@@ -61,9 +70,12 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 	}
 
 	// Validar campos polimórficos baseado no tipo de link
-	if err := s.validateLinkTypeFields(ctx, industryID, input); err != nil {
+	// industryID pode ser atualizado para brokers (usa industryID do batch/produto)
+	updatedIndustryID, err := s.validateLinkTypeFields(ctx, userID, industryID, input)
+	if err != nil {
 		return nil, err
 	}
+	industryID = updatedIndustryID
 
 	// Validar preço de exibição (se fornecido)
 	if input.DisplayPrice != nil && *input.DisplayPrice <= 0 {
@@ -177,6 +189,85 @@ func (s *salesLinkService) GetBySlug(ctx context.Context, slug string) (*entity.
 	}
 
 	return link, nil
+}
+
+func (s *salesLinkService) GetPublicBySlug(ctx context.Context, slug string) (*entity.PublicSalesLink, error) {
+	link, err := s.linkRepo.FindBySlug(ctx, slug)
+	if err != nil {
+		return nil, err
+	}
+
+	if !link.IsActive {
+		return nil, domainErrors.NewNotFoundError("Link de venda")
+	}
+
+	if link.IsExpired() {
+		return nil, domainErrors.NewNotFoundError("Link de venda")
+	}
+
+	result := &entity.PublicSalesLink{
+		ShowPrice: link.ShowPrice,
+	}
+
+	if link.Title != nil {
+		result.Title = *link.Title
+	}
+	if link.CustomMessage != nil {
+		result.CustomMessage = *link.CustomMessage
+	}
+	if link.ShowPrice && link.DisplayPrice != nil {
+		result.DisplayPrice = link.DisplayPrice
+	}
+
+	// Buscar batch com mídias
+	if link.BatchID != nil {
+		batch, err := s.batchRepo.FindByID(ctx, *link.BatchID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar batch", zap.Error(err))
+		} else {
+			medias, _ := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+			publicBatch := &entity.PublicBatch{
+				BatchCode:    batch.BatchCode,
+				Height:       batch.Height,
+				Width:        batch.Width,
+				Thickness:    batch.Thickness,
+				TotalArea:    batch.TotalArea,
+				OriginQuarry: batch.OriginQuarry,
+				Medias:       medias,
+			}
+
+			// Buscar produto relacionado ao batch
+			if batch.ProductID != "" {
+				product, err := s.productRepo.FindByID(ctx, batch.ProductID)
+				if err == nil {
+					publicBatch.ProductName = product.Name
+					publicBatch.Material = string(product.Material)
+					publicBatch.Finish = string(product.Finish)
+				}
+			}
+
+			result.Batch = publicBatch
+		}
+	}
+
+	// Buscar produto (se não for lote)
+	if link.ProductID != nil && link.BatchID == nil {
+		product, err := s.productRepo.FindByID(ctx, *link.ProductID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar produto", zap.Error(err))
+		} else {
+			medias, _ := s.mediaRepo.FindProductMedias(ctx, product.ID)
+			result.Product = &entity.PublicProduct{
+				Name:        product.Name,
+				Material:    string(product.Material),
+				Finish:      string(product.Finish),
+				Description: product.Description,
+				Medias:      medias,
+			}
+		}
+	}
+
+	return result, nil
 }
 
 func (s *salesLinkService) List(ctx context.Context, filters entity.SalesLinkFilters) (*entity.SalesLinkListResponse, error) {
@@ -308,7 +399,7 @@ func (s *salesLinkService) IncrementViews(ctx context.Context, id string) error 
 }
 
 func (s *salesLinkService) GenerateFullURL(slug string) string {
-	return s.baseURL + "/" + slug
+	return s.baseURL + "/pt/" + slug
 }
 
 // validateSlugFormat valida o formato do slug
@@ -332,50 +423,91 @@ func (s *salesLinkService) validateSlugFormat(slug string) error {
 }
 
 // validateLinkTypeFields valida campos polimórficos baseado no tipo de link
-func (s *salesLinkService) validateLinkTypeFields(ctx context.Context, industryID string, input entity.CreateSalesLinkInput) error {
+// Retorna o industryID atualizado (pode ser diferente para brokers)
+func (s *salesLinkService) validateLinkTypeFields(ctx context.Context, userID, industryID string, input entity.CreateSalesLinkInput) (string, error) {
 	switch input.LinkType {
 	case entity.LinkTypeLoteUnico:
 		// LOTE_UNICO: batchId obrigatório, productId deve ser null
 		if input.BatchID == nil {
-			return domainErrors.ValidationError("BatchId é obrigatório para link de lote único")
+			return "", domainErrors.ValidationError("BatchId é obrigatório para link de lote único")
 		}
 		if input.ProductID != nil {
-			return domainErrors.ValidationError("ProductId não pode ser fornecido para link de lote único")
+			return "", domainErrors.ValidationError("ProductId não pode ser fornecido para link de lote único")
 		}
-		// Validar que batch existe e pertence à indústria
+		// Validar que batch existe
 		batch, err := s.batchRepo.FindByID(ctx, *input.BatchID)
 		if err != nil {
-			return err
+			return "", err
 		}
-		if batch.IndustryID != industryID {
-			return domainErrors.ForbiddenError()
+		
+		// Se industryID está vazio (broker), verificar se batch está compartilhado
+		if industryID == "" {
+			exists, err := s.sharedInventoryRepo.ExistsForUser(ctx, *input.BatchID, userID)
+			if err != nil {
+				return "", err
+			}
+			if !exists {
+				return "", domainErrors.ForbiddenError()
+			}
+			// Usar industryID do batch para brokers
+			industryID = batch.IndustryID
+		} else {
+			// Se industryID não está vazio (admin/vendedor), validar que batch pertence à indústria
+			if batch.IndustryID != industryID {
+				return "", domainErrors.ForbiddenError()
+			}
 		}
 
 	case entity.LinkTypeProdutoGeral:
 		// PRODUTO_GERAL: productId obrigatório, batchId deve ser null
 		if input.ProductID == nil {
-			return domainErrors.ValidationError("ProductId é obrigatório para link de produto geral")
+			return "", domainErrors.ValidationError("ProductId é obrigatório para link de produto geral")
 		}
 		if input.BatchID != nil {
-			return domainErrors.ValidationError("BatchId não pode ser fornecido para link de produto geral")
+			return "", domainErrors.ValidationError("BatchId não pode ser fornecido para link de produto geral")
 		}
-		// Validar que produto existe e pertence à indústria
+		// Validar que produto existe
 		product, err := s.productRepo.FindByID(ctx, *input.ProductID)
 		if err != nil {
-			return err
+			return "", err
 		}
-		if product.IndustryID != industryID {
-			return domainErrors.ForbiddenError()
+		
+		// Se industryID está vazio (broker), verificar se há lotes compartilhados deste produto
+		if industryID == "" {
+			// Para brokers, verificar se há pelo menos um lote compartilhado deste produto
+			// Buscar lotes do produto compartilhados com o broker
+			batches, err := s.batchRepo.FindByProductID(ctx, *input.ProductID)
+			if err != nil {
+				return "", err
+			}
+			hasSharedBatch := false
+			for _, batch := range batches {
+				exists, err := s.sharedInventoryRepo.ExistsForUser(ctx, batch.ID, userID)
+				if err == nil && exists {
+					hasSharedBatch = true
+					// Usar industryID do primeiro batch compartilhado
+					industryID = batch.IndustryID
+					break
+				}
+			}
+			if !hasSharedBatch {
+				return "", domainErrors.ForbiddenError()
+			}
+		} else {
+			// Se industryID não está vazio (admin/vendedor), validar que produto pertence à indústria
+			if product.IndustryID != industryID {
+				return "", domainErrors.ForbiddenError()
+			}
 		}
 
 	case entity.LinkTypeCatalogoCompleto:
 		// CATALOGO_COMPLETO: ambos devem ser null
 		if input.BatchID != nil || input.ProductID != nil {
-			return domainErrors.ValidationError("BatchId e ProductId devem ser null para link de catálogo completo")
+			return "", domainErrors.ValidationError("BatchId e ProductId devem ser null para link de catálogo completo")
 		}
 	}
 
-	return nil
+	return industryID, nil
 }
 
 // populateLinkData popula dados relacionados do link
@@ -396,6 +528,18 @@ func (s *salesLinkService) populateLinkData(ctx context.Context, link *entity.Sa
 			return err
 		}
 		link.Product = product
+	}
+
+	if link.CreatedByUserID != "" {
+		user, err := s.userRepo.FindByID(ctx, link.CreatedByUserID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar usuário criador do link",
+				zap.String("userId", link.CreatedByUserID),
+				zap.Error(err),
+			)
+		} else {
+			link.CreatedBy = user
+		}
 	}
 
 	return nil

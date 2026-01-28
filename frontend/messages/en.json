@@ -1,6 +1,6 @@
 {
   "common": {
-    "appName": "CAVA Stone Platform",
+    "appName": "CAVA",
     "loading": "Loading...",
     "save": "Save",
     "cancel": "Cancel",
@@ -41,10 +41,10 @@
     "price": "Price",
     "total": "Total",
     "quantity": "Quantity",
-    "poweredBy": "Powered by CAVA Stone Platform"
+    "poweredBy": "Powered by CAVA"
   },
   "metadata": {
-    "title": "CAVA Stone Platform",
+    "title": "CAVA",
     "description": "Premium platform for ornamental stone management",
     "keywords": "ornamental stones, marble, granite, quartzite, luxury"
   },
@@ -110,6 +110,7 @@
     "sharedInventory": "Shared Inventory",
     "sales": "Sales",
     "links": "Links",
+    "catalogos": "Catalogs",
     "clientes": "Clientes",
     "brokers": "Partners",
     "team": "Team",
@@ -191,7 +192,19 @@
     "edit": "Edit",
     "viewDetails": "View details",
     "loadError": "Error loading inventory",
-    "productsError": "Error loading products"
+    "productsError": "Error loading products",
+    "archive": "Archive",
+    "restore": "Restore",
+    "delete": "Delete",
+    "showArchived": "Show Archived",
+    "showActive": "Show Active",
+    "archiveError": "Error archiving batch",
+    "restoreError": "Error restoring batch",
+    "deleteError": "Error deleting batch",
+    "deleteConfirmTitle": "Delete Batch",
+    "deleteConfirmMessage": "Are you sure you want to delete this batch?",
+    "deleteConfirmWarning": "This action cannot be undone. The batch will be permanently removed.",
+    "cancel": "Cancel"
   },
   "catalog": {
     "title": "Catalog",
@@ -347,6 +360,7 @@
     "views": "Views",
     "clientes": "Clientes",
     "status": "Status",
+    "createdBy": "Created by",
     "createdAt": "Created at",
     "actions": "Actions",
     "untitledLink": "Untitled link",

@@ -51,7 +51,7 @@ func (h *SharedInventoryHandler) GetBrokerSharedInventory(w http.ResponseWriter,
 
 	// Buscar inventário compartilhado
 	filters := entity.SharedInventoryFilters{}
-	batches, err := h.sharedInventoryService.GetBrokerInventory(r.Context(), brokerID, filters)
+	batches, err := h.sharedInventoryService.GetUserInventory(r.Context(), brokerID, filters)
 	if err != nil {
 		h.logger.Error("erro ao buscar inventário compartilhado",
 			zap.String("brokerId", brokerID),
@@ -102,7 +102,7 @@ func (h *SharedInventoryHandler) ShareBatch(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		h.logger.Error("erro ao compartilhar lote",
 			zap.String("batchId", input.BatchID),
-			zap.String("brokerId", input.BrokerUserID),
+			zap.String("userId", input.SharedWithUserID),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -112,7 +112,7 @@ func (h *SharedInventoryHandler) ShareBatch(w http.ResponseWriter, r *http.Reque
 	h.logger.Info("lote compartilhado",
 		zap.String("sharedId", shared.ID),
 		zap.String("batchId", input.BatchID),
-		zap.String("brokerId", input.BrokerUserID),
+		zap.String("userId", input.SharedWithUserID),
 	)
 
 	response.Created(w, shared)
@@ -189,10 +189,10 @@ func (h *SharedInventoryHandler) GetMySharedInventory(w http.ResponseWriter, r *
 	}
 
 	// Buscar inventário compartilhado
-	batches, err := h.sharedInventoryService.GetBrokerInventory(r.Context(), userID, filters)
+	batches, err := h.sharedInventoryService.GetUserInventory(r.Context(), userID, filters)
 	if err != nil {
 		h.logger.Error("erro ao buscar meu inventário compartilhado",
-			zap.String("brokerId", userID),
+			zap.String("userId", userID),
 			zap.Error(err),
 		)
 		response.HandleError(w, err)
@@ -258,6 +258,36 @@ func (h *SharedInventoryHandler) UpdateNegotiatedPrice(w http.ResponseWriter, r 
 		zap.String("sharedId", id),
 		zap.String("brokerId", userID),
 	)
+
+	response.OK(w, shared)
+}
+
+// GetSharedBatchesByBatchID godoc
+// @Summary Busca compartilhamentos de um lote
+// @Description Retorna todos os compartilhamentos de um lote específico
+// @Tags shared-inventory
+// @Produce json
+// @Param batchId path string true "ID do lote"
+// @Success 200 {array} entity.SharedInventoryBatch
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/batches/{batchId}/shared [get]
+func (h *SharedInventoryHandler) GetSharedBatchesByBatchID(w http.ResponseWriter, r *http.Request) {
+	batchID := chi.URLParam(r, "batchId")
+	if batchID == "" {
+		response.BadRequest(w, "ID do lote é obrigatório", nil)
+		return
+	}
+
+	// Buscar compartilhamentos
+	shared, err := h.sharedInventoryService.GetSharedBatchesByBatchID(r.Context(), batchID)
+	if err != nil {
+		h.logger.Error("erro ao buscar compartilhamentos do lote",
+			zap.String("batchId", batchID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
 
 	response.OK(w, shared)
 }

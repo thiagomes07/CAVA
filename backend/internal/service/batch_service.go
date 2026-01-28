@@ -163,6 +163,7 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		EntryDate:      entryDate,
 		Status:         entity.BatchStatusDisponivel,
 		IsActive:       true,
+		IsPublic:       false, // Por padrão, lotes não são públicos
 		CreatedAt:      time.Now(),
 		UpdatedAt:      time.Now(),
 	}
@@ -355,6 +356,10 @@ func (s *batchService) Update(ctx context.Context, id string, input entity.Updat
 
 	if input.OriginQuarry != nil {
 		batch.OriginQuarry = input.OriginQuarry
+	}
+
+	if input.IsPublic != nil {
+		batch.IsPublic = *input.IsPublic
 	}
 
 	// Recalcular área se dimensões mudaram
@@ -737,25 +742,14 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 		// 5. Atualizar Lote (Chapas)
 		newAvailable := batch.AvailableSlabs - input.QuantitySlabsSold
 		newSold := batch.SoldSlabs + input.QuantitySlabsSold
-		
+
 		if err := s.batchRepo.UpdateSlabCounts(ctx, tx, batch.ID, newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs); err != nil {
 			return err
 		}
 
-		// 6. Atualizar Status se necessário (Esgotou)
-		// Se zerou disponível, vira VENDIDO (ou mantém RESERVADO/INATIVO se houver sobras nesses status?
-		// Lógica: Se Available == 0, e não há Reservado/Inativo, então Vendido.
-		// Mas se houver reservado, continua Reservado?
-		// Vamos usar a função deriveBatchStatus do service (que precisa ser acessível ou duplicada)
-		// A função deriveBatchStatus está no arquivo (linha 591), então posso usar.
-		
+		// 6. Atualizar Status se necessário
 		newStatus := deriveBatchStatus(newAvailable, batch.ReservedSlabs, newSold, batch.InactiveSlabs)
-		
-		// Constraint: Se o usuário vendeu TUDO que estava disponível, e o que sobrou são outros status, ok.
-		// Se vendeu EXATAMENTE o que tinha, vira VENDIDO?
-		// deriveBatchStatus prioriza DISPONIVEL > RESERVADO > VENDIDO > INATIVO.
-		// Se Available=0, Reserved=0, Sold>0, Inactive=0 -> VENDIDO.
-		
+
 		if newStatus != batch.Status {
 			if err := s.batchRepo.UpdateStatus(ctx, tx, batch.ID, newStatus); err != nil {
 				return err
@@ -767,7 +761,7 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 		if err != nil {
 			return err
 		}
-		
+
 		s.logger.Info("venda realizada com sucesso",
 			zap.String("saleId", sale.ID),
 			zap.String("batchId", batch.ID),
@@ -778,4 +772,61 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 	})
 
 	return updatedBatch, err
+}
+
+func (s *batchService) Archive(ctx context.Context, id string) error {
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if !batch.IsActive {
+		return domainErrors.ValidationError("Lote já está arquivado")
+	}
+
+	if err := s.batchRepo.Archive(ctx, id); err != nil {
+		s.logger.Error("erro ao arquivar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote arquivado", zap.String("batchId", id))
+	return nil
+}
+
+func (s *batchService) Restore(ctx context.Context, id string) error {
+	batch, err := s.batchRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if batch.IsActive {
+		return domainErrors.ValidationError("Lote não está arquivado")
+	}
+
+	if err := s.batchRepo.Restore(ctx, id); err != nil {
+		s.logger.Error("erro ao restaurar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote restaurado", zap.String("batchId", id))
+	return nil
+}
+
+func (s *batchService) Delete(ctx context.Context, id string) error {
+	if err := s.batchRepo.Delete(ctx, id); err != nil {
+		s.logger.Error("erro ao deletar lote",
+			zap.String("batchId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("lote deletado permanentemente", zap.String("batchId", id))
+	return nil
 }
