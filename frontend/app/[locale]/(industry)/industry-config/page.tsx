@@ -144,13 +144,13 @@ export default function IndustryConfigPage() {
                 setPreviewLogoUrl('');
             }
         }
-        
+
         setSelectedLogo(null);
     };
 
     const onSubmit = async (data: FormValues) => {
         setIsUploading(true);
-        
+
         try {
             const payload: any = { ...data };
 
@@ -241,11 +241,11 @@ export default function IndustryConfigPage() {
                                     onRemove={handleLogoRemove}
                                     isUploading={isUploading}
                                     aspectRatio={1}
-                                    maxSizeInMB={2}
+                                    maxSizeInMB={5}
                                     className="w-full"
                                 />
                                 <p className="text-xs text-slate-500">
-                                    Formato quadrado recomendado. Máx: 2MB
+                                    Formato quadrado recomendado. Máx: 5MB
                                 </p>
                             </div>
 

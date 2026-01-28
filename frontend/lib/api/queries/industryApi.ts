@@ -43,11 +43,7 @@ export function useUploadIndustryLogo() {
             const formData = new FormData();
             formData.append('logo', file);
 
-            const response = await apiClient.post<{ urls: string[] }>('/upload/industry-logo', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
+            const response = await apiClient.upload<{ urls: string[] }>('/upload/industry-logo', formData);
             return response.urls[0];
         },
     });

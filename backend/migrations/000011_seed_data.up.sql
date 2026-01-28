@@ -17,7 +17,7 @@ BEGIN
     VALUES (
         '00000000-0000-0000-0000-000000000001',
         '', -- Nome vazio
-        '00000000000100', -- CNPJ placeholder (ainda unique)
+        NULL, -- CNPJ vazio
         'temp-slug', -- Slug placeholder
         '' -- Email vazio
     );
