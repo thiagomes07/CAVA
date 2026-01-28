@@ -53,6 +53,7 @@ export default function IndustryConfigPage() {
         defaultValues: {
             name: '',
             contactEmail: '',
+            addressCountry: 'Brasil',
         },
     });
 
