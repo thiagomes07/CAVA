@@ -120,6 +120,16 @@ export interface SharedInventoryBatch {
   sharedWith: User; // Broker ou Vendedor Interno
 }
 
+export interface SalesLinkItem {
+  id: string;
+  salesLinkId: string;
+  batchId: string;
+  quantity: number;
+  unitPrice: number;
+  createdAt: string;
+  batch?: Batch;
+}
+
 export interface SalesLink {
   id: string;
   createdByUserId: string;
@@ -140,6 +150,7 @@ export interface SalesLink {
   batch?: Batch;
   product?: Product;
   createdBy?: User;
+  items?: SalesLinkItem[];
 }
 
 export interface Cliente {

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations, useLocale } from 'next-intl';
-import { Plus, Search, Copy, Edit2, Archive, Eye, Users, ExternalLink } from 'lucide-react';
+import { Plus, Search, Copy, Edit2, Archive, Eye, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -13,6 +13,7 @@ import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter } from '@/components/ui/modal';
+import { LinkDetailsModal } from '@/components/links/LinkDetailsModal';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
@@ -36,6 +37,7 @@ export default function LinksManagementPage() {
   const [totalItems, setTotalItems] = useState(0);
   const [selectedLink, setSelectedLink] = useState<SalesLink | null>(null);
   const [showStatsModal, setShowStatsModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const [filters, setFilters] = useState<LinkFilter>({
     type: '',
@@ -93,6 +95,29 @@ export default function LinksManagementPage() {
     setShowStatsModal(true);
   };
 
+  const handleOpenDetails = async (link: SalesLink) => {
+    try {
+      // Buscar detalhes completos do link (incluindo items para MULTIPLOS_LOTES)
+      const fullLink = await apiClient.get<SalesLink>(`/sales-links/${link.id}`);
+      setSelectedLink(fullLink);
+      setShowDetailsModal(true);
+    } catch (err) {
+      // Fallback para dados da listagem se falhar
+      setSelectedLink(link);
+      setShowDetailsModal(true);
+    }
+  };
+
+  const handleCloseDetailsModal = () => {
+    setShowDetailsModal(false);
+    setSelectedLink(null);
+  };
+
+  const handleArchiveLinkFromModal = async (link: SalesLink) => {
+    await handleArchiveLink(link.id);
+    handleCloseDetailsModal();
+  };
+
   const handleClearFilters = () => {
     setFilters({
       type: '',
@@ -115,7 +140,7 @@ export default function LinksManagementPage() {
     };
     const variant = variants[type] || variants.LOTE_UNICO;
     return (
-      <span className={cn('inline-flex items-center px-2 py-1 rounded-full text-[10px] uppercase tracking-widest font-semibold border', variant.color)}>
+      <span className={cn('inline-flex items-center px-2.5 py-1 rounded-sm text-[10px] uppercase tracking-widest font-bold border', variant.color)}>
         {variant.label}
       </span>
     );
@@ -123,7 +148,7 @@ export default function LinksManagementPage() {
 
   const getLinkStatus = (link: SalesLink) => {
     if (!link.isActive) return { label: t('statusArchived'), variant: 'INATIVO' as const };
-    if (link.expiresAt && new Date(link.expiresAt) < new Date()) return { label: t('statusExpired'), variant: 'INATIVO' as const };
+    if (link.expiresAt && new Date(link.expiresAt) < new Date()) return { label: t('statusExpired'), variant: 'warning' as const };
     return { label: t('statusActive'), variant: 'DISPONIVEL' as const };
   };
 
@@ -242,14 +267,11 @@ export default function LinksManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('preview')}</TableHead>
                     <TableHead>{t('titleSlug')}</TableHead>
                     <TableHead>{t('type')}</TableHead>
                     <TableHead>{t('price')}</TableHead>
                     <TableHead>{t('views')}</TableHead>
-                    <TableHead>{t('clientes')}</TableHead>
                     <TableHead>{t('status')}</TableHead>
-                    <TableHead>{t('createdBy')}</TableHead>
                     <TableHead>{t('createdAt')}</TableHead>
                     <TableHead>{t('actions')}</TableHead>
                   </TableRow>
@@ -257,25 +279,13 @@ export default function LinksManagementPage() {
                 <TableBody>
                   {links.map((link) => {
                     const status = getLinkStatus(link);
-                    const thumbnail = link.batch?.medias?.[0] || link.product?.medias?.[0];
 
                     return (
-                      <TableRow key={link.id}>
-                        <TableCell>
-                          <div className="w-16 h-16 rounded-sm overflow-hidden bg-slate-200">
-                            {thumbnail ? (
-                              <img
-                                src={thumbnail.url}
-                                alt="Preview"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <ExternalLink className="w-6 h-6 text-slate-400" />
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
+                      <TableRow 
+                        key={link.id} 
+                        className="cursor-pointer hover:bg-slate-50 transition-colors"
+                        onClick={() => handleOpenDetails(link)}
+                      >
                         <TableCell>
                           <div>
                             <p
@@ -310,7 +320,7 @@ export default function LinksManagementPage() {
                         </TableCell>
                         <TableCell>
                           <button
-                            onClick={() => handleViewStats(link)}
+                            onClick={(e) => { e.stopPropagation(); handleViewStats(link); }}
                             className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
                           >
                             <Eye className="w-4 h-4" />
@@ -318,29 +328,15 @@ export default function LinksManagementPage() {
                           </button>
                         </TableCell>
                         <TableCell>
-                          <button
-                            onClick={() => router.push(`/${locale}/clientes?linkId=${link.id}`)}
-                            className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
-                          >
-                            <Users className="w-4 h-4" />
-                            <span className="font-mono">0</span>
-                          </button>
-                        </TableCell>
-                        <TableCell>
                           <Badge variant={status.variant}>{status.label}</Badge>
                         </TableCell>
                         <TableCell>
-                          <span className="text-sm text-slate-600">
-                            {link.createdBy?.name || '-'}
-                          </span>
-                        </TableCell>
-                        <TableCell>
                           <span className="text-sm text-slate-500">
-                            {formatDate(link.createdAt)}
+                            {formatDate(link.createdAt, 'dd/MM/yyyy')}
                           </span>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => window.open(`/${locale}/${link.slugToken}`, '_blank')}
                               className="p-2 hover:bg-blue-50 rounded-sm transition-colors"
@@ -461,6 +457,16 @@ export default function LinksManagementPage() {
           </Button>
         </ModalFooter>
       </Modal>
+
+      {/* Link Details Modal */}
+      {showDetailsModal && selectedLink && (
+        <LinkDetailsModal
+          link={selectedLink}
+          onClose={handleCloseDetailsModal}
+          onCopyLink={handleCopyLink}
+          onArchive={handleArchiveLinkFromModal}
+        />
+      )}
     </div>
   );
 }
