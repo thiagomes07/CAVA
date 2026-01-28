@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX, RefreshCw, Clock } from 'lucide-react';
+import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX, RefreshCw, Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -374,69 +374,141 @@ export default function BrokersManagementPage() {
       </div>
 
       {/* Invite Modal */}
-      <Modal open={showInviteModal} onClose={() => setShowInviteModal(false)}>
-        <ModalClose onClose={() => setShowInviteModal(false)} />
-        <ModalHeader>
-          <ModalTitle>{t('inviteBrokerTitle')}</ModalTitle>
-        </ModalHeader>
-
-        <form onSubmit={handleSubmit(onSubmit)}>
-          <ModalContent>
-            <div className="space-y-6">
-              <Input
-                {...register('name')}
-                label={tTeam('fullName')}
-                placeholder="Maria Santos"
-                error={errors.name?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                {...register('email')}
-                type="email"
-                label={tCommon('email')}
-                placeholder="maria@exemplo.com"
-                helperText={t('emailHelperText')}
-                error={errors.email?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                value={phoneField.value}
-                onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
-                label={tTeam('phoneOptional')}
-                placeholder="(11) 98765-4321"
-                error={errors.phone?.message}
-                disabled={isSubmitting}
-              />
-
-              <Input
-                value={whatsappField.value}
-                onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
-                label={t('whatsappOptional')}
-                placeholder="(11) 98765-4321"
-                helperText={t('whatsappHelperText')}
-                error={errors.whatsapp?.message}
-                disabled={isSubmitting}
-              />
+      {showInviteModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
+              <div>
+                <h2 className="font-serif text-xl">{t('inviteBrokerTitle')}</h2>
+                <p className="text-xs text-white/50 mt-0.5">Convide um corretor parceiro</p>
+              </div>
+              <button 
+                onClick={() => setShowInviteModal(false)} 
+                className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-          </ModalContent>
 
-          <ModalFooter>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setShowInviteModal(false)}
-              disabled={isSubmitting}
-            >
-              {tCommon('cancel')}
-            </Button>
-            <Button type="submit" variant="primary" loading={isSubmitting}>
-              {t('sendInvite')}
-            </Button>
-          </ModalFooter>
-        </form>
-      </Modal>
+            {/* Progress Bar */}
+            <div className="h-1 bg-[#C2410C]" />
+
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <div className="px-6 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
+                {/* Name */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {tTeam('fullName')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('name')}
+                    placeholder="Maria Santos"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.name ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
+                </div>
+
+                {/* Email */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {tCommon('email')} <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('email')}
+                    type="email"
+                    placeholder="maria@exemplo.com"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.email ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">{t('emailHelperText')}</p>
+                  {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {tTeam('phoneOptional')}
+                  </label>
+                  <input
+                    value={phoneField.value}
+                    onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.phone ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
+                </div>
+
+                {/* WhatsApp */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('whatsappOptional')}
+                  </label>
+                  <input
+                    value={whatsappField.value}
+                    onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.whatsapp ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">{t('whatsappHelperText')}</p>
+                  {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowInviteModal(false)}
+                  disabled={isSubmitting}
+                  className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors disabled:opacity-50"
+                >
+                  {tCommon('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={cn(
+                    'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
+                    isSubmitting ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+                  )}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Mail className="w-4 h-4" />
+                      {t('sendInvite')}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Resend Invite Confirmation Modal */}
       <Modal open={showResendModal} onClose={() => setShowResendModal(false)}>
