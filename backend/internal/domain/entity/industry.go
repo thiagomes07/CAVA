@@ -21,7 +21,6 @@ type Industry struct {
 	AddressStreet  *string   `json:"addressStreet,omitempty"`
 	AddressNumber  *string   `json:"addressNumber,omitempty"`
 	AddressZipCode *string   `json:"addressZipCode,omitempty"`
-	PolicyTerms    *string   `json:"policyTerms,omitempty"`
 	CreatedAt      time.Time `json:"createdAt"`
 	UpdatedAt      time.Time `json:"updatedAt"`
 }
@@ -33,7 +32,6 @@ type CreateIndustryInput struct {
 	Slug         string  `json:"slug" validate:"required,min=3,max=100"`
 	ContactEmail string  `json:"contactEmail" validate:"required,email"`
 	ContactPhone *string `json:"contactPhone,omitempty" validate:"omitempty,min=10,max=15"`
-	PolicyTerms  *string `json:"policyTerms,omitempty" validate:"omitempty,max=5000"`
 }
 
 // UpdateIndustryInput representa os dados para atualizar uma indústria
@@ -50,5 +48,4 @@ type UpdateIndustryInput struct {
 	AddressStreet  *string `json:"addressStreet,omitempty" validate:"omitempty,max=255"`
 	AddressNumber  *string `json:"addressNumber,omitempty" validate:"omitempty,max=50"`
 	AddressZipCode *string `json:"addressZipCode,omitempty" validate:"omitempty,max=20"`
-	PolicyTerms    *string `json:"policyTerms,omitempty" validate:"omitempty,max=5000"`
 }

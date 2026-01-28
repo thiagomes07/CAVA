@@ -20,7 +20,7 @@ CREATE TABLE industries (
     address_street VARCHAR(255),
     address_number VARCHAR(50),
     address_zip_code VARCHAR(20),
-    policy_terms TEXT,
+    address_zip_code VARCHAR(20),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -33,7 +33,7 @@ CREATE INDEX idx_industries_cnpj ON industries(cnpj);
 COMMENT ON TABLE industries IS 'Indústrias cadastradas no sistema';
 COMMENT ON COLUMN industries.slug IS 'Slug único para URLs (ex: pedras-sul)';
 COMMENT ON COLUMN industries.cnpj IS 'CNPJ da indústria (apenas dígitos)';
-COMMENT ON COLUMN industries.policy_terms IS 'Termos e políticas de venda da indústria';
+
 
 -- Tabela: Usuários
 CREATE TABLE users (

@@ -609,8 +609,6 @@
     "visualIdentityDesc": "Define your company logo and description.",
     "contact": "Contact",
     "address": "Address",
-    "policies": "Policies & Terms",
-    "policiesDesc": "Define your sales terms and company policies.",
     "logo": "Logo",
     "logoUploadError": "Error uploading logo",
     "logoDeleted": "Logo removed successfully",
@@ -632,8 +630,6 @@
     "zipCode": "Zip Code",
     "street": "Street",
     "number": "Number",
-    "terms": "Sales Terms",
-    "termsPlaceholder": "Insert payment conditions, shipping info, etc...",
     "success": "Data updated successfully",
     "error": "Error updating data"
   }

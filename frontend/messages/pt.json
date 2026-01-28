@@ -609,8 +609,6 @@
     "visualIdentityDesc": "Defina a logo e descrição da sua empresa.",
     "contact": "Contato",
     "address": "Endereço",
-    "policies": "Políticas e Termos",
-    "policiesDesc": "Defina os termos de venda e políticas da sua empresa.",
     "logo": "Logo",
     "logoUploadError": "Erro ao enviar logo",
     "logoDeleted": "Logo removida com sucesso",
@@ -632,8 +630,6 @@
     "zipCode": "CEP",
     "street": "Logradouro",
     "number": "Número",
-    "terms": "Termos de Venda",
-    "termsPlaceholder": "Insira aqui as condições de pagamento, frete, etc...",
     "success": "Dados atualizados com sucesso",
     "error": "Erro ao atualizar dados"
   }
