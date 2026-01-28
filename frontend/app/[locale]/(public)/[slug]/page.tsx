@@ -202,7 +202,7 @@ export default function PublicLinkPage() {
       {/* Header */}
       <header className="bg-[#121212] text-white">
         <div className="max-w-7xl mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-          <div className="text-xl md:text-2xl font-serif font-bold tracking-tight">CAVA.</div>
+          <div className="text-xl md:text-2xl font-serif font-bold tracking-tight">CAVA</div>
           <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.15em] text-white/60">
             <ShieldCheck className="w-4 h-4" />
             <span className="hidden sm:inline">Link Seguro</span>
@@ -460,7 +460,7 @@ export default function PublicLinkPage() {
       {/* Footer */}
       <footer className="border-t border-slate-200 bg-white mt-auto">
         <div className="max-w-7xl mx-auto px-4 md:px-8 py-6 flex items-center justify-between">
-          <div className="text-lg font-serif font-bold tracking-tight text-[#121212]">CAVA.</div>
+          <div className="text-lg font-serif font-bold tracking-tight text-[#121212]">CAVA</div>
           <p className="text-xs text-slate-400">© {new Date().getFullYear()}</p>
         </div>
       </footer>

@@ -254,8 +254,7 @@ export function Sidebar() {
               <span className="text-white font-serif font-bold text-lg">C</span>
             </div>
             <div className="leading-tight">
-              <h1 className="text-lg font-serif font-bold tracking-tight text-white">CAVA.</h1>
-              <p className="text-[9px] uppercase tracking-[0.28em] text-[#C2410C] font-medium opacity-80">Architecture</p>
+              <h1 className="text-lg font-serif font-bold tracking-tight text-white">CAVA</h1>
             </div>
           </div>
           <button onClick={toggleSidebar} className="text-slate-400 hover:text-white transition-colors">
@@ -285,8 +284,7 @@ export function Sidebar() {
             </div>
             {sidebarOpen && (
               <div>
-                <h1 className="text-2xl font-serif font-bold tracking-tight text-white">CAVA.</h1>
-                <p className="text-[9px] uppercase tracking-[0.3em] text-[#C2410C] font-medium opacity-80">Architecture</p>
+                <h1 className="text-2xl font-serif font-bold tracking-tight text-white">CAVA</h1>
               </div>
             )}
           </div>

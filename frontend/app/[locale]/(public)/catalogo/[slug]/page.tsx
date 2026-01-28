@@ -205,7 +205,7 @@ export default function CatalogPage() {
                     <span className="text-sm font-medium hidden sm:inline">Voltar ao catálogo</span>
                   </button>
                   
-                  <div className="text-2xl md:text-3xl font-serif font-bold tracking-tight">CAVA.</div>
+                  <div className="text-2xl md:text-3xl font-serif font-bold tracking-tight">CAVAS</div>
 
                   <div className="text-[9px] sm:text-[10px] font-bold uppercase tracking-[0.2em] text-[#C2410C] border border-[#C2410C] px-2 sm:px-3 py-1">
                     Catálogo
@@ -429,7 +429,7 @@ export default function CatalogPage() {
         <div className="max-w-[1600px] mx-auto px-4 md:px-8 h-20 md:h-24 flex items-center justify-between gap-4">
           {/* Logo & Identity */}
           <div className="flex items-center">
-            <div className="text-2xl md:text-3xl font-serif font-bold tracking-tight">CAVA.</div>
+            <div className="text-2xl md:text-3xl font-serif font-bold tracking-tight">CAVA</div>
             <div className="h-8 w-px bg-slate-200 mx-4 md:mx-6 hidden sm:block"></div>
             {catalog.depositLogo && (
               <img
@@ -584,7 +584,7 @@ export default function CatalogPage() {
       <footer className="border-t border-slate-200 bg-white">
         <div className="max-w-[1600px] mx-auto px-4 md:px-8 py-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="text-2xl font-serif font-bold tracking-tight text-[#121212]">CAVA.</div>
+            <div className="text-2xl font-serif font-bold tracking-tight text-[#121212]">CAVA</div>
             {catalog.depositLogo && (
               <>
                 <div className="h-6 w-px bg-slate-200"></div>
