@@ -11,8 +11,14 @@ export function useIndustryConfig() {
         queryKey: industryKeys.config,
         queryFn: async () => {
             const data = await apiClient.get<Industry>('/industry-config');
+            // Retorna os dados diretamente sem transformação adicional
             return data;
         },
+        // Adiciona configurações para evitar problemas de cache
+        staleTime: 5 * 60 * 1000, // 5 minutos
+        gcTime: 10 * 60 * 1000, // 10 minutos (antes era cacheTime)
+        refetchOnWindowFocus: false,
+        retry: 1,
     });
 }
 
@@ -25,6 +31,7 @@ export function useUpdateIndustryConfig() {
             return response;
         },
         onSuccess: (updatedIndustry) => {
+            // Atualiza o cache com os novos dados
             queryClient.setQueryData(industryKeys.config, updatedIndustry);
         },
     });
@@ -36,11 +43,7 @@ export function useUploadIndustryLogo() {
             const formData = new FormData();
             formData.append('logo', file);
 
-            const response = await apiClient.post<{ urls: string[] }>('/upload/industry-logo', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            });
+            const response = await apiClient.upload<{ urls: string[] }>('/upload/industry-logo', formData);
             return response.urls[0];
         },
     });

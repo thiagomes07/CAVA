@@ -70,8 +70,9 @@ func (h *IndustryHandler) GetMyIndustry(w http.ResponseWriter, r *http.Request) 
 
 // UpdateConfigInput representa os dados para atualização da configuração
 type UpdateConfigInput struct {
-	Name           *string `json:"name" validate:"omitempty,min=2,max=255"`
-	ContactEmail   *string `json:"contactEmail" validate:"omitempty,email"`
+	Name           *string `json:"name" validate:"omitempty"`
+	CNPJ           *string `json:"cnpj" validate:"omitempty"`
+	ContactEmail   *string `json:"contactEmail" validate:"omitempty"`
 	ContactPhone   *string `json:"contactPhone" validate:"omitempty,max=20"`
 	Whatsapp       *string `json:"whatsapp" validate:"omitempty,max=20"`
 	Description    *string `json:"description" validate:"omitempty,max=2000"`
@@ -115,7 +116,7 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar input
+	// Validar input (não verificamos strings vazias aqui pois queremos permitir limpeza)
 	if err := h.validator.Validate(input); err != nil {
 		response.HandleError(w, err)
 		return
@@ -129,6 +130,13 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) == "" {
 		response.BadRequest(w, "Email não pode conter apenas espaços", nil)
 		return
+	}
+	// Validar formato de email
+	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) != "" {
+		if !strings.Contains(*input.ContactEmail, "@") {
+			response.BadRequest(w, "Email inválido", nil)
+			return
+		}
 	}
 	if input.ContactPhone != nil && strings.TrimSpace(*input.ContactPhone) == "" {
 		input.ContactPhone = nil
@@ -183,10 +191,28 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	// Aplicar atualizações
 	if input.Name != nil {
-		industry.Name = strings.TrimSpace(*input.Name)
+		trimmed := strings.TrimSpace(*input.Name)
+		if trimmed == "" {
+			industry.Name = nil
+		} else {
+			industry.Name = &trimmed
+		}
+	}
+	if input.CNPJ != nil {
+		trimmed := strings.TrimSpace(*input.CNPJ)
+		if trimmed == "" {
+			industry.CNPJ = nil
+		} else {
+			industry.CNPJ = &trimmed
+		}
 	}
 	if input.ContactEmail != nil {
-		industry.ContactEmail = strings.TrimSpace(*input.ContactEmail)
+		trimmed := strings.TrimSpace(*input.ContactEmail)
+		if trimmed == "" {
+			industry.ContactEmail = nil
+		} else {
+			industry.ContactEmail = &trimmed
+		}
 	}
 	if input.ContactPhone != nil {
 		trimmed := strings.TrimSpace(*input.ContactPhone)
