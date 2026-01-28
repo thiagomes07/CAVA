@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO'] as const;
+export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO', 'MULTIPLOS_LOTES'] as const;
 
 export const salesLinkSchema = z
   .object({
@@ -17,12 +17,8 @@ export const salesLinkSchema = z
       .optional(),
     slugToken: z
       .string()
-      .min(3, 'Slug deve ter no mínimo 3 caracteres')
       .max(50, 'Slug deve ter no máximo 50 caracteres')
-      .regex(
-        /^(?!-)(?!.*--)[a-z0-9-]+(?<!-)$/,
-        'Slug deve conter apenas letras minúsculas e números, não pode iniciar/terminar com hífen nem ter hífens consecutivos'
-      ),
+      .optional(),
     displayPrice: z
       .number({ message: 'Preço deve ser um número' })
       .positive('Preço deve ser maior que zero')
@@ -30,12 +26,9 @@ export const salesLinkSchema = z
     showPrice: z.boolean(),
     expiresAt: z
       .string()
-      .refine((val) => !val || !isNaN(Date.parse(val)), 'Data inválida')
-      .refine(
-        (val) => !val || new Date(val) > new Date(),
-        'Data de expiração deve ser futura'
-      )
-      .optional(),
+      .optional()
+      .nullable()
+      .transform((val) => val || undefined),
     isActive: z.boolean(),
   })
   .refine(

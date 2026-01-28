@@ -14,15 +14,14 @@ import {
   Inbox,
   UserPlus,
   PackageOpen,
-  ChevronLeft,
-  ChevronRight,
   LogOut,
   ChevronUp,
   User,
   BookOpen,
   Building2,
   X,
-  UserCircle
+  UserCircle,
+  Menu
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -150,6 +149,7 @@ export function Sidebar() {
   const tRoles = useTranslations('roles');
 
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
   // Handle click outside to close user menu
@@ -163,6 +163,7 @@ export function Sidebar() {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setUserMenuOpen(false);
+        setMobileMenuOpen(false);
       }
     };
 
@@ -174,6 +175,11 @@ export function Sidebar() {
       document.removeEventListener('keydown', handleEscape);
     };
   }, []);
+
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [pathname]);
 
   const handleLogout = async () => {
     try {
@@ -188,11 +194,9 @@ export function Sidebar() {
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
 
-    // Select menu items based on user role
     if (user.role === 'ADMIN_INDUSTRIA') {
       return industryMenuItems.filter((item) => item.roles.includes(user.role));
     } else if (user.role === 'VENDEDOR_INTERNO') {
-      // Vendedores use the admin routes but with limited options
       return industryMenuItems.filter((item) => item.roles.includes(user.role));
     } else if (user.role === 'BROKER') {
       return brokerMenuItems;
@@ -202,21 +206,10 @@ export function Sidebar() {
   }, [user]);
 
   const isActive = (href: string) => {
-    // Check for exact match on dashboard routes
     if (href.endsWith('/dashboard')) {
       return pathname === href;
     }
-    // Ensure we match the exact path or path followed by /
-    // This prevents /catalog from matching /catalogos
     return pathname === href || pathname.startsWith(href + '/');
-  };
-
-  const closeOnMobile = () => {
-    if (typeof window === 'undefined') return;
-    const isMobile = window.innerWidth < 1024;
-    if (isMobile && sidebarOpen) {
-      toggleSidebar();
-    }
   };
 
   if (!user) return null;
@@ -230,42 +223,126 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={toggleSidebar}
-        />
-      )}
-
-      {/* Sidebar */}
-      <aside
-        className={cn(
-          'fixed top-0 left-0 z-50 h-screen bg-[#121212] text-white transition-all duration-300',
-          'flex flex-col border-r border-white/5',
-          sidebarOpen ? 'w-64' : 'w-0 lg:w-20',
-          'lg:relative lg:z-auto'
-        )}
-      >
-        {/* Mobile Header */}
-        <div className="p-4 pl-5 flex items-center justify-between lg:hidden">
+      {/* ============================================ */}
+      {/* MOBILE: Fixed Header + Full Screen Menu */}
+      {/* ============================================ */}
+      
+      {/* Mobile Header - Fixed at top */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-[#121212] border-b border-white/10 lg:hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Logo */}
           <div className="flex items-center space-x-3">
-            <div className="w-9 h-9 bg-[#C2410C] rounded-sm flex items-center justify-center shadow-lg shadow-[#C2410C]/20 rotate-3">
-              <span className="text-white font-serif font-bold text-lg">C</span>
+            <div className="w-8 h-8 bg-[#C2410C] rounded-sm flex items-center justify-center shadow-lg shadow-[#C2410C]/20 rotate-3">
+              <span className="text-white font-serif font-bold text-base">C</span>
             </div>
-            <div className="leading-tight">
-              <h1 className="text-lg font-serif font-bold tracking-tight text-white">CAVA</h1>
-            </div>
+            <h1 className="text-lg font-serif font-bold tracking-tight text-white">CAVA</h1>
           </div>
-          <button onClick={toggleSidebar} className="text-slate-400 hover:text-white transition-colors">
-            <X className="w-6 h-6" />
+          
+          {/* Menu Button */}
+          <button 
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-slate-400 hover:text-white transition-colors"
+          >
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </button>
         </div>
+      </header>
 
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-40 bg-[#121212] lg:hidden pt-14 flex flex-col">
+          {/* Navigation */}
+          <nav className="flex-1 px-4 py-6 overflow-y-auto">
+            <div className="space-y-1">
+              {filteredMenuItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={cn(
+                      'flex items-center space-x-4 px-4 py-4 rounded-sm transition-all',
+                      active
+                        ? 'text-white bg-white/10'
+                        : 'text-slate-400 hover:text-white hover:bg-white/5'
+                    )}
+                  >
+                    <Icon className={cn(
+                      'w-5 h-5',
+                      active ? 'text-[#C2410C]' : 'text-slate-500'
+                    )} />
+                    <span className={cn(
+                      'text-base',
+                      active && 'font-semibold'
+                    )}>
+                      {t(item.label)}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
+          </nav>
+
+          {/* Language Switcher */}
+          <div className="px-4 py-3 border-t border-white/10">
+            <LanguageSwitcher variant="sidebar" collapsed={false} />
+          </div>
+
+          {/* User Section */}
+          <div className="px-4 py-4 border-t border-white/10">
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 rounded-sm bg-gradient-to-br from-slate-700 to-slate-900 border border-white/10 flex items-center justify-center">
+                <UserCircle className="w-6 h-6 text-slate-300" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-white font-serif">
+                  {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
+                </p>
+                <p className="text-xs text-[#C2410C] capitalize">
+                  {getRoleLabel()}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Link
+                href="/profile"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/5 rounded-sm text-slate-300 hover:bg-white/10 transition-colors"
+              >
+                <User className="w-4 h-4" />
+                <span className="text-sm">{t('navigation.profile')}</span>
+              </Link>
+              <button
+                onClick={handleLogout}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/5 rounded-sm text-slate-300 hover:bg-white/10 transition-colors"
+              >
+                <LogOut className="w-4 h-4" />
+                <span className="text-sm">{tAuth('logout')}</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Content Spacer */}
+      <div className="h-14 lg:hidden" />
+
+      {/* ============================================ */}
+      {/* DESKTOP: Traditional Sidebar */}
+      {/* ============================================ */}
+      <aside
+        className={cn(
+          'hidden lg:flex lg:flex-col',
+          'h-screen bg-[#121212] text-white transition-all duration-300',
+          'border-r border-white/5 shrink-0',
+          sidebarOpen ? 'w-64' : 'w-20'
+        )}
+      >
         {/* Desktop Logo */}
         <div
           className={cn(
-            'p-8 pb-10 hidden lg:block transition-all duration-200',
+            'p-8 pb-10 transition-all duration-200',
             !sidebarOpen && 'p-4 pb-4'
           )}
         >
@@ -290,7 +367,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* Desktop Navigation */}
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
@@ -300,13 +377,12 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                onClick={closeOnMobile}
                 className={cn(
                   'relative w-full flex items-center space-x-3 px-3 py-3 rounded-sm transition-all duration-300 group overflow-hidden',
                   active
                     ? 'text-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]'
                     : 'text-slate-400 hover:text-white hover:bg-white/5',
-                  !sidebarOpen && 'lg:justify-center lg:px-0'
+                  !sidebarOpen && 'justify-center px-0'
                 )}
               >
                 {active && (
@@ -329,12 +405,12 @@ export function Sidebar() {
           })}
         </nav>
 
-        {/* Language Switcher */}
+        {/* Desktop Language Switcher */}
         <div className="px-3 py-2 border-t border-white/5">
           <LanguageSwitcher variant="sidebar" collapsed={!sidebarOpen} />
         </div>
 
-        {/* User Card */}
+        {/* Desktop User Card */}
         <div className="p-3 border-t border-white/5" ref={userMenuRef}>
           <div className="relative">
             {/* User Menu Dropdown */}
@@ -349,10 +425,7 @@ export function Sidebar() {
               >
                 <Link
                   href="/profile"
-                  onClick={() => {
-                    closeOnMobile();
-                    setUserMenuOpen(false);
-                  }}
+                  onClick={() => setUserMenuOpen(false)}
                   className={cn(
                     'w-full px-4 py-3 text-left text-sm transition-colors duration-150',
                     'flex items-center gap-3 cursor-pointer',
@@ -406,7 +479,7 @@ export function Sidebar() {
                 />
               </button>
             ) : (
-              <div className="hidden lg:flex lg:flex-col gap-1">
+              <div className="flex flex-col gap-1">
                 <Link
                   href="/profile"
                   className={cn(

@@ -167,13 +167,19 @@ func (s *catalogLinkService) GetPublicBySlug(ctx context.Context, slug string) (
 		return nil, err
 	}
 
+	// Extrair nome da indústria (dereferenciar ponteiro)
+	depositName := ""
+	if industry.Name != nil {
+		depositName = *industry.Name
+	}
+
 	// Construir resposta pública
 	result := &entity.PublicCatalogLink{
 		Title:        link.Title,
 		CustomMessage: link.CustomMessage,
-		DepositName:  industry.Name,
-		DepositCity:  industry.City,
-		DepositState: industry.State,
+		DepositName:  depositName,
+		DepositCity:  industry.AddressCity,
+		DepositState: industry.AddressState,
 		DepositLogo:  industry.LogoURL,
 		Batches:      []entity.PublicBatch{},
 	}
@@ -186,8 +192,8 @@ func (s *catalogLinkService) GetPublicBySlug(ctx context.Context, slug string) (
 		// Buscar indústria do lote
 		batchIndustry, err := s.industryRepo.FindByID(ctx, batch.IndustryID)
 		industryName := ""
-		if err == nil && batchIndustry != nil {
-			industryName = batchIndustry.Name
+		if err == nil && batchIndustry != nil && batchIndustry.Name != nil {
+			industryName = *batchIndustry.Name
 		}
 
 		publicBatch := entity.PublicBatch{

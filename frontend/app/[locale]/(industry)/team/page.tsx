@@ -45,6 +45,13 @@ const inviteSellerSchema = z.object({
       (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
       'Telefone inválido'
     ),
+  whatsapp: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'WhatsApp inválido'
+    ),
   isAdmin: z.boolean(),
 });
 
@@ -92,6 +99,7 @@ export default function TeamManagementPage() {
   });
 
   const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
+  const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
   // Form for resend invite modal
   const {
@@ -143,6 +151,7 @@ export default function TeamManagementPage() {
         name: data.name,
         email: data.email,
         phone: sanitizePhone(data.phone),
+        whatsapp: sanitizePhone(data.whatsapp),
         isAdmin: data.isAdmin || false,
       });
 
@@ -499,6 +508,26 @@ export default function TeamManagementPage() {
                     )}
                   />
                   {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
+                </div>
+
+                {/* WhatsApp */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('whatsappOptional')}
+                  </label>
+                  <input
+                    value={whatsappField.value}
+                    onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.whatsapp ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">{t('whatsappHelperText')}</p>
+                  {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
                 </div>
 
                 {/* Admin Checkbox */}

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useForm } from 'react-hook-form';
+import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus, Send } from 'lucide-react';
@@ -23,6 +23,7 @@ import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { useSendLinksToClientes } from '@/lib/api/mutations/useLeadMutations';
+import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 import type { Cliente, SalesLink, SendLinksResponse } from '@/lib/types';
 import type { ClienteFilter } from '@/lib/schemas/lead.schema';
 import { clienteStatuses } from '@/lib/schemas/lead.schema';
@@ -31,9 +32,21 @@ import { cn } from '@/lib/utils/cn';
 // Schema for creating a new cliente
 const createClienteSchema = z.object({
   name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(100),
-  contact: z.string().min(5, 'Contato deve ter no mínimo 5 caracteres'),
+  email: z.string().email('Email inválido').optional().or(z.literal('')),
+  phone: z.string().optional().refine(
+    (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+    'Telefone inválido'
+  ),
   message: z.string().max(500).optional(),
   marketingOptIn: z.boolean(),
+}).refine((data) => {
+  // Pelo menos email ou telefone deve ser preenchido
+  const hasEmail = data.email && data.email.trim() !== '';
+  const hasPhone = data.phone && data.phone.replace(/\D/g, '').length >= 10;
+  return hasEmail || hasPhone;
+}, {
+  message: 'Informe pelo menos o email ou telefone',
+  path: ['email'],
 });
 
 type CreateClienteForm = z.infer<typeof createClienteSchema>;
@@ -70,16 +83,20 @@ export default function ClientesManagementPage() {
     reset,
     watch,
     setValue,
+    control,
     formState: { errors },
   } = useForm<CreateClienteForm>({
     resolver: zodResolver(createClienteSchema),
     defaultValues: {
       name: '',
-      contact: '',
+      email: '',
+      phone: '',
       message: '',
       marketingOptIn: false,
     },
   });
+
+  const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
 
   const [filters, setFilters] = useState<ClienteFilter>({
     search: searchParams.get('search') || '',
@@ -240,7 +257,19 @@ export default function ClientesManagementPage() {
   const handleCreateCliente = async (data: CreateClienteForm) => {
     try {
       setIsCreating(true);
-      await apiClient.post('/clientes', data);
+      
+      // Combina email e phone em contact para compatibilidade com o backend
+      // Prioriza email se ambos forem preenchidos
+      const contact = data.email && data.email.trim() !== '' 
+        ? data.email.trim() 
+        : sanitizePhone(data.phone);
+      
+      await apiClient.post('/clientes', {
+        name: data.name,
+        contact,
+        message: data.message,
+        marketingOptIn: data.marketingOptIn,
+      });
       success(t('clienteCreated'));
       setShowCreateModal(false);
       reset();
@@ -803,21 +832,39 @@ export default function ClientesManagementPage() {
                   {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
                 </div>
 
-                {/* Contact */}
+                {/* Email */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('contact')} <span className="text-[#C2410C]">*</span>
+                    {tCommon('email')}
                   </label>
                   <input
-                    {...register('contact')}
-                    placeholder={t('contactPlaceholder')}
+                    {...register('email')}
+                    type="email"
+                    placeholder={t('emailPlaceholder')}
                     className={cn(
                       'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.contact ? 'border-rose-500' : 'border-slate-200'
+                      errors.email ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
+                </div>
+
+                {/* Phone */}
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    {t('phonePlaceholder')}
+                  </label>
+                  <input
+                    value={phoneField.value}
+                    onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.phone ? 'border-rose-500' : 'border-slate-200'
                     )}
                   />
                   <p className="mt-1 text-xs text-slate-400">{t('contactHelperText')}</p>
-                  {errors.contact && <p className="mt-1 text-xs text-rose-500">{errors.contact.message}</p>}
+                  {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
                 </div>
 
                 {/* Message */}

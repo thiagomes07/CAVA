@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"strings"
 	"time"
@@ -67,6 +68,11 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 	}
 	if exists {
 		return nil, domainErrors.SlugExistsError(input.SlugToken)
+	}
+
+	// Para MULTIPLOS_LOTES, validar itens
+	if input.LinkType == entity.LinkTypeMultiplosLotes {
+		return s.createMultipleBatchesLink(ctx, userID, industryID, input)
 	}
 
 	// Validar campos polimórficos baseado no tipo de link
@@ -139,6 +145,139 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 	}, nil
 }
 
+// createMultipleBatchesLink cria um link com múltiplos lotes
+func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID, industryID string, input entity.CreateSalesLinkInput) (*entity.CreateSalesLinkResponse, error) {
+	// Validar que há itens
+	if len(input.Items) == 0 {
+		return nil, domainErrors.ValidationError("MULTIPLOS_LOTES requer pelo menos um item")
+	}
+
+	// Validar cada item e verificar disponibilidade
+	var totalPrice float64
+	items := make([]entity.SalesLinkItem, 0, len(input.Items))
+
+	for _, itemInput := range input.Items {
+		// Validar quantidade
+		if itemInput.Quantity <= 0 {
+			return nil, domainErrors.ValidationError("Quantidade deve ser maior que 0")
+		}
+
+		// Validar preço unitário
+		if itemInput.UnitPrice < 0 {
+			return nil, domainErrors.ValidationError("Preço unitário não pode ser negativo")
+		}
+
+		// Buscar batch
+		batch, err := s.batchRepo.FindByID(ctx, itemInput.BatchID)
+		if err != nil {
+			return nil, domainErrors.ValidationError("Lote não encontrado: " + itemInput.BatchID)
+		}
+
+		// Verificar disponibilidade
+		if batch.Status != entity.BatchStatusDisponivel {
+			return nil, domainErrors.ValidationError("Lote " + batch.BatchCode + " não está disponível")
+		}
+
+		if batch.AvailableSlabs < itemInput.Quantity {
+			return nil, domainErrors.ValidationError(fmt.Sprintf("Lote %s possui apenas %d peça(s) disponível(is)", 
+				batch.BatchCode, batch.AvailableSlabs))
+		}
+
+		// Verificar permissão (broker ou industria)
+		if industryID == "" {
+			// Broker: verificar se batch está compartilhado
+			exists, err := s.sharedInventoryRepo.ExistsForUser(ctx, batch.ID, userID)
+			if err != nil {
+				return nil, err
+			}
+			if !exists {
+				return nil, domainErrors.ForbiddenError()
+			}
+			// Usar industryID do primeiro batch para brokers
+			if industryID == "" {
+				industryID = batch.IndustryID
+			}
+		} else {
+			// Validar que batch pertence à indústria
+			if batch.IndustryID != industryID {
+				return nil, domainErrors.ForbiddenError()
+			}
+		}
+
+		// Criar item
+		item := entity.SalesLinkItem{
+			ID:        uuid.New().String(),
+			BatchID:   itemInput.BatchID,
+			Quantity:  itemInput.Quantity,
+			UnitPrice: itemInput.UnitPrice,
+		}
+		items = append(items, item)
+		totalPrice += float64(itemInput.Quantity) * itemInput.UnitPrice
+	}
+
+	// Validar data de expiração
+	var expiresAt *time.Time
+	if input.ExpiresAt != nil {
+		expiration, err := time.Parse(time.RFC3339, *input.ExpiresAt)
+		if err != nil {
+			return nil, domainErrors.ValidationError("Data de expiração inválida")
+		}
+		if expiration.Before(time.Now()) {
+			return nil, domainErrors.ValidationError("Data de expiração deve ser futura")
+		}
+		expiresAt = &expiration
+	}
+
+	// Se displayPrice não foi fornecido, usar total calculado
+	displayPrice := input.DisplayPrice
+	if displayPrice == nil {
+		displayPrice = &totalPrice
+	}
+
+	// Criar link
+	link := &entity.SalesLink{
+		ID:              uuid.New().String(),
+		CreatedByUserID: userID,
+		IndustryID:      industryID,
+		BatchID:         nil, // MULTIPLOS_LOTES não usa batch_id direto
+		ProductID:       nil,
+		LinkType:        entity.LinkTypeMultiplosLotes,
+		SlugToken:       input.SlugToken,
+		Title:           input.Title,
+		CustomMessage:   input.CustomMessage,
+		DisplayPrice:    displayPrice,
+		ShowPrice:       input.ShowPrice,
+		ViewsCount:      0,
+		ExpiresAt:       expiresAt,
+		IsActive:        input.IsActive,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	// Criar link com itens em transação
+	if err := s.linkRepo.CreateWithItems(ctx, link, items); err != nil {
+		s.logger.Error("erro ao criar link de múltiplos lotes",
+			zap.String("userId", userID),
+			zap.String("slug", input.SlugToken),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	fullURL := s.GenerateFullURL(input.SlugToken)
+
+	s.logger.Info("link de múltiplos lotes criado com sucesso",
+		zap.String("linkId", link.ID),
+		zap.String("slug", input.SlugToken),
+		zap.Int("itemCount", len(items)),
+	)
+
+	return &entity.CreateSalesLinkResponse{
+		ID:      link.ID,
+		FullURL: fullURL,
+	}, nil
+}
+
 func (s *salesLinkService) GetByID(ctx context.Context, id string) (*entity.SalesLink, error) {
 	link, err := s.linkRepo.FindByID(ctx, id)
 	if err != nil {
@@ -155,6 +294,26 @@ func (s *salesLinkService) GetByID(ctx context.Context, id string) (*entity.Sale
 			zap.String("linkId", id),
 			zap.Error(err),
 		)
+	}
+
+	// Buscar itens se for MULTIPLOS_LOTES
+	if link.LinkType == entity.LinkTypeMultiplosLotes {
+		items, err := s.linkRepo.FindItemsByLinkID(ctx, link.ID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar itens do link",
+				zap.String("linkId", id),
+				zap.Error(err),
+			)
+		} else {
+			// Popular batch de cada item
+			for i := range items {
+				batch, err := s.batchRepo.FindByID(ctx, items[i].BatchID)
+				if err == nil {
+					items[i].Batch = batch
+				}
+			}
+			link.Items = items
+		}
 	}
 
 	return link, nil
@@ -219,7 +378,54 @@ func (s *salesLinkService) GetPublicBySlug(ctx context.Context, slug string) (*e
 		result.DisplayPrice = link.DisplayPrice
 	}
 
-	// Buscar batch com mídias
+	// Para MULTIPLOS_LOTES, buscar itens
+	if link.LinkType == entity.LinkTypeMultiplosLotes {
+		items, err := s.linkRepo.FindItemsByLinkID(ctx, link.ID)
+		if err != nil {
+			s.logger.Warn("erro ao buscar itens do link", zap.Error(err))
+		} else {
+			publicItems := make([]entity.PublicLinkItem, 0, len(items))
+			for _, item := range items {
+				batch, err := s.batchRepo.FindByID(ctx, item.BatchID)
+				if err != nil {
+					continue
+				}
+
+				medias, _ := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+
+				publicItem := entity.PublicLinkItem{
+					BatchCode: batch.BatchCode,
+					Height:    batch.Height,
+					Width:     batch.Width,
+					Thickness: batch.Thickness,
+					Quantity:  item.Quantity,
+					Medias:    medias,
+				}
+
+				// Buscar produto
+				if batch.ProductID != "" {
+					product, err := s.productRepo.FindByID(ctx, batch.ProductID)
+					if err == nil {
+						publicItem.ProductName = product.Name
+						publicItem.Material = string(product.Material)
+						publicItem.Finish = string(product.Finish)
+					}
+				}
+
+				// Se showPrice, incluir preços
+				if link.ShowPrice {
+					publicItem.UnitPrice = item.UnitPrice
+					publicItem.TotalPrice = float64(item.Quantity) * item.UnitPrice
+				}
+
+				publicItems = append(publicItems, publicItem)
+			}
+			result.Items = publicItems
+		}
+		return result, nil
+	}
+
+	// Buscar batch com mídias (para LOTE_UNICO)
 	if link.BatchID != nil {
 		batch, err := s.batchRepo.FindByID(ctx, *link.BatchID)
 		if err != nil {

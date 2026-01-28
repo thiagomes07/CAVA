@@ -11,12 +11,13 @@ const (
 	LinkTypeLoteUnico        LinkType = "LOTE_UNICO"
 	LinkTypeProdutoGeral     LinkType = "PRODUTO_GERAL"
 	LinkTypeCatalogoCompleto LinkType = "CATALOGO_COMPLETO"
+	LinkTypeMultiplosLotes   LinkType = "MULTIPLOS_LOTES"
 )
 
 // IsValid verifica se o tipo de link é válido
 func (l LinkType) IsValid() bool {
 	switch l {
-	case LinkTypeLoteUnico, LinkTypeProdutoGeral, LinkTypeCatalogoCompleto:
+	case LinkTypeLoteUnico, LinkTypeProdutoGeral, LinkTypeCatalogoCompleto, LinkTypeMultiplosLotes:
 		return true
 	}
 	return false
@@ -24,26 +25,27 @@ func (l LinkType) IsValid() bool {
 
 // SalesLink representa um link de venda público
 type SalesLink struct {
-	ID              string     `json:"id"`
-	CreatedByUserID string     `json:"createdByUserId"`
-	IndustryID      string     `json:"industryId"`
-	BatchID         *string    `json:"batchId,omitempty"`
-	ProductID       *string    `json:"productId,omitempty"`
-	LinkType        LinkType   `json:"linkType"`
-	SlugToken       string     `json:"slugToken"`
-	Title           *string    `json:"title,omitempty"`
-	CustomMessage   *string    `json:"customMessage,omitempty"`
-	DisplayPrice    *float64   `json:"displayPrice,omitempty"`
-	ShowPrice       bool       `json:"showPrice"`
-	ViewsCount      int        `json:"viewsCount"`
-	ExpiresAt       *time.Time `json:"expiresAt,omitempty"`
-	IsActive        bool       `json:"isActive"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
-	FullURL         *string    `json:"fullUrl,omitempty"`   // Gerada pelo service
-	Batch           *Batch     `json:"batch,omitempty"`     // Populated quando necessário
-	Product         *Product   `json:"product,omitempty"`   // Populated quando necessário
-	CreatedBy       *User      `json:"createdBy,omitempty"` // Populated quando necessário
+	ID              string           `json:"id"`
+	CreatedByUserID string           `json:"createdByUserId"`
+	IndustryID      string           `json:"industryId"`
+	BatchID         *string          `json:"batchId,omitempty"`
+	ProductID       *string          `json:"productId,omitempty"`
+	LinkType        LinkType         `json:"linkType"`
+	SlugToken       string           `json:"slugToken"`
+	Title           *string          `json:"title,omitempty"`
+	CustomMessage   *string          `json:"customMessage,omitempty"`
+	DisplayPrice    *float64         `json:"displayPrice,omitempty"`
+	ShowPrice       bool             `json:"showPrice"`
+	ViewsCount      int              `json:"viewsCount"`
+	ExpiresAt       *time.Time       `json:"expiresAt,omitempty"`
+	IsActive        bool             `json:"isActive"`
+	CreatedAt       time.Time        `json:"createdAt"`
+	UpdatedAt       time.Time        `json:"updatedAt"`
+	FullURL         *string          `json:"fullUrl,omitempty"`   // Gerada pelo service
+	Batch           *Batch           `json:"batch,omitempty"`     // Populated quando necessário
+	Product         *Product         `json:"product,omitempty"`   // Populated quando necessário
+	CreatedBy       *User            `json:"createdBy,omitempty"` // Populated quando necessário
+	Items           []SalesLinkItem  `json:"items,omitempty"`     // Itens para MULTIPLOS_LOTES
 }
 
 // IsExpired verifica se o link está expirado
@@ -54,18 +56,37 @@ func (s *SalesLink) IsExpired() bool {
 	return time.Now().After(*s.ExpiresAt)
 }
 
+// SalesLinkItem representa um item dentro de um link de múltiplos lotes
+type SalesLinkItem struct {
+	ID          string    `json:"id"`
+	SalesLinkID string    `json:"salesLinkId"`
+	BatchID     string    `json:"batchId"`
+	Quantity    int       `json:"quantity"`
+	UnitPrice   float64   `json:"unitPrice"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Batch       *Batch    `json:"batch,omitempty"` // Populated quando necessário
+}
+
+// SalesLinkItemInput representa os dados de um item na criação
+type SalesLinkItemInput struct {
+	BatchID   string  `json:"batchId" validate:"required,uuid"`
+	Quantity  int     `json:"quantity" validate:"required,min=1"`
+	UnitPrice float64 `json:"unitPrice" validate:"required,min=0"`
+}
+
 // CreateSalesLinkInput representa os dados para criar um link de venda
 type CreateSalesLinkInput struct {
-	LinkType      LinkType `json:"linkType" validate:"required,oneof=LOTE_UNICO PRODUTO_GERAL CATALOGO_COMPLETO"`
-	BatchID       *string  `json:"batchId,omitempty" validate:"omitempty,uuid"`
-	ProductID     *string  `json:"productId,omitempty" validate:"omitempty,uuid"`
-	Title         *string  `json:"title,omitempty" validate:"omitempty,max=100"`
-	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
-	SlugToken     string   `json:"slugToken" validate:"required,min=3,max=50,slug"`
-	DisplayPrice  *float64 `json:"displayPrice,omitempty" validate:"omitempty,gt=0"`
-	ShowPrice     bool     `json:"showPrice"`
-	ExpiresAt     *string  `json:"expiresAt,omitempty"` // ISO date
-	IsActive      bool     `json:"isActive"`
+	LinkType      LinkType             `json:"linkType" validate:"required,oneof=LOTE_UNICO PRODUTO_GERAL CATALOGO_COMPLETO MULTIPLOS_LOTES"`
+	BatchID       *string              `json:"batchId,omitempty" validate:"omitempty,uuid"`
+	ProductID     *string              `json:"productId,omitempty" validate:"omitempty,uuid"`
+	Items         []SalesLinkItemInput `json:"items,omitempty"` // Para MULTIPLOS_LOTES
+	Title         *string              `json:"title,omitempty" validate:"omitempty,max=100"`
+	CustomMessage *string              `json:"customMessage,omitempty" validate:"omitempty,max=500"`
+	SlugToken     string               `json:"slugToken" validate:"required,min=3,max=50,slug"`
+	DisplayPrice  *float64             `json:"displayPrice,omitempty" validate:"omitempty,gt=0"`
+	ShowPrice     bool                 `json:"showPrice"`
+	ExpiresAt     *string              `json:"expiresAt,omitempty"` // ISO date
+	IsActive      bool                 `json:"isActive"`
 }
 
 // UpdateSalesLinkInput representa os dados para atualizar um link de venda
@@ -138,10 +159,26 @@ type PublicProduct struct {
 
 // PublicSalesLink representa dados seguros de um link para exibição pública
 type PublicSalesLink struct {
-	Title         string         `json:"title,omitempty"`
-	CustomMessage string         `json:"customMessage,omitempty"`
-	DisplayPrice  *float64       `json:"displayPrice,omitempty"`
-	ShowPrice     bool           `json:"showPrice"`
-	Batch         *PublicBatch   `json:"batch,omitempty"`
-	Product       *PublicProduct `json:"product,omitempty"`
+	Title         string              `json:"title,omitempty"`
+	CustomMessage string              `json:"customMessage,omitempty"`
+	DisplayPrice  *float64            `json:"displayPrice,omitempty"`
+	ShowPrice     bool                `json:"showPrice"`
+	Batch         *PublicBatch        `json:"batch,omitempty"`
+	Product       *PublicProduct      `json:"product,omitempty"`
+	Items         []PublicLinkItem    `json:"items,omitempty"` // Para MULTIPLOS_LOTES
+}
+
+// PublicLinkItem representa dados seguros de um item de link para exibição pública
+type PublicLinkItem struct {
+	BatchCode    string   `json:"batchCode"`
+	ProductName  string   `json:"productName"`
+	Material     string   `json:"material"`
+	Finish       string   `json:"finish"`
+	Height       float64  `json:"height"`
+	Width        float64  `json:"width"`
+	Thickness    float64  `json:"thickness"`
+	Quantity     int      `json:"quantity"`
+	UnitPrice    float64  `json:"unitPrice,omitempty"`
+	TotalPrice   float64  `json:"totalPrice,omitempty"`
+	Medias       []Media  `json:"medias"`
 }

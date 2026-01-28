@@ -332,3 +332,93 @@ func (r *salesLinkRepository) scanLinks(rows *sql.Rows) ([]entity.SalesLink, err
 	}
 	return links, nil
 }
+
+// CreateWithItems cria um link de venda com múltiplos itens em uma transação
+func (r *salesLinkRepository) CreateWithItems(ctx context.Context, link *entity.SalesLink, items []entity.SalesLinkItem) error {
+	tx, err := r.db.BeginTx(ctx)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+	defer tx.Rollback()
+
+	// Inserir link
+	linkQuery := `
+		INSERT INTO sales_links (
+			id, created_by_user_id, industry_id, batch_id, product_id,
+			link_type, slug_token, title, custom_message, display_price,
+			show_price, expires_at, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		RETURNING created_at, updated_at
+	`
+
+	err = tx.QueryRowContext(ctx, linkQuery,
+		link.ID, link.CreatedByUserID, link.IndustryID, link.BatchID,
+		link.ProductID, link.LinkType, link.SlugToken, link.Title,
+		link.CustomMessage, link.DisplayPrice, link.ShowPrice,
+		link.ExpiresAt, link.IsActive,
+	).Scan(&link.CreatedAt, &link.UpdatedAt)
+
+	if err != nil {
+		if pqErr, ok := err.(*pq.Error); ok {
+			if pqErr.Code == "23505" {
+				return errors.SlugExistsError(link.SlugToken)
+			}
+		}
+		return errors.DatabaseError(err)
+	}
+
+	// Inserir itens
+	itemQuery := `
+		INSERT INTO sales_link_items (id, sales_link_id, batch_id, quantity, unit_price)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING created_at
+	`
+
+	for i := range items {
+		items[i].SalesLinkID = link.ID
+		err = tx.QueryRowContext(ctx, itemQuery,
+			items[i].ID, items[i].SalesLinkID, items[i].BatchID,
+			items[i].Quantity, items[i].UnitPrice,
+		).Scan(&items[i].CreatedAt)
+		if err != nil {
+			return errors.DatabaseError(err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	link.Items = items
+	return nil
+}
+
+// FindItemsByLinkID busca todos os itens de um link
+func (r *salesLinkRepository) FindItemsByLinkID(ctx context.Context, linkID string) ([]entity.SalesLinkItem, error) {
+	query := `
+		SELECT id, sales_link_id, batch_id, quantity, unit_price, created_at
+		FROM sales_link_items
+		WHERE sales_link_id = $1
+		ORDER BY created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, linkID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	items := []entity.SalesLinkItem{}
+	for rows.Next() {
+		var item entity.SalesLinkItem
+		if err := rows.Scan(
+			&item.ID, &item.SalesLinkID, &item.BatchID,
+			&item.Quantity, &item.UnitPrice, &item.CreatedAt,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		items = append(items, item)
+	}
+
+	return items, nil
+}

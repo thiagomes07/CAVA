@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils/cn';
 
 const formSchema = z.object({
     name: z.string().min(2, 'Nome muito curto'),
-    cnpj: z.string().min(1, 'CNPJ/identificação é obrigatória'),
+    cnpj: z.string().optional(),
     contactEmail: z.string().email('Email inválido'),
     contactPhone: z.string().optional(),
     whatsapp: z.string().optional(),
@@ -56,10 +56,16 @@ export default function IndustryConfigPage() {
         },
     });
 
-    const { control, handleSubmit, watch, setValue, reset, register, formState: { errors } } = form;
+    const { control, handleSubmit, watch, setValue, reset, register, formState: { errors, isDirty } } = form;
 
     const watchedCountry = watch('addressCountry');
     const watchedState = watch('addressState');
+
+    // Detect if logo changed
+    const isLogoDirty = !!selectedLogo || (previewLogoUrl !== (industry?.logoUrl || ''));
+
+    // Detect if form or logo has changes
+    const hasChanges = isDirty || isLogoDirty;
 
     // Load data
     useEffect(() => {
@@ -94,6 +100,36 @@ export default function IndustryConfigPage() {
 
     const handleLogoRemove = () => {
         setPreviewLogoUrl('');
+        setSelectedLogo(null);
+    };
+
+    const handleCancel = () => {
+        if (industry) {
+            // Restore all form fields to original values
+            reset({
+                name: industry.name,
+                cnpj: industry.cnpj || '',
+                contactEmail: industry.contactEmail,
+                contactPhone: industry.contactPhone || '',
+                whatsapp: industry.whatsapp || '',
+                description: industry.description || '',
+                addressCountry: industry.addressCountry || 'Brasil',
+                addressState: industry.addressState || '',
+                addressCity: industry.addressCity || '',
+                addressStreet: industry.addressStreet || '',
+                addressNumber: industry.addressNumber || '',
+                addressZipCode: industry.addressZipCode || '',
+            });
+
+            // Restore logo preview
+            if (industry.logoUrl) {
+                setPreviewLogoUrl(industry.logoUrl);
+            } else {
+                setPreviewLogoUrl('');
+            }
+        }
+
+        // Reset selected logo
         setSelectedLogo(null);
     };
 
@@ -163,10 +199,10 @@ export default function IndustryConfigPage() {
 
                     {/* Identidade */}
                     <div className="bg-white border border-slate-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#C2410C] flex items-center justify-center">
-                                    <Building2 className="h-4 w-4 text-white" />
+                                <div className="p-2 rounded-lg bg-[#C2410C]/10">
+                                    <Building2 className="h-5 w-5 text-[#C2410C]" />
                                 </div>
                                 <div>
                                     <h2 className="font-semibold text-[#121212]">{t('identity')}</h2>
@@ -306,10 +342,10 @@ export default function IndustryConfigPage() {
 
                     {/* Contato */}
                     <div className="bg-white border border-slate-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#C2410C] flex items-center justify-center">
-                                    <Phone className="h-4 w-4 text-white" />
+                                <div className="p-2 rounded-lg bg-[#C2410C]/10">
+                                    <Phone className="h-5 w-5 text-[#C2410C]" />
                                 </div>
                                 <div>
                                     <h2 className="font-semibold text-[#121212]">{t('contact')}</h2>
@@ -378,10 +414,10 @@ export default function IndustryConfigPage() {
 
                     {/* Endereço */}
                     <div className="bg-white border border-slate-200 overflow-hidden">
-                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
                             <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 bg-[#C2410C] flex items-center justify-center">
-                                    <MapPin className="h-4 w-4 text-white" />
+                                <div className="p-2 rounded-lg bg-[#C2410C]/10">
+                                    <MapPin className="h-5 w-5 text-[#C2410C]" />
                                 </div>
                                 <div>
                                     <h2 className="font-semibold text-[#121212]">{t('address')}</h2>
@@ -405,6 +441,18 @@ export default function IndustryConfigPage() {
                                             >
                                                 <option value="Brasil">Brasil</option>
                                                 <option value="Estados Unidos">Estados Unidos</option>
+                                                <option value="Itália">Itália</option>
+                                                <option value="China">China</option>
+                                                <option value="Índia">Índia</option>
+                                                <option value="Turquia">Turquia</option>
+                                                <option value="Espanha">Espanha</option>
+                                                <option value="Portugal">Portugal</option>
+                                                <option value="México">México</option>
+                                                <option value="Canadá">Canadá</option>
+                                                <option value="Emirados Árabes Unidos">Emirados Árabes Unidos</option>
+                                                <option value="Arábia Saudita">Arábia Saudita</option>
+                                                <option value="Catar">Catar</option>
+                                                <option value="Kuwait">Kuwait</option>
                                                 <option value="Outro">Outro</option>
                                             </select>
                                         )}
@@ -539,20 +587,20 @@ export default function IndustryConfigPage() {
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+                    <div className="flex items-center justify-end gap-3 sticky bottom-6 bg-white/95 backdrop-blur-md p-4 rounded-xl shadow-xl border border-slate-200/50 mx-6 mb-6">
                         <button
                             type="button"
-                            onClick={() => reset()}
-                            className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
+                            onClick={handleCancel}
+                            className="px-6 py-3 text-slate-600 hover:text-[#121212] text-sm font-medium transition-colors border border-slate-200 hover:border-slate-300"
                         >
                             {tCommon('cancel')}
                         </button>
                         <button
                             type="submit"
-                            disabled={isUploading || updateConfig.isPending}
+                            disabled={!hasChanges || isUploading || updateConfig.isPending}
                             className={cn(
                                 'flex items-center gap-2 px-6 py-3 text-white text-sm font-medium transition-all',
-                                (isUploading || updateConfig.isPending) ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+                                (!hasChanges || isUploading || updateConfig.isPending) ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
                             )}
                         >
                             {(isUploading || updateConfig.isPending) ? (
