@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Loader2, Building2, MapPin, Phone, FileText } from 'lucide-react';
+import { Save, Loader2, Building2, MapPin, Phone } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +31,6 @@ const formSchema = z.object({
     addressStreet: z.string().optional(),
     addressNumber: z.string().optional(),
     addressZipCode: z.string().optional(),
-    policyTerms: z.string().max(5000, 'Máximo 5000 caracteres').optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -54,6 +53,7 @@ export default function IndustryConfigPage() {
         defaultValues: {
             name: '',
             contactEmail: '',
+            addressCountry: 'Brasil',
         },
     });
 
@@ -77,7 +77,6 @@ export default function IndustryConfigPage() {
                 addressStreet: industry.addressStreet || '',
                 addressNumber: industry.addressNumber || '',
                 addressZipCode: industry.addressZipCode || '',
-                policyTerms: industry.policyTerms || '',
             });
 
             if (industry.logoUrl) {
@@ -136,7 +135,7 @@ export default function IndustryConfigPage() {
     }
 
     return (
-        <div className="container max-w-4xl py-8 space-y-8">
+        <div className="container mx-auto max-w-4xl py-8 space-y-8">
             <div>
                 <h1 className="text-3xl font-serif font-bold text-obsidian">{t('title')}</h1>
                 <p className="text-slate-500 mt-2">{t('subtitle')}</p>
@@ -357,29 +356,7 @@ export default function IndustryConfigPage() {
                     </CardContent>
                 </Card>
 
-                {/* Políticas */}
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center gap-2">
-                            <FileText className="h-5 w-5 text-gold-500" />
-                            <CardTitle>{t('policies')}</CardTitle>
-                        </div>
-                        <CardDescription>{t('policiesDesc')}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-2">
-                            <Label>{t('terms')}</Label>
-                            <Textarea
-                                {...register('policyTerms')}
-                                placeholder={t('termsPlaceholder')}
-                                className="h-48"
-                            />
-                            <p className="text-xs text-slate-400 text-right">
-                                {(watch('policyTerms')?.length || 0)} / 5000
-                            </p>
-                        </div>
-                    </CardContent>
-                </Card>
+
 
                 <div className="flex justify-end gap-4 sticky bottom-6 bg-white/80 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-slate-200">
                     <Button type="button" variant="secondary" onClick={() => reset()}>{tCommon('cancel')}</Button>
