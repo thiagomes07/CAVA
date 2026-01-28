@@ -147,8 +147,8 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 		SET name = $1, contact_email = $2, contact_phone = $3, whatsapp = $4,
 		    description = $5, logo_url = $6, address_country = $7, address_state = $8,
 		    address_city = $9, address_street = $10, address_number = $11, 
-		    address_zip_code = $12, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $13
+		    address_zip_code = $12, cnpj = $13, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $14
 		RETURNING updated_at
 	`
 
@@ -156,7 +156,7 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 		industry.Name, industry.ContactEmail, industry.ContactPhone, industry.Whatsapp,
 		industry.Description, industry.LogoURL, industry.AddressCountry, industry.AddressState,
 		industry.AddressCity, industry.AddressStreet, industry.AddressNumber,
-		industry.AddressZipCode, industry.ID,
+		industry.AddressZipCode, industry.CNPJ, industry.ID,
 	).Scan(&industry.UpdatedAt)
 
 	if err == sql.ErrNoRows {

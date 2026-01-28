@@ -610,15 +610,19 @@ func (h *UploadHandler) UploadIndustryLogo(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Limitar tamanho do request (2MB)
-	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
+	// Limitar tamanho do request (5MB)
+	r.Body = http.MaxBytesReader(w, r.Body, maxUploadSize)
 
 	// Parse multipart form
-	if err := r.ParseMultipartForm(2 << 20); err != nil {
+	if err := r.ParseMultipartForm(maxUploadSize); err != nil {
 		h.logger.Error("erro ao parsear multipart form",
 			zap.Error(err),
 		)
-		response.BadRequest(w, "Arquivo muito grande. Máximo 2MB", nil)
+		if err.Error() == "http: request body too large" {
+			response.BadRequest(w, "Arquivo muito grande. Máximo 5MB", nil)
+		} else {
+			response.BadRequest(w, "Erro ao processar envio do arquivo", map[string]interface{}{"error": err.Error()})
+		}
 		return
 	}
 
