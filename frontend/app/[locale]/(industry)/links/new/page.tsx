@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, ArrowRight, Check, Search, Package, Copy, Link2, Tag, Eye, EyeOff, Calendar, Type, MessageSquare, Hash, Sparkles, X, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Search, Package, Copy, Link2, Eye, EyeOff, X, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
@@ -20,8 +20,9 @@ import type { Batch, Product, LinkType, SharedInventoryBatch } from '@/lib/types
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { useLocale } from 'next-intl';
+import { format, addDays } from 'date-fns';
 
-type WizardStep = 'content' | 'pricing' | 'config';
+type WizardStep = 'content' | 'config';
 
 export default function CreateSalesLinkPage() {
   const locale = useLocale();
@@ -41,8 +42,10 @@ export default function CreateSalesLinkPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string>('');
   const [calculatedMargin, setCalculatedMargin] = useState<number>(0);
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
-  const [isSlugAvailable, setIsSlugAvailable] = useState(true);
+  const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
+
+  // Generate slug once on mount - user doesn't need to see or edit it
+  const [generatedSlug] = useState(() => nanoid(10).toLowerCase());
 
   const {
     register,
@@ -57,33 +60,18 @@ export default function CreateSalesLinkPage() {
       linkType: 'LOTE_UNICO',
       showPrice: true,
       isActive: true,
-      slugToken: nanoid(10).toLowerCase(),
+      slugToken: '',
     },
   });
 
   const displayPrice = watch('displayPrice');
   const showPrice = watch('showPrice');
-  const slugToken = watch('slugToken');
 
   useEffect(() => {
     if (currentStep === 'content') {
       fetchAvailableContent();
     }
   }, [currentStep, linkType]);
-
-  useEffect(() => {
-    if (currentStep !== 'config') return;
-    
-    const handle = setTimeout(async () => {
-      if (!slugToken) return;
-      setIsCheckingSlug(true);
-      const available = await validateSlug(slugToken);
-      setIsSlugAvailable(available);
-      setIsCheckingSlug(false);
-    }, 400);
-
-    return () => clearTimeout(handle);
-  }, [slugToken, currentStep]);
 
   useEffect(() => {
     if (isBroker() && selectedBatch && displayPrice) {
@@ -130,30 +118,12 @@ export default function CreateSalesLinkPage() {
     }
   };
 
-  const validateSlug = async (slug: string): Promise<boolean> => {
-    try {
-      await apiClient.get('/sales-links/validate-slug', {
-        params: { slug },
-      });
-      return true;
-    } catch {
-      return false;
-    }
-  };
-
-  const handleGenerateSlug = () => {
-    const newSlug = nanoid(10).toLowerCase();
-    setValue('slugToken', newSlug);
-  };
-
   const handleSelectBatch = (batch: Batch) => {
     setSelectedBatch(batch);
     setValue('batchId', batch.id);
     setValue('linkType', 'LOTE_UNICO');
-    
-    if (isBroker()) {
-      setValue('displayPrice', batch.industryPrice);
-    }
+    // Pre-fill the price with the batch's industry price
+    setValue('displayPrice', batch.industryPrice);
   };
 
   const handleSelectProduct = (product: Product) => {
@@ -162,23 +132,13 @@ export default function CreateSalesLinkPage() {
     setValue('linkType', 'PRODUTO_GERAL');
   };
 
-  const handleNextStep = () => {
+  const handleNextStep = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     if (currentStep === 'content') {
       if (!selectedBatch) {
         error('Selecione um lote para continuar');
         return;
-      }
-      setCurrentStep('pricing');
-    } else if (currentStep === 'pricing') {
-      if (isBroker()) {
-        if (!displayPrice) {
-          error('Defina o preço para o cliente');
-          return;
-        }
-        if (selectedBatch && displayPrice < selectedBatch.industryPrice) {
-          error('Preço não pode ser menor que o preço base');
-          return;
-        }
       }
       setCurrentStep('config');
     }
@@ -186,8 +146,6 @@ export default function CreateSalesLinkPage() {
 
   const handlePrevStep = () => {
     if (currentStep === 'config') {
-      setCurrentStep('pricing');
-    } else if (currentStep === 'pricing') {
       setCurrentStep('content');
     }
   };
@@ -196,40 +154,35 @@ export default function CreateSalesLinkPage() {
     try {
       setIsSubmitting(true);
 
-      const isSlugValid = await validateSlug(data.slugToken);
-      if (!isSlugValid) {
-        error('Este slug já está em uso. Tente outro.');
-        handleGenerateSlug();
-        return;
-      }
-
-      if (linkType === 'LOTE_UNICO') {
+      if (linkType === 'LOTE_UNICO' && data.batchId) {
         const statusCheck = await apiClient.get<Batch>(`/batches/${data.batchId}`);
         if (statusCheck.status !== 'DISPONIVEL') {
           error('Lote não está mais disponível');
+          setIsSubmitting(false);
           return;
         }
       }
 
-      // Converter data para RFC3339 se fornecida
-      const payload = { ...data };
-      if (payload.expiresAt) {
-        const date = new Date(payload.expiresAt);
-        payload.expiresAt = date.toISOString();
-      }
+      // Use the pre-generated slug and expiration date
+      const payload = { 
+        ...data, 
+        slugToken: generatedSlug,
+        expiresAt: expirationDate ? expirationDate.toISOString() : undefined,
+      };
 
       const response = await apiClient.post<{ id: string; fullUrl: string }>(
         '/sales-links',
         payload
       );
 
-      const fullUrl = response.fullUrl || `${window.location.origin}/${locale}/${data.slugToken}`;
+      const fullUrl = response.fullUrl || `${window.location.origin}/${locale}/${generatedSlug}`;
       setGeneratedLink(fullUrl);
       setShowSuccessModal(true);
 
       await navigator.clipboard.writeText(fullUrl);
-    } catch (err) {
-      error('Erro ao criar link');
+    } catch (err: any) {
+      console.error('Erro ao criar link:', err);
+      error(err?.message || 'Erro ao criar link');
     } finally {
       setIsSubmitting(false);
     }
@@ -253,6 +206,9 @@ export default function CreateSalesLinkPage() {
     );
   });
 
+  // Minimum date is tomorrow
+  const minDate = addDays(new Date(), 1);
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
       <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
@@ -262,9 +218,8 @@ export default function CreateSalesLinkPage() {
           <div>
             <h2 className="font-serif text-xl">Criar Link de Venda</h2>
             <p className="text-xs text-white/50 mt-0.5">
-              {currentStep === 'content' && 'Passo 1 de 3 — Selecione o lote'}
-              {currentStep === 'pricing' && 'Passo 2 de 3 — Configure preço'}
-              {currentStep === 'config' && 'Passo 3 de 3 — Finalize o link'}
+              {currentStep === 'content' && 'Passo 1 de 2 — Selecione o lote'}
+              {currentStep === 'config' && 'Passo 2 de 2 — Configure o link'}
             </p>
           </div>
           <button 
@@ -280,13 +235,19 @@ export default function CreateSalesLinkPage() {
           <div 
             className="bg-[#C2410C] transition-all duration-300"
             style={{ 
-              width: currentStep === 'content' ? '33%' : currentStep === 'pricing' ? '66%' : '100%' 
+              width: currentStep === 'content' ? '50%' : '100%' 
             }}
           />
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+        <form onSubmit={handleSubmit(onSubmit, (errors) => {
+          console.error('Form validation errors:', errors);
+          const firstError = Object.values(errors)[0];
+          if (firstError?.message) {
+            error(firstError.message as string);
+          }
+        })} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto px-6 py-6">
             
             {/* Step 1: Content Selection */}
@@ -300,6 +261,11 @@ export default function CreateSalesLinkPage() {
                     placeholder="Buscar por código ou produto..."
                     value={searchTerm}
                     onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                      }
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
                   />
                 </div>
@@ -360,8 +326,8 @@ export default function CreateSalesLinkPage() {
               </div>
             )}
 
-            {/* Step 2: Pricing */}
-            {currentStep === 'pricing' && (
+            {/* Step 2: Configuration */}
+            {currentStep === 'config' && (
               <div className="space-y-5">
                 {/* Selected Batch Summary */}
                 {selectedBatch && (
@@ -383,12 +349,12 @@ export default function CreateSalesLinkPage() {
                   </div>
                 )}
 
-                {/* Price for Broker */}
-                {isBroker() && selectedBatch && (
+                {/* Price */}
+                {selectedBatch && (
                   <div className="space-y-4">
                     <div>
                       <label className="text-xs font-medium text-slate-600 block mb-2">
-                        Preço Final para o Cliente
+                        Preço para o Cliente
                       </label>
                       <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 focus-within:border-[#C2410C] focus-within:bg-white transition-colors">
                         <span className="text-slate-400">R$</span>
@@ -403,9 +369,12 @@ export default function CreateSalesLinkPage() {
                       {errors.displayPrice && (
                         <p className="text-xs text-rose-500 mt-1">{errors.displayPrice.message}</p>
                       )}
+                      <p className="text-xs text-slate-400 mt-1">
+                        Preço base do lote: {formatCurrency(selectedBatch.industryPrice)}
+                      </p>
                     </div>
 
-                    {displayPrice && displayPrice >= selectedBatch.industryPrice && (
+                    {isBroker() && displayPrice && displayPrice >= selectedBatch.industryPrice && (
                       <div className="grid grid-cols-2 gap-3">
                         <div className="p-3 bg-emerald-50 border border-emerald-100 text-center">
                           <p className="text-[10px] uppercase tracking-wide text-emerald-600 mb-0.5">Sua Margem</p>
@@ -459,59 +428,40 @@ export default function CreateSalesLinkPage() {
                     placeholder="Mensagem que aparecerá no link..."
                   />
                 </div>
-              </div>
-            )}
 
-            {/* Step 3: Configuration */}
-            {currentStep === 'config' && (
-              <div className="space-y-5">
-                {/* Slug */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    URL do Link
-                  </label>
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-[#C2410C] focus-within:bg-white transition-colors">
-                    <span className="pl-3 text-sm text-slate-400 whitespace-nowrap">
-                      {typeof window !== 'undefined' ? `${window.location.host}/${locale}/` : ''}
-                    </span>
-                    <input
-                      {...register('slugToken')}
-                      type="text"
-                      className="flex-1 py-2.5 pr-2 bg-transparent outline-none text-sm font-mono min-w-0"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleGenerateSlug}
-                      className="p-2 mr-1 text-slate-400 hover:text-[#C2410C] transition-colors"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1.5 text-xs">
-                    {isCheckingSlug && <span className="text-slate-400">Verificando...</span>}
-                    {!isCheckingSlug && !isSlugAvailable && (
-                      <span className="text-rose-500 flex items-center gap-1">
-                        <X className="w-3 h-3" /> Slug já em uso
-                      </span>
-                    )}
-                    {!isCheckingSlug && isSlugAvailable && slugToken && (
-                      <span className="text-emerald-500 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Disponível
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Expiration */}
+                {/* Expiration Date */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-2">
                     Expiração <span className="text-slate-400">(opcional)</span>
                   </label>
-                  <input
-                    {...register('expiresAt')}
-                    type="date"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={expirationDate ? format(expirationDate, 'yyyy-MM-dd') : ''}
+                      min={format(minDate, 'yyyy-MM-dd')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setExpirationDate(value ? new Date(value + 'T00:00:00') : undefined);
+                      }}
+                      className={cn(
+                        'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm transition-colors',
+                        'hover:border-[#C2410C] focus:border-[#C2410C] focus:bg-white outline-none',
+                        !expirationDate && 'text-slate-400'
+                      )}
+                    />
+                    {expirationDate && (
+                      <button
+                        type="button"
+                        onClick={() => setExpirationDate(undefined)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-slate-400 mt-1">
+                    O link ficará disponível até a data selecionada
+                  </p>
                 </div>
 
                 {/* Active Toggle */}
@@ -544,10 +494,14 @@ export default function CreateSalesLinkPage() {
                           }
                         </span>
                       </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">URL</span>
-                        <span className="font-mono text-xs text-[#C2410C]">/{slugToken}</span>
-                      </div>
+                      {expirationDate && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500">Expira em</span>
+                          <span className="text-xs text-[#121212]">
+                            {format(expirationDate, "dd/MM/yyyy")}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -580,10 +534,10 @@ export default function CreateSalesLinkPage() {
               <button
                 type="button"
                 onClick={handleNextStep}
-                disabled={currentStep === 'content' && !selectedBatch}
+                disabled={!selectedBatch}
                 className={cn(
                   'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                  currentStep === 'content' && !selectedBatch
+                  !selectedBatch
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-[#121212] hover:bg-[#C2410C]'
                 )}
@@ -594,10 +548,10 @@ export default function CreateSalesLinkPage() {
             ) : (
               <button
                 type="submit"
-                disabled={isSubmitting || !isSlugAvailable}
+                disabled={isSubmitting}
                 className={cn(
                   'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                  (isSubmitting || !isSlugAvailable)
+                  isSubmitting
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-[#C2410C] hover:bg-[#a03609]'
                 )}

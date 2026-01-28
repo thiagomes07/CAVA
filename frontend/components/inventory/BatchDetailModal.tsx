@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  X, Layers, Settings, Save, AlertTriangle, DollarSign,
-  Share2, Archive, Trash2, Package, Eye, EyeOff, User,
-  RotateCcw, Upload, ArrowUp, ArrowDown, Receipt
+  X, Layers, Settings, Save, DollarSign,
+  Share2, Trash2, Package, User,
+  Upload, ArrowUp, ArrowDown, Boxes
 } from 'lucide-react';
 import type { Batch, Media, PriceUnit, BatchStatus, User as UserType, SharedInventoryBatch } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
@@ -13,7 +13,8 @@ import { formatArea, calculateTotalArea } from '@/lib/utils/formatDimensions';
 import { calculateTotalBatchPrice, formatPricePerUnit, getPriceUnitLabel } from '@/lib/utils/priceConversion';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { cn } from '@/lib/utils/cn';
-import { SellBatchModal } from '@/app/[locale]/(industry)/inventory/[id]/components/SellBatchModal';
+import { apiClient, ApiError } from '@/lib/api/client';
+import { useToast } from '@/lib/hooks/useToast';
 
 interface UploadedMedia {
   file: File;
@@ -31,6 +32,7 @@ interface BatchDetailModalProps {
   onShare: (userId: string, negotiatedPrice?: number) => Promise<void>;
   onRemoveShare: (shareId: string) => Promise<void>;
   onUpdateMedia: (existingMedias: Media[], newMedias: File[], mediasToDelete: string[]) => Promise<void>;
+  onUpdateStatus?: (status: BatchStatus, fromStatus: BatchStatus, quantity: number) => Promise<void>;
 }
 
 export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
@@ -44,9 +46,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   onShare,
   onRemoveShare,
   onUpdateMedia,
+  onUpdateStatus,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing'>('stock');
-  const [showSellModal, setShowSellModal] = useState(false);
+  const { success, error: toastError } = useToast();
+  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing' | 'inventory'>('stock');
+  
+  // Inventory tab state
+  const [statusQuantityInput, setStatusQuantityInput] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<BatchStatus | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<BatchStatus>('DISPONIVEL');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
+  const [currentBatch, setCurrentBatch] = useState<Batch>(batch);
 
   // Form data for stock tab
   const [formData, setFormData] = useState({
@@ -73,6 +84,32 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
 
   const [isSaving, setIsSaving] = useState(false);
 
+  // Status labels for inventory management
+  const statusLabels: Record<BatchStatus, string> = {
+    DISPONIVEL: 'Disponível',
+    RESERVADO: 'Reservado',
+    VENDIDO: 'Vendido',
+    INATIVO: 'Inativo',
+  };
+
+  const getMaxForSource = (source: BatchStatus) => {
+    switch (source) {
+      case 'DISPONIVEL':
+        return currentBatch.availableSlabs;
+      case 'RESERVADO':
+        return currentBatch.reservedSlabs ?? 0;
+      case 'VENDIDO':
+        return currentBatch.soldSlabs ?? 0;
+      case 'INATIVO':
+        return currentBatch.inactiveSlabs ?? 0;
+      default:
+        return 0;
+    }
+  };
+
+  const parsedStatusQuantity = statusQuantityInput === '' ? 0 : Number(statusQuantityInput);
+  const isQuantityValid = Number.isFinite(parsedStatusQuantity) && parsedStatusQuantity > 0;
+
   useEffect(() => {
     setFormData({
       batchCode: batch.batchCode,
@@ -86,6 +123,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       isPublic: batch.isPublic || false,
     });
     setExistingMedias(batch.medias || []);
+    setCurrentBatch(batch);
   }, [batch]);
 
   const calculatedArea = useMemo(() => {
@@ -101,6 +139,57 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     }
     return 0;
   }, [calculatedArea, formData.industryPrice, formData.priceUnit]);
+
+  const handleUpdateStatus = async (status: BatchStatus): Promise<boolean> => {
+    if (sourceStatus === status) {
+      toastError('Selecione um destino diferente da origem');
+      return false;
+    }
+    const maxAllowed = getMaxForSource(sourceStatus);
+    if (maxAllowed <= 0) {
+      toastError('Não há chapas suficientes para essa ação');
+      return false;
+    }
+    if (!isQuantityValid) {
+      toastError('Informe uma quantidade válida de chapas');
+      return false;
+    }
+    if (parsedStatusQuantity > maxAllowed) {
+      toastError(`Quantidade máxima para ${statusLabels[status]} é ${maxAllowed}`);
+      return false;
+    }
+    try {
+      setIsUpdatingStatus(true);
+      const updated = await apiClient.patch<Batch>(`/batches/${batch.id}/availability`, {
+        status,
+        fromStatus: sourceStatus,
+        quantity: parsedStatusQuantity,
+      });
+      setCurrentBatch(updated);
+      setSelectedStatus(null);
+      setStatusQuantityInput('');
+      setStatusUpdatedAt(Date.now());
+      success('Status do lote atualizado');
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('Erro ao atualizar status do lote');
+      }
+      return false;
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleApplyStatus = async () => {
+    if (!selectedStatus) {
+      toastError('Selecione um status para atualizar');
+      return;
+    }
+    await handleUpdateStatus(selectedStatus);
+  };
 
   const handleSaveStock = async () => {
     try {
@@ -199,11 +288,11 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const allMedias = [...existingMedias, ...newMedias.map((_, i) => ({ id: `new-${i}`, url: '', displayOrder: existingMedias.length + i, batchId: '', createdAt: new Date() }))];
   const coverMedia = existingMedias[0] || (newMedias[0] ? { url: newMedias[0].preview } : null);
 
-  const totalQuantity = batch.quantitySlabs;
-  const availableQty = batch.availableSlabs;
-  const reservedQty = batch.reservedSlabs ?? 0;
-  const soldQty = batch.soldSlabs ?? 0;
-  const inactiveQty = batch.inactiveSlabs ?? 0;
+  const totalQuantity = currentBatch.quantitySlabs;
+  const availableQty = currentBatch.availableSlabs;
+  const reservedQty = currentBatch.reservedSlabs ?? 0;
+  const soldQty = currentBatch.soldSlabs ?? 0;
+  const inactiveQty = currentBatch.inactiveSlabs ?? 0;
 
   return (
     <>
@@ -261,6 +350,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 Estoque
               </button>
               <button
+                onClick={() => setActiveTab('inventory')}
+                className={cn(
+                  'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
+                  activeTab === 'inventory'
+                    ? 'border-[#C2410C] text-[#121212]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                )}
+              >
+                <Boxes className="w-3 h-3 mr-2" />
+                Inventário
+              </button>
+              <button
                 onClick={() => setActiveTab('sharing')}
                 className={cn(
                   'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
@@ -299,25 +400,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       {batch.width}x{batch.height}x{batch.thickness} cm
                     </p>
                   </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 gap-2 md:gap-3">
-                  <button
-                    onClick={() => setShowSellModal(true)}
-                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all border bg-transparent hover:bg-slate-50 text-[#121212] border-slate-200 hover:border-[#121212]"
-                    disabled={availableQty === 0}
-                  >
-                    <Receipt className="w-3 h-3 mr-2" />
-                    Vender
-                  </button>
-                  <button
-                    onClick={onArchive}
-                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all shadow-lg bg-[#121212] hover:bg-[#C2410C] text-white border border-transparent"
-                  >
-                    <Archive className="w-3 h-3 mr-2" />
-                    Arquivar
-                  </button>
                 </div>
 
                 {/* Global Inventory */}
@@ -411,6 +493,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 >
                   <Settings className="w-3 h-3 mr-2" />
                   Estoque
+                </button>
+                <button
+                  onClick={() => setActiveTab('inventory')}
+                  className={cn(
+                    'pb-4 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-b-2 whitespace-nowrap',
+                    activeTab === 'inventory'
+                      ? 'border-[#C2410C] text-[#121212]'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  <Boxes className="w-3 h-3 mr-2" />
+                  Inventário
                 </button>
                 <button
                   onClick={() => setActiveTab('sharing')}
@@ -762,6 +856,223 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                   </div>
                 )}
 
+                {/* Inventory Tab */}
+                {activeTab === 'inventory' && (
+                  <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="bg-[#121212] p-4 md:p-6 flex items-start gap-5 shadow-xl">
+                      <Boxes className="w-6 h-6 text-[#C2410C] mt-1 flex-shrink-0" />
+                      <div>
+                        <h3 className="text-lg font-serif text-white">Gestão de Inventário</h3>
+                        <p className="text-sm text-slate-400 mt-2 font-light leading-relaxed max-w-xl">
+                          Mova chapas entre diferentes status: disponível, reservado, vendido ou inativo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 p-6 space-y-6">
+                      {/* Status Overview */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                          <Layers className="w-3 h-3 mr-2" /> Resumo do Inventário
+                        </h4>
+                        
+                        <div className="h-4 w-full rounded-full overflow-hidden bg-slate-100 flex">
+                          {availableQty > 0 && (
+                            <div
+                              className="bg-emerald-500"
+                              style={{ width: `${(availableQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {reservedQty > 0 && (
+                            <div
+                              className="bg-amber-500"
+                              style={{ width: `${(reservedQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {soldQty > 0 && (
+                            <div
+                              className="bg-blue-500"
+                              style={{ width: `${(soldQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {inactiveQty > 0 && (
+                            <div
+                              className="bg-slate-400"
+                              style={{ width: `${(inactiveQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Disponíveis: <span className="font-bold text-[#121212]">{availableQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-emerald-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Reservadas: <span className="font-bold text-[#121212]">{reservedQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-amber-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Vendidas: <span className="font-bold text-[#121212]">{soldQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-blue-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Inativas: <span className="font-bold text-[#121212]">{inactiveQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-slate-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Transfer Form */}
+                      <div className="space-y-4 pt-4 border-t border-slate-200">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          Mover Chapas
+                        </h4>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Quantidade de chapas
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={statusQuantityInput}
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/\D/g, '');
+                              setStatusQuantityInput(next);
+                              setStatusUpdatedAt(null);
+                            }}
+                            disabled={isUpdatingStatus}
+                            className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-serif text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                            placeholder="Digite a quantidade"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Mover de
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { value: 'DISPONIVEL', label: 'Disponível' },
+                              { value: 'RESERVADO', label: 'Reservado' },
+                              { value: 'VENDIDO', label: 'Vendido' },
+                              { value: 'INATIVO', label: 'Inativo' },
+                            ] as { value: BatchStatus; label: string }[]).map((option) => (
+                              <button
+                                key={`from-${option.value}`}
+                                type="button"
+                                onClick={() => setSourceStatus(option.value)}
+                                className={cn(
+                                  'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                                  sourceStatus === option.value
+                                    ? 'bg-[#121212] text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                )}
+                                disabled={isUpdatingStatus}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Para
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { value: 'DISPONIVEL', label: 'Disponível' },
+                              { value: 'RESERVADO', label: 'Reservado' },
+                              { value: 'VENDIDO', label: 'Vendido' },
+                              { value: 'INATIVO', label: 'Inativo' },
+                            ] as { value: BatchStatus; label: string }[]).map((option) => {
+                              const maxAllowed = getMaxForSource(sourceStatus);
+                              const isDisabled =
+                                isUpdatingStatus ||
+                                sourceStatus === option.value ||
+                                maxAllowed <= 0 ||
+                                !isQuantityValid ||
+                                parsedStatusQuantity > maxAllowed;
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedStatus((prev) => (prev === option.value ? null : option.value))
+                                  }
+                                  className={cn(
+                                    'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                                    selectedStatus === option.value
+                                      ? 'bg-[#121212] text-white'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                    isDisabled && 'opacity-40 cursor-not-allowed'
+                                  )}
+                                  disabled={isDisabled}
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 pt-4">
+                          <button
+                            type="button"
+                            onClick={handleApplyStatus}
+                            disabled={
+                              isUpdatingStatus ||
+                              !selectedStatus ||
+                              !isQuantityValid ||
+                              selectedStatus === sourceStatus
+                            }
+                            className="px-8 py-3 bg-[#121212] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2410C] shadow-lg transition-all flex items-center disabled:opacity-50"
+                          >
+                            {isUpdatingStatus ? 'Atualizando...' : 'Atualizar Status'}
+                          </button>
+                          {selectedStatus && (
+                            <span className="text-sm text-slate-500">
+                              {statusLabels[sourceStatus]} → {statusLabels[selectedStatus]}
+                            </span>
+                          )}
+                        </div>
+
+                        {(() => {
+                          const now = Date.now();
+                          const recent = statusUpdatedAt && now - statusUpdatedAt < 5000;
+                          if (recent) {
+                            return (
+                              <p className="text-sm text-emerald-600 font-medium">✓ Status atualizado com sucesso</p>
+                            );
+                          }
+
+                          if (statusQuantityInput === '') {
+                            return (
+                              <p className="text-xs text-slate-500">
+                                Informe a quantidade de chapas e escolha o status para ajustar o estoque.
+                              </p>
+                            );
+                          }
+
+                          if (isQuantityValid) {
+                            return (
+                              <p className="text-xs text-slate-500">
+                                Quantidade válida: {parsedStatusQuantity} chapas
+                              </p>
+                            );
+                          }
+
+                          return (
+                            <p className="text-xs text-rose-600">Quantidade inválida</p>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 {/* Sharing Tab */}
                 {activeTab === 'sharing' && (
                   <div className="space-y-4">
@@ -867,21 +1178,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Sell Modal */}
-      {showSellModal && (
-        <SellBatchModal
-          batch={batch}
-          quantitySlabs={availableQty}
-          sourceStatus="DISPONIVEL"
-          isOpen={showSellModal}
-          onClose={() => setShowSellModal(false)}
-          onSuccess={() => {
-            setShowSellModal(false);
-            // Parent component should refetch batch
-          }}
-        />
-      )}
     </>
   );
 };
