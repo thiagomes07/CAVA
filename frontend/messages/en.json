@@ -346,6 +346,7 @@
     "typeSingleBatch": "Single Batch",
     "typeProduct": "Product",
     "typeCatalog": "Catalog",
+    "typeMultipleBatches": "Multiple Batches",
     "allStatuses": "All Statuses",
     "statusActive": "Active",
     "statusExpired": "Expired",

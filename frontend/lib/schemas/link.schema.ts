@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO'] as const;
+export const linkTypes = ['LOTE_UNICO', 'PRODUTO_GERAL', 'CATALOGO_COMPLETO', 'MULTIPLOS_LOTES'] as const;
 
 export const salesLinkSchema = z
   .object({

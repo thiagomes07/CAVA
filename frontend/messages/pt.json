@@ -346,6 +346,7 @@
     "typeSingleBatch": "Lote Único",
     "typeProduct": "Produto",
     "typeCatalog": "Catálogo",
+    "typeMultipleBatches": "Múltiplos Lotes",
     "allStatuses": "Todos os Status",
     "statusActive": "Ativos",
     "statusExpired": "Expirados",

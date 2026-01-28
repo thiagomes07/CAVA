@@ -10,6 +10,9 @@ type SalesLinkRepository interface {
 	// Create cria um novo link de venda
 	Create(ctx context.Context, link *entity.SalesLink) error
 
+	// CreateWithItems cria um link de venda com múltiplos itens (transação)
+	CreateWithItems(ctx context.Context, link *entity.SalesLink, items []entity.SalesLinkItem) error
+
 	// FindByID busca link por ID
 	FindByID(ctx context.Context, id string) (*entity.SalesLink, error)
 
@@ -39,4 +42,7 @@ type SalesLinkRepository interface {
 
 	// CountActive conta links ativos de um usuário
 	CountActive(ctx context.Context, userID string) (int, error)
+
+	// FindItemsByLinkID busca todos os itens de um link
+	FindItemsByLinkID(ctx context.Context, linkID string) ([]entity.SalesLinkItem, error)
 }

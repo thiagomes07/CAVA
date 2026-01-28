@@ -19,7 +19,7 @@ export type FinishType =
   | 'APICOADO'
   | 'FLAMEADO';
 
-export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO';
+export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO' | 'MULTIPLOS_LOTES';
 
 export interface User {
   id: string;

@@ -107,12 +107,13 @@ export default function LinksManagementPage() {
   const isEmpty = links.length === 0;
 
   const getLinkTypeBadge = (type: LinkType) => {
-    const variants = {
+    const variants: Record<LinkType, { label: string; color: string }> = {
       LOTE_UNICO: { label: t('typeSingleBatch'), color: 'bg-blue-50 text-blue-700 border-blue-200' },
       PRODUTO_GERAL: { label: t('typeProduct'), color: 'bg-purple-50 text-purple-700 border-purple-200' },
       CATALOGO_COMPLETO: { label: t('typeCatalog'), color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+      MULTIPLOS_LOTES: { label: t('typeMultipleBatches') || 'Múltiplos Lotes', color: 'bg-amber-50 text-amber-700 border-amber-200' },
     };
-    const variant = variants[type];
+    const variant = variants[type] || variants.LOTE_UNICO;
     return (
       <span className={cn('inline-flex items-center px-2 py-1 rounded-full text-[10px] uppercase tracking-widest font-semibold border', variant.color)}>
         {variant.label}
