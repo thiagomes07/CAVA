@@ -20,7 +20,9 @@ import {
   ChevronUp,
   User,
   BookOpen,
-  Building2
+  Building2,
+  X,
+  UserCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -204,7 +206,9 @@ export function Sidebar() {
     if (href.endsWith('/dashboard')) {
       return pathname === href;
     }
-    return pathname.startsWith(href);
+    // Ensure we match the exact path or path followed by /
+    // This prevents /catalog from matching /catalogos
+    return pathname === href || pathname.startsWith(href + '/');
   };
 
   const closeOnMobile = () => {
@@ -216,6 +220,13 @@ export function Sidebar() {
   };
 
   if (!user) return null;
+
+  const getRoleLabel = () => {
+    if (user.role === 'ADMIN_INDUSTRIA') return tRoles('admin');
+    if (user.role === 'VENDEDOR_INTERNO') return tRoles('seller');
+    if (user.role === 'BROKER') return tRoles('broker');
+    return '';
+  };
 
   return (
     <>
@@ -230,87 +241,103 @@ export function Sidebar() {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed top-0 left-0 z-50 h-screen bg-obsidian text-porcelain transition-all duration-300',
-          'flex flex-col',
+          'fixed top-0 left-0 z-50 h-screen bg-[#121212] text-white transition-all duration-300',
+          'flex flex-col border-r border-white/5',
           sidebarOpen ? 'w-64' : 'w-0 lg:w-20',
           'lg:relative lg:z-auto'
         )}
       >
-        {/* Logo & Toggle */}
-        <div
-          className={cn(
-            'flex items-center border-b border-white/10 transition-all duration-200',
-            sidebarOpen ? 'justify-between p-6' : 'justify-center p-4'
-          )}
-        >
-          <div
-            className={cn(
-              'flex items-center gap-3 transition-all duration-200',
-              sidebarOpen ? 'opacity-100' : 'lg:w-0 lg:opacity-0 lg:overflow-hidden'
-            )}
-          >
-            <div className="w-8 h-8 bg-porcelain rounded-sm" />
-            {sidebarOpen && (
-              <span className="font-serif text-xl font-semibold">CAVA</span>
-            )}
+        {/* Mobile Header */}
+        <div className="p-4 pl-5 flex items-center justify-between lg:hidden">
+          <div className="flex items-center space-x-3">
+            <div className="w-9 h-9 bg-[#C2410C] rounded-sm flex items-center justify-center shadow-lg shadow-[#C2410C]/20 rotate-3">
+              <span className="text-white font-serif font-bold text-lg">C</span>
+            </div>
+            <div className="leading-tight">
+              <h1 className="text-lg font-serif font-bold tracking-tight text-white">CAVA.</h1>
+              <p className="text-[9px] uppercase tracking-[0.28em] text-[#C2410C] font-medium opacity-80">Architecture</p>
+            </div>
           </div>
-
-          <button
-            onClick={toggleSidebar}
-            className={cn(
-              'p-2 rounded-sm hover:bg-white/10 transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-white/20',
-              !sidebarOpen && 'lg:mx-auto'
-            )}
-          >
-            {sidebarOpen ? (
-              <ChevronLeft className="w-5 h-5" />
-            ) : (
-              <ChevronRight className="w-5 h-5" />
-            )}
+          <button onClick={toggleSidebar} className="text-slate-400 hover:text-white transition-colors">
+            <X className="w-6 h-6" />
           </button>
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-6">
-          <ul className="space-y-1 px-3">
-            {filteredMenuItems.map((item) => {
-              const Icon = item.icon;
-              const active = isActive(item.href);
+        {/* Desktop Logo */}
+        <div
+          className={cn(
+            'p-8 pb-10 hidden lg:block transition-all duration-200',
+            !sidebarOpen && 'p-4 pb-4'
+          )}
+        >
+          <div className={cn(
+            'flex items-center',
+            sidebarOpen ? 'space-x-4' : 'justify-center'
+          )}>
+            <div className={cn(
+              'bg-[#C2410C] rounded-sm flex items-center justify-center shadow-lg shadow-[#C2410C]/20 rotate-3 transition-transform hover:rotate-0',
+              sidebarOpen ? 'w-10 h-10' : 'w-8 h-8'
+            )}>
+              <span className={cn(
+                'text-white font-serif font-bold',
+                sidebarOpen ? 'text-2xl' : 'text-lg'
+              )}>C</span>
+            </div>
+            {sidebarOpen && (
+              <div>
+                <h1 className="text-2xl font-serif font-bold tracking-tight text-white">CAVA.</h1>
+                <p className="text-[9px] uppercase tracking-[0.3em] text-[#C2410C] font-medium opacity-80">Architecture</p>
+              </div>
+            )}
+          </div>
+        </div>
 
-              return (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    onClick={closeOnMobile}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-3 rounded-sm transition-all duration-200',
-                      'text-sm font-medium',
-                      'focus:outline-none focus:ring-2 focus:ring-white/20',
-                      active
-                        ? 'bg-porcelain text-obsidian'
-                        : 'text-porcelain/80 hover:bg-white/10 hover:text-porcelain',
-                      !sidebarOpen && 'lg:justify-center'
-                    )}
-                  >
-                    <Icon className="w-5 h-5 shrink-0" />
-                    {sidebarOpen && (
-                      <span className="truncate">{t(item.label)}</span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+        {/* Navigation */}
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto">
+          {filteredMenuItems.map((item) => {
+            const Icon = item.icon;
+            const active = isActive(item.href);
+
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={closeOnMobile}
+                className={cn(
+                  'relative w-full flex items-center space-x-3 px-3 py-3 rounded-sm transition-all duration-300 group overflow-hidden',
+                  active
+                    ? 'text-white bg-white/10 shadow-[0_0_20px_rgba(255,255,255,0.05)]'
+                    : 'text-slate-400 hover:text-white hover:bg-white/5',
+                  !sidebarOpen && 'lg:justify-center lg:px-0'
+                )}
+              >
+                {active && (
+                  <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-[#C2410C] shadow-[0_0_10px_#C2410C]" />
+                )}
+                <Icon className={cn(
+                  'w-5 h-5 transition-colors duration-300 shrink-0',
+                  active ? 'text-[#C2410C]' : 'text-slate-500 group-hover:text-slate-300'
+                )} />
+                {sidebarOpen && (
+                  <span className={cn(
+                    'font-medium text-sm tracking-wide truncate',
+                    active && 'font-semibold'
+                  )}>
+                    {t(item.label)}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
         </nav>
 
         {/* Language Switcher */}
-        <div className="px-3 py-2 border-t border-white/10">
+        <div className="px-3 py-2 border-t border-white/5">
           <LanguageSwitcher variant="sidebar" collapsed={!sidebarOpen} />
         </div>
 
-        {/* User Info with Dropdown */}
-        <div className="p-6 border-t border-white/10" ref={userMenuRef}>
+        {/* User Card */}
+        <div className="p-3 border-t border-white/5" ref={userMenuRef}>
           <div className="relative">
             {/* User Menu Dropdown */}
             {userMenuOpen && sidebarOpen && (
@@ -322,6 +349,21 @@ export function Sidebar() {
                   'py-1'
                 )}
               >
+                <Link
+                  href="/profile"
+                  onClick={() => {
+                    closeOnMobile();
+                    setUserMenuOpen(false);
+                  }}
+                  className={cn(
+                    'w-full px-4 py-3 text-left text-sm transition-colors duration-150',
+                    'flex items-center gap-3 cursor-pointer',
+                    'text-slate-700 hover:bg-slate-50 focus:bg-slate-50 focus:outline-none'
+                  )}
+                >
+                  <User className="w-4 h-4" />
+                  {t('navigation.profile')}
+                </Link>
                 <button
                   type="button"
                   onClick={handleLogout}
@@ -337,98 +379,63 @@ export function Sidebar() {
               </div>
             )}
 
-            {/* User Info Area */}
-            <div
-              className={cn(
-                'w-full flex items-center gap-3 rounded-sm',
-                sidebarOpen ? 'p-2 -m-2' : 'justify-center'
-              )}
-            >
-              {/* Avatar + Name - Clickable to go to Profile */}
-              <Link
-                href="/profile"
-                onClick={closeOnMobile}
+            {/* User Card */}
+            {sidebarOpen ? (
+              <button
+                type="button"
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
                 className={cn(
-                  'flex items-center gap-3 flex-1 min-w-0 rounded-sm transition-colors duration-200',
-                  'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
-                  'py-1 px-1 -ml-1',
-                  !sidebarOpen && 'justify-center'
+                  'w-full bg-white/5 rounded-sm p-3 flex items-center space-x-3',
+                  'hover:bg-white/10 transition-colors cursor-pointer border border-white/5'
                 )}
-                title={t('navigation.profile')}
               >
-                <div className="w-10 h-10 rounded-full bg-porcelain/20 flex items-center justify-center shrink-0">
-                  <span className="text-sm font-semibold">
-                    {user.name.charAt(0).toUpperCase()}
-                  </span>
+                <div className="w-9 h-9 rounded-sm bg-gradient-to-br from-slate-700 to-slate-900 border border-white/10 flex items-center justify-center text-slate-300 shadow-inner shrink-0">
+                  <UserCircle className="w-6 h-6" />
                 </div>
-                {sidebarOpen && (
-                  <div className="flex-1 min-w-0 text-left">
-                    <p className="text-sm font-medium truncate" title={user.name}>
-                      {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
-                    </p>
-                    <p className="text-xs text-porcelain/60 truncate">
-                      {user.role === 'ADMIN_INDUSTRIA' && tRoles('admin')}
-                      {user.role === 'VENDEDOR_INTERNO' && tRoles('seller')}
-                      {user.role === 'BROKER' && tRoles('broker')}
-                    </p>
-                  </div>
-                )}
-              </Link>
-
-              {/* Chevron Button - Opens Dropdown */}
-              {sidebarOpen && (
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-sm font-bold text-white truncate font-serif tracking-wide">
+                    {truncateText(user.name, TRUNCATION_LIMITS.SIDEBAR_USER_NAME)}
+                  </p>
+                  <p className="text-[11px] text-[#C2410C] truncate capitalize tracking-wider">
+                    {getRoleLabel()}
+                  </p>
+                </div>
+                <ChevronUp
+                  className={cn(
+                    'w-4 h-4 text-slate-500 transition-transform duration-200 shrink-0',
+                    userMenuOpen && 'rotate-180'
+                  )}
+                />
+              </button>
+            ) : (
+              <div className="hidden lg:flex lg:flex-col gap-1">
+                <Link
+                  href="/profile"
+                  className={cn(
+                    'w-full p-3 rounded-sm transition-colors duration-200',
+                    'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
+                    'flex items-center justify-center'
+                  )}
+                  title={t('navigation.profile')}
+                >
+                  <User className="w-5 h-5 text-slate-400" />
+                </Link>
                 <button
                   type="button"
-                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  onClick={handleLogout}
                   className={cn(
-                    'p-2 rounded-sm transition-colors duration-200',
+                    'w-full p-3 rounded-sm transition-colors duration-200',
                     'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
-                    userMenuOpen && 'bg-white/10'
+                    'flex items-center justify-center'
                   )}
-                  aria-expanded={userMenuOpen}
-                  aria-haspopup="true"
                   title={tAuth('logout')}
                 >
-                  <ChevronUp
-                    className={cn(
-                      'w-4 h-4 text-porcelain/60 transition-transform duration-200',
-                      userMenuOpen && 'rotate-180'
-                    )}
-                  />
+                  <LogOut className="w-5 h-5 text-slate-400" />
                 </button>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
-
-        {/* Collapsed Sidebar - Profile & Logout Buttons */}
-        {!sidebarOpen && (
-          <div className="hidden lg:flex lg:flex-col gap-1 p-3 border-t border-white/10">
-            <Link
-              href="/profile"
-              className={cn(
-                'w-full p-3 rounded-sm transition-colors duration-200',
-                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
-                'flex items-center justify-center'
-              )}
-              title={t('navigation.profile')}
-            >
-              <User className="w-5 h-5" />
-            </Link>
-            <button
-              type="button"
-              onClick={handleLogout}
-              className={cn(
-                'w-full p-3 rounded-sm transition-colors duration-200',
-                'hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20',
-                'flex items-center justify-center'
-              )}
-              title={tAuth('logout')}
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        )}
       </aside>
     </>
   );
