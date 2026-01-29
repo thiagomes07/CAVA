@@ -1,37 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle, DollarSign, User, Users, UserPlus } from "lucide-react";
 import { apiClient } from "@/lib/api/client";
 import { formatCurrency } from "@/lib/utils/formatCurrency";
 import { calculateTotalBatchPrice } from "@/lib/utils/priceConversion";
 import { cn } from "@/lib/utils/cn";
-
-import {
-    Modal,
-    ModalContent,
-    ModalDescription,
-    ModalFooter,
-    ModalHeader,
-    ModalTitle,
-} from "@/components/ui/modal";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Select } from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { Checkbox } from "@/components/ui/checkbox";
 import type { Batch, PriceUnit } from "@/lib/types";
 import { useToast } from "@/lib/hooks/useToast";
-
-// Simple Label component
-const Label = ({ children, className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) => (
-    <label className={cn("text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70", className)} {...props}>
-        {children}
-    </label>
-);
 
 interface SellBatchModalProps {
     batch: Batch;
@@ -42,7 +20,6 @@ interface SellBatchModalProps {
     onSuccess: () => void;
 }
 
-// Form schema - validation is done manually in onSubmit
 const formSchema = z.object({
     sellerType: z.enum(["USER", "CUSTOM"]),
     soldByUserId: z.string().optional(),
@@ -58,7 +35,7 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>;
 
-interface User {
+interface UserData {
     id: string;
     name: string;
     email?: string;
@@ -73,27 +50,18 @@ interface Cliente {
     whatsapp?: string;
 }
 
-// Role translation map
 const roleLabels: Record<string, string> = {
-    "ADMIN_INDUSTRIA": "Administrador",
-    "VENDEDOR_INTERNO": "Vendedor Interno",
+    "ADMIN_INDUSTRIA": "Admin",
+    "VENDEDOR_INTERNO": "Vendedor",
     "BROKER": "Broker",
-    "ADMIN_BROKER": "Admin Broker",
-    "VIEWER": "Visualizador",
 };
 
-// Phone mask function
 const formatPhoneNumber = (value: string): string => {
     const digits = value.replace(/\D/g, "");
-    if (digits.length <= 2) {
-        return digits.length > 0 ? `(${digits}` : "";
-    } else if (digits.length <= 7) {
-        return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-    } else if (digits.length <= 10) {
-        return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
-    } else {
-        return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
-    }
+    if (digits.length <= 2) return digits.length > 0 ? `(${digits}` : "";
+    if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+    if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7, 11)}`;
 };
 
 export function SellBatchModal({
@@ -107,15 +75,12 @@ export function SellBatchModal({
     const { success, error } = useToast();
     const [isPending, setIsPending] = useState(false);
     const [salePriceValue, setSalePriceValue] = useState<number>(0);
-    const [users, setUsers] = useState<User[]>([]);
+    const [users, setUsers] = useState<UserData[]>([]);
     const [clientes, setClientes] = useState<Cliente[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(false);
     const [isLoadingClientes, setIsLoadingClientes] = useState(false);
 
-    // Safe quantity value - fallback to at least 1 if provided value is invalid
     const safeQuantitySlabs = quantitySlabs > 0 ? quantitySlabs : 1;
-
-    // Calculate derived values using the same function as the page
     const avgArea = batch.quantitySlabs > 0 ? batch.totalArea / batch.quantitySlabs : 0;
     const estimatedArea = avgArea * safeQuantitySlabs;
     const basePrice = useMemo(() =>
@@ -123,7 +88,6 @@ export function SellBatchModal({
         [estimatedArea, batch.industryPrice, batch.priceUnit]
     );
 
-    // No zodResolver - we validate manually in onSubmit
     const form = useForm<FormValues>({
         defaultValues: {
             sellerType: "CUSTOM",
@@ -137,10 +101,8 @@ export function SellBatchModal({
     const sellerType = form.watch("sellerType");
     const clientType = form.watch("clientType");
 
-    // Initialize price and reset form when modal opens
     useEffect(() => {
         if (isOpen) {
-            // Reset form to defaults when modal opens
             form.reset({
                 sellerType: "CUSTOM",
                 clientType: "NONE",
@@ -157,185 +119,108 @@ export function SellBatchModal({
         }
     }, [isOpen, basePrice, form]);
 
-    // Fetch users AND brokers using apiClient (includes CSRF)
     useEffect(() => {
         if (isOpen) {
             setIsLoadingUsers(true);
-
-            // Fetch both users and brokers in parallel
             Promise.all([
-                apiClient.get<User[] | { users: User[] }>('/users').catch(() => []),
-                apiClient.get<User[] | { brokers: User[] }>('/brokers').catch(() => []),
+                apiClient.get<UserData[] | { users: UserData[] }>('/users').catch(() => []),
+                apiClient.get<UserData[] | { brokers: UserData[] }>('/brokers').catch(() => []),
             ])
                 .then(([usersData, brokersData]) => {
-                    // Parse users response
-                    let userList: User[] = [];
-                    if (Array.isArray(usersData)) {
-                        userList = usersData;
-                    } else if (usersData && 'users' in usersData) {
-                        userList = usersData.users || [];
-                    }
-
-                    // Parse brokers response
-                    let brokerList: User[] = [];
+                    let userList: UserData[] = Array.isArray(usersData) ? usersData : (usersData as any).users || [];
+                    let brokerList: UserData[] = [];
                     if (Array.isArray(brokersData)) {
-                        brokerList = brokersData.map((b: any) => ({
-                            id: b.id,
-                            name: b.name,
-                            email: b.email,
-                            role: 'BROKER',
-                        }));
-                    } else if (brokersData && 'brokers' in brokersData) {
-                        brokerList = (brokersData.brokers || []).map((b: any) => ({
-                            id: b.id,
-                            name: b.name,
-                            email: b.email,
-                            role: 'BROKER',
-                        }));
+                        brokerList = brokersData.map((b: any) => ({ id: b.id, name: b.name, email: b.email, role: 'BROKER' }));
+                    } else if ((brokersData as any)?.brokers) {
+                        brokerList = ((brokersData as any).brokers || []).map((b: any) => ({ id: b.id, name: b.name, email: b.email, role: 'BROKER' }));
                     }
-
-                    // Merge and dedupe by ID
                     const allUsers = [...userList, ...brokerList];
-                    const uniqueUsers = allUsers.filter((user, index, self) =>
-                        index === self.findIndex(u => u.id === user.id)
-                    );
-
-                    // Filter to only include roles that can sell
-                    const allowedRoles = ["ADMIN_INDUSTRIA", "VENDEDOR_INTERNO", "BROKER", "ADMIN_BROKER"];
-                    const filteredUsers = uniqueUsers.filter(u => u.role && allowedRoles.includes(u.role));
-                    setUsers(filteredUsers);
-                })
-                .catch((err) => {
-                    console.error("Error fetching users/brokers:", err);
-                    setUsers([]);
+                    const uniqueUsers = allUsers.filter((user, index, self) => index === self.findIndex(u => u.id === user.id));
+                    const allowedRoles = ["ADMIN_INDUSTRIA", "VENDEDOR_INTERNO", "BROKER"];
+                    setUsers(uniqueUsers.filter(u => u.role && allowedRoles.includes(u.role)));
                 })
                 .finally(() => setIsLoadingUsers(false));
         }
     }, [isOpen]);
 
-    // Fetch clientes using apiClient (includes CSRF)
     useEffect(() => {
         if (isOpen) {
             setIsLoadingClientes(true);
             apiClient.get<{ clientes: Cliente[] } | Cliente[]>('/clientes')
-                .then((data) => {
-                    if (Array.isArray(data)) {
-                        setClientes(data);
-                    } else {
-                        setClientes(data.clientes || []);
-                    }
-                })
-                .catch((err) => {
-                    console.error("Error fetching clientes:", err);
-                    setClientes([]);
-                })
+                .then((data) => setClientes(Array.isArray(data) ? data : data.clientes || []))
+                .catch(() => setClientes([]))
                 .finally(() => setIsLoadingClientes(false));
         }
     }, [isOpen]);
 
-    // Format price input as currency with BRL mask
     const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const rawValue = e.target.value.replace(/\D/g, "");
-        const numericValue = parseInt(rawValue, 10) / 100 || 0;
-        setSalePriceValue(numericValue);
+        setSalePriceValue(parseInt(rawValue, 10) / 100 || 0);
     };
 
-    // Handle phone input with mask
     const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const formatted = formatPhoneNumber(e.target.value);
-        form.setValue("customerPhone", formatted, { shouldValidate: true });
+        form.setValue("customerPhone", formatPhoneNumber(e.target.value), { shouldValidate: true });
     };
 
-    // Get display value for price input
-    const getPriceDisplayValue = () => {
-        return formatCurrency(salePriceValue);
-    };
-
-    // Check if price is valid
     const isPriceValid = salePriceValue >= basePrice;
-
-    // Get role label
-    const getRoleLabel = (role: string | undefined): string => {
-        if (!role) return "";
-        return roleLabels[role] || role;
-    };
 
     const onSubmit = async (values: FormValues) => {
         try {
             setIsPending(true);
 
-            // Validate based on ACTIVE TAB, not stored values
-            // For seller: only check the field for the ACTIVE sellerType
-            if (values.sellerType === "USER") {
-                if (!values.soldByUserId) {
-                    error("Selecione um vendedor do sistema");
-                    form.setError("soldByUserId", { message: "Selecione um vendedor" });
-                    setIsPending(false);
-                    return;
-                }
-            } else if (values.sellerType === "CUSTOM") {
-                if (!values.sellerName || values.sellerName.trim() === "") {
-                    error("Informe o nome do vendedor");
-                    form.setError("sellerName", { message: "Informe o nome do vendedor" });
-                    setIsPending(false);
-                    return;
-                }
+            if (values.sellerType === "USER" && !values.soldByUserId) {
+                error("Selecione um vendedor do sistema");
+                setIsPending(false);
+                return;
             }
-
-            // For client: validate based on active clientType
-            if (values.clientType === "EXISTING") {
-                if (!values.clienteId) {
-                    error("Selecione um cliente existente");
-                    form.setError("clienteId", { message: "Selecione um cliente" });
-                    setIsPending(false);
-                    return;
-                }
-            } else if (values.clientType === "NEW") {
-                if (!values.customerName || values.customerName.trim() === "") {
+            if (values.sellerType === "CUSTOM" && (!values.sellerName || values.sellerName.trim() === "")) {
+                error("Informe o nome do vendedor");
+                setIsPending(false);
+                return;
+            }
+            if (values.clientType === "EXISTING" && !values.clienteId) {
+                error("Selecione um cliente existente");
+                setIsPending(false);
+                return;
+            }
+            if (values.clientType === "NEW") {
+                if (!values.customerName?.trim()) {
                     error("Nome do cliente é obrigatório");
-                    form.setError("customerName", { message: "Nome do cliente obrigatório" });
                     setIsPending(false);
                     return;
                 }
                 if (!values.customerPhone || values.customerPhone.replace(/\D/g, "").length < 10) {
-                    error("Telefone do cliente é obrigatório (mínimo 10 dígitos)");
-                    form.setError("customerPhone", { message: "Telefone obrigatório" });
+                    error("Telefone do cliente é obrigatório");
                     setIsPending(false);
                     return;
                 }
             }
-
-            // Validate minimum price
             if (!isPriceValid) {
-                error(`Preço de venda não pode ser menor que o preço base (${formatCurrency(basePrice)})`);
+                error(`Preço não pode ser menor que ${formatCurrency(basePrice)}`);
                 setIsPending(false);
                 return;
             }
 
-            // Get seller name BASED ON ACTIVE TAB
             let sellerName = "";
             let soldByUserId: string | undefined = undefined;
 
             if (values.sellerType === "USER" && values.soldByUserId) {
-                const selectedUser = users.find((u: User) => u.id === values.soldByUserId);
+                const selectedUser = users.find(u => u.id === values.soldByUserId);
                 sellerName = selectedUser?.name || "Usuário do Sistema";
                 soldByUserId = values.soldByUserId;
-            } else if (values.sellerType === "CUSTOM") {
+            } else {
                 sellerName = values.sellerName || "";
-                soldByUserId = undefined; // Explicitly clear
             }
 
-            // Get customer info BASED ON ACTIVE TAB
             let customerName = "Cliente não informado";
             let customerContact = "Não informado";
             let clienteId: string | undefined = undefined;
             let newClient: { name: string; phone: string; email?: string } | undefined = undefined;
 
             if (values.clientType === "EXISTING" && values.clienteId) {
-                const selectedClient = clientes.find((c: Cliente) => c.id === values.clienteId);
+                const selectedClient = clientes.find(c => c.id === values.clienteId);
                 customerName = selectedClient?.name || "Cliente Existente";
-                // Prioriza email, depois phone, depois whatsapp
-                customerContact = selectedClient?.email || selectedClient?.phone || selectedClient?.whatsapp || "Não informado";
+                customerContact = selectedClient?.email || selectedClient?.phone || "Não informado";
                 clienteId = values.clienteId;
             } else if (values.clientType === "NEW") {
                 customerName = values.customerName!;
@@ -346,7 +231,6 @@ export function SellBatchModal({
                     email: values.customerEmail || undefined,
                 };
             }
-            // If clientType is "NONE", we don't set clienteId or newClient
 
             const payload = {
                 quantitySlabsSold: safeQuantitySlabs,
@@ -355,337 +239,306 @@ export function SellBatchModal({
                 pricePerUnit: salePriceValue / estimatedArea,
                 priceUnit: batch.priceUnit,
                 industryId: batch.industryId,
-                sellerName: sellerName,
-                customerName: customerName,
-                customerContact: customerContact,
+                sellerName,
+                customerName,
+                customerContact,
                 netIndustryValue: salePriceValue,
                 brokerCommission: 0,
-                soldByUserId: soldByUserId,
-                clienteId: clienteId,
-                newClient: newClient,
+                soldByUserId,
+                clienteId,
+                newClient,
                 notes: values.notes,
             };
 
             await apiClient.post(`/batches/${batch.id}/sell`, payload);
-
             success("Venda registrada com sucesso!");
             onSuccess();
             onClose();
         } catch (err: any) {
-            console.error(err);
             error(err?.message || "Erro ao registrar venda");
         } finally {
             setIsPending(false);
         }
     };
 
-    // If quantitySlabs is invalid, show warning
+    if (!isOpen) return null;
+
     if (quantitySlabs <= 0) {
         return (
-            <Modal open={isOpen} onClose={onClose}>
-                <ModalContent className="max-w-md w-full bg-white rounded-lg p-6">
-                    <ModalHeader>
-                        <ModalTitle>Erro</ModalTitle>
-                    </ModalHeader>
-                    <div className="p-4">
-                        <p className="text-red-600">
-                            Quantidade de chapas inválida. Por favor, defina uma quantidade válida antes de confirmar a venda.
-                        </p>
+            <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                <div className="bg-white w-full max-w-md shadow-2xl">
+                    <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
+                        <h2 className="font-serif text-xl">Erro</h2>
+                        <button onClick={onClose} className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors">
+                            <X className="w-5 h-5" />
+                        </button>
                     </div>
-                    <ModalFooter>
-                        <Button variant="secondary" onClick={onClose}>
+                    <div className="h-1 bg-rose-500" />
+                    <div className="p-6">
+                        <p className="text-rose-600">Quantidade de chapas inválida. Defina uma quantidade válida antes de confirmar a venda.</p>
+                    </div>
+                    <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+                        <button onClick={onClose} className="px-5 py-2.5 text-slate-600 text-sm font-medium hover:text-[#121212] transition-colors">
                             Fechar
-                        </Button>
-                    </ModalFooter>
-                </ModalContent>
-            </Modal>
+                        </button>
+                    </div>
+                </div>
+            </div>
         );
     }
 
     return (
-        <Modal open={isOpen} onClose={onClose}>
-            <ModalContent className="max-w-2xl max-h-[90vh] overflow-y-auto w-full bg-white rounded-lg p-6">
-                <ModalHeader>
-                    <ModalTitle>Confirmar Venda</ModalTitle>
-                    <ModalDescription>
-                        Registre os detalhes da venda para atualizar o status das chapas.
-                    </ModalDescription>
-                    <div className="flex items-center gap-2 mt-2 p-3 bg-amber-50 border border-amber-200 rounded-sm">
-                        <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
-                        <span className="text-sm text-amber-800">
-                            Tem certeza que quer atualizar o status de <strong>{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</strong> para vendido?
-                            Para desfazer, acesse a página de Vendas e remova a venda.
-                        </span>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+            <div className="bg-white w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+                {/* Header */}
+                <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between shrink-0">
+                    <div>
+                        <h2 className="font-serif text-xl">Confirmar Venda</h2>
+                        <p className="text-xs text-white/50 mt-0.5">Registre os detalhes da venda</p>
                     </div>
-                </ModalHeader>
+                    <button onClick={onClose} className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors">
+                        <X className="w-5 h-5" />
+                    </button>
+                </div>
 
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-4">
-                    {/* Sale Info Summary */}
-                    <div className="grid grid-cols-2 gap-4 p-4 bg-slate-50 rounded-md">
-                        <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">Quantidade</p>
-                            <p className="text-lg font-semibold text-obsidian">{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</p>
-                        </div>
-                        <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wide">Área Total</p>
-                            <p className="text-lg font-semibold text-obsidian">{estimatedArea.toFixed(2)} {batch.priceUnit === 'M2' ? 'm²' : 'ft²'}</p>
-                        </div>
-                    </div>
+                {/* Progress Bar */}
+                <div className="h-1 bg-[#C2410C] shrink-0" />
 
-                    {/* Sale Price */}
-                    <div className="space-y-2">
-                        <Label htmlFor="salePrice">Valor da Venda (opcional)</Label>
-                        <Input
-                            id="salePrice"
-                            type="text"
-                            value={getPriceDisplayValue()}
-                            onChange={handlePriceChange}
-                            placeholder={formatCurrency(basePrice)}
-                        />
-                        <p className="text-xs text-slate-500">
-                            Preço base: {formatCurrency(basePrice)} ({formatCurrency(batch.industryPrice)}/{batch.priceUnit === 'M2' ? 'm²' : 'ft²'})
-                        </p>
-                        {!isPriceValid && (
-                            <p className="text-sm text-red-500">
-                                Preço não pode ser menor que o preço base
+                <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
+                    <div className="px-6 py-6 space-y-6 overflow-y-auto flex-1">
+                        {/* Warning */}
+                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200">
+                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                            <p className="text-sm text-amber-800">
+                                Você está vendendo <strong>{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</strong>.
+                                Para desfazer, acesse a página de Vendas.
                             </p>
-                        )}
-                    </div>
-
-                    {/* SELLER SECTION */}
-                    <div className="border p-4 rounded-md space-y-4">
-                        <h3 className="font-medium">Vendedor</h3>
-
-                        <div className="flex space-x-2 bg-slate-100 p-1 rounded-md mb-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    form.setValue("sellerType", "USER");
-                                    form.setValue("sellerName", ""); // Clear custom name when switching to USER tab
-                                }}
-                                className={cn(
-                                    "flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors",
-                                    sellerType === "USER" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-900"
-                                )}
-                            >
-                                Usuário do Sistema
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    form.setValue("sellerType", "CUSTOM");
-                                    form.setValue("soldByUserId", undefined); // Clear selected user when switching to CUSTOM tab
-                                }}
-                                className={cn(
-                                    "flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors",
-                                    sellerType === "CUSTOM" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-900"
-                                )}
-                            >
-                                Nome Personalizado
-                            </button>
                         </div>
 
-                        {sellerType === "USER" && (
-                            <div className="space-y-2">
-                                <Controller
-                                    control={form.control}
-                                    name="soldByUserId"
-                                    render={({ field }) => (
-                                        <Select
-                                            value={field.value || ""}
-                                            onChange={(e) => field.onChange(e.target.value)}
-                                            disabled={isLoadingUsers}
-                                        >
-                                            <option value="">
-                                                {isLoadingUsers ? "Carregando..." : "Selecione um vendedor"}
-                                            </option>
-                                            {users.map((user) => (
-                                                <option key={user.id} value={user.id}>
-                                                    {user.name} {user.role ? `(${getRoleLabel(user.role)})` : ''}
-                                                </option>
-                                            ))}
-                                        </Select>
-                                    )}
-                                />
-                                {users.length === 0 && !isLoadingUsers && (
-                                    <p className="text-xs text-slate-500">
-                                        Nenhum usuário encontrado. Use &quot;Nome Personalizado&quot; para informar manualmente.
-                                    </p>
-                                )}
-                                {form.formState.errors.soldByUserId && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.soldByUserId.message}</p>
-                                )}
+                        {/* Sale Summary */}
+                        <div className="grid grid-cols-3 gap-4 p-4 bg-slate-50 border border-slate-200">
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Chapas</p>
+                                <p className="font-serif text-lg text-[#121212]">{safeQuantitySlabs}</p>
                             </div>
-                        )}
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Área</p>
+                                <p className="font-serif text-lg text-[#121212]">{estimatedArea.toFixed(2)} {batch.priceUnit === 'M2' ? 'm²' : 'ft²'}</p>
+                            </div>
+                            <div>
+                                <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Preço Base</p>
+                                <p className="font-serif text-lg text-[#121212]">{formatCurrency(basePrice)}</p>
+                            </div>
+                        </div>
 
-                        {sellerType === "CUSTOM" && (
-                            <div className="space-y-2">
-                                <Input
-                                    placeholder="Nome do vendedor (externo/parceiro)"
+                        {/* Sale Price */}
+                        <div>
+                            <label className="text-xs font-medium text-slate-600 block mb-2">
+                                <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+                                Valor da Venda
+                            </label>
+                            <input
+                                type="text"
+                                value={formatCurrency(salePriceValue)}
+                                onChange={handlePriceChange}
+                                className={cn(
+                                    "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors font-medium",
+                                    !isPriceValid ? "border-rose-500" : "border-slate-200"
+                                )}
+                            />
+                            {!isPriceValid && (
+                                <p className="mt-1 text-xs text-rose-500">Preço não pode ser menor que {formatCurrency(basePrice)}</p>
+                            )}
+                        </div>
+
+                        {/* Seller Section */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-medium text-slate-600 block">
+                                <User className="w-3.5 h-3.5 inline mr-1" />
+                                Vendedor
+                            </label>
+                            <div className="flex bg-slate-100 p-1 gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("sellerType", "USER"); form.setValue("sellerName", ""); }}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
+                                        sellerType === "USER" ? "bg-white text-[#121212] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Do Sistema
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("sellerType", "CUSTOM"); form.setValue("soldByUserId", undefined); }}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
+                                        sellerType === "CUSTOM" ? "bg-white text-[#121212] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Personalizado
+                                </button>
+                            </div>
+                            {sellerType === "USER" ? (
+                                <select
+                                    value={form.watch("soldByUserId") || ""}
+                                    onChange={(e) => form.setValue("soldByUserId", e.target.value)}
+                                    disabled={isLoadingUsers}
+                                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                                >
+                                    <option value="">{isLoadingUsers ? "Carregando..." : "Selecione um vendedor"}</option>
+                                    {users.map((user) => (
+                                        <option key={user.id} value={user.id}>
+                                            {user.name} {user.role ? `(${roleLabels[user.role] || user.role})` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            ) : (
+                                <input
                                     {...form.register("sellerName")}
+                                    placeholder="Nome do vendedor externo/parceiro"
+                                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
                                 />
-                                {form.formState.errors.sellerName && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.sellerName.message}</p>
-                                )}
-                            </div>
-                        )}
-                    </div>
-
-                    {/* CLIENT SECTION */}
-                    <div className="border p-4 rounded-md space-y-4">
-                        <h3 className="font-medium">Cliente (opcional)</h3>
-
-                        <div className="flex space-x-2 bg-slate-100 p-1 rounded-md mb-2">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    form.setValue("clientType", "NONE");
-                                    form.setValue("clienteId", undefined);
-                                    form.setValue("customerName", "");
-                                    form.setValue("customerPhone", "");
-                                    form.setValue("customerEmail", "");
-                                }}
-                                className={cn(
-                                    "flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors",
-                                    clientType === "NONE" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-900"
-                                )}
-                            >
-                                Não informar
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    form.setValue("clientType", "EXISTING");
-                                    form.setValue("customerName", "");
-                                    form.setValue("customerPhone", "");
-                                    form.setValue("customerEmail", "");
-                                }}
-                                className={cn(
-                                    "flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors",
-                                    clientType === "EXISTING" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-900"
-                                )}
-                            >
-                                Existente
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    form.setValue("clientType", "NEW");
-                                    form.setValue("clienteId", undefined);
-                                }}
-                                className={cn(
-                                    "flex-1 py-1.5 text-sm font-medium rounded-sm transition-colors",
-                                    clientType === "NEW" ? "bg-white shadow-sm text-slate-900" : "text-slate-500 hover:text-slate-900"
-                                )}
-                            >
-                                Novo
-                            </button>
+                            )}
                         </div>
 
-                        {clientType === "EXISTING" && (
-                            <div className="space-y-2">
-                                <Controller
-                                    control={form.control}
-                                    name="clienteId"
-                                    render={({ field }) => (
-                                        <Select
-                                            value={field.value || ""}
-                                            onChange={(e) => field.onChange(e.target.value)}
-                                            disabled={isLoadingClientes}
-                                        >
-                                            <option value="">
-                                                {isLoadingClientes ? "Carregando..." : "Selecione um cliente"}
-                                            </option>
-                                            {clientes.map((client) => (
-                                                <option key={client.id} value={client.id}>
-                                                    {client.name}{client.email ? ` - ${client.email}` : client.phone ? ` - ${client.phone}` : ''}
-                                                </option>
-                                            ))}
-                                        </Select>
+                        {/* Client Section */}
+                        <div className="space-y-3">
+                            <label className="text-xs font-medium text-slate-600 block">
+                                <Users className="w-3.5 h-3.5 inline mr-1" />
+                                Cliente <span className="text-slate-400 font-normal">(opcional)</span>
+                            </label>
+                            <div className="flex bg-slate-100 p-1 gap-1">
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("clientType", "NONE"); form.setValue("clienteId", undefined); form.setValue("customerName", ""); form.setValue("customerPhone", ""); }}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
+                                        clientType === "NONE" ? "bg-white text-[#121212] shadow-sm" : "text-slate-500 hover:text-slate-700"
                                     )}
-                                />
-                                {clientes.length === 0 && !isLoadingClientes && (
-                                    <p className="text-xs text-slate-500">
-                                        Nenhum cliente encontrado. Use &quot;Novo&quot; para cadastrar.
-                                    </p>
-                                )}
-                                {form.formState.errors.clienteId && (
-                                    <p className="text-sm text-red-500">{form.formState.errors.clienteId.message}</p>
-                                )}
+                                >
+                                    Não Informar
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("clientType", "EXISTING"); form.setValue("customerName", ""); form.setValue("customerPhone", ""); }}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
+                                        clientType === "EXISTING" ? "bg-white text-[#121212] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Existente
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { form.setValue("clientType", "NEW"); form.setValue("clienteId", undefined); }}
+                                    className={cn(
+                                        "flex-1 py-2 text-xs font-bold uppercase tracking-widest transition-colors",
+                                        clientType === "NEW" ? "bg-white text-[#121212] shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                    )}
+                                >
+                                    Novo
+                                </button>
                             </div>
-                        )}
 
-                        {clientType === "NEW" && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="customerName">Nome *</Label>
-                                    <Input
-                                        id="customerName"
-                                        placeholder="Nome do cliente"
+                            {clientType === "EXISTING" && (
+                                <select
+                                    value={form.watch("clienteId") || ""}
+                                    onChange={(e) => form.setValue("clienteId", e.target.value)}
+                                    disabled={isLoadingClientes}
+                                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                                >
+                                    <option value="">{isLoadingClientes ? "Carregando..." : "Selecione um cliente"}</option>
+                                    {clientes.map((client) => (
+                                        <option key={client.id} value={client.id}>
+                                            {client.name}{client.email ? ` - ${client.email}` : client.phone ? ` - ${client.phone}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            )}
+
+                            {clientType === "NEW" && (
+                                <div className="space-y-3 p-4 bg-slate-50 border border-slate-200">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <UserPlus className="w-4 h-4 text-slate-400" />
+                                        <span className="text-xs font-medium text-slate-500">Novo Cliente</span>
+                                    </div>
+                                    <input
                                         {...form.register("customerName")}
+                                        placeholder="Nome do cliente *"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
                                     />
-                                    {form.formState.errors.customerName && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.customerName.message}</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="customerPhone">Telefone *</Label>
-                                    <Input
-                                        id="customerPhone"
-                                        type="tel"
-                                        placeholder="(11) 99999-9999"
+                                    <input
                                         value={form.watch("customerPhone") || ""}
                                         onChange={handlePhoneChange}
+                                        placeholder="Telefone *"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
                                     />
-                                    {form.formState.errors.customerPhone && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.customerPhone.message}</p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="customerEmail">Email (opcional)</Label>
-                                    <Input
-                                        id="customerEmail"
-                                        type="email"
-                                        placeholder="email@exemplo.com"
+                                    <input
                                         {...form.register("customerEmail")}
+                                        type="email"
+                                        placeholder="Email (opcional)"
+                                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
                                     />
-                                    {form.formState.errors.customerEmail && (
-                                        <p className="text-sm text-red-500">{form.formState.errors.customerEmail.message}</p>
-                                    )}
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={form.watch("marketingOptIn") || false}
+                                            onChange={(e) => form.setValue("marketingOptIn", e.target.checked)}
+                                            className="h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
+                                        />
+                                        <span className="text-xs text-slate-500">Aceita comunicações de marketing</span>
+                                    </label>
                                 </div>
-                                <Checkbox
-                                    id="marketingOptIn"
-                                    checked={form.watch("marketingOptIn") || false}
-                                    onChange={(e) => form.setValue("marketingOptIn", e.target.checked)}
-                                    label="Aceita receber comunicações de marketing"
-                                />
-                            </div>
-                        )}
+                            )}
+                        </div>
+
+                        {/* Notes */}
+                        <div>
+                            <label className="text-xs font-medium text-slate-600 block mb-2">
+                                Observações <span className="text-slate-400 font-normal">(opcional)</span>
+                            </label>
+                            <textarea
+                                {...form.register("notes")}
+                                placeholder="Detalhes adicionais da venda..."
+                                rows={2}
+                                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors resize-none"
+                            />
+                        </div>
                     </div>
 
-                    <div className="space-y-2">
-                        <Label htmlFor="notes">Observações</Label>
-                        <Textarea
-                            id="notes"
-                            placeholder="Detalhes adicionais da venda..."
-                            {...form.register("notes")}
-                        />
-                    </div>
-
-                    <ModalFooter>
-                        <Button type="button" variant="secondary" onClick={onClose}>
+                    {/* Footer */}
+                    <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
+                        >
                             Cancelar
-                        </Button>
-                        <Button
+                        </button>
+                        <button
                             type="submit"
                             disabled={isPending || !isPriceValid}
+                            className={cn(
+                                "flex items-center gap-1.5 px-6 py-2.5 text-white text-sm font-medium transition-all",
+                                isPending || !isPriceValid ? "bg-slate-300 cursor-not-allowed" : "bg-[#C2410C] hover:bg-[#a03609]"
+                            )}
                         >
-                            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirmar Venda
-                        </Button>
-                    </ModalFooter>
+                            {isPending ? (
+                                <>
+                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                    Processando...
+                                </>
+                            ) : (
+                                <>
+                                    <DollarSign className="w-4 h-4" />
+                                    Confirmar Venda
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </form>
-            </ModalContent>
-        </Modal>
+            </div>
+        </div>
     );
 }
