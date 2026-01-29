@@ -15,6 +15,7 @@ import { isPlaceholderUrl } from '@/lib/utils/media';
 import { cn } from '@/lib/utils/cn';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { SellBatchModal } from '@/app/[locale]/(industry)/inventory/[id]/components/SellBatchModal';
 
 interface UploadedMedia {
   file: File;
@@ -58,6 +59,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
   const [currentBatch, setCurrentBatch] = useState<Batch>(batch);
+  const [showSellModal, setShowSellModal] = useState(false);
 
   // Form data for stock tab
   const [formData, setFormData] = useState({
@@ -188,7 +190,31 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       toastError('Selecione um status para atualizar');
       return;
     }
+
+    // Intercepta status 'VENDIDO' para abrir modal de venda
+    if (selectedStatus === 'VENDIDO') {
+      if (!isQuantityValid || parsedStatusQuantity <= 0) {
+        toastError('Informe uma quantidade válida de chapas para vender');
+        return;
+      }
+      setShowSellModal(true);
+      return;
+    }
+
     await handleUpdateStatus(selectedStatus);
+  };
+
+  const handleSellSuccess = async () => {
+    // Recarregar dados do batch após venda bem-sucedida
+    try {
+      const updated = await apiClient.get<Batch>(`/batches/${batch.id}`);
+      setCurrentBatch(updated);
+      setSelectedStatus(null);
+      setStatusQuantityInput('');
+      setStatusUpdatedAt(Date.now());
+    } catch (err) {
+      console.error('Erro ao recarregar batch:', err);
+    }
   };
 
   const handleSaveStock = async () => {
@@ -1178,6 +1204,21 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Sell Batch Modal */}
+      {showSellModal && currentBatch && (
+        <SellBatchModal
+          batch={currentBatch}
+          quantitySlabs={parsedStatusQuantity}
+          sourceStatus={sourceStatus}
+          isOpen={showSellModal}
+          onClose={() => setShowSellModal(false)}
+          onSuccess={() => {
+            handleSellSuccess();
+            setShowSellModal(false);
+          }}
+        />
+      )}
     </>
   );
 };

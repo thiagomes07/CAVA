@@ -68,7 +68,9 @@ interface User {
 interface Cliente {
     id: string;
     name: string;
-    contact: string;
+    email?: string;
+    phone?: string;
+    whatsapp?: string;
 }
 
 // Role translation map
@@ -332,7 +334,8 @@ export function SellBatchModal({
             if (values.clientType === "EXISTING" && values.clienteId) {
                 const selectedClient = clientes.find((c: Cliente) => c.id === values.clienteId);
                 customerName = selectedClient?.name || "Cliente Existente";
-                customerContact = selectedClient?.contact || "Não informado";
+                // Prioriza email, depois phone, depois whatsapp
+                customerContact = selectedClient?.email || selectedClient?.phone || selectedClient?.whatsapp || "Não informado";
                 clienteId = values.clienteId;
             } else if (values.clientType === "NEW") {
                 customerName = values.customerName!;
@@ -595,7 +598,7 @@ export function SellBatchModal({
                                             </option>
                                             {clientes.map((client) => (
                                                 <option key={client.id} value={client.id}>
-                                                    {client.name}
+                                                    {client.name}{client.email ? ` - ${client.email}` : client.phone ? ` - ${client.phone}` : ''}
                                                 </option>
                                             ))}
                                         </Select>

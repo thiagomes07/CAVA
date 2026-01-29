@@ -122,16 +122,14 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validar que strings não são apenas espaços
+	// Limpar strings vazias para nil (para não atualizar o campo)
 	if input.Name != nil && strings.TrimSpace(*input.Name) == "" {
-		response.BadRequest(w, "Nome não pode conter apenas espaços", nil)
-		return
+		input.Name = nil
 	}
 	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) == "" {
-		response.BadRequest(w, "Email não pode conter apenas espaços", nil)
-		return
+		input.ContactEmail = nil
 	}
-	// Validar formato de email
+	// Validar formato de email apenas se não for vazio
 	if input.ContactEmail != nil && strings.TrimSpace(*input.ContactEmail) != "" {
 		if !strings.Contains(*input.ContactEmail, "@") {
 			response.BadRequest(w, "Email inválido", nil)

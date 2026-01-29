@@ -36,7 +36,9 @@ type Cliente struct {
 	ID             string        `json:"id"`
 	SalesLinkID    string        `json:"salesLinkId"`
 	Name           string        `json:"name"`
-	Contact        string        `json:"contact"` // Email ou telefone
+	Email          *string       `json:"email,omitempty"`
+	Phone          *string       `json:"phone,omitempty"`
+	Whatsapp       *string       `json:"whatsapp,omitempty"`
 	Message        *string       `json:"message,omitempty"`
 	MarketingOptIn bool          `json:"marketingOptIn"`
 	Status         ClienteStatus `json:"status"`
@@ -70,7 +72,9 @@ type ClienteSubscription struct {
 type CreateClienteInput struct {
 	SalesLinkID    string  `json:"salesLinkId" validate:"required,uuid"`
 	Name           string  `json:"name" validate:"required,min=2,max=100"`
-	Contact        string  `json:"contact" validate:"required,min=10"` // Email ou telefone
+	Email          *string `json:"email,omitempty" validate:"omitempty,email"`
+	Phone          *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp       *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 	Message        *string `json:"message,omitempty" validate:"omitempty,max=500"`
 	MarketingOptIn bool    `json:"marketingOptIn"`
 }
@@ -78,7 +82,9 @@ type CreateClienteInput struct {
 // CreateClienteManualInput representa os dados para criar um cliente manualmente (autenticado)
 type CreateClienteManualInput struct {
 	Name           string  `json:"name" validate:"required,min=2,max=100"`
-	Contact        string  `json:"contact" validate:"required,min=5"` // Email ou telefone
+	Email          *string `json:"email,omitempty" validate:"omitempty,email"`
+	Phone          *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp       *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 	Message        *string `json:"message,omitempty" validate:"omitempty,max=500"`
 	MarketingOptIn bool    `json:"marketingOptIn"`
 }

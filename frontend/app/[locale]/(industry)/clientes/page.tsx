@@ -37,6 +37,10 @@ const createClienteSchema = z.object({
     (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
     'Telefone inválido'
   ),
+  whatsapp: z.string().optional().refine(
+    (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+    'WhatsApp inválido'
+  ),
   message: z.string().max(500).optional(),
   marketingOptIn: z.boolean(),
 }).refine((data) => {
@@ -73,6 +77,7 @@ export default function ClientesManagementPage() {
   const [selectedClienteIds, setSelectedClienteIds] = useState<Set<string>>(new Set());
   const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState('');
+  const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
 
   // Send links mutation
   const sendLinksMutation = useSendLinksToClientes();
@@ -91,12 +96,14 @@ export default function ClientesManagementPage() {
       name: '',
       email: '',
       phone: '',
+      whatsapp: '',
       message: '',
       marketingOptIn: false,
     },
   });
 
   const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
+  const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
   const [filters, setFilters] = useState<ClienteFilter>({
     search: searchParams.get('search') || '',
@@ -147,6 +154,14 @@ export default function ClientesManagementPage() {
     fetchClientes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
+
+  // Sync whatsapp with phone when checkbox is checked
+  const phoneValue = watch('phone');
+  useEffect(() => {
+    if (useSamePhoneForWhatsapp && phoneValue) {
+      setValue('whatsapp', phoneValue);
+    }
+  }, [useSamePhoneForWhatsapp, phoneValue, setValue]);
 
   // Filter active links only
   const activeLinks = useMemo(() => {
@@ -258,15 +273,11 @@ export default function ClientesManagementPage() {
     try {
       setIsCreating(true);
       
-      // Combina email e phone em contact para compatibilidade com o backend
-      // Prioriza email se ambos forem preenchidos
-      const contact = data.email && data.email.trim() !== '' 
-        ? data.email.trim() 
-        : sanitizePhone(data.phone);
-      
       await apiClient.post('/clientes', {
         name: data.name,
-        contact,
+        email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
+        phone: data.phone ? sanitizePhone(data.phone) : undefined,
+        whatsapp: data.whatsapp ? sanitizePhone(data.whatsapp) : undefined,
         message: data.message,
         marketingOptIn: data.marketingOptIn,
       });
@@ -482,9 +493,10 @@ export default function ClientesManagementPage() {
                       />
                     </TableHead>
                     <TableHead>{t('name')}</TableHead>
-                    <TableHead>{t('contact')}</TableHead>
+                    <TableHead>{tCommon('email')}</TableHead>
+                    <TableHead>{t('phonePlaceholder')}</TableHead>
+                    <TableHead>WhatsApp</TableHead>
                     <TableHead>{t('origin')}</TableHead>
-                    <TableHead>{t('interestedProduct')}</TableHead>
                     <TableHead>{t('message')}</TableHead>
                     <TableHead>{t('optIn')}</TableHead>
                     <TableHead>{t('status')}</TableHead>
@@ -494,7 +506,6 @@ export default function ClientesManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {clientes.map((cliente) => {
-                    const isEmail = cliente.contact.includes('@');
                     const isSelected = selectedClienteIds.has(cliente.id);
 
                     return (
@@ -525,21 +536,55 @@ export default function ClientesManagementPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleCopyContact(cliente.contact);
-                            }}
-                            className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
-                            title={cliente.contact}
-                          >
-                            {isEmail ? (
+                          {cliente.email ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyContact(cliente.email!);
+                              }}
+                              className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
+                              title={cliente.email}
+                            >
                               <Mail className="w-4 h-4" />
-                            ) : (
+                              <span>{truncateText(cliente.email, TRUNCATION_LIMITS.CONTACT)}</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {cliente.phone ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCopyContact(cliente.phone!);
+                              }}
+                              className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
+                              title={cliente.phone}
+                            >
                               <Phone className="w-4 h-4" />
-                            )}
-                            <span>{truncateText(cliente.contact, TRUNCATION_LIMITS.CONTACT)}</span>
-                          </button>
+                              <span>{cliente.phone}</span>
+                            </button>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {cliente.whatsapp ? (
+                            <a
+                              href={`https://wa.me/55${cliente.whatsapp.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-500 transition-colors"
+                              title={cliente.whatsapp}
+                            >
+                              <MessageSquare className="w-4 h-4" />
+                              <span>{cliente.whatsapp}</span>
+                            </a>
+                          ) : (
+                            <span className="text-slate-400">-</span>
+                          )}
                         </TableCell>
                         <TableCell>
                           <div>
@@ -558,19 +603,6 @@ export default function ClientesManagementPage() {
                               </Badge>
                             )}
                           </div>
-                        </TableCell>
-                        <TableCell>
-                          <span
-                            className="text-sm text-slate-600"
-                            title={cliente.salesLink?.batch?.product?.name || cliente.salesLink?.product?.name || 'Catálogo'}
-                          >
-                            {truncateText(
-                              cliente.salesLink?.batch?.product?.name ||
-                              cliente.salesLink?.product?.name ||
-                              'Catálogo',
-                              TRUNCATION_LIMITS.PRODUCT_NAME_SHORT
-                            )}
-                          </span>
                         </TableCell>
                         <TableCell>
                           {cliente.message ? (
@@ -804,7 +836,7 @@ export default function ClientesManagementPage() {
                 <p className="text-xs text-white/50 mt-0.5">Cadastre um novo cliente manualmente</p>
               </div>
               <button 
-                onClick={() => { setShowCreateModal(false); reset(); }} 
+                onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }} 
                 className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -867,6 +899,44 @@ export default function ClientesManagementPage() {
                   {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
                 </div>
 
+                {/* WhatsApp */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-xs font-medium text-slate-600">
+                      WhatsApp
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={useSamePhoneForWhatsapp}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setUseSamePhoneForWhatsapp(checked);
+                          if (checked && phoneField.value) {
+                            setValue('whatsapp', phoneField.value);
+                          }
+                        }}
+                        className="h-3.5 w-3.5 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
+                      />
+                      <span className="text-xs text-slate-500">{t('useSamePhone')}</span>
+                    </label>
+                  </div>
+                  <input
+                    value={whatsappField.value}
+                    onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                    placeholder="(11) 98765-4321"
+                    disabled={useSamePhoneForWhatsapp}
+                    className={cn(
+                      'w-full px-3 py-2.5 border outline-none text-sm transition-colors',
+                      useSamePhoneForWhatsapp 
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' 
+                        : 'bg-slate-50 focus:border-[#C2410C] focus:bg-white',
+                      errors.whatsapp ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
+                </div>
+
                 {/* Message */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-2">
@@ -905,7 +975,7 @@ export default function ClientesManagementPage() {
               <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
                 <button
                   type="button"
-                  onClick={() => { setShowCreateModal(false); reset(); }}
+                  onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }}
                   className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
                 >
                   {tCommon('cancel')}

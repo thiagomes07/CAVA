@@ -14,9 +14,9 @@ import { ESTADOS_BRASIL, CIDADES_POR_ESTADO } from '@/lib/utils/brazil-locations
 import { cn } from '@/lib/utils/cn';
 
 const formSchema = z.object({
-    name: z.string().min(2, 'Nome muito curto'),
+    name: z.string().optional(),
     cnpj: z.string().optional(),
-    contactEmail: z.string().email('Email inválido'),
+    contactEmail: z.string().email('Email inválido').optional().or(z.literal('')),
     contactPhone: z.string().optional(),
     whatsapp: z.string().optional(),
     description: z.string().max(2000, 'Máximo 2000 caracteres').optional(),
@@ -71,9 +71,9 @@ export default function IndustryConfigPage() {
     useEffect(() => {
         if (industry) {
             reset({
-                name: industry.name,
+                name: industry.name || '',
                 cnpj: industry.cnpj || '',
-                contactEmail: industry.contactEmail,
+                contactEmail: industry.contactEmail || '',
                 contactPhone: industry.contactPhone || '',
                 whatsapp: industry.whatsapp || '',
                 description: industry.description || '',
@@ -107,9 +107,9 @@ export default function IndustryConfigPage() {
         if (industry) {
             // Restore all form fields to original values
             reset({
-                name: industry.name,
+                name: industry.name || '',
                 cnpj: industry.cnpj || '',
-                contactEmail: industry.contactEmail,
+                contactEmail: industry.contactEmail || '',
                 contactPhone: industry.contactPhone || '',
                 whatsapp: industry.whatsapp || '',
                 description: industry.description || '',
@@ -236,7 +236,7 @@ export default function IndustryConfigPage() {
                                     {/* Nome da Empresa */}
                                     <div>
                                         <label className="text-xs font-medium text-slate-600 block mb-2">
-                                            {t('companyName')} <span className="text-[#C2410C]">*</span>
+                                            {t('companyName')}
                                         </label>
                                         <input
                                             {...register('name')}
@@ -255,7 +255,7 @@ export default function IndustryConfigPage() {
                                     <div>
                                         <div className="flex items-center justify-between mb-2">
                                             <label className="text-xs font-medium text-slate-600">
-                                                {useCNPJMask ? 'CNPJ' : t('businessId')} <span className="text-[#C2410C]">*</span>
+                                                {useCNPJMask ? 'CNPJ' : t('businessId')}
                                             </label>
                                             <div className="flex items-center gap-2">
                                                 <button
@@ -357,7 +357,7 @@ export default function IndustryConfigPage() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                 <div className="md:col-span-2">
                                     <label className="text-xs font-medium text-slate-600 block mb-2">
-                                        {t('email')} <span className="text-[#C2410C]">*</span>
+                                        {t('email')}
                                     </label>
                                     <input
                                         {...register('contactEmail')}

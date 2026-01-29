@@ -157,7 +157,9 @@ export interface Cliente {
   id: string;
   salesLinkId: string;
   name: string;
-  contact: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
   message?: string;
   marketingOptIn: boolean;
   status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO';
