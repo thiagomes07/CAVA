@@ -82,14 +82,14 @@ export default function EditBatchPage() {
         await apiClient.delete(`/batch-medias/${mediaId}`);
       }
 
-      // Update display order for existing medias
-      for (let i = 0; i < existingMedias.length; i++) {
-        const media = existingMedias[i];
-        if (media.displayOrder !== i) {
-          await apiClient.put(`/batch-medias/${media.id}`, {
-            displayOrder: i,
-          });
-        }
+      // Update display order and isCover for existing medias (batch)
+      if (existingMedias.length > 0) {
+        const payload = existingMedias.map((media, i) => ({
+          id: media.id,
+          displayOrder: i,
+          isCover: i === 0,
+        }));
+        await apiClient.patch('/batch-medias/order', payload);
       }
 
       // Upload new medias

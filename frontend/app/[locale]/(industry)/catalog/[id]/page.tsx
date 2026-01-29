@@ -1,10 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, X, Trash2, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -22,8 +41,105 @@ import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface UploadedMedia {
+  id: string;
   file: File;
   preview: string;
+}
+
+// Unified media item for drag and drop
+interface DraggableMediaItem {
+  id: string;
+  url: string;
+  isNew: boolean;
+  originalMedia?: Media;
+  newMedia?: UploadedMedia;
+}
+
+// Sortable Media Item Component
+function SortableMediaItem({
+  item,
+  onRemove,
+  isFirst
+}: {
+  item: DraggableMediaItem;
+  onRemove: (id: string) => void;
+  isFirst: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative aspect-[4/3] rounded-sm overflow-hidden border-2 group',
+        isDragging ? 'opacity-50 shadow-xl' : '',
+        item.isNew ? 'border-dashed border-emerald-400' : 'border-slate-200'
+      )}
+    >
+      {isPlaceholderUrl(item.url) ? (
+        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+          Sem foto
+        </div>
+      ) : (
+        <img
+          src={item.url}
+          alt="Foto do produto"
+          className="w-full h-full object-cover"
+        />
+      )}
+
+      {/* Overlay with controls */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <button
+          type="button"
+          className="p-2 bg-white/90 rounded-sm cursor-grab active:cursor-grabbing touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4 text-slate-700" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Cover badge */}
+      {isFirst && (
+        <div className="absolute top-2 left-2">
+          <span className="px-2 py-1 bg-[#C2410C] text-white text-xs font-semibold rounded-sm">
+            CAPA
+          </span>
+        </div>
+      )}
+
+      {/* New badge */}
+      {item.isNew && (
+        <div className="absolute top-2 right-2">
+          <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
+            NOVA
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function EditProductPage() {
@@ -33,13 +149,48 @@ export default function EditProductPage() {
   const { success, error } = useToast();
 
   const [product, setProduct] = useState<Product | null>(null);
-  const [existingMedias, setExistingMedias] = useState<Media[]>([]);
+  const [orderedMediaItems, setOrderedMediaItems] = useState<DraggableMediaItem[]>([]);
   const [mediasToDelete, setMediasToDelete] = useState<string[]>([]);
-  const [newMedias, setNewMedias] = useState<UploadedMedia[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // State for active dragging item
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeItem = activeId ? orderedMediaItems.find(item => item.id === activeId) : null;
+
+  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    setOrderedMediaItems((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return items;
+
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }, []);
 
   const {
     register,
@@ -71,8 +222,16 @@ export default function EditProductPage() {
       setIsLoading(true);
       const data = await apiClient.get<Product>(`/products/${productId}`);
       setProduct(data);
-      setExistingMedias(data.medias || []);
-      
+
+      // Initialize ordered media items from product
+      const initialItems: DraggableMediaItem[] = (data.medias || []).map((media) => ({
+        id: `existing-${media.id}`,
+        url: media.url,
+        isNew: false,
+        originalMedia: media,
+      }));
+      setOrderedMediaItems(initialItems);
+
       reset({
         name: data.name,
         sku: data.sku || '',
@@ -91,14 +250,13 @@ export default function EditProductPage() {
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    // existingMedias já está filtrada (não contém mídias removidas)
-    const totalPhotos = existingMedias.length + newMedias.length + files.length;
+    const totalPhotos = orderedMediaItems.length + files.length;
 
     if (totalPhotos > 10) {
       error('Máximo de 10 fotos por produto');
       return;
     }
-    
+
     files.forEach((file) => {
       if (!file.type.startsWith('image/')) {
         error('Formato não suportado. Use JPG, PNG ou WebP');
@@ -112,13 +270,17 @@ export default function EditProductPage() {
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        setNewMedias((prev) => [
-          ...prev,
-          {
+        const newItem: DraggableMediaItem = {
+          id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          url: event.target?.result as string,
+          isNew: true,
+          newMedia: {
+            id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             file,
             preview: event.target?.result as string,
           },
-        ]);
+        };
+        setOrderedMediaItems((prev) => [...prev, newItem]);
       };
       reader.readAsDataURL(file);
     });
@@ -126,63 +288,29 @@ export default function EditProductPage() {
     e.target.value = '';
   };
 
-  const handleRemoveExistingMedia = (index: number) => {
-    const mediaToRemove = existingMedias[index];
-    if (mediaToRemove?.id) {
-      setMediasToDelete((prev) => [...prev, mediaToRemove.id]);
+  const handleRemoveMedia = useCallback((itemId: string) => {
+    const itemToRemove = orderedMediaItems.find(item => item.id === itemId);
+    if (itemToRemove && !itemToRemove.isNew && itemToRemove.originalMedia) {
+      setMediasToDelete((prev) => [...prev, itemToRemove.originalMedia!.id]);
     }
-    setExistingMedias((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleRemoveNewMedia = (index: number) => {
-    setNewMedias((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleReorderExisting = (fromIndex: number, toIndex: number) => {
-    setExistingMedias((prev) => {
-      if (toIndex < 0 || toIndex >= prev.length) return prev;
-      const updated = [...prev];
-      const [moved] = updated.splice(fromIndex, 1);
-      updated.splice(toIndex, 0, moved);
-      return updated.map((media, i) => ({ ...media, displayOrder: i }));
-    });
-  };
-
-  const handleSetExistingCover = (index: number) => {
-    setExistingMedias((prev) => {
-      if (index === 0) return prev;
-      const updated = [...prev];
-      const [cover] = updated.splice(index, 1);
-      updated.unshift(cover);
-      return updated.map((media, i) => ({ ...media, displayOrder: i }));
-    });
-  };
-
-  const handleMoveNewMedia = (from: number, to: number) => {
-    setNewMedias((prev) => {
-      if (to < 0 || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-  const handleSetNewCover = (index: number) => {
-    // Se não há mídias existentes, a nova mídia se torna capa (primeira posição)
-    if (existingMedias.length === 0 && index !== 0) {
-      setNewMedias((prev) => {
-        const next = [...prev];
-        const [cover] = next.splice(index, 1);
-        next.unshift(cover);
-        return next;
-      });
-    }
-  };
+    setOrderedMediaItems((prev) => prev.filter((item) => item.id !== itemId));
+  }, [orderedMediaItems]);
 
   const onSubmit = async (data: ProductInput) => {
     try {
       setIsSubmitting(true);
+
+      // Extract existing and new medias from ordered items
+      const existingMedias: Media[] = [];
+      const newMediaFiles: File[] = [];
+
+      orderedMediaItems.forEach((item, index) => {
+        if (!item.isNew && item.originalMedia) {
+          existingMedias.push({ ...item.originalMedia, displayOrder: index });
+        } else if (item.isNew && item.newMedia) {
+          newMediaFiles.push(item.newMedia.file);
+        }
+      });
 
       // 1. Deletar mídias removidas (ignora erros 404)
       if (mediasToDelete.length > 0) {
@@ -197,9 +325,9 @@ export default function EditProductPage() {
 
       // 2. Atualizar ordem das mídias existentes
       if (existingMedias.length > 0) {
-        const orderPayload = existingMedias.map((media, index) => ({
+        const orderPayload = existingMedias.map((media) => ({
           id: media.id,
-          displayOrder: index,
+          displayOrder: media.displayOrder,
         }));
 
         await apiClient.patch('/product-medias/order', orderPayload).catch((err) => {
@@ -208,11 +336,11 @@ export default function EditProductPage() {
       }
 
       // 3. Upload de novas mídias
-      if (newMedias.length > 0) {
+      if (newMediaFiles.length > 0) {
         const formData = new FormData();
         formData.append('productId', productId);
-        newMedias.forEach((media) => {
-          formData.append('medias', media.file);
+        newMediaFiles.forEach((file) => {
+          formData.append('medias', file);
         });
 
         await apiClient.upload<{ urls: string[] }>(
@@ -268,9 +396,6 @@ export default function EditProductPage() {
   }
 
   if (!product) return null;
-
-  // existingMedias já está filtrada (mídias removidas são retiradas em handleRemoveExistingMedia)
-  const allMedias = [...existingMedias, ...newMedias.map((m) => ({ ...m, id: `new-${Math.random()}` }))];
 
   return (
     <div>
@@ -375,7 +500,7 @@ export default function EditProductPage() {
                   'border-2 border-dashed border-slate-300 rounded-sm',
                   'cursor-pointer transition-colors',
                   'hover:border-obsidian hover:bg-slate-50',
-                  (isSubmitting || allMedias.length >= 10) && 'opacity-50 cursor-not-allowed'
+                  (isSubmitting || orderedMediaItems.length >= 10) && 'opacity-50 cursor-not-allowed'
                 )}
               >
                 <Upload className="w-12 h-12 text-slate-400 mb-4" />
@@ -383,7 +508,7 @@ export default function EditProductPage() {
                   Adicionar mais fotos
                 </p>
                 <p className="text-xs text-slate-400">
-                  {allMedias.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
+                  {orderedMediaItems.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
                 </p>
                 <input
                   id="file-upload"
@@ -391,151 +516,59 @@ export default function EditProductPage() {
                   accept="image/jpeg,image/png,image/webp"
                   multiple
                   onChange={handleFileSelect}
-                  disabled={isSubmitting || allMedias.length >= 10}
+                  disabled={isSubmitting || orderedMediaItems.length >= 10}
                   className="hidden"
                 />
               </label>
-              <p className="text-xs text-slate-500 mt-2">
-                A primeira foto será a capa do produto
-              </p>
+              {orderedMediaItems.length === 0 && (
+                <p className="text-xs text-slate-500 mt-2">
+                  A primeira foto será a capa do produto
+                </p>
+              )}
             </div>
 
-            {allMedias.length > 0 && (
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {/* Mídias Existentes */}
-                {existingMedias.map((media, index) => (
-                  <div
-                    key={media.id}
-                    className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
-                  >
-                    {isPlaceholderUrl(media.url) ? (
-                      <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
-                        Sem foto
-                      </div>
-                    ) : (
+            {orderedMediaItems.length > 0 && (
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                modifiers={[restrictToParentElement]}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={orderedMediaItems.map(item => item.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {orderedMediaItems.map((item, index) => (
+                      <SortableMediaItem
+                        key={item.id}
+                        item={item}
+                        onRemove={handleRemoveMedia}
+                        isFirst={index === 0}
+                      />
+                    ))}
+                  </div>
+                </SortableContext>
+                <DragOverlay>
+                  {activeItem ? (
+                    <div className="aspect-[4/3] rounded-sm overflow-hidden border-2 border-[#C2410C] shadow-2xl opacity-90">
                       <img
-                        src={media.url}
-                        alt={`Foto ${index + 1}`}
+                        src={activeItem.url}
+                        alt="Arrastando"
                         className="w-full h-full object-cover"
                       />
-                    )}
-
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
-                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleReorderExisting(index, index - 1)}
-                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                          disabled={index === 0}
-                          aria-label="Mover para cima"
-                        >
-                          <ArrowUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetExistingCover(index)}
-                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
-                          disabled={index === 0}
-                        >
-                          Definir capa
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleReorderExisting(index, index + 1)}
-                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                          disabled={index === existingMedias.length - 1}
-                          aria-label="Mover para baixo"
-                        >
-                          <ArrowDown className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveExistingMedia(index)}
-                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
                     </div>
+                  ) : null}
+                </DragOverlay>
+              </DndContext>
+            )}
 
-                    {index === 0 && (
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
-                          CAPA
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                {/* Novas Mídias */}
-                {newMedias.map((media, index) => (
-                  <div
-                    key={`new-${index}`}
-                    className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-dashed border-emerald-400 group"
-                  >
-                    <img
-                      src={media.preview}
-                      alt={`Nova foto ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
-                      <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
-                        <button
-                          type="button"
-                          onClick={() => handleMoveNewMedia(index, index - 1)}
-                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                          disabled={index === 0}
-                          aria-label="Mover para cima"
-                        >
-                          <ArrowUp className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleSetNewCover(index)}
-                          className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
-                          disabled={existingMedias.length > 0 || index === 0}
-                        >
-                          Definir capa
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleMoveNewMedia(index, index + 1)}
-                          className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                          disabled={index === newMedias.length - 1}
-                          aria-label="Mover para baixo"
-                        >
-                          <ArrowDown className="w-4 h-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveNewMedia(index)}
-                          className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {existingMedias.length === 0 && index === 0 && (
-                      <div className="absolute top-2 left-2">
-                        <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
-                          CAPA
-                        </span>
-                      </div>
-                    )}
-
-                    <div className="absolute top-2 right-2">
-                      <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
-                        NOVA
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
+            {orderedMediaItems.length > 0 && (
+              <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+                <GripVertical className="w-3 h-3" />
+                Arraste as fotos para reordenar
+              </p>
             )}
           </Card>
 

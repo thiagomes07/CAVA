@@ -1,10 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Package, Plus, ArrowUp, ArrowDown, Ruler, DollarSign, Camera, Sparkles } from 'lucide-react';
+import { Upload, X, Package, Plus, Ruler, DollarSign, Camera, Sparkles, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { batchSchema, type BatchInput, priceUnits } from '@/lib/schemas/batch.schema';
@@ -15,8 +34,80 @@ import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface UploadedMedia {
+  id: string;
   file: File;
   preview: string;
+}
+
+// Sortable Media Item Component
+function SortableMediaItem({
+  item,
+  onRemove,
+  isFirst
+}: {
+  item: UploadedMedia;
+  onRemove: (id: string) => void;
+  isFirst: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative aspect-square overflow-hidden border group',
+        isDragging ? 'opacity-50 shadow-xl border-[#C2410C]' : 'border-slate-200'
+      )}
+    >
+      <img
+        src={item.preview}
+        alt="Preview"
+        className="w-full h-full object-cover"
+      />
+
+      {/* Overlay with controls */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <button
+          type="button"
+          className="p-2 bg-white/90 cursor-grab active:cursor-grabbing touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4 text-slate-700" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="p-2 bg-rose-500 text-white hover:bg-rose-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Cover badge */}
+      {isFirst && (
+        <div className="absolute top-1.5 left-1.5">
+          <span className="px-1.5 py-0.5 bg-[#C2410C] text-white text-[10px] font-bold">
+            CAPA
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function NewBatchPage() {
@@ -76,6 +167,42 @@ export default function NewBatchPage() {
     }
   };
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // State for active dragging item
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeItem = activeId ? medias.find(item => item.id === activeId) : null;
+
+  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    setMedias((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return items;
+
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }, []);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
 
@@ -100,6 +227,7 @@ export default function NewBatchPage() {
         setMedias((prev) => [
           ...prev,
           {
+            id: `media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             file,
             preview: event.target?.result as string,
           },
@@ -111,29 +239,9 @@ export default function NewBatchPage() {
     e.target.value = '';
   };
 
-  const handleRemoveMedia = (index: number) => {
-    setMedias((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleMoveMedia = (from: number, to: number) => {
-    setMedias((prev) => {
-      if (to < 0 || to >= prev.length) return prev;
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
-  };
-
-  const handleSetCover = (index: number) => {
-    setMedias((prev) => {
-      if (index === 0) return prev;
-      const next = [...prev];
-      const [cover] = next.splice(index, 1);
-      next.unshift(cover);
-      return next;
-    });
-  };
+  const handleRemoveMedia = useCallback((id: string) => {
+    setMedias((prev) => prev.filter((item) => item.id !== id));
+  }, []);
 
   const onSubmit = async (data: BatchInput) => {
     try {
@@ -637,59 +745,55 @@ export default function NewBatchPage() {
                   className="hidden"
                 />
               </label>
-              <p className="text-xs text-slate-500 mt-3">
-                A primeira foto será a capa do lote
-              </p>
+              {medias.length === 0 && (
+                <p className="text-xs text-slate-500 mt-3">
+                  A primeira foto será a capa do lote
+                </p>
+              )}
+
+              {/* Preview Grid with Drag and Drop */}
+              {medias.length > 0 && (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToParentElement]}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={medias.map(item => item.id)}
+                    strategy={rectSortingStrategy}
+                  >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                      {medias.map((media, index) => (
+                        <SortableMediaItem
+                          key={media.id}
+                          item={media}
+                          onRemove={handleRemoveMedia}
+                          isFirst={index === 0}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                  <DragOverlay>
+                    {activeItem ? (
+                      <div className="aspect-square overflow-hidden border-2 border-[#C2410C] shadow-2xl opacity-90">
+                        <img
+                          src={activeItem.preview}
+                          alt="Arrastando"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
 
               {medias.length > 0 && (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
-                  {medias.map((media, index) => (
-                    <div
-                      key={index}
-                      className="relative aspect-square overflow-hidden border border-slate-200 group"
-                    >
-                      <img
-                        src={media.preview}
-                        alt={`Preview ${index + 1}`}
-                        className="w-full h-full object-cover"
-                      />
-
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
-                        <button
-                          type="button"
-                          onClick={() => handleMoveMedia(index, index - 1)}
-                          className="p-1.5 bg-white text-slate-700 disabled:opacity-40"
-                          disabled={index === 0}
-                        >
-                          <ArrowUp className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleMoveMedia(index, index + 1)}
-                          className="p-1.5 bg-white text-slate-700 disabled:opacity-40"
-                          disabled={index === medias.length - 1}
-                        >
-                          <ArrowDown className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveMedia(index)}
-                          className="p-1.5 bg-rose-500 text-white hover:bg-rose-600 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-
-                      {index === 0 && (
-                        <div className="absolute top-1.5 left-1.5">
-                          <span className="px-1.5 py-0.5 bg-[#C2410C] text-white text-[10px] font-bold">
-                            CAPA
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+                  <GripVertical className="w-3 h-3" />
+                  Arraste as fotos para reordenar
+                </p>
               )}
             </div>
           </div>
