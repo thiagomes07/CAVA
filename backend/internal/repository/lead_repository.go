@@ -123,75 +123,115 @@ func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID s
 func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilters) ([]entity.Cliente, int, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-	query := psql.Select(
-		"id", "COALESCE(sales_link_id::text, '')", "name", "email", "phone", "whatsapp",
-		"message", "marketing_opt_in", "status", "created_at", "updated_at",
-	).From("clientes")
+	// Verifica se precisa fazer JOIN com sales_links para filtros de escopo
+	needsJoin := filters.IndustryID != nil || filters.CreatedByUserID != nil
+
+	var query sq.SelectBuilder
+	if needsJoin {
+		query = psql.Select(
+			"c.id", "COALESCE(c.sales_link_id::text, '')", "c.name", "c.email", "c.phone", "c.whatsapp",
+			"c.message", "c.marketing_opt_in", "c.status", "c.created_at", "c.updated_at",
+		).From("clientes c").
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+	} else {
+		query = psql.Select(
+			"id", "COALESCE(sales_link_id::text, '')", "name", "email", "phone", "whatsapp",
+			"message", "marketing_opt_in", "status", "created_at", "updated_at",
+		).From("clientes")
+	}
+
+	// Aplicar filtros de escopo
+	if filters.IndustryID != nil {
+		query = query.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+	}
+	if filters.CreatedByUserID != nil {
+		query = query.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+	}
+
+	// Prefixo para colunas (depende do JOIN)
+	colPrefix := ""
+	if needsJoin {
+		colPrefix = "c."
+	}
 
 	if filters.LinkID != nil {
-		query = query.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+		query = query.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
 	}
 
 	if filters.Status != nil {
-		query = query.Where(sq.Eq{"status": *filters.Status})
+		query = query.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 
 	if filters.OptIn != nil {
-		query = query.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+		query = query.Where(sq.Eq{colPrefix + "marketing_opt_in": *filters.OptIn})
 	}
 
 	if filters.Search != nil && *filters.Search != "" {
 		search := "%" + *filters.Search + "%"
 		query = query.Where(sq.Or{
-			sq.ILike{"name": search},
-			sq.ILike{"email": search},
-			sq.ILike{"phone": search},
+			sq.ILike{colPrefix + "name": search},
+			sq.ILike{colPrefix + "email": search},
+			sq.ILike{colPrefix + "phone": search},
 		})
 	}
 
 	if filters.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
 		if err == nil {
-			query = query.Where(sq.GtOrEq{"created_at": startDate})
+			query = query.Where(sq.GtOrEq{colPrefix + "created_at": startDate})
 		}
 	}
 
 	if filters.EndDate != nil {
 		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
 		if err == nil {
-			query = query.Where(sq.LtOrEq{"created_at": endDate})
+			query = query.Where(sq.LtOrEq{colPrefix + "created_at": endDate})
 		}
 	}
 
-	// Count
-	countQuery := psql.Select("COUNT(*)").From("clientes")
+	// Count query
+	var countQuery sq.SelectBuilder
+	if needsJoin {
+		countQuery = psql.Select("COUNT(*)").From("clientes c").
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+	} else {
+		countQuery = psql.Select("COUNT(*)").From("clientes")
+	}
+
+	// Aplicar mesmos filtros de escopo no count
+	if filters.IndustryID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+	}
+	if filters.CreatedByUserID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+	}
 	if filters.LinkID != nil {
-		countQuery = countQuery.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
 	}
 	if filters.Status != nil {
-		countQuery = countQuery.Where(sq.Eq{"status": *filters.Status})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 	if filters.OptIn != nil {
-		countQuery = countQuery.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "marketing_opt_in": *filters.OptIn})
 	}
 	if filters.Search != nil && *filters.Search != "" {
 		search := "%" + *filters.Search + "%"
 		countQuery = countQuery.Where(sq.Or{
-			sq.ILike{"name": search},
-			sq.ILike{"email": search},
-			sq.ILike{"phone": search},
+			sq.ILike{colPrefix + "name": search},
+			sq.ILike{colPrefix + "email": search},
+			sq.ILike{colPrefix + "phone": search},
 		})
 	}
 	if filters.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
 		if err == nil {
-			countQuery = countQuery.Where(sq.GtOrEq{"created_at": startDate})
+			countQuery = countQuery.Where(sq.GtOrEq{colPrefix + "created_at": startDate})
 		}
 	}
 	if filters.EndDate != nil {
 		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
 		if err == nil {
-			countQuery = countQuery.Where(sq.LtOrEq{"created_at": endDate})
+			countQuery = countQuery.Where(sq.LtOrEq{colPrefix + "created_at": endDate})
 		}
 	}
 
@@ -203,7 +243,7 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	// Pagination
 	offset := (filters.Page - 1) * filters.Limit
-	query = query.OrderBy("created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+	query = query.OrderBy(colPrefix + "created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()
 	if err != nil {

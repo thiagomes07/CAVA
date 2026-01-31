@@ -303,12 +303,12 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// CLIENTES
 			// ----------------------------------------
 			r.Route("/clientes", func(r chi.Router) {
-				r.With(m.RBAC.RequireIndustryUser).Get("/", h.Cliente.List)
-				r.With(m.RBAC.RequireIndustryUser).Post("/", h.Cliente.Create)
-				r.With(m.RBAC.RequireIndustryUser).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
-				r.With(m.RBAC.RequireIndustryUser).Get("/{id}", h.Cliente.GetByID)
-				r.With(m.RBAC.RequireIndustryUser).Get("/{id}/interactions", h.Cliente.GetInteractions)
-				r.With(m.RBAC.RequireIndustryUser).Patch("/{id}/status", h.Cliente.UpdateStatus)
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/", h.Cliente.List)
+				r.With(m.RBAC.RequireAnyAuthenticated).Post("/", h.Cliente.Create)
+				r.With(m.RBAC.RequireAnyAuthenticated).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.Cliente.GetByID)
+				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}/interactions", h.Cliente.GetInteractions)
+				r.With(m.RBAC.RequireAnyAuthenticated).Patch("/{id}/status", h.Cliente.UpdateStatus)
 			})
 
 			// ----------------------------------------

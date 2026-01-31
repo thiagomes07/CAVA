@@ -96,14 +96,16 @@ type UpdateClienteStatusInput struct {
 
 // ClienteFilters representa os filtros para busca de clientes
 type ClienteFilters struct {
-	Search    *string        `json:"search,omitempty"` // Busca por nome ou contato
-	LinkID    *string        `json:"linkId,omitempty"`
-	StartDate *string        `json:"startDate,omitempty"` // ISO date
-	EndDate   *string        `json:"endDate,omitempty"`   // ISO date
-	OptIn     *bool          `json:"optIn,omitempty"`
-	Status    *ClienteStatus `json:"status,omitempty"`
-	Page      int            `json:"page" validate:"min=1"`
-	Limit     int            `json:"limit" validate:"min=1,max=100"`
+	Search          *string        `json:"search,omitempty"` // Busca por nome ou contato
+	LinkID          *string        `json:"linkId,omitempty"`
+	StartDate       *string        `json:"startDate,omitempty"` // ISO date
+	EndDate         *string        `json:"endDate,omitempty"`   // ISO date
+	OptIn           *bool          `json:"optIn,omitempty"`
+	Status          *ClienteStatus `json:"status,omitempty"`
+	Page            int            `json:"page" validate:"min=1"`
+	Limit           int            `json:"limit" validate:"min=1,max=100"`
+	IndustryID      *string        `json:"-"` // Filtro interno: clientes de links da indústria
+	CreatedByUserID *string        `json:"-"` // Filtro interno: clientes de links criados pelo usuário (broker)
 }
 
 // ClienteListResponse representa a resposta de listagem de clientes

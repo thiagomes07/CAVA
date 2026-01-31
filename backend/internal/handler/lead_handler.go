@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
+	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
 	"github.com/thiagomes07/CAVA/backend/pkg/validator"
 	"go.uber.org/zap"
@@ -96,6 +97,19 @@ func (h *ClienteHandler) List(w http.ResponseWriter, r *http.Request) {
 	filters := entity.ClienteFilters{
 		Page:  1,
 		Limit: 50,
+	}
+
+	// Aplicar filtros de escopo baseado na role do usuário
+	userRole := entity.UserRole(middleware.GetUserRole(r.Context()))
+	userID := middleware.GetUserID(r.Context())
+	industryID := middleware.GetIndustryID(r.Context())
+
+	if userRole == entity.RoleBroker {
+		// Broker vê apenas clientes dos links que ele criou
+		filters.CreatedByUserID = &userID
+	} else {
+		// Usuários de indústria veem clientes dos links da indústria
+		filters.IndustryID = &industryID
 	}
 
 	if search := r.URL.Query().Get("search"); search != "" {
