@@ -22,7 +22,8 @@ CREATE TYPE batch_status_type AS ENUM (
 CREATE TYPE link_type_enum AS ENUM (
     'LOTE_UNICO',
     'PRODUTO_GERAL',
-    'CATALOGO_COMPLETO'
+    'CATALOGO_COMPLETO',
+    'MULTIPLOS_LOTES'
 );
 
 -- ENUM: Tipos de mídia
@@ -62,6 +63,12 @@ CREATE TYPE cliente_status_type AS ENUM (
     'RESOLVIDO'
 );
 
+-- ENUM: Unidade de preço
+CREATE TYPE price_unit_type AS ENUM (
+    'M2',
+    'FT2'
+);
+
 -- Comentários descritivos
 COMMENT ON TYPE user_role_type IS 'Tipos de roles de usuários no sistema';
 COMMENT ON TYPE batch_status_type IS 'Status possíveis de um lote de estoque';
@@ -71,3 +78,4 @@ COMMENT ON TYPE interaction_type_enum IS 'Tipos de interação de clientes';
 COMMENT ON TYPE reservation_status_type IS 'Status de reservas de lotes';
 COMMENT ON TYPE finish_type_enum IS 'Tipos de acabamento de produtos';
 COMMENT ON TYPE cliente_status_type IS 'Status de acompanhamento de clientes';
+COMMENT ON TYPE price_unit_type IS 'Unidade de preço: M2 (metro quadrado) ou FT2 (pé quadrado)';
