@@ -26,6 +26,12 @@ type UserService interface {
 	// ListByIndustry lista usuários por indústria com filtro de role opcional
 	ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error)
 
+	// ListByIndustryWithFilters lista usuários com filtros, busca, ordenação e paginação
+	ListByIndustryWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.User, int, error)
+
+	// GetBrokersWithFilters lista brokers com filtros, busca, ordenação e paginação
+	GetBrokersWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.BrokerWithStats, int, error)
+
 	// Update atualiza dados do usuário
 	Update(ctx context.Context, id string, input entity.UpdateUserInput) (*entity.User, error)
 

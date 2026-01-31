@@ -645,3 +645,40 @@ func (s *userService) getRoleDescription(roleDesc string) string {
 		return "Usuário"
 	}
 }
+
+func (s *userService) ListByIndustryWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.User, int, error) {
+	users, total, err := s.userRepo.ListByIndustryWithFilters(ctx, industryID, filters)
+	if err != nil {
+		s.logger.Error("erro ao listar usuários com filtros",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		return nil, 0, err
+	}
+
+	// Limpar senhas antes de retornar
+	for i := range users {
+		users[i].Password = ""
+	}
+
+	return users, total, nil
+}
+
+func (s *userService) GetBrokersWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.BrokerWithStats, int, error) {
+	brokers, total, err := s.userRepo.FindBrokersWithFilters(ctx, industryID, filters)
+	if err != nil {
+		s.logger.Error("erro ao buscar brokers com filtros",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		return nil, 0, err
+	}
+
+	// Limpar senhas antes de retornar
+	for i := range brokers {
+		brokers[i].Password = ""
+	}
+
+	return brokers, total, nil
+}
+

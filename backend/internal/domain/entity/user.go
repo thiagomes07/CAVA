@@ -112,6 +112,67 @@ type BrokerWithStats struct {
 	SharedBatchesCount int `json:"sharedBatchesCount"`
 }
 
+// UserFilters representa os filtros para busca de usuários
+type UserFilters struct {
+	Search    *string   `json:"search,omitempty"`   // Busca por nome, email ou telefone
+	Role      *UserRole `json:"role,omitempty"`     // Filtrar por role
+	IsActive  *bool     `json:"isActive,omitempty"` // Filtrar por status
+	Page      int       `json:"page" validate:"min=1"`
+	Limit     int       `json:"limit" validate:"min=1,max=100"`
+	SortBy    string    `json:"sortBy,omitempty"`    // Campo para ordenação: name, email, created_at
+	SortOrder string    `json:"sortOrder,omitempty"` // Ordem: asc ou desc
+}
+
+// ValidSortFields retorna os campos válidos para ordenação de usuários
+func ValidUserSortFields() []string {
+	return []string{"name", "email", "created_at", "phone"}
+}
+
+// IsValidSortField verifica se o campo de ordenação é válido
+func (f *UserFilters) IsValidSortField() bool {
+	if f.SortBy == "" {
+		return true // Sem ordenação especificada é válido
+	}
+	validFields := ValidUserSortFields()
+	for _, field := range validFields {
+		if f.SortBy == field {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidSortOrder verifica se a ordem de ordenação é válida
+func (f *UserFilters) IsValidSortOrder() bool {
+	if f.SortOrder == "" {
+		return true
+	}
+	return f.SortOrder == "asc" || f.SortOrder == "desc"
+}
+
+// GetSortBy retorna o campo de ordenação com valor padrão
+func (f *UserFilters) GetSortBy() string {
+	if f.SortBy == "" {
+		return "name"
+	}
+	return f.SortBy
+}
+
+// GetSortOrder retorna a ordem de ordenação com valor padrão
+func (f *UserFilters) GetSortOrder() string {
+	if f.SortOrder == "" {
+		return "asc"
+	}
+	return f.SortOrder
+}
+
+// UserListResponse representa a resposta de listagem de usuários
+type UserListResponse struct {
+	Users []User `json:"users"`
+	Total int    `json:"total"`
+	Page  int    `json:"page"`
+}
+
 // ChangePasswordInput representa os dados para trocar senha
 type ChangePasswordInput struct {
 	CurrentPassword string `json:"currentPassword" validate:"required,min=8"`

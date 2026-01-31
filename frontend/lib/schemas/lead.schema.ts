@@ -15,6 +15,8 @@ export const clienteFilterSchema = z.object({
     .optional(),
   optIn: z.boolean().optional(),
   status: z.enum([...clienteStatuses, '']).optional(),
+  sortBy: z.string().optional(),
+  sortOrder: z.enum(['asc', 'desc']).optional(),
   page: z.number().min(1).default(1),
   limit: z.number().min(1).max(100).default(50),
 });

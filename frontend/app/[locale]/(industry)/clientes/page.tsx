@@ -16,6 +16,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
+import { SortableTableHead } from '@/components/shared/SortableTableHead';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
@@ -112,6 +113,8 @@ export default function ClientesManagementPage() {
     endDate: '',
     optIn: undefined,
     status: '',
+    sortBy: 'created_at',
+    sortOrder: 'desc',
     page: parseInt(searchParams.get('page') || '1'),
     limit: 50,
   });
@@ -310,6 +313,15 @@ export default function ClientesManagementPage() {
     }
   };
 
+  const handleSort = (field: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: field,
+      sortOrder: prev.sortBy === field && prev.sortOrder === 'asc' ? 'desc' : 'asc',
+      page: 1,
+    }));
+  };
+
   const handleClearFilters = () => {
     setFilters({
       search: '',
@@ -318,6 +330,8 @@ export default function ClientesManagementPage() {
       endDate: '',
       optIn: undefined,
       status: '',
+      sortBy: 'created_at',
+      sortOrder: 'desc',
       page: 1,
       limit: 50,
     });
@@ -492,15 +506,39 @@ export default function ClientesManagementPage() {
                         onChange={handleSelectAllClientes}
                       />
                     </TableHead>
-                    <TableHead>{t('name')}</TableHead>
-                    <TableHead>{tCommon('email')}</TableHead>
+                    <SortableTableHead
+                      field="name"
+                      label={t('name')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
+                    <SortableTableHead
+                      field="email"
+                      label={tCommon('email')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
                     <TableHead>{t('phonePlaceholder')}</TableHead>
                     <TableHead>WhatsApp</TableHead>
                     <TableHead>{t('origin')}</TableHead>
                     <TableHead>{t('message')}</TableHead>
                     <TableHead>{t('optIn')}</TableHead>
-                    <TableHead>{t('status')}</TableHead>
-                    <TableHead>{t('date')}</TableHead>
+                    <SortableTableHead
+                      field="status"
+                      label={t('status')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
+                    <SortableTableHead
+                      field="created_at"
+                      label={t('date')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
                     <TableHead>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>

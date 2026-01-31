@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"fmt"
 
 	"github.com/lib/pq"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -526,3 +527,197 @@ func (r *userRepository) InvalidatePasswordResetTokens(ctx context.Context, user
 
 	return nil
 }
+
+// ListByIndustryWithFilters lista usuários com filtros, busca, ordenação e paginação
+func (r *userRepository) ListByIndustryWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.User, int, error) {
+	// Build base query
+	baseQuery := `
+		FROM users
+		WHERE industry_id = $1
+	`
+	args := []interface{}{industryID}
+	argIndex := 2
+
+	// Apply role filter
+	if filters.Role != nil {
+		baseQuery += fmt.Sprintf(` AND role = $%d`, argIndex)
+		args = append(args, *filters.Role)
+		argIndex++
+	}
+
+	// Apply status filter
+	if filters.IsActive != nil {
+		baseQuery += fmt.Sprintf(` AND is_active = $%d`, argIndex)
+		args = append(args, *filters.IsActive)
+		argIndex++
+	}
+
+	// Apply search filter
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		baseQuery += fmt.Sprintf(` AND (LOWER(name) LIKE LOWER($%d) 
+			OR LOWER(email) LIKE LOWER($%d) 
+			OR LOWER(phone) LIKE LOWER($%d))`, argIndex, argIndex, argIndex)
+		args = append(args, search)
+		argIndex++
+	}
+
+	// Count total records
+	countQuery := `SELECT COUNT(*) ` + baseQuery
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Validate and apply sorting
+	sortBy := filters.GetSortBy()
+	sortOrder := filters.GetSortOrder()
+	if !filters.IsValidSortField() {
+		sortBy = "name"
+	}
+	if !filters.IsValidSortOrder() {
+		sortOrder = "asc"
+	}
+
+	// Build select query with sorting and pagination
+	selectQuery := fmt.Sprintf(`
+		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		       is_active, first_login_at, created_at, updated_at
+	%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d`, baseQuery, sortBy, sortOrder, argIndex, argIndex+1)
+
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	page := filters.Page
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	args = append(args, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	users := []entity.User{}
+	for rows.Next() {
+		var u entity.User
+		if err := rows.Scan(
+			&u.ID, &u.IndustryID, &u.Name, &u.Email,
+			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+		); err != nil {
+			return nil, 0, errors.DatabaseError(err)
+		}
+		users = append(users, u)
+	}
+
+	return users, total, nil
+}
+
+// FindBrokersWithFilters busca brokers com filtros, busca, ordenação e paginação
+func (r *userRepository) FindBrokersWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.BrokerWithStats, int, error) {
+	// Build base query
+	baseQuery := `
+		FROM users u
+		LEFT JOIN shared_inventory_batches sib 
+			ON u.id = sib.shared_with_user_id 
+			AND sib.industry_owner_id = $1
+			AND sib.is_active = TRUE
+		WHERE u.role = 'BROKER'
+	`
+	args := []interface{}{industryID}
+	argIndex := 2
+
+	// Apply status filter
+	if filters.IsActive != nil {
+		baseQuery += fmt.Sprintf(` AND u.is_active = $%d`, argIndex)
+		args = append(args, *filters.IsActive)
+		argIndex++
+	}
+
+	// Apply search filter
+	if filters.Search != nil && *filters.Search != "" {
+		search := "%" + *filters.Search + "%"
+		baseQuery += fmt.Sprintf(` AND (LOWER(u.name) LIKE LOWER($%d) 
+			OR LOWER(u.email) LIKE LOWER($%d) 
+			OR LOWER(u.phone) LIKE LOWER($%d))`, argIndex, argIndex, argIndex)
+		args = append(args, search)
+		argIndex++
+	}
+
+	// Group by for count
+	groupBy := ` GROUP BY u.id`
+
+	// Count total records - need to count distinct user ids
+	countQuery := `SELECT COUNT(DISTINCT u.id) ` + baseQuery
+	var total int
+	if err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total); err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+
+	// Validate and apply sorting
+	sortBy := filters.GetSortBy()
+	sortOrder := filters.GetSortOrder()
+	if !filters.IsValidSortField() {
+		sortBy = "name"
+	}
+	if !filters.IsValidSortOrder() {
+		sortOrder = "asc"
+	}
+
+	// Map sort fields to actual column names with table prefix
+	sortColumn := "u." + sortBy
+	if sortBy == "created_at" {
+		sortColumn = "u.created_at"
+	}
+
+	// Build select query with sorting and pagination
+	selectQuery := fmt.Sprintf(`
+		SELECT 
+			u.id, u.name, u.email, u.phone, u.whatsapp, u.role, 
+			u.is_active, u.first_login_at, u.created_at, u.updated_at,
+			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
+	%s%s
+		ORDER BY %s %s
+		LIMIT $%d OFFSET $%d`, baseQuery, groupBy, sortColumn, sortOrder, argIndex, argIndex+1)
+
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	page := filters.Page
+	if page <= 0 {
+		page = 1
+	}
+	offset := (page - 1) * limit
+
+	args = append(args, limit, offset)
+
+	rows, err := r.db.QueryContext(ctx, selectQuery, args...)
+	if err != nil {
+		return nil, 0, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	brokers := []entity.BrokerWithStats{}
+	for rows.Next() {
+		var b entity.BrokerWithStats
+		if err := rows.Scan(
+			&b.ID, &b.Name, &b.Email, &b.Phone, &b.Whatsapp, &b.Role,
+			&b.IsActive, &b.FirstLoginAt, &b.CreatedAt, &b.UpdatedAt,
+			&b.SharedBatchesCount,
+		); err != nil {
+			return nil, 0, errors.DatabaseError(err)
+		}
+		brokers = append(brokers, b)
+	}
+
+	return brokers, total, nil
+}
+

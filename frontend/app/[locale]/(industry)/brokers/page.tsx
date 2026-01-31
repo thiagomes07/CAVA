@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX, RefreshCw, Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -21,6 +22,9 @@ import {
 } from '@/components/ui/modal';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
+import { Pagination } from '@/components/shared/Pagination';
+import { SearchInput } from '@/components/shared/SearchInput';
+import { SortableTableHead } from '@/components/shared/SortableTableHead';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { inviteBrokerSchema, type InviteBrokerInput } from '@/lib/schemas/auth.schema';
@@ -62,11 +66,22 @@ export default function BrokersManagementPage() {
   const tTeam = useTranslations('team');
 
   const [brokers, setBrokers] = useState<BrokerWithStats[]>([]);
+  const [totalItems, setTotalItems] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showResendModal, setShowResendModal] = useState(false);
   const [selectedBroker, setSelectedBroker] = useState<BrokerWithStats | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Filters state
+  const [filters, setFilters] = useState({
+    search: '',
+    isActive: undefined as boolean | undefined,
+    sortBy: 'name',
+    sortOrder: 'asc',
+    page: 1,
+    limit: 50,
+  });
 
   const {
     register,
@@ -101,19 +116,66 @@ export default function BrokersManagementPage() {
 
   useEffect(() => {
     fetchBrokers();
-  }, []);
+  }, [filters]);
 
-  const fetchBrokers = async () => {
+  const fetchBrokers = useCallback(async () => {
     try {
       setIsLoading(true);
-      const data = await apiClient.get<BrokerWithStats[]>('/brokers');
-      setBrokers(data);
+      
+      // Build query params
+      const params: Record<string, string> = {
+        page: filters.page.toString(),
+        limit: filters.limit.toString(),
+        sortBy: filters.sortBy,
+        sortOrder: filters.sortOrder,
+      };
+
+      if (filters.search) {
+        params.search = filters.search;
+      }
+      if (filters.isActive !== undefined) {
+        params.isActive = filters.isActive.toString();
+      }
+
+      const data = await apiClient.get<{
+        brokers: BrokerWithStats[];
+        total: number;
+        page: number;
+      }>('/brokers', { params });
+      
+      setBrokers(data.brokers);
+      setTotalItems(data.total);
     } catch {
       error(t('loadError'));
+      setBrokers([]);
+      setTotalItems(0);
     } finally {
       setIsLoading(false);
     }
+  }, [filters, error, t]);
+
+  const handleSort = (field: string) => {
+    setFilters((prev) => ({
+      ...prev,
+      sortBy: field,
+      sortOrder: prev.sortBy === field && prev.sortOrder === 'asc' ? 'desc' : 'asc',
+      page: 1,
+    }));
   };
+
+  const handleClearFilters = () => {
+    setFilters({
+      search: '',
+      isActive: undefined,
+      sortBy: 'name',
+      sortOrder: 'asc',
+      page: 1,
+      limit: 50,
+    });
+  };
+
+  const hasFilters = filters.search || filters.isActive !== undefined;
+  const isEmpty = brokers.length === 0;
 
   const onSubmit = async (data: InviteBrokerInput) => {
     try {
@@ -204,8 +266,6 @@ export default function BrokersManagementPage() {
   // Check if user can have invite resent (never logged in)
   const canResendInvite = (broker: BrokerWithStats) => !broker.firstLoginAt;
 
-  const isEmpty = brokers.length === 0;
-
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
@@ -226,32 +286,101 @@ export default function BrokersManagementPage() {
         </div>
       </div>
 
+      {/* Filters */}
+      <div className="px-8 py-6">
+        <div className="bg-porcelain rounded-sm border border-slate-100 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:flex-wrap md:items-end md:gap-4">
+            {/* Search */}
+            <div className="w-full md:w-auto md:min-w-[280px]">
+              <SearchInput
+                value={filters.search}
+                onChange={(value) =>
+                  setFilters((prev) => ({ ...prev, search: value, page: 1 }))
+                }
+                placeholder="Buscar por nome, email ou telefone..."
+              />
+            </div>
+
+            {/* Status Filter */}
+            <div className="w-full md:w-auto md:min-w-[180px]">
+              <Select
+                value={filters.isActive === undefined ? '' : filters.isActive.toString()}
+                onChange={(e: React.ChangeEvent<HTMLSelectElement>) => {
+                  const value = e.target.value;
+                  setFilters((prev) => ({
+                    ...prev,
+                    isActive: value === '' ? undefined : value === 'true',
+                    page: 1,
+                  }));
+                }}
+              >
+                <option value="">Todos os status</option>
+                <option value="true">Ativo</option>
+                <option value="false">Inativo</option>
+              </Select>
+            </div>
+
+            {/* Clear Filters */}
+            <div className="w-full md:w-auto md:ml-auto">
+              <Button
+                variant="secondary"
+                onClick={handleClearFilters}
+                disabled={!hasFilters}
+                className="w-full md:w-auto h-[48px] px-6"
+              >
+                Limpar Filtros
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Content */}
-      <div className="px-8 py-8">
+      <div className="px-8 pb-8">
         {isLoading ? (
           <LoadingState variant="table" rows={5} columns={6} />
         ) : isEmpty ? (
           <EmptyState
-            icon={Plus}
-            title={t('noBrokers')}
-            description={t('noBrokersDescription')}
-            actionLabel={t('inviteBrokerButton')}
-            onAction={() => setShowInviteModal(true)}
+            icon={hasFilters ? Plus : Plus}
+            title={hasFilters ? 'Nenhum resultado encontrado' : t('noBrokers')}
+            description={hasFilters ? 'Ajuste os filtros para ver mais resultados' : t('noBrokersDescription')}
+            actionLabel={hasFilters ? 'Limpar Filtros' : t('inviteBrokerButton')}
+            onAction={hasFilters ? handleClearFilters : () => setShowInviteModal(true)}
           />
         ) : (
-          <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{tCommon('name')}</TableHead>
-                  <TableHead>{tCommon('email')}</TableHead>
-                  <TableHead>{tCommon('phone')}</TableHead>
-                  <TableHead>WhatsApp</TableHead>
-                  <TableHead>{t('sharedBatches')}</TableHead>
-                  <TableHead>{tCommon('status')}</TableHead>
-                  <TableHead>{tCommon('actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
+          <>
+            <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <SortableTableHead
+                      field="name"
+                      label={tCommon('name')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
+                    <SortableTableHead
+                      field="email"
+                      label={tCommon('email')}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
+                    <TableHead>{tCommon('phone')}</TableHead>
+                    <TableHead>WhatsApp</TableHead>
+                    <TableHead>{t('sharedBatches')}</TableHead>
+                    <SortableTableHead
+                      field="created_at"
+                      label={tTeam('since') || 'Desde'}
+                      sortBy={filters.sortBy}
+                      sortOrder={filters.sortOrder}
+                      onSort={handleSort}
+                    />
+                    <TableHead>{tCommon('status')}</TableHead>
+                    <TableHead>{tCommon('actions')}</TableHead>
+                  </TableRow>
+                </TableHeader>
               <TableBody>
                 {brokers.map((broker) => (
                   <TableRow key={broker.id}>
@@ -370,6 +499,16 @@ export default function BrokersManagementPage() {
               </TableBody>
             </Table>
           </div>
+
+          {/* Pagination */}
+          <Pagination
+            currentPage={filters.page}
+            totalPages={Math.ceil(totalItems / filters.limit)}
+            totalItems={totalItems}
+            itemsPerPage={filters.limit}
+            onPageChange={(page: number) => setFilters((prev) => ({ ...prev, page }))}
+          />
+        </>
         )}
       </div>
 

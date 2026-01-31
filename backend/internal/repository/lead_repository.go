@@ -243,7 +243,18 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	// Pagination
 	offset := (filters.Page - 1) * filters.Limit
-	query = query.OrderBy(colPrefix + "created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+	
+	// Validate and apply sorting
+	sortBy := filters.GetSortBy()
+	sortOrder := filters.GetSortOrder()
+	if !filters.IsValidSortField() {
+		sortBy = "created_at"
+	}
+	if !filters.IsValidSortOrder() {
+		sortOrder = "desc"
+	}
+	
+	query = query.OrderBy(colPrefix + sortBy + " " + sortOrder).Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()
 	if err != nil {

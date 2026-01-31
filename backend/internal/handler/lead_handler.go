@@ -79,7 +79,7 @@ func (h *ClienteHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 // List godoc
 // @Summary Lista clientes
-// @Description Lista clientes com filtros e paginação
+// @Description Lista clientes com filtros, busca, ordenação e paginação
 // @Tags clientes
 // @Produce json
 // @Param search query string false "Buscar por nome ou contato"
@@ -88,6 +88,8 @@ func (h *ClienteHandler) Create(w http.ResponseWriter, r *http.Request) {
 // @Param startDate query string false "Data inicial"
 // @Param endDate query string false "Data final"
 // @Param optIn query bool false "Filtrar por opt-in"
+// @Param sortBy query string false "Campo para ordenação: name, email, created_at, status"
+// @Param sortOrder query string false "Ordem: asc ou desc"
 // @Param page query int false "Número da página"
 // @Param limit query int false "Itens por página"
 // @Success 200 {object} entity.ClienteListResponse
@@ -141,6 +143,10 @@ func (h *ClienteHandler) List(w http.ResponseWriter, r *http.Request) {
 			filters.OptIn = &b
 		}
 	}
+
+	// Sort filters
+	filters.SortBy = r.URL.Query().Get("sortBy")
+	filters.SortOrder = r.URL.Query().Get("sortOrder")
 
 	if page := r.URL.Query().Get("page"); page != "" {
 		if p, err := strconv.Atoi(page); err == nil && p > 0 {

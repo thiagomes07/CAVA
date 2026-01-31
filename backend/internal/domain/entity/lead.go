@@ -104,8 +104,53 @@ type ClienteFilters struct {
 	Status          *ClienteStatus `json:"status,omitempty"`
 	Page            int            `json:"page" validate:"min=1"`
 	Limit           int            `json:"limit" validate:"min=1,max=100"`
-	IndustryID      *string        `json:"-"` // Filtro interno: clientes de links da indústria
-	CreatedByUserID *string        `json:"-"` // Filtro interno: clientes de links criados pelo usuário (broker)
+	SortBy          string         `json:"sortBy,omitempty"`    // Campo para ordenação: name, email, created_at, status
+	SortOrder       string         `json:"sortOrder,omitempty"` // Ordem: asc ou desc
+	IndustryID      *string        `json:"-"`                   // Filtro interno: clientes de links da indústria
+	CreatedByUserID *string        `json:"-"`                   // Filtro interno: clientes de links criados pelo usuário (broker)
+}
+
+// ValidClienteSortFields retorna os campos válidos para ordenação de clientes
+func ValidClienteSortFields() []string {
+	return []string{"name", "email", "phone", "created_at", "status"}
+}
+
+// IsValidSortField verifica se o campo de ordenação é válido
+func (f *ClienteFilters) IsValidSortField() bool {
+	if f.SortBy == "" {
+		return true
+	}
+	validFields := ValidClienteSortFields()
+	for _, field := range validFields {
+		if f.SortBy == field {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidSortOrder verifica se a ordem de ordenação é válida
+func (f *ClienteFilters) IsValidSortOrder() bool {
+	if f.SortOrder == "" {
+		return true
+	}
+	return f.SortOrder == "asc" || f.SortOrder == "desc"
+}
+
+// GetSortBy retorna o campo de ordenação com valor padrão
+func (f *ClienteFilters) GetSortBy() string {
+	if f.SortBy == "" {
+		return "created_at"
+	}
+	return f.SortBy
+}
+
+// GetSortOrder retorna a ordem de ordenação com valor padrão
+func (f *ClienteFilters) GetSortOrder() string {
+	if f.SortOrder == "" {
+		return "desc"
+	}
+	return f.SortOrder
 }
 
 // ClienteListResponse representa a resposta de listagem de clientes

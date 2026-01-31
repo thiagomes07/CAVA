@@ -50,6 +50,12 @@ type UserRepository interface {
 	// ListByIndustry lista usuários por industryID com filtro de role opcional
 	ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error)
 
+	// ListByIndustryWithFilters lista usuários com filtros, busca, ordenação e paginação
+	ListByIndustryWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.User, int, error)
+
+	// FindBrokersWithFilters busca brokers com filtros, busca, ordenação e paginação
+	FindBrokersWithFilters(ctx context.Context, industryID string, filters entity.UserFilters) ([]entity.BrokerWithStats, int, error)
+
 	// UpdateEmail atualiza o email do usuário
 	UpdateEmail(ctx context.Context, id string, email string) error
 

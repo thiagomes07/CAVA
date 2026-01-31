@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -34,11 +35,17 @@ func NewUserHandler(
 
 // List godoc
 // @Summary Lista usuários
-// @Description Lista usuários da indústria com filtro opcional por role
+// @Description Lista usuários da indústria com filtros, busca, ordenação e paginação
 // @Tags users
 // @Produce json
 // @Param role query string false "Filtrar por role"
-// @Success 200 {array} entity.User
+// @Param search query string false "Buscar por nome, email ou telefone"
+// @Param isActive query bool false "Filtrar por status (true/false)"
+// @Param sortBy query string false "Campo para ordenação: name, email, created_at"
+// @Param sortOrder query string false "Ordem: asc ou desc"
+// @Param page query int false "Número da página"
+// @Param limit query int false "Itens por página"
+// @Success 200 {object} entity.UserListResponse
 // @Router /api/users [get]
 func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 	// Obter industryID do contexto
@@ -48,21 +55,63 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extrair filtro de role da query
-	roleStr := r.URL.Query().Get("role")
+	// Extrair filtros da query string
+	filters := entity.UserFilters{
+		Page:  1,
+		Limit: 50,
+	}
 
-	var roleFilter *entity.UserRole
+	// Role filter
+	roleStr := r.URL.Query().Get("role")
 	if roleStr != "" {
 		role := entity.UserRole(roleStr)
 		if !role.IsValid() {
 			response.BadRequest(w, "Role inválido", nil)
 			return
 		}
-		roleFilter = &role
+		filters.Role = &role
 	}
 
-	// Buscar usuários da indústria
-	users, err := h.userService.ListByIndustry(r.Context(), industryID, roleFilter)
+	// Search filter
+	if search := r.URL.Query().Get("search"); search != "" {
+		filters.Search = &search
+	}
+
+	// IsActive filter
+	if isActiveStr := r.URL.Query().Get("isActive"); isActiveStr != "" {
+		if isActiveStr == "true" {
+			isActive := true
+			filters.IsActive = &isActive
+		} else if isActiveStr == "false" {
+			isActive := false
+			filters.IsActive = &isActive
+		}
+	}
+
+	// Sort filters
+	filters.SortBy = r.URL.Query().Get("sortBy")
+	filters.SortOrder = r.URL.Query().Get("sortOrder")
+
+	// Pagination
+	if page := r.URL.Query().Get("page"); page != "" {
+		if p, err := strconv.Atoi(page); err == nil && p > 0 {
+			filters.Page = p
+		}
+	}
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil && l > 0 && l <= 100 {
+			filters.Limit = l
+		}
+	}
+
+	// Validar filtros
+	if err := h.validator.Validate(filters); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Buscar usuários da indústria com filtros
+	users, total, err := h.userService.ListByIndustryWithFilters(r.Context(), industryID, filters)
 	if err != nil {
 		h.logger.Error("erro ao listar usuários",
 			zap.String("industryId", industryID),
@@ -72,7 +121,14 @@ func (h *UserHandler) List(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, users)
+	// Construir resposta com metadados
+	resp := entity.UserListResponse{
+		Users: users,
+		Total: total,
+		Page:  filters.Page,
+	}
+
+	response.OK(w, resp)
 }
 
 // GetByID godoc
@@ -216,10 +272,16 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 
 // ListBrokers godoc
 // @Summary Lista brokers
-// @Description Lista brokers com estatísticas
+// @Description Lista brokers com estatísticas, filtros, busca, ordenação e paginação
 // @Tags brokers
 // @Produce json
-// @Success 200 {array} entity.BrokerWithStats
+// @Param search query string false "Buscar por nome, email ou telefone"
+// @Param isActive query bool false "Filtrar por status (true/false)"
+// @Param sortBy query string false "Campo para ordenação: name, email, created_at"
+// @Param sortOrder query string false "Ordem: asc ou desc"
+// @Param page query int false "Número da página"
+// @Param limit query int false "Itens por página"
+// @Success 200 {object} entity.UserListResponse
 // @Router /api/brokers [get]
 func (h *UserHandler) ListBrokers(w http.ResponseWriter, r *http.Request) {
 	// Obter industryID do contexto
@@ -229,8 +291,52 @@ func (h *UserHandler) ListBrokers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Buscar brokers
-	brokers, err := h.userService.GetBrokers(r.Context(), industryID)
+	// Extrair filtros da query string
+	filters := entity.UserFilters{
+		Page:  1,
+		Limit: 50,
+	}
+
+	// Search filter
+	if search := r.URL.Query().Get("search"); search != "" {
+		filters.Search = &search
+	}
+
+	// IsActive filter
+	if isActiveStr := r.URL.Query().Get("isActive"); isActiveStr != "" {
+		if isActiveStr == "true" {
+			isActive := true
+			filters.IsActive = &isActive
+		} else if isActiveStr == "false" {
+			isActive := false
+			filters.IsActive = &isActive
+		}
+	}
+
+	// Sort filters
+	filters.SortBy = r.URL.Query().Get("sortBy")
+	filters.SortOrder = r.URL.Query().Get("sortOrder")
+
+	// Pagination
+	if page := r.URL.Query().Get("page"); page != "" {
+		if p, err := strconv.Atoi(page); err == nil && p > 0 {
+			filters.Page = p
+		}
+	}
+	if limit := r.URL.Query().Get("limit"); limit != "" {
+		if l, err := strconv.Atoi(limit); err == nil && l > 0 && l <= 100 {
+			filters.Limit = l
+		}
+	}
+
+	// Validar filtros
+	if err := h.validator.Validate(filters); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Buscar brokers com filtros
+	brokers, total, err := h.userService.GetBrokersWithFilters(r.Context(), industryID, filters)
 	if err != nil {
 		h.logger.Error("erro ao listar brokers",
 			zap.Error(err),
@@ -239,7 +345,14 @@ func (h *UserHandler) ListBrokers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response.OK(w, brokers)
+	// Construir resposta com metadados (reutilizando UserListResponse mas com brokers)
+	resp := map[string]interface{}{
+		"brokers": brokers,
+		"total":   total,
+		"page":    filters.Page,
+	}
+
+	response.OK(w, resp)
 }
 
 // InviteBroker godoc
