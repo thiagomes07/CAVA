@@ -329,7 +329,11 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			cliente, err := s.clienteRepo.FindByID(ctx, *reservation.ClienteID)
 			if err == nil {
 				sale.CustomerName = cliente.Name
-				sale.CustomerContact = cliente.Contact
+				if cliente.Email != nil && *cliente.Email != "" {
+					sale.CustomerContact = *cliente.Email
+				} else if cliente.Phone != nil && *cliente.Phone != "" {
+					sale.CustomerContact = *cliente.Phone
+				}
 			}
 		}
 

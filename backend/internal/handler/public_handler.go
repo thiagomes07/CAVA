@@ -129,7 +129,6 @@ func (h *PublicHandler) CaptureClienteInterest(w http.ResponseWriter, r *http.Re
 	h.logger.Info("cliente capturado",
 		zap.String("salesLinkId", input.SalesLinkID),
 		zap.String("name", input.Name),
-		zap.String("contact", input.Contact),
 	)
 
 	response.Created(w, entity.CreateClienteResponse{Success: true})

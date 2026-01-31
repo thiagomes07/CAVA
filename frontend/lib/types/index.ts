@@ -19,7 +19,7 @@ export type FinishType =
   | 'APICOADO'
   | 'FLAMEADO';
 
-export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO';
+export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO' | 'MULTIPLOS_LOTES';
 
 export interface User {
   id: string;
@@ -120,6 +120,16 @@ export interface SharedInventoryBatch {
   sharedWith: User; // Broker ou Vendedor Interno
 }
 
+export interface SalesLinkItem {
+  id: string;
+  salesLinkId: string;
+  batchId: string;
+  quantity: number;
+  unitPrice: number;
+  createdAt: string;
+  batch?: Batch;
+}
+
 export interface SalesLink {
   id: string;
   createdByUserId: string;
@@ -140,13 +150,16 @@ export interface SalesLink {
   batch?: Batch;
   product?: Product;
   createdBy?: User;
+  items?: SalesLinkItem[];
 }
 
 export interface Cliente {
   id: string;
   salesLinkId: string;
   name: string;
-  contact: string;
+  email?: string;
+  phone?: string;
+  whatsapp?: string;
   message?: string;
   marketingOptIn: boolean;
   status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO';

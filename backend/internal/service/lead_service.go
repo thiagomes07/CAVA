@@ -66,11 +66,22 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 		return domainErrors.NewNotFoundError("Link de venda")
 	}
 
+	// Determinar contato para busca de cliente existente (prioriza email)
+	var searchContact string
+	if input.Email != nil && *input.Email != "" {
+		searchContact = *input.Email
+	} else if input.Phone != nil && *input.Phone != "" {
+		searchContact = *input.Phone
+	}
+
 	// Verificar se cliente já existe por contato
-	existingCliente, err := s.clienteRepo.FindByContact(ctx, input.Contact)
-	if err != nil && !isNotFoundError(err) {
-		s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
-		return domainErrors.InternalError(err)
+	var existingCliente *entity.Cliente
+	if searchContact != "" {
+		existingCliente, err = s.clienteRepo.FindByContact(ctx, searchContact)
+		if err != nil && !isNotFoundError(err) {
+			s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
+			return domainErrors.InternalError(err)
+		}
 	}
 
 	// Executar em transação
@@ -90,7 +101,9 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 				ID:             uuid.New().String(),
 				SalesLinkID:    link.ID,
 				Name:           input.Name,
-				Contact:        input.Contact,
+				Email:          input.Email,
+				Phone:          input.Phone,
+				Whatsapp:       input.Whatsapp,
 				Message:        input.Message,
 				MarketingOptIn: input.MarketingOptIn,
 				Status:         entity.ClienteStatusNovo,
@@ -141,15 +154,25 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 
 // CreateManual cria um cliente manualmente (usuário autenticado)
 func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateClienteManualInput) (*entity.Cliente, error) {
-	// Verificar se cliente já existe por contato
-	existingCliente, err := s.clienteRepo.FindByContact(ctx, input.Contact)
-	if err != nil && !isNotFoundError(err) {
-		s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
-		return nil, domainErrors.InternalError(err)
+	// Determinar contato para busca de cliente existente (prioriza email)
+	var searchContact string
+	if input.Email != nil && *input.Email != "" {
+		searchContact = *input.Email
+	} else if input.Phone != nil && *input.Phone != "" {
+		searchContact = *input.Phone
 	}
 
-	if existingCliente != nil {
-		return nil, domainErrors.NewConflictError("Cliente com este contato já existe")
+	// Verificar se cliente já existe por contato/email/phone
+	if searchContact != "" {
+		existingCliente, err := s.clienteRepo.FindByContact(ctx, searchContact)
+		if err != nil && !isNotFoundError(err) {
+			s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+
+		if existingCliente != nil {
+			return nil, domainErrors.NewConflictError("Cliente com este contato já existe")
+		}
 	}
 
 	// Criar novo cliente (sem SalesLinkID, criado manualmente)
@@ -157,7 +180,9 @@ func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateCl
 		ID:             uuid.New().String(),
 		SalesLinkID:    "", // Sem link associado
 		Name:           input.Name,
-		Contact:        input.Contact,
+		Email:          input.Email,
+		Phone:          input.Phone,
+		Whatsapp:       input.Whatsapp,
 		Message:        input.Message,
 		MarketingOptIn: input.MarketingOptIn,
 		Status:         entity.ClienteStatusNovo,
@@ -355,13 +380,14 @@ func (s *clienteService) SendLinksToClientes(ctx context.Context, input entity.S
 		result := entity.SendLinkResult{
 			ClienteID:   cliente.ID,
 			ClienteName: cliente.Name,
-			Email:       cliente.Contact,
+			Email:       getClienteEmail(cliente),
 		}
 
-		// Validar se o contato é um email válido
-		if !isValidEmail(cliente.Contact) {
+		// Validar se o cliente tem um email válido
+		email := getClienteEmail(cliente)
+		if email == "" || !isValidEmail(email) {
 			result.Success = false
-			result.Error = "Contato não é um email válido"
+			result.Error = "Cliente não tem email válido"
 			response.TotalSkipped++
 			response.Results = append(response.Results, result)
 			continue
@@ -375,7 +401,7 @@ func (s *clienteService) SendLinksToClientes(ctx context.Context, input entity.S
 			response.TotalFailed++
 			s.logger.Error("erro ao enviar email para cliente",
 				zap.String("clienteId", cliente.ID),
-				zap.String("email", cliente.Contact),
+				zap.String("email", email),
 				zap.Error(err),
 			)
 		} else {
@@ -383,7 +409,7 @@ func (s *clienteService) SendLinksToClientes(ctx context.Context, input entity.S
 			response.TotalSent++
 			s.logger.Info("email enviado para cliente com sucesso",
 				zap.String("clienteId", cliente.ID),
-				zap.String("email", cliente.Contact),
+				zap.String("email", email),
 				zap.Int("linksCount", len(links)),
 			)
 		}
@@ -392,6 +418,14 @@ func (s *clienteService) SendLinksToClientes(ctx context.Context, input entity.S
 	}
 
 	return response, nil
+}
+
+// getClienteEmail retorna o email do cliente (campo email)
+func getClienteEmail(cliente *entity.Cliente) string {
+	if cliente.Email != nil && *cliente.Email != "" {
+		return *cliente.Email
+	}
+	return ""
 }
 
 // isValidEmail verifica se uma string é um email válido
@@ -452,8 +486,9 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 	}
 
 	// Enviar email
+	email := getClienteEmail(cliente)
 	msg := domainService.EmailMessage{
-		To:       cliente.Contact,
+		To:       email,
 		Subject:  "Ofertas Especiais para você - CAVA Stone Platform",
 		HTMLBody: htmlBody,
 		TextBody: textBody,

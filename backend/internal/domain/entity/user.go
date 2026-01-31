@@ -51,11 +51,12 @@ type CreateUserInput struct {
 
 // CreateSellerInput representa os dados para criar um vendedor interno (senha gerada automaticamente)
 type CreateSellerInput struct {
-	Name    string   `json:"name" validate:"required,min=2,max=255"`
-	Email   string   `json:"email" validate:"required,email"`
-	Phone   *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Role    UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO ADMIN_INDUSTRIA"`
-	IsAdmin bool     `json:"isAdmin"`
+	Name     string   `json:"name" validate:"required,min=2,max=255"`
+	Email    string   `json:"email" validate:"required,email"`
+	Phone    *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp *string  `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	Role     UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO ADMIN_INDUSTRIA"`
+	IsAdmin  bool     `json:"isAdmin"`
 }
 
 // UpdateUserInput representa os dados para atualizar um usuário

@@ -144,6 +144,7 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		Email:      input.Email,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
+		Whatsapp:   input.Whatsapp,
 		Role:       role,
 		IsActive:   true,
 		CreatedAt:  time.Now(),

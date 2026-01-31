@@ -1,11 +1,30 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
-  X, Layers, Settings, Save, AlertTriangle, DollarSign,
-  Share2, Archive, Trash2, Package, Eye, EyeOff, User,
-  RotateCcw, Upload, ArrowUp, ArrowDown, Receipt
+  X, Layers, Settings, Save, DollarSign,
+  Share2, Trash2, Package, User,
+  Upload, Boxes, GripVertical
 } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
 import type { Batch, Media, PriceUnit, BatchStatus, User as UserType, SharedInventoryBatch } from '@/lib/types';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
@@ -13,11 +32,110 @@ import { formatArea, calculateTotalArea } from '@/lib/utils/formatDimensions';
 import { calculateTotalBatchPrice, formatPricePerUnit, getPriceUnitLabel } from '@/lib/utils/priceConversion';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { cn } from '@/lib/utils/cn';
+import { apiClient, ApiError } from '@/lib/api/client';
+import { useToast } from '@/lib/hooks/useToast';
 import { SellBatchModal } from '@/app/[locale]/(industry)/inventory/[id]/components/SellBatchModal';
 
 interface UploadedMedia {
+  id: string;
   file: File;
   preview: string;
+}
+
+// Unified media item for drag and drop
+interface DraggableMediaItem {
+  id: string;
+  url: string;
+  isNew: boolean;
+  originalMedia?: Media;
+  newMedia?: UploadedMedia;
+}
+
+// Sortable Media Item Component
+function SortableMediaItem({ 
+  item, 
+  onRemove, 
+  isFirst 
+}: { 
+  item: DraggableMediaItem; 
+  onRemove: (id: string) => void; 
+  isFirst: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative aspect-[4/3] rounded-sm overflow-hidden border-2 group',
+        isDragging ? 'opacity-50 shadow-xl' : '',
+        item.isNew ? 'border-dashed border-emerald-400' : 'border-slate-200'
+      )}
+    >
+      {isPlaceholderUrl(item.url) ? (
+        <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
+          Sem foto
+        </div>
+      ) : (
+        <img
+          src={item.url}
+          alt="Foto do lote"
+          className="w-full h-full object-cover"
+        />
+      )}
+
+      {/* Overlay with controls */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <button
+          type="button"
+          className="p-2 bg-white/90 rounded-sm cursor-grab active:cursor-grabbing touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4 text-slate-700" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Cover badge */}
+      {isFirst && (
+        <div className="absolute top-2 left-2">
+          <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
+            CAPA
+          </span>
+        </div>
+      )}
+
+      {/* New badge */}
+      {item.isNew && (
+        <div className="absolute top-2 right-2">
+          <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
+            NOVA
+          </span>
+        </div>
+      )}
+    </div>
+  );
 }
 
 interface BatchDetailModalProps {
@@ -31,6 +149,7 @@ interface BatchDetailModalProps {
   onShare: (userId: string, negotiatedPrice?: number) => Promise<void>;
   onRemoveShare: (shareId: string) => Promise<void>;
   onUpdateMedia: (existingMedias: Media[], newMedias: File[], mediasToDelete: string[]) => Promise<void>;
+  onUpdateStatus?: (status: BatchStatus, fromStatus: BatchStatus, quantity: number) => Promise<void>;
 }
 
 export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
@@ -44,8 +163,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   onShare,
   onRemoveShare,
   onUpdateMedia,
+  onUpdateStatus,
 }) => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing'>('stock');
+  const { success, error: toastError } = useToast();
+  const [activeTab, setActiveTab] = useState<'overview' | 'stock' | 'sharing' | 'inventory'>('stock');
+  
+  // Inventory tab state
+  const [statusQuantityInput, setStatusQuantityInput] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<BatchStatus | null>(null);
+  const [sourceStatus, setSourceStatus] = useState<BatchStatus>('DISPONIVEL');
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusUpdatedAt, setStatusUpdatedAt] = useState<number | null>(null);
+  const [currentBatch, setCurrentBatch] = useState<Batch>(batch);
   const [showSellModal, setShowSellModal] = useState(false);
 
   // Form data for stock tab
@@ -61,10 +190,9 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     isPublic: batch.isPublic || false,
   });
 
-  // Media management
-  const [existingMedias, setExistingMedias] = useState<Media[]>(batch.medias || []);
+  // Media management - single ordered list
+  const [orderedMediaItems, setOrderedMediaItems] = useState<DraggableMediaItem[]>([]);
   const [mediasToDelete, setMediasToDelete] = useState<string[]>([]);
-  const [newMedias, setNewMedias] = useState<UploadedMedia[]>([]);
 
   // Sharing
   const [selectedUserId, setSelectedUserId] = useState('');
@@ -72,6 +200,32 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
   const [isSharing, setIsSharing] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // Status labels for inventory management
+  const statusLabels: Record<BatchStatus, string> = {
+    DISPONIVEL: 'Disponível',
+    RESERVADO: 'Reservado',
+    VENDIDO: 'Vendido',
+    INATIVO: 'Inativo',
+  };
+
+  const getMaxForSource = (source: BatchStatus) => {
+    switch (source) {
+      case 'DISPONIVEL':
+        return currentBatch.availableSlabs;
+      case 'RESERVADO':
+        return currentBatch.reservedSlabs ?? 0;
+      case 'VENDIDO':
+        return currentBatch.soldSlabs ?? 0;
+      case 'INATIVO':
+        return currentBatch.inactiveSlabs ?? 0;
+      default:
+        return 0;
+    }
+  };
+
+  const parsedStatusQuantity = statusQuantityInput === '' ? 0 : Number(statusQuantityInput);
+  const isQuantityValid = Number.isFinite(parsedStatusQuantity) && parsedStatusQuantity > 0;
 
   useEffect(() => {
     setFormData({
@@ -85,7 +239,15 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
       originQuarry: batch.originQuarry || '',
       isPublic: batch.isPublic || false,
     });
-    setExistingMedias(batch.medias || []);
+    // Initialize ordered media items from batch
+    const initialItems: DraggableMediaItem[] = (batch.medias || []).map((media) => ({
+      id: `existing-${media.id}`,
+      url: media.url,
+      isNew: false,
+      originalMedia: media,
+    }));
+    setOrderedMediaItems(initialItems);
+    setCurrentBatch(batch);
   }, [batch]);
 
   const calculatedArea = useMemo(() => {
@@ -102,23 +264,156 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     return 0;
   }, [calculatedArea, formData.industryPrice, formData.priceUnit]);
 
+  const handleUpdateStatus = async (status: BatchStatus): Promise<boolean> => {
+    if (sourceStatus === status) {
+      toastError('Selecione um destino diferente da origem');
+      return false;
+    }
+    const maxAllowed = getMaxForSource(sourceStatus);
+    if (maxAllowed <= 0) {
+      toastError('Não há chapas suficientes para essa ação');
+      return false;
+    }
+    if (!isQuantityValid) {
+      toastError('Informe uma quantidade válida de chapas');
+      return false;
+    }
+    if (parsedStatusQuantity > maxAllowed) {
+      toastError(`Quantidade máxima para ${statusLabels[status]} é ${maxAllowed}`);
+      return false;
+    }
+    try {
+      setIsUpdatingStatus(true);
+      const updated = await apiClient.patch<Batch>(`/batches/${batch.id}/availability`, {
+        status,
+        fromStatus: sourceStatus,
+        quantity: parsedStatusQuantity,
+      });
+      setCurrentBatch(updated);
+      setSelectedStatus(null);
+      setStatusQuantityInput('');
+      setStatusUpdatedAt(Date.now());
+      success('Status do lote atualizado');
+      return true;
+    } catch (err) {
+      if (err instanceof ApiError) {
+        toastError(err.message);
+      } else {
+        toastError('Erro ao atualizar status do lote');
+      }
+      return false;
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleApplyStatus = async () => {
+    if (!selectedStatus) {
+      toastError('Selecione um status para atualizar');
+      return;
+    }
+
+    // Intercepta status 'VENDIDO' para abrir modal de venda
+    if (selectedStatus === 'VENDIDO') {
+      if (!isQuantityValid || parsedStatusQuantity <= 0) {
+        toastError('Informe uma quantidade válida de chapas para vender');
+        return;
+      }
+      setShowSellModal(true);
+      return;
+    }
+
+    await handleUpdateStatus(selectedStatus);
+  };
+
+  const handleSellSuccess = async () => {
+    // Recarregar dados do batch após venda bem-sucedida
+    try {
+      const updated = await apiClient.get<Batch>(`/batches/${batch.id}`);
+      setCurrentBatch(updated);
+      setSelectedStatus(null);
+      setStatusQuantityInput('');
+      setStatusUpdatedAt(Date.now());
+    } catch (err) {
+      console.error('Erro ao recarregar batch:', err);
+    }
+  };
+
   const handleSaveStock = async () => {
     try {
       setIsSaving(true);
       await onUpdate(formData);
 
+      // Extract existing and new medias from ordered items
+      const existingMedias: Media[] = [];
+      const newMediaFiles: File[] = [];
+      
+      orderedMediaItems.forEach((item, index) => {
+        if (!item.isNew && item.originalMedia) {
+          existingMedias.push({ ...item.originalMedia, displayOrder: index });
+        } else if (item.isNew && item.newMedia) {
+          newMediaFiles.push(item.newMedia.file);
+        }
+      });
+
       // Handle media updates if there are changes
-      if (mediasToDelete.length > 0 || newMedias.length > 0) {
-        await onUpdateMedia(existingMedias, newMedias.map(m => m.file), mediasToDelete);
+      const hasNewMedias = orderedMediaItems.some(item => item.isNew);
+      if (mediasToDelete.length > 0 || hasNewMedias || existingMedias.length > 0) {
+        await onUpdateMedia(existingMedias, newMediaFiles, mediasToDelete);
       }
     } finally {
       setIsSaving(false);
     }
   };
 
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // State for active dragging item
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const activeItem = activeId ? orderedMediaItems.find(item => item.id === activeId) : null;
+
+  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+    
+    if (!over || active.id === over.id) return;
+
+    setOrderedMediaItems((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+      
+      if (oldIndex === -1 || newIndex === -1) return items;
+      
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }, []);
+
+  const handleRemoveMedia = useCallback((itemId: string) => {
+    const itemToRemove = orderedMediaItems.find(item => item.id === itemId);
+    if (itemToRemove && !itemToRemove.isNew && itemToRemove.originalMedia) {
+      setMediasToDelete((prev) => [...prev, itemToRemove.originalMedia!.id]);
+    }
+    setOrderedMediaItems((prev) => prev.filter((item) => item.id !== itemId));
+  }, [orderedMediaItems]);
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
-    const totalPhotos = existingMedias.length + newMedias.length + files.length;
+    const totalPhotos = orderedMediaItems.length + files.length;
 
     if (totalPhotos > 10) {
       alert('Máximo de 10 fotos por lote');
@@ -138,50 +433,22 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
 
       const reader = new FileReader();
       reader.onload = (event) => {
-        setNewMedias((prev) => [
-          ...prev,
-          {
+        const newItem: DraggableMediaItem = {
+          id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+          url: event.target?.result as string,
+          isNew: true,
+          newMedia: {
+            id: `new-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             file,
             preview: event.target?.result as string,
           },
-        ]);
+        };
+        setOrderedMediaItems((prev) => [...prev, newItem]);
       };
       reader.readAsDataURL(file);
     });
 
     e.target.value = '';
-  };
-
-  const handleRemoveExistingMedia = (index: number) => {
-    const mediaToRemove = existingMedias[index];
-    if (mediaToRemove?.id) {
-      setMediasToDelete((prev) => [...prev, mediaToRemove.id]);
-    }
-    setExistingMedias((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleRemoveNewMedia = (index: number) => {
-    setNewMedias((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleReorderExisting = (fromIndex: number, toIndex: number) => {
-    setExistingMedias((prev) => {
-      if (toIndex < 0 || toIndex >= prev.length) return prev;
-      const updated = [...prev];
-      const [moved] = updated.splice(fromIndex, 1);
-      updated.splice(toIndex, 0, moved);
-      return updated.map((media, i) => ({ ...media, displayOrder: i }));
-    });
-  };
-
-  const handleSetExistingCover = (index: number) => {
-    setExistingMedias((prev) => {
-      if (index === 0) return prev;
-      const updated = [...prev];
-      const [cover] = updated.splice(index, 1);
-      updated.unshift(cover);
-      return updated.map((media, i) => ({ ...media, displayOrder: i }));
-    });
   };
 
   const handleShareBatch = async () => {
@@ -196,14 +463,13 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
     }
   };
 
-  const allMedias = [...existingMedias, ...newMedias.map((_, i) => ({ id: `new-${i}`, url: '', displayOrder: existingMedias.length + i, batchId: '', createdAt: new Date() }))];
-  const coverMedia = existingMedias[0] || (newMedias[0] ? { url: newMedias[0].preview } : null);
+  const coverMedia = orderedMediaItems[0] ? { url: orderedMediaItems[0].url } : null;
 
-  const totalQuantity = batch.quantitySlabs;
-  const availableQty = batch.availableSlabs;
-  const reservedQty = batch.reservedSlabs ?? 0;
-  const soldQty = batch.soldSlabs ?? 0;
-  const inactiveQty = batch.inactiveSlabs ?? 0;
+  const totalQuantity = currentBatch.quantitySlabs;
+  const availableQty = currentBatch.availableSlabs;
+  const reservedQty = currentBatch.reservedSlabs ?? 0;
+  const soldQty = currentBatch.soldSlabs ?? 0;
+  const inactiveQty = currentBatch.inactiveSlabs ?? 0;
 
   return (
     <>
@@ -261,6 +527,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 Estoque
               </button>
               <button
+                onClick={() => setActiveTab('inventory')}
+                className={cn(
+                  'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
+                  activeTab === 'inventory'
+                    ? 'border-[#C2410C] text-[#121212]'
+                    : 'border-transparent text-slate-400 hover:text-slate-600'
+                )}
+              >
+                <Boxes className="w-3 h-3 mr-2" />
+                Inventário
+              </button>
+              <button
                 onClick={() => setActiveTab('sharing')}
                 className={cn(
                   'pb-4 pl-3 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-l-2 whitespace-nowrap',
@@ -299,25 +577,6 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       {batch.width}x{batch.height}x{batch.thickness} cm
                     </p>
                   </div>
-                </div>
-
-                {/* Quick Actions */}
-                <div className="grid grid-cols-2 gap-2 md:gap-3">
-                  <button
-                    onClick={() => setShowSellModal(true)}
-                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all border bg-transparent hover:bg-slate-50 text-[#121212] border-slate-200 hover:border-[#121212]"
-                    disabled={availableQty === 0}
-                  >
-                    <Receipt className="w-3 h-3 mr-2" />
-                    Vender
-                  </button>
-                  <button
-                    onClick={onArchive}
-                    className="flex items-center justify-center px-4 py-3 rounded-sm text-xs font-bold uppercase tracking-wider transition-all shadow-lg bg-[#121212] hover:bg-[#C2410C] text-white border border-transparent"
-                  >
-                    <Archive className="w-3 h-3 mr-2" />
-                    Arquivar
-                  </button>
                 </div>
 
                 {/* Global Inventory */}
@@ -411,6 +670,18 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                 >
                   <Settings className="w-3 h-3 mr-2" />
                   Estoque
+                </button>
+                <button
+                  onClick={() => setActiveTab('inventory')}
+                  className={cn(
+                    'pb-4 text-xs font-bold uppercase tracking-widest flex items-center transition-colors border-b-2 whitespace-nowrap',
+                    activeTab === 'inventory'
+                      ? 'border-[#C2410C] text-[#121212]'
+                      : 'border-transparent text-slate-400 hover:text-slate-600'
+                  )}
+                >
+                  <Boxes className="w-3 h-3 mr-2" />
+                  Inventário
                 </button>
                 <button
                   onClick={() => setActiveTab('sharing')}
@@ -612,7 +883,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             'border-2 border-dashed border-slate-300 rounded-sm',
                             'cursor-pointer transition-colors',
                             'hover:border-obsidian hover:bg-slate-50',
-                            allMedias.length >= 10 && 'opacity-50 cursor-not-allowed'
+                            orderedMediaItems.length >= 10 && 'opacity-50 cursor-not-allowed'
                           )}
                         >
                           <Upload className="w-12 h-12 text-slate-400 mb-4" />
@@ -620,7 +891,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             Adicionar mais fotos
                           </p>
                           <p className="text-xs text-slate-400">
-                            {allMedias.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
+                            {orderedMediaItems.length}/10 fotos • JPG, PNG ou WebP • 5MB máx.
                           </p>
                           <input
                             id="file-upload"
@@ -628,7 +899,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             accept="image/jpeg,image/png,image/webp"
                             multiple
                             onChange={handleFileSelect}
-                            disabled={allMedias.length >= 10}
+                            disabled={orderedMediaItems.length >= 10}
                             className="hidden"
                           />
                         </label>
@@ -637,108 +908,48 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                         </p>
                       </div>
 
-                      {allMedias.length > 0 && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          {existingMedias.map((media, index) => (
-                            <div
-                              key={media.id}
-                              className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-slate-200 group"
-                            >
-                              {isPlaceholderUrl(media.url) ? (
-                                <div className="w-full h-full flex items-center justify-center text-slate-400 text-xs bg-slate-100">
-                                  Sem foto
-                                </div>
-                              ) : (
+                      {orderedMediaItems.length > 0 && (
+                        <DndContext
+                          sensors={sensors}
+                          collisionDetection={closestCenter}
+                          modifiers={[restrictToParentElement]}
+                          onDragStart={handleDragStart}
+                          onDragEnd={handleDragEnd}
+                        >
+                          <SortableContext
+                            items={orderedMediaItems.map(item => item.id)}
+                            strategy={rectSortingStrategy}
+                          >
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 overflow-hidden">
+                              {orderedMediaItems.map((item, index) => (
+                                <SortableMediaItem
+                                  key={item.id}
+                                  item={item}
+                                  onRemove={handleRemoveMedia}
+                                  isFirst={index === 0}
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                          <DragOverlay>
+                            {activeItem ? (
+                              <div className="aspect-[4/3] rounded-sm overflow-hidden border-2 border-blue-500 shadow-2xl opacity-90">
                                 <img
-                                  src={media.url}
-                                  alt={`Foto ${index + 1}`}
+                                  src={activeItem.url}
+                                  alt="Arrastando"
                                   className="w-full h-full object-cover"
                                 />
-                              )}
-
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center px-2">
-                                <div className="grid grid-cols-[auto_minmax(7rem,1fr)] gap-2 items-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReorderExisting(index, index - 1)}
-                                    className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                                    disabled={index === 0}
-                                  >
-                                    <ArrowUp className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleSetExistingCover(index)}
-                                    className="w-full px-3 py-2 bg-blue-500 text-white text-xs font-semibold rounded-sm disabled:opacity-60 text-center"
-                                    disabled={index === 0}
-                                  >
-                                    Definir capa
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleReorderExisting(index, index + 1)}
-                                    className="p-2 bg-white/90 text-obsidian rounded-sm disabled:opacity-40 justify-self-center"
-                                    disabled={index === existingMedias.length - 1}
-                                  >
-                                    <ArrowDown className="w-4 h-4" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleRemoveExistingMedia(index)}
-                                    className="w-full p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors flex items-center justify-center"
-                                  >
-                                    <X className="w-4 h-4" />
-                                  </button>
-                                </div>
                               </div>
-
-                              {index === 0 && (
-                                <div className="absolute top-2 left-2">
-                                  <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
-                                    CAPA
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          ))}
-
-                          {newMedias.map((media, index) => (
-                            <div
-                              key={`new-${index}`}
-                              className="relative aspect-[4/3] rounded-sm overflow-hidden border-2 border-dashed border-emerald-400 group"
-                            >
-                              <img
-                                src={media.preview}
-                                alt={`Nova foto ${index + 1}`}
-                                className="w-full h-full object-cover"
-                              />
-
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <button
-                                  type="button"
-                                  onClick={() => handleRemoveNewMedia(index)}
-                                  className="p-2 bg-rose-500 text-white rounded-sm hover:bg-rose-600 transition-colors"
-                                >
-                                  <X className="w-4 h-4" />
-                                </button>
-                              </div>
-
-                              {existingMedias.length === 0 && index === 0 && (
-                                <div className="absolute top-2 left-2">
-                                  <span className="px-2 py-1 bg-blue-500 text-white text-xs font-semibold rounded-sm">
-                                    CAPA
-                                  </span>
-                                </div>
-                              )}
-
-                              <div className="absolute top-2 right-2">
-                                <span className="px-2 py-1 bg-emerald-500 text-white text-xs font-semibold rounded-sm">
-                                  NOVA
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                            ) : null}
+                          </DragOverlay>
+                        </DndContext>
+                      )}
+                      
+                      {orderedMediaItems.length > 0 && (
+                        <p className="text-xs text-slate-400 mt-2 flex items-center gap-1">
+                          <GripVertical className="w-3 h-3" />
+                          Arraste as fotos para reordenar. A primeira foto será a capa.
+                        </p>
                       )}
                     </div>
 
@@ -758,6 +969,223 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                         <Save className="w-4 h-4 mr-2" />
                         {isSaving ? 'Salvando...' : 'Salvar Alterações'}
                       </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Inventory Tab */}
+                {activeTab === 'inventory' && (
+                  <div className="space-y-6 md:space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <div className="bg-[#121212] p-4 md:p-6 flex items-start gap-5 shadow-xl">
+                      <Boxes className="w-6 h-6 text-[#C2410C] mt-1 flex-shrink-0" />
+                      <div>
+                        <h3 className="text-lg font-serif text-white">Gestão de Inventário</h3>
+                        <p className="text-sm text-slate-400 mt-2 font-light leading-relaxed max-w-xl">
+                          Mova chapas entre diferentes status: disponível, reservado, vendido ou inativo.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white border border-slate-200 p-6 space-y-6">
+                      {/* Status Overview */}
+                      <div className="space-y-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                          <Layers className="w-3 h-3 mr-2" /> Resumo do Inventário
+                        </h4>
+                        
+                        <div className="h-4 w-full rounded-full overflow-hidden bg-slate-100 flex">
+                          {availableQty > 0 && (
+                            <div
+                              className="bg-emerald-500"
+                              style={{ width: `${(availableQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {reservedQty > 0 && (
+                            <div
+                              className="bg-amber-500"
+                              style={{ width: `${(reservedQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {soldQty > 0 && (
+                            <div
+                              className="bg-blue-500"
+                              style={{ width: `${(soldQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                          {inactiveQty > 0 && (
+                            <div
+                              className="bg-slate-400"
+                              style={{ width: `${(inactiveQty / Math.max(totalQuantity, 1)) * 100}%` }}
+                            />
+                          )}
+                        </div>
+                        
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Disponíveis: <span className="font-bold text-[#121212]">{availableQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-emerald-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Reservadas: <span className="font-bold text-[#121212]">{reservedQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-amber-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Vendidas: <span className="font-bold text-[#121212]">{soldQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-blue-500" />
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-slate-600">Inativas: <span className="font-bold text-[#121212]">{inactiveQty}</span></span>
+                            <span className="h-1.5 w-10 rounded-full bg-slate-400" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Status Transfer Form */}
+                      <div className="space-y-4 pt-4 border-t border-slate-200">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-widest">
+                          Mover Chapas
+                        </h4>
+                        
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Quantidade de chapas
+                          </label>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={statusQuantityInput}
+                            onChange={(e) => {
+                              const next = e.target.value.replace(/\D/g, '');
+                              setStatusQuantityInput(next);
+                              setStatusUpdatedAt(null);
+                            }}
+                            disabled={isUpdatingStatus}
+                            className="w-full py-2 bg-transparent border-b border-slate-300 text-xl font-serif text-[#121212] focus:border-[#121212] outline-none transition-colors"
+                            placeholder="Digite a quantidade"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Mover de
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { value: 'DISPONIVEL', label: 'Disponível' },
+                              { value: 'RESERVADO', label: 'Reservado' },
+                              { value: 'VENDIDO', label: 'Vendido' },
+                              { value: 'INATIVO', label: 'Inativo' },
+                            ] as { value: BatchStatus; label: string }[]).map((option) => (
+                              <button
+                                key={`from-${option.value}`}
+                                type="button"
+                                onClick={() => setSourceStatus(option.value)}
+                                className={cn(
+                                  'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                                  sourceStatus === option.value
+                                    ? 'bg-[#121212] text-white'
+                                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                )}
+                                disabled={isUpdatingStatus}
+                              >
+                                {option.label}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wide block">
+                            Para
+                          </label>
+                          <div className="flex flex-wrap gap-2">
+                            {([
+                              { value: 'DISPONIVEL', label: 'Disponível' },
+                              { value: 'RESERVADO', label: 'Reservado' },
+                              { value: 'VENDIDO', label: 'Vendido' },
+                              { value: 'INATIVO', label: 'Inativo' },
+                            ] as { value: BatchStatus; label: string }[]).map((option) => {
+                              const maxAllowed = getMaxForSource(sourceStatus);
+                              const isDisabled =
+                                isUpdatingStatus ||
+                                sourceStatus === option.value ||
+                                maxAllowed <= 0 ||
+                                !isQuantityValid ||
+                                parsedStatusQuantity > maxAllowed;
+                              return (
+                                <button
+                                  key={option.value}
+                                  type="button"
+                                  onClick={() =>
+                                    setSelectedStatus((prev) => (prev === option.value ? null : option.value))
+                                  }
+                                  className={cn(
+                                    'px-4 py-2 rounded-sm text-sm font-medium transition-colors',
+                                    selectedStatus === option.value
+                                      ? 'bg-[#121212] text-white'
+                                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200',
+                                    isDisabled && 'opacity-40 cursor-not-allowed'
+                                  )}
+                                  disabled={isDisabled}
+                                >
+                                  {option.label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-4 pt-4">
+                          <button
+                            type="button"
+                            onClick={handleApplyStatus}
+                            disabled={
+                              isUpdatingStatus ||
+                              !selectedStatus ||
+                              !isQuantityValid ||
+                              selectedStatus === sourceStatus
+                            }
+                            className="px-8 py-3 bg-[#121212] text-white text-xs font-bold uppercase tracking-widest hover:bg-[#C2410C] shadow-lg transition-all flex items-center disabled:opacity-50"
+                          >
+                            {isUpdatingStatus ? 'Atualizando...' : 'Atualizar Status'}
+                          </button>
+                          {selectedStatus && (
+                            <span className="text-sm text-slate-500">
+                              {statusLabels[sourceStatus]} → {statusLabels[selectedStatus]}
+                            </span>
+                          )}
+                        </div>
+
+                        {(() => {
+                          const now = Date.now();
+                          const recent = statusUpdatedAt && now - statusUpdatedAt < 5000;
+                          if (recent) {
+                            return (
+                              <p className="text-sm text-emerald-600 font-medium">✓ Status atualizado com sucesso</p>
+                            );
+                          }
+
+                          if (statusQuantityInput === '') {
+                            return (
+                              <p className="text-xs text-slate-500">
+                                Informe a quantidade de chapas e escolha o status para ajustar o estoque.
+                              </p>
+                            );
+                          }
+
+                          if (isQuantityValid) {
+                            return (
+                              <p className="text-xs text-slate-500">
+                                Quantidade válida: {parsedStatusQuantity} chapas
+                              </p>
+                            );
+                          }
+
+                          return (
+                            <p className="text-xs text-rose-600">Quantidade inválida</p>
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -868,17 +1296,17 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
         </div>
       </div>
 
-      {/* Sell Modal */}
-      {showSellModal && (
+      {/* Sell Batch Modal */}
+      {showSellModal && currentBatch && (
         <SellBatchModal
-          batch={batch}
-          quantitySlabs={availableQty}
-          sourceStatus="DISPONIVEL"
+          batch={currentBatch}
+          quantitySlabs={parsedStatusQuantity}
+          sourceStatus={sourceStatus}
           isOpen={showSellModal}
           onClose={() => setShowSellModal(false)}
           onSuccess={() => {
+            handleSellSuccess();
             setShowSellModal(false);
-            // Parent component should refetch batch
           }}
         />
       )}

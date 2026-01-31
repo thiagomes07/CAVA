@@ -1,17 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, ArrowRight, Check, Search, Package, Copy, Link2, Tag, Eye, EyeOff, Calendar, Type, MessageSquare, Hash, Sparkles, X, ExternalLink } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Search, Package, Copy, Link2, Eye, EyeOff, X, ExternalLink, Plus, Minus, Trash2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Toggle } from '@/components/ui/toggle';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
-import { salesLinkSchema, type SalesLinkInput } from '@/lib/schemas/link.schema';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { nanoid } from 'nanoid';
@@ -20,8 +17,16 @@ import type { Batch, Product, LinkType, SharedInventoryBatch } from '@/lib/types
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { useLocale } from 'next-intl';
+import { format, addDays } from 'date-fns';
 
-type WizardStep = 'content' | 'pricing' | 'config';
+type WizardStep = 'content' | 'config';
+
+// Item selecionado com quantidade e preço
+interface SelectedItem {
+  batch: Batch;
+  quantity: number;
+  unitPrice: number;
+}
 
 export default function CreateSalesLinkPage() {
   const locale = useLocale();
@@ -30,98 +35,49 @@ export default function CreateSalesLinkPage() {
   const { user, isBroker } = useAuth();
 
   const [currentStep, setCurrentStep] = useState<WizardStep>('content');
-  const [linkType, setLinkType] = useState<LinkType>('LOTE_UNICO');
-  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [availableBatches, setAvailableBatches] = useState<Batch[]>([]);
-  const [availableProducts, setAvailableProducts] = useState<Product[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoadingContent, setIsLoadingContent] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [generatedLink, setGeneratedLink] = useState<string>('');
-  const [calculatedMargin, setCalculatedMargin] = useState<number>(0);
-  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
-  const [isSlugAvailable, setIsSlugAvailable] = useState(true);
+  const [expirationDate, setExpirationDate] = useState<Date | undefined>(undefined);
 
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    watch,
-    setValue,
-    reset,
-  } = useForm<SalesLinkInput>({
-    resolver: zodResolver(salesLinkSchema),
-    defaultValues: {
-      linkType: 'LOTE_UNICO',
-      showPrice: true,
-      isActive: true,
-      slugToken: nanoid(10).toLowerCase(),
-    },
-  });
+  // Multiple items selection
+  const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([]);
 
-  const displayPrice = watch('displayPrice');
-  const showPrice = watch('showPrice');
-  const slugToken = watch('slugToken');
+  // Link config
+  const [showPrice, setShowPrice] = useState(true);
+  const [isActive, setIsActive] = useState(true);
+  const [title, setTitle] = useState('');
+  const [customMessage, setCustomMessage] = useState('');
+
+  // Generate slug once on mount
+  const [generatedSlug] = useState(() => nanoid(10).toLowerCase());
 
   useEffect(() => {
-    if (currentStep === 'content') {
-      fetchAvailableContent();
-    }
-  }, [currentStep, linkType]);
-
-  useEffect(() => {
-    if (currentStep !== 'config') return;
-    
-    const handle = setTimeout(async () => {
-      if (!slugToken) return;
-      setIsCheckingSlug(true);
-      const available = await validateSlug(slugToken);
-      setIsSlugAvailable(available);
-      setIsCheckingSlug(false);
-    }, 400);
-
-    return () => clearTimeout(handle);
-  }, [slugToken, currentStep]);
-
-  useEffect(() => {
-    if (isBroker() && selectedBatch && displayPrice) {
-      const basePrice = selectedBatch.industryPrice;
-      const margin = displayPrice - basePrice;
-      setCalculatedMargin(margin);
-    }
-  }, [displayPrice, selectedBatch, isBroker]);
+    fetchAvailableContent();
+  }, []);
 
   const fetchAvailableContent = async () => {
     try {
       setIsLoadingContent(true);
 
-      if (linkType === 'LOTE_UNICO') {
-        if (isBroker()) {
-          // Para brokers, buscar inventário compartilhado
-          const data = await apiClient.get<SharedInventoryBatch[]>(
-            '/broker/shared-inventory',
-            { params: { status: 'DISPONIVEL', limit: 1000 } }
-          );
-          // Extrair batches do array de SharedInventoryBatch
-          const batches = data
-            .map((shared) => shared.batch)
-            .filter((batch): batch is Batch => batch !== null && batch !== undefined && batch.status === 'DISPONIVEL');
-          setAvailableBatches(batches);
-        } else {
-          // Para admins, buscar batches normalmente
-          const data = await apiClient.get<{ batches?: Batch[]; data?: Batch[] }>(
-            '/batches',
-            { params: { status: 'DISPONIVEL', limit: 1000 } }
-          );
-          setAvailableBatches(data.batches || data.data || []);
-        }
-      } else if (linkType === 'PRODUTO_GERAL') {
-        const data = await apiClient.get<{ products: Product[] }>('/products', {
-          params: { includeInactive: false, limit: 1000 },
-        });
-        setAvailableProducts(data.products);
+      if (isBroker()) {
+        const data = await apiClient.get<SharedInventoryBatch[]>(
+          '/broker/shared-inventory',
+          { params: { status: 'DISPONIVEL', limit: 1000 } }
+        );
+        const batches = data
+          .map((shared) => shared.batch)
+          .filter((batch): batch is Batch => batch !== null && batch !== undefined && batch.status === 'DISPONIVEL');
+        setAvailableBatches(batches);
+      } else {
+        const data = await apiClient.get<{ batches?: Batch[]; data?: Batch[] }>(
+          '/batches',
+          { params: { status: 'DISPONIVEL', limit: 1000 } }
+        );
+        setAvailableBatches(data.batches || data.data || []);
       }
     } catch (err) {
       error('Erro ao carregar conteúdo');
@@ -130,144 +86,216 @@ export default function CreateSalesLinkPage() {
     }
   };
 
-  const validateSlug = async (slug: string): Promise<boolean> => {
-    try {
-      await apiClient.get('/sales-links/validate-slug', {
-        params: { slug },
-      });
-      return true;
-    } catch {
-      return false;
+  // Add batch to selection
+  const handleAddBatch = (batch: Batch) => {
+    // Check if already selected
+    if (selectedItems.some(item => item.batch.id === batch.id)) {
+      error('Este lote já foi adicionado');
+      return;
     }
+
+    setSelectedItems(prev => [...prev, {
+      batch,
+      quantity: 1,
+      unitPrice: batch.industryPrice
+    }]);
   };
 
-  const handleGenerateSlug = () => {
-    const newSlug = nanoid(10).toLowerCase();
-    setValue('slugToken', newSlug);
+  // Remove batch from selection
+  const handleRemoveBatch = (batchId: string) => {
+    setSelectedItems(prev => prev.filter(item => item.batch.id !== batchId));
   };
 
-  const handleSelectBatch = (batch: Batch) => {
-    setSelectedBatch(batch);
-    setValue('batchId', batch.id);
-    setValue('linkType', 'LOTE_UNICO');
+  // Update quantity for a batch
+  const handleUpdateQuantity = (batchId: string, newQuantity: number) => {
+    setSelectedItems(prev => prev.map(item => {
+      if (item.batch.id === batchId) {
+        const maxQty = item.batch.availableSlabs;
+        const validQty = Math.max(1, Math.min(newQuantity, maxQty));
+        return { ...item, quantity: validQty };
+      }
+      return item;
+    }));
+  };
+
+  // Update price for a batch
+  const handleUpdatePrice = (batchId: string, newPrice: number) => {
+    setSelectedItems(prev => prev.map(item => {
+      if (item.batch.id === batchId) {
+        return { ...item, unitPrice: Math.max(0, newPrice) };
+      }
+      return item;
+    }));
+  };
+
+  // Calculate totals
+  const totals = useMemo(() => {
+    const totalPieces = selectedItems.reduce((sum, item) => sum + item.quantity, 0);
+    const totalValue = selectedItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+    return { totalPieces, totalValue };
+  }, [selectedItems]);
+
+  // Check availability for all items
+  const availabilityErrors = useMemo(() => {
+    const errors: { batchId: string; message: string }[] = [];
+    selectedItems.forEach(item => {
+      if (item.quantity > item.batch.availableSlabs) {
+        errors.push({
+          batchId: item.batch.id,
+          message: `Apenas ${item.batch.availableSlabs} peça(s) disponível(is)`
+        });
+      }
+    });
+    return errors;
+  }, [selectedItems]);
+
+  const hasErrors = availabilityErrors.length > 0;
+
+  const handleNextStep = (e?: React.MouseEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
     
-    if (isBroker()) {
-      setValue('displayPrice', batch.industryPrice);
+    if (selectedItems.length === 0) {
+      error('Selecione pelo menos um lote');
+      return;
     }
-  };
 
-  const handleSelectProduct = (product: Product) => {
-    setSelectedProduct(product);
-    setValue('productId', product.id);
-    setValue('linkType', 'PRODUTO_GERAL');
-  };
-
-  const handleNextStep = () => {
-    if (currentStep === 'content') {
-      if (!selectedBatch) {
-        error('Selecione um lote para continuar');
-        return;
-      }
-      setCurrentStep('pricing');
-    } else if (currentStep === 'pricing') {
-      if (isBroker()) {
-        if (!displayPrice) {
-          error('Defina o preço para o cliente');
-          return;
-        }
-        if (selectedBatch && displayPrice < selectedBatch.industryPrice) {
-          error('Preço não pode ser menor que o preço base');
-          return;
-        }
-      }
-      setCurrentStep('config');
+    if (hasErrors) {
+      error('Corrija os erros de disponibilidade antes de continuar');
+      return;
     }
+
+    setCurrentStep('config');
   };
 
   const handlePrevStep = () => {
-    if (currentStep === 'config') {
-      setCurrentStep('pricing');
-    } else if (currentStep === 'pricing') {
-      setCurrentStep('content');
-    }
+    setCurrentStep('content');
   };
 
-  const onSubmit = async (data: SalesLinkInput) => {
+  const onSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (selectedItems.length === 0) {
+      error('Selecione pelo menos um lote');
+      return;
+    }
+
+    if (hasErrors) {
+      error('Corrija os erros de disponibilidade');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
 
-      const isSlugValid = await validateSlug(data.slugToken);
-      if (!isSlugValid) {
-        error('Este slug já está em uso. Tente outro.');
-        handleGenerateSlug();
-        return;
-      }
-
-      if (linkType === 'LOTE_UNICO') {
-        const statusCheck = await apiClient.get<Batch>(`/batches/${data.batchId}`);
+      // Verificar disponibilidade atual de todos os lotes
+      for (const item of selectedItems) {
+        const statusCheck = await apiClient.get<Batch>(`/batches/${item.batch.id}`);
         if (statusCheck.status !== 'DISPONIVEL') {
-          error('Lote não está mais disponível');
+          error(`Lote ${item.batch.batchCode} não está mais disponível`);
+          setIsSubmitting(false);
+          return;
+        }
+        if (statusCheck.availableSlabs < item.quantity) {
+          error(`Lote ${item.batch.batchCode} possui apenas ${statusCheck.availableSlabs} peça(s) disponível(is)`);
+          setIsSubmitting(false);
           return;
         }
       }
 
-      // Converter data para RFC3339 se fornecida
-      const payload = { ...data };
-      if (payload.expiresAt) {
-        const date = new Date(payload.expiresAt);
-        payload.expiresAt = date.toISOString();
-      }
+      // Usar MULTIPLOS_LOTES quando há mais de um item, LOTE_UNICO quando é só um
+      const isMultiple = selectedItems.length > 1;
+      
+      // Calcular preço total para o link
+      const totalDisplayPrice = selectedItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+
+      // Construir payload baseado no tipo
+      const payload = isMultiple 
+        ? {
+            linkType: 'MULTIPLOS_LOTES' as LinkType,
+            items: selectedItems.map(item => ({
+              batchId: item.batch.id,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+            })),
+            title: title || `Pedido com ${selectedItems.length} lote(s)`,
+            customMessage: customMessage || undefined,
+            slugToken: generatedSlug,
+            displayPrice: totalDisplayPrice,
+            showPrice,
+            isActive,
+            expiresAt: expirationDate ? expirationDate.toISOString() : undefined,
+          }
+        : {
+            linkType: 'LOTE_UNICO' as LinkType,
+            batchId: selectedItems[0].batch.id,
+            title: title || selectedItems[0].batch.product?.name || 'Link de Venda',
+            customMessage: customMessage || buildItemsDescription(),
+            slugToken: generatedSlug,
+            displayPrice: totalDisplayPrice,
+            showPrice,
+            isActive,
+            expiresAt: expirationDate ? expirationDate.toISOString() : undefined,
+          };
 
       const response = await apiClient.post<{ id: string; fullUrl: string }>(
         '/sales-links',
         payload
       );
 
-      const fullUrl = response.fullUrl || `${window.location.origin}/${locale}/${data.slugToken}`;
+      const fullUrl = response.fullUrl || `${window.location.origin}/${locale}/${generatedSlug}`;
       setGeneratedLink(fullUrl);
       setShowSuccessModal(true);
 
       await navigator.clipboard.writeText(fullUrl);
-    } catch (err) {
-      error('Erro ao criar link');
+    } catch (err: any) {
+      console.error('Erro ao criar link:', err);
+      error(err?.message || 'Erro ao criar link');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const filteredBatches = availableBatches.filter((batch) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      batch.batchCode.toLowerCase().includes(searchLower) ||
-      batch.product?.name.toLowerCase().includes(searchLower)
-    );
-  });
+  const buildItemsDescription = () => {
+    return selectedItems.map(item => 
+      `• ${item.batch.batchCode} (${item.batch.product?.name}) - ${item.quantity} peça(s) x ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.quantity * item.unitPrice)}`
+    ).join('\n');
+  };
 
-  const filteredProducts = availableProducts.filter((product) => {
-    if (!searchTerm) return true;
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      product.name.toLowerCase().includes(searchLower) ||
-      product.sku?.toLowerCase().includes(searchLower)
-    );
-  });
+  const filteredBatches = useMemo(() => {
+    return availableBatches.filter((batch) => {
+      if (!searchTerm) return true;
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        batch.batchCode.toLowerCase().includes(searchLower) ||
+        batch.product?.name.toLowerCase().includes(searchLower)
+      );
+    });
+  }, [availableBatches, searchTerm]);
+
+  // Batches that are not yet selected
+  const unselectedBatches = useMemo(() => {
+    const selectedIds = new Set(selectedItems.map(item => item.batch.id));
+    return filteredBatches.filter(batch => !selectedIds.has(batch.id));
+  }, [filteredBatches, selectedItems]);
+
+  const minDate = addDays(new Date(), 1);
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-white w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
         <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
           <div>
             <h2 className="font-serif text-xl">Criar Link de Venda</h2>
             <p className="text-xs text-white/50 mt-0.5">
-              {currentStep === 'content' && 'Passo 1 de 3 — Selecione o lote'}
-              {currentStep === 'pricing' && 'Passo 2 de 3 — Configure preço'}
-              {currentStep === 'config' && 'Passo 3 de 3 — Finalize o link'}
+              {currentStep === 'content' && 'Passo 1 de 2 — Selecione os lotes e quantidades'}
+              {currentStep === 'config' && 'Passo 2 de 2 — Configure o link'}
             </p>
           </div>
           <button 
+            type="button"
             onClick={() => router.back()} 
             className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
           >
@@ -279,19 +307,163 @@ export default function CreateSalesLinkPage() {
         <div className="h-1 bg-slate-100 flex">
           <div 
             className="bg-[#C2410C] transition-all duration-300"
-            style={{ 
-              width: currentStep === 'content' ? '33%' : currentStep === 'pricing' ? '66%' : '100%' 
-            }}
+            style={{ width: currentStep === 'content' ? '50%' : '100%' }}
           />
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="flex-1 flex flex-col overflow-hidden">
+        {/* Content */}
+        <form onSubmit={onSubmit} className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 overflow-y-auto px-6 py-6">
             
             {/* Step 1: Content Selection */}
             {currentStep === 'content' && (
               <div className="space-y-5">
+                {/* Selected Items */}
+                {selectedItems.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-semibold text-slate-700">
+                        Itens Selecionados ({selectedItems.length})
+                      </h3>
+                      <div className="text-sm text-emerald-600 font-semibold">
+                        Total: {formatCurrency(totals.totalValue)}
+                      </div>
+                    </div>
+                    
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                      {selectedItems.map((item) => {
+                        const itemError = availabilityErrors.find(e => e.batchId === item.batch.id);
+                        const itemTotal = item.quantity * item.unitPrice;
+                        
+                        return (
+                          <div 
+                            key={item.batch.id}
+                            className={cn(
+                              "p-3 border rounded-lg",
+                              itemError ? "border-rose-300 bg-rose-50" : "border-slate-200 bg-white"
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              {/* Image */}
+                              <div className="w-12 h-12 flex-shrink-0 bg-slate-100 rounded overflow-hidden">
+                                {item.batch.medias?.[0] && !isPlaceholderUrl(item.batch.medias[0].url) ? (
+                                  <img src={item.batch.medias[0].url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center">
+                                    <Package className="w-5 h-5 text-slate-300" />
+                                  </div>
+                                )}
+                              </div>
+                              
+                              {/* Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <p className="font-medium text-sm text-[#121212] truncate">
+                                      {item.batch.product?.name}
+                                    </p>
+                                    <p className="font-mono text-xs text-slate-400">
+                                      {item.batch.batchCode} • {item.batch.availableSlabs} disponível(is)
+                                    </p>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveBatch(item.batch.id)}
+                                    className="p-1 text-slate-400 hover:text-rose-500 transition-colors"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+
+                                {/* Quantity and Price */}
+                                <div className="flex items-center gap-4 mt-2">
+                                  {/* Quantity */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">Qtd:</span>
+                                    <div className="flex items-center border border-slate-200 rounded">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateQuantity(item.batch.id, item.quantity - 1)}
+                                        disabled={item.quantity <= 1}
+                                        className="p-1 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <Minus className="w-3 h-3" />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        value={item.quantity}
+                                        onChange={(e) => handleUpdateQuantity(item.batch.id, parseInt(e.target.value) || 1)}
+                                        className="w-12 text-center text-sm border-x border-slate-200 py-1 outline-none"
+                                        min={1}
+                                        max={item.batch.availableSlabs}
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateQuantity(item.batch.id, item.quantity + 1)}
+                                        disabled={item.quantity >= item.batch.availableSlabs}
+                                        className="p-1 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        <Plus className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {/* Unit Price */}
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-slate-500">Preço unit.:</span>
+                                    <div className="flex items-center border border-slate-200 rounded px-2 py-1">
+                                      <span className="text-xs text-slate-400 mr-1">R$</span>
+                                      <input
+                                        type="number"
+                                        value={item.unitPrice}
+                                        onChange={(e) => handleUpdatePrice(item.batch.id, parseFloat(e.target.value) || 0)}
+                                        step="0.01"
+                                        className="w-20 text-sm outline-none"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Subtotal */}
+                                  <div className="ml-auto text-sm font-medium text-emerald-600">
+                                    {formatCurrency(itemTotal)}
+                                  </div>
+                                </div>
+
+                                {/* Error message */}
+                                {itemError && (
+                                  <div className="flex items-center gap-1 mt-2 text-xs text-rose-600">
+                                    <AlertCircle className="w-3 h-3" />
+                                    {itemError.message}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Summary */}
+                    <div className="flex items-center justify-between p-3 bg-slate-100 rounded-lg">
+                      <span className="text-sm text-slate-600">
+                        {totals.totalPieces} peça(s) em {selectedItems.length} lote(s)
+                      </span>
+                      <span className="text-lg font-bold text-[#121212]">
+                        {formatCurrency(totals.totalValue)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Divider */}
+                {selectedItems.length > 0 && (
+                  <div className="border-t border-slate-200 pt-4">
+                    <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                      Adicionar mais lotes
+                    </h3>
+                  </div>
+                )}
+
                 {/* Search */}
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
@@ -299,151 +471,110 @@ export default function CreateSalesLinkPage() {
                     type="text"
                     placeholder="Buscar por código ou produto..."
                     value={searchTerm}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearchTerm(e.target.value)}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') e.preventDefault();
+                    }}
                     className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
                   />
                 </div>
 
                 {/* Batch List */}
-                <div className="border border-slate-200 max-h-[340px] overflow-y-auto">
+                <div className="border border-slate-200 max-h-[300px] overflow-y-auto rounded-lg">
                   {isLoadingContent ? (
                     <div className="py-12 text-center">
                       <div className="w-6 h-6 border-2 border-[#C2410C] border-t-transparent rounded-full animate-spin mx-auto mb-3" />
                       <p className="text-slate-400 text-sm">Carregando...</p>
                     </div>
-                  ) : filteredBatches.length === 0 ? (
+                  ) : unselectedBatches.length === 0 ? (
                     <div className="py-12 text-center">
                       <Package className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                       <p className="text-slate-400 text-sm">
-                        {searchTerm ? 'Nenhum lote encontrado' : 'Nenhum lote disponível'}
+                        {searchTerm ? 'Nenhum lote encontrado' : selectedItems.length > 0 ? 'Todos os lotes já foram adicionados' : 'Nenhum lote disponível'}
                       </p>
                     </div>
                   ) : (
-                    filteredBatches.map((batch) => {
-                      const isSelected = selectedBatch?.id === batch.id;
-                      return (
-                        <button
-                          key={batch.id}
-                          type="button"
-                          onClick={() => handleSelectBatch(batch)}
-                          className={cn(
-                            'w-full p-3 flex items-center gap-3 border-b border-slate-100 last:border-b-0 transition-colors text-left',
-                            isSelected 
-                              ? 'bg-orange-50 border-l-2 border-l-[#C2410C]' 
-                              : 'hover:bg-slate-50'
-                          )}
-                        >
-                          <div className="w-12 h-12 flex-shrink-0 bg-slate-100 overflow-hidden">
-                            {batch.medias?.[0] && !isPlaceholderUrl(batch.medias[0].url) ? (
-                              <img src={batch.medias[0].url} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-5 h-5 text-slate-300" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm text-[#121212] truncate">{batch.product?.name}</p>
-                            <p className="font-mono text-xs text-slate-400">{batch.batchCode}</p>
-                            <p className="text-xs text-emerald-600 font-medium mt-0.5">{formatCurrency(batch.industryPrice)}</p>
-                          </div>
-                          {isSelected && (
-                            <div className="w-5 h-5 bg-[#C2410C] rounded-full flex items-center justify-center flex-shrink-0">
-                              <Check className="w-3 h-3 text-white" />
+                    unselectedBatches.map((batch) => (
+                      <button
+                        key={batch.id}
+                        type="button"
+                        onClick={() => handleAddBatch(batch)}
+                        className="w-full p-3 flex items-center gap-3 border-b border-slate-100 last:border-b-0 transition-colors text-left hover:bg-slate-50"
+                      >
+                        <div className="w-12 h-12 flex-shrink-0 bg-slate-100 rounded overflow-hidden">
+                          {batch.medias?.[0] && !isPlaceholderUrl(batch.medias[0].url) ? (
+                            <img src={batch.medias[0].url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="w-5 h-5 text-slate-300" />
                             </div>
                           )}
-                        </button>
-                      );
-                    })
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-[#121212] truncate">{batch.product?.name}</p>
+                          <p className="font-mono text-xs text-slate-400">{batch.batchCode}</p>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-xs text-emerald-600 font-medium">{formatCurrency(batch.industryPrice)}</span>
+                            <span className="text-xs text-slate-400">• {batch.availableSlabs} disponível(is)</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-slate-100 hover:bg-[#C2410C] hover:text-white transition-colors">
+                          <Plus className="w-4 h-4" />
+                        </div>
+                      </button>
+                    ))
                   )}
                 </div>
               </div>
             )}
 
-            {/* Step 2: Pricing */}
-            {currentStep === 'pricing' && (
+            {/* Step 2: Configuration */}
+            {currentStep === 'config' && (
               <div className="space-y-5">
-                {/* Selected Batch Summary */}
-                {selectedBatch && (
-                  <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200">
-                    <div className="w-10 h-10 bg-slate-200 overflow-hidden flex-shrink-0">
-                      {selectedBatch.medias?.[0] && !isPlaceholderUrl(selectedBatch.medias[0].url) ? (
-                        <img src={selectedBatch.medias[0].url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <Package className="w-4 h-4 text-slate-400" />
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-sm truncate">{selectedBatch.product?.name}</p>
-                      <p className="text-xs text-slate-400">{selectedBatch.batchCode} • {formatArea(selectedBatch.totalArea)}</p>
-                    </div>
-                    <p className="text-sm font-semibold text-emerald-600">{formatCurrency(selectedBatch.industryPrice)}</p>
-                  </div>
-                )}
-
-                {/* Price for Broker */}
-                {isBroker() && selectedBatch && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-medium text-slate-600 block mb-2">
-                        Preço Final para o Cliente
-                      </label>
-                      <div className="flex items-center gap-2 p-3 bg-slate-50 border border-slate-200 focus-within:border-[#C2410C] focus-within:bg-white transition-colors">
-                        <span className="text-slate-400">R$</span>
-                        <input
-                          {...register('displayPrice', { valueAsNumber: true })}
-                          type="number"
-                          step="0.01"
-                          className="flex-1 bg-transparent outline-none text-lg font-medium"
-                          placeholder="0,00"
-                        />
+                {/* Selected Items Summary */}
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                    Resumo do Pedido
+                  </h3>
+                  <div className="space-y-2 max-h-[150px] overflow-y-auto">
+                    {selectedItems.map((item) => (
+                      <div key={item.batch.id} className="flex items-center justify-between text-sm">
+                        <span className="text-slate-600">
+                          {item.batch.batchCode} ({item.quantity}x)
+                        </span>
+                        <span className="font-medium">{formatCurrency(item.quantity * item.unitPrice)}</span>
                       </div>
-                      {errors.displayPrice && (
-                        <p className="text-xs text-rose-500 mt-1">{errors.displayPrice.message}</p>
-                      )}
-                    </div>
-
-                    {displayPrice && displayPrice >= selectedBatch.industryPrice && (
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="p-3 bg-emerald-50 border border-emerald-100 text-center">
-                          <p className="text-[10px] uppercase tracking-wide text-emerald-600 mb-0.5">Sua Margem</p>
-                          <p className="font-semibold text-emerald-700">{formatCurrency(calculatedMargin)}</p>
-                        </div>
-                        <div className="p-3 bg-emerald-50 border border-emerald-100 text-center">
-                          <p className="text-[10px] uppercase tracking-wide text-emerald-600 mb-0.5">Percentual</p>
-                          <p className="font-semibold text-emerald-700">
-                            {((calculatedMargin / selectedBatch.industryPrice) * 100).toFixed(1)}%
-                          </p>
-                        </div>
-                      </div>
-                    )}
+                    ))}
                   </div>
-                )}
+                  <div className="border-t border-slate-200 mt-3 pt-3 flex justify-between">
+                    <span className="font-semibold">Total ({totals.totalPieces} peças)</span>
+                    <span className="font-bold text-lg text-emerald-600">{formatCurrency(totals.totalValue)}</span>
+                  </div>
+                </div>
 
                 {/* Show Price Toggle */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded">
                   <div className="flex items-center gap-2">
                     {showPrice ? <Eye className="w-4 h-4 text-emerald-500" /> : <EyeOff className="w-4 h-4 text-slate-400" />}
-                    <span className="text-sm">{showPrice ? 'Preço visível' : 'Sob consulta'}</span>
+                    <span className="text-sm">{showPrice ? 'Preço visível no link' : 'Preço sob consulta'}</span>
                   </div>
                   <Toggle
                     checked={showPrice}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('showPrice', e.target.checked)}
+                    onChange={(e) => setShowPrice(e.target.checked)}
                   />
                 </div>
 
                 {/* Title */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-2">
-                    Título Personalizado <span className="text-slate-400">(opcional)</span>
+                    Título do Link <span className="text-slate-400">(opcional)</span>
                   </label>
                   <input
-                    {...register('title')}
                     type="text"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
-                    placeholder={selectedBatch?.product?.name || 'Ex: Oferta Exclusiva'}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors rounded"
+                    placeholder={`Pedido com ${selectedItems.length} lote(s)`}
                   />
                 </div>
 
@@ -453,104 +584,57 @@ export default function CreateSalesLinkPage() {
                     Mensagem <span className="text-slate-400">(opcional)</span>
                   </label>
                   <textarea
-                    {...register('customMessage')}
+                    value={customMessage}
+                    onChange={(e) => setCustomMessage(e.target.value)}
                     rows={3}
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm resize-none transition-colors"
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm resize-none transition-colors rounded"
                     placeholder="Mensagem que aparecerá no link..."
                   />
                 </div>
-              </div>
-            )}
 
-            {/* Step 3: Configuration */}
-            {currentStep === 'config' && (
-              <div className="space-y-5">
-                {/* Slug */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    URL do Link
-                  </label>
-                  <div className="flex items-center bg-slate-50 border border-slate-200 focus-within:border-[#C2410C] focus-within:bg-white transition-colors">
-                    <span className="pl-3 text-sm text-slate-400 whitespace-nowrap">
-                      {typeof window !== 'undefined' ? `${window.location.host}/${locale}/` : ''}
-                    </span>
-                    <input
-                      {...register('slugToken')}
-                      type="text"
-                      className="flex-1 py-2.5 pr-2 bg-transparent outline-none text-sm font-mono min-w-0"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleGenerateSlug}
-                      className="p-2 mr-1 text-slate-400 hover:text-[#C2410C] transition-colors"
-                    >
-                      <Sparkles className="w-4 h-4" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1.5 text-xs">
-                    {isCheckingSlug && <span className="text-slate-400">Verificando...</span>}
-                    {!isCheckingSlug && !isSlugAvailable && (
-                      <span className="text-rose-500 flex items-center gap-1">
-                        <X className="w-3 h-3" /> Slug já em uso
-                      </span>
-                    )}
-                    {!isCheckingSlug && isSlugAvailable && slugToken && (
-                      <span className="text-emerald-500 flex items-center gap-1">
-                        <Check className="w-3 h-3" /> Disponível
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Expiration */}
+                {/* Expiration Date */}
                 <div>
                   <label className="text-xs font-medium text-slate-600 block mb-2">
                     Expiração <span className="text-slate-400">(opcional)</span>
                   </label>
-                  <input
-                    {...register('expiresAt')}
-                    type="date"
-                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
-                  />
+                  <div className="relative">
+                    <input
+                      type="date"
+                      value={expirationDate ? format(expirationDate, 'yyyy-MM-dd') : ''}
+                      min={format(minDate, 'yyyy-MM-dd')}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setExpirationDate(value ? new Date(value + 'T00:00:00') : undefined);
+                      }}
+                      className={cn(
+                        'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 text-sm transition-colors rounded',
+                        'hover:border-[#C2410C] focus:border-[#C2410C] focus:bg-white outline-none',
+                        !expirationDate && 'text-slate-400'
+                      )}
+                    />
+                    {expirationDate && (
+                      <button
+                        type="button"
+                        onClick={() => setExpirationDate(undefined)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
                 {/* Active Toggle */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200">
+                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200 rounded">
                   <div className="flex items-center gap-2">
-                    <div className={cn('w-2 h-2 rounded-full', watch('isActive') ? 'bg-emerald-500' : 'bg-slate-300')} />
-                    <span className="text-sm">{watch('isActive') ? 'Link ativo' : 'Link desativado'}</span>
+                    <div className={cn('w-2 h-2 rounded-full', isActive ? 'bg-emerald-500' : 'bg-slate-300')} />
+                    <span className="text-sm">{isActive ? 'Link ativo' : 'Link desativado'}</span>
                   </div>
                   <Toggle
-                    checked={watch('isActive')}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setValue('isActive', e.target.checked)}
+                    checked={isActive}
+                    onChange={(e) => setIsActive(e.target.checked)}
                   />
                 </div>
-
-                {/* Summary */}
-                {selectedBatch && (
-                  <div className="p-4 bg-white border-2 border-[#C2410C]">
-                    <p className="text-[10px] uppercase tracking-widest text-[#C2410C] mb-3 font-semibold">Resumo do Link</p>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Lote</span>
-                        <span className="font-mono text-xs text-[#121212]">{selectedBatch.batchCode}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">Preço</span>
-                        <span className="text-emerald-600 font-medium">
-                          {showPrice 
-                            ? formatCurrency(isBroker() ? displayPrice! : selectedBatch.industryPrice)
-                            : 'Sob Consulta'
-                          }
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-slate-500">URL</span>
-                        <span className="font-mono text-xs text-[#C2410C]">/{slugToken}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -580,10 +664,10 @@ export default function CreateSalesLinkPage() {
               <button
                 type="button"
                 onClick={handleNextStep}
-                disabled={currentStep === 'content' && !selectedBatch}
+                disabled={selectedItems.length === 0 || hasErrors}
                 className={cn(
                   'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                  currentStep === 'content' && !selectedBatch
+                  (selectedItems.length === 0 || hasErrors)
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-[#121212] hover:bg-[#C2410C]'
                 )}
@@ -594,10 +678,10 @@ export default function CreateSalesLinkPage() {
             ) : (
               <button
                 type="submit"
-                disabled={isSubmitting || !isSlugAvailable}
+                disabled={isSubmitting}
                 className={cn(
                   'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                  (isSubmitting || !isSlugAvailable)
+                  isSubmitting
                     ? 'bg-slate-300 cursor-not-allowed'
                     : 'bg-[#C2410C] hover:bg-[#a03609]'
                 )}
@@ -652,6 +736,18 @@ export default function CreateSalesLinkPage() {
                   <Copy className="w-4 h-4" />
                 </button>
               </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded text-sm">
+              <p className="font-medium mb-2">Itens incluídos:</p>
+              {selectedItems.map(item => (
+                <p key={item.batch.id} className="text-slate-600">
+                  • {item.batch.batchCode} - {item.quantity} peça(s) x {formatCurrency(item.unitPrice)}
+                </p>
+              ))}
+              <p className="font-semibold mt-2 pt-2 border-t border-slate-200">
+                Total: {formatCurrency(totals.totalValue)}
+              </p>
             </div>
           </div>
         </ModalContent>

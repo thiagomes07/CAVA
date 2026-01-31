@@ -4,18 +4,18 @@
 -- =============================================
 
 -- Adicionar campos em industries
-ALTER TABLE industries ADD COLUMN city VARCHAR(100) DEFAULT NULL;
-ALTER TABLE industries ADD COLUMN state VARCHAR(2) DEFAULT NULL;
-ALTER TABLE industries ADD COLUMN banner_url VARCHAR(500) DEFAULT NULL;
-ALTER TABLE industries ADD COLUMN logo_url VARCHAR(500) DEFAULT NULL;
-ALTER TABLE industries ADD COLUMN is_public BOOLEAN DEFAULT FALSE;
+ALTER TABLE industries ADD COLUMN IF NOT EXISTS city VARCHAR(100) DEFAULT NULL;
+ALTER TABLE industries ADD COLUMN IF NOT EXISTS state VARCHAR(2) DEFAULT NULL;
+ALTER TABLE industries ADD COLUMN IF NOT EXISTS banner_url VARCHAR(500) DEFAULT NULL;
+ALTER TABLE industries ADD COLUMN IF NOT EXISTS logo_url VARCHAR(500) DEFAULT NULL;
+ALTER TABLE industries ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
 
 -- Adicionar campo is_public em batches
-ALTER TABLE batches ADD COLUMN is_public BOOLEAN DEFAULT FALSE;
+ALTER TABLE batches ADD COLUMN IF NOT EXISTS is_public BOOLEAN DEFAULT FALSE;
 
 -- Índices para busca pública
-CREATE INDEX idx_industries_public ON industries(is_public) WHERE is_public = TRUE;
-CREATE INDEX idx_batches_public ON batches(industry_id, is_public, deleted_at) WHERE is_public = TRUE AND deleted_at IS NULL;
+CREATE INDEX IF NOT EXISTS idx_industries_public ON industries(is_public) WHERE is_public = TRUE;
+CREATE INDEX IF NOT EXISTS idx_batches_public ON batches(industry_id, is_public, deleted_at) WHERE is_public = TRUE AND deleted_at IS NULL;
 
 -- Comentários
 COMMENT ON COLUMN industries.city IS 'Cidade do depósito';

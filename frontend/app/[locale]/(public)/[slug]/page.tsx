@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -49,6 +49,21 @@ interface PublicProduct {
   medias: Media[];
 }
 
+// Item para MULTIPLOS_LOTES
+interface PublicLinkItem {
+  batchCode: string;
+  productName: string;
+  material: string;
+  finish: string;
+  height: number;
+  width: number;
+  thickness: number;
+  quantity: number;
+  unitPrice?: number;
+  totalPrice?: number;
+  medias: Media[];
+}
+
 interface PublicSalesLink {
   title?: string;
   customMessage?: string;
@@ -56,6 +71,7 @@ interface PublicSalesLink {
   showPrice: boolean;
   batch?: PublicBatch;
   product?: PublicProduct;
+  items?: PublicLinkItem[]; // Para MULTIPLOS_LOTES
 }
 
 export default function PublicLinkPage() {
@@ -117,6 +133,34 @@ export default function PublicLinkPage() {
     }
   };
 
+  // Derived values - must be computed before any returns to maintain hook order
+  const batch = link?.batch;
+  const product = link?.product;
+  const items = link?.items;
+  const isMultipleBatches = items && items.length > 0;
+  
+  // Para múltiplos lotes, coletar todas as mídias de todos os itens
+  const allMedias = useMemo(() => {
+    if (!link) return [];
+    if (isMultipleBatches && items) {
+      return items.flatMap(item => item.medias || []);
+    }
+    return batch?.medias || product?.medias || [];
+  }, [link, isMultipleBatches, items, batch, product]);
+  
+  // Calcular totais para múltiplos lotes
+  const totals = useMemo(() => {
+    if (!isMultipleBatches || !items) return null;
+    const totalPieces = items.reduce((sum, item) => sum + item.quantity, 0);
+    const totalValue = items.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+    return { totalPieces, totalValue };
+  }, [isMultipleBatches, items]);
+
+  const productName = link?.title || (isMultipleBatches && items ? `Pedido com ${items.length} lote(s)` : batch?.productName || product?.name || 'Produto');
+  const medias: Media[] = allMedias;
+  const hasMultipleImages = medias.length > 1;
+  const currentImage = medias[selectedImageIndex];
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#FAFAFA] flex items-center justify-center">
@@ -139,13 +183,6 @@ export default function PublicLinkPage() {
       </div>
     );
   }
-
-  const batch = link.batch;
-  const product = link.product;
-  const productName = link.title || batch?.productName || product?.name || 'Produto';
-  const medias: Media[] = batch?.medias || product?.medias || [];
-  const hasMultipleImages = medias.length > 1;
-  const currentImage = medias[selectedImageIndex];
 
   const nextImage = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -285,18 +322,25 @@ export default function PublicLinkPage() {
             {/* Product Info - Mobile Only */}
             <div className="lg:hidden space-y-4">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Produto</p>
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
+                  {isMultipleBatches ? 'Pedido' : 'Produto'}
+                </p>
                 <h1 className="text-2xl font-serif text-[#121212]">{productName}</h1>
-                {(batch?.material || product?.material) && (
+                {!isMultipleBatches && (batch?.material || product?.material) && (
                   <p className="text-sm text-slate-500 mt-1">
                     {batch?.material || product?.material} • {batch?.finish || product?.finish}
+                  </p>
+                )}
+                {isMultipleBatches && totals && (
+                  <p className="text-sm text-slate-500 mt-1">
+                    {totals.totalPieces} peça(s) em {items!.length} lote(s)
                   </p>
                 )}
               </div>
             </div>
 
-            {/* Specs Grid */}
-            {batch && (
+            {/* Specs Grid - Single Batch */}
+            {batch && !isMultipleBatches && (
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white p-4 border border-slate-200">
                   <div className="flex items-center gap-2 text-slate-400 mb-2">
@@ -320,21 +364,99 @@ export default function PublicLinkPage() {
                 )}
               </div>
             )}
+
+            {/* Items List - Multiple Batches */}
+            {isMultipleBatches && (
+              <div className="space-y-3">
+                <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400">
+                  {items.length} Lote(s) no Pedido
+                </p>
+                <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                  {items.map((item, index) => (
+                    <div key={index} className="bg-white border border-slate-200 p-4">
+                      <div className="flex gap-3">
+                        {/* Thumbnail */}
+                        <div className="w-16 h-16 flex-shrink-0 bg-slate-100 overflow-hidden">
+                          {item.medias?.[0] ? (
+                            <img 
+                              src={item.medias[0].url} 
+                              alt={item.productName} 
+                              className="w-full h-full object-cover cursor-pointer"
+                              onClick={() => {
+                                const mediaIndex = allMedias.findIndex(m => m.id === item.medias[0].id);
+                                if (mediaIndex >= 0) setSelectedImageIndex(mediaIndex);
+                                setIsLightboxOpen(true);
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package className="w-6 h-6 text-slate-300" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm text-[#121212] truncate">{item.productName}</p>
+                          <p className="text-xs text-slate-400 font-mono">{item.batchCode}</p>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {item.material} • {item.finish}
+                          </p>
+                          <div className="flex items-center justify-between mt-2">
+                            <span className="text-xs text-slate-500">
+                              {item.quantity} peça(s) • {item.height}×{item.width} cm
+                            </span>
+                            {link.showPrice && item.totalPrice && (
+                              <span className="text-sm font-semibold text-[#121212]">
+                                {formatCurrency(item.totalPrice)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Summary */}
+                {totals && (
+                  <div className="bg-slate-100 p-4 border border-slate-200">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-600">
+                        Total: {totals.totalPieces} peça(s)
+                      </span>
+                      {link.showPrice && totals.totalValue > 0 && (
+                        <span className="text-lg font-bold text-[#121212]">
+                          {formatCurrency(totals.totalValue)}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Right Column - Checkout */}
           <div className="lg:sticky lg:top-8 lg:self-start space-y-6">
             {/* Product Info - Desktop */}
             <div className="hidden lg:block">
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">Produto</p>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-2">
+                {isMultipleBatches ? 'Pedido' : 'Produto'}
+              </p>
               <h1 className="text-3xl font-serif text-[#121212] mb-2">{productName}</h1>
-              {(batch?.material || product?.material) && (
+              {!isMultipleBatches && (batch?.material || product?.material) && (
                 <p className="text-slate-500">
                   {batch?.material || product?.material} • {batch?.finish || product?.finish}
                 </p>
               )}
-              {batch && (
+              {!isMultipleBatches && batch && (
                 <p className="text-sm text-slate-400 font-mono mt-2">Lote: {batch.batchCode}</p>
+              )}
+              {isMultipleBatches && totals && (
+                <p className="text-slate-500 mt-1">
+                  {totals.totalPieces} peça(s) em {items!.length} lote(s)
+                </p>
               )}
             </div>
 
@@ -350,8 +472,11 @@ export default function PublicLinkPage() {
               {link.showPrice && link.displayPrice ? (
                 <div>
                   <p className="text-4xl md:text-5xl font-serif tracking-tight">{formatCurrency(link.displayPrice)}</p>
-                  {batch && batch.totalArea > 0 && (
+                  {!isMultipleBatches && batch && batch.totalArea > 0 && (
                     <p className="text-sm text-white/50 mt-2">≈ {formatCurrency(link.displayPrice / batch.totalArea)}/m²</p>
+                  )}
+                  {isMultipleBatches && totals && (
+                    <p className="text-sm text-white/50 mt-2">{totals.totalPieces} peça(s)</p>
                   )}
                 </div>
               ) : (

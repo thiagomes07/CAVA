@@ -682,18 +682,24 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 
 		if input.NewClient != nil {
 			// Criar novo cliente
+			var email *string
+			var phone *string
+			if input.NewClient.Email != "" {
+				email = &input.NewClient.Email
+			}
+			if input.NewClient.Phone != "" {
+				phone = &input.NewClient.Phone
+			}
 			newCliente := &entity.Cliente{
 				ID:             uuid.New().String(),
 				SalesLinkID:    "", // Será convertido para NULL pelo NULLIF no repositório
 				Name:           input.NewClient.Name,
-				Contact:        input.NewClient.Phone,
+				Email:          email,
+				Phone:          phone,
 				MarketingOptIn: false,
 				Status:         entity.ClienteStatusNovo,
 				CreatedAt:      time.Now(),
 				UpdatedAt:      time.Now(),
-			}
-			if input.NewClient.Email != "" {
-				// Se houver email, poderia ser concatenado ou armazenado se houvesse campo
 			}
 
 			if err := s.clienteRepo.Create(ctx, tx, newCliente); err != nil {
@@ -702,7 +708,11 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 			}
 			clienteID = &newCliente.ID
 			customerName = newCliente.Name
-			customerContact = newCliente.Contact
+			if newCliente.Email != nil && *newCliente.Email != "" {
+				customerContact = *newCliente.Email
+			} else if newCliente.Phone != nil && *newCliente.Phone != "" {
+				customerContact = *newCliente.Phone
+			}
 		}
 
 		// 4. Criar Registro de Venda

@@ -21,20 +21,22 @@ func NewClienteRepository(db *DB) *clienteRepository {
 func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
 	query := `
 		INSERT INTO clientes (
-			id, sales_link_id, name, contact, message, marketing_opt_in, status
-		) VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE $2::uuid END, $3, $4, $5, $6, $7)
+			id, sales_link_id, name, email, phone, whatsapp, message, marketing_opt_in, status
+		) VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE $2::uuid END, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at, last_interaction
 	`
 
 	var err error
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
-			cliente.ID, cliente.SalesLinkID, cliente.Name, cliente.Contact,
+			cliente.ID, cliente.SalesLinkID, cliente.Name,
+			cliente.Email, cliente.Phone, cliente.Whatsapp,
 			cliente.Message, cliente.MarketingOptIn, cliente.Status,
 		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
-			cliente.ID, cliente.SalesLinkID, cliente.Name, cliente.Contact,
+			cliente.ID, cliente.SalesLinkID, cliente.Name,
+			cliente.Email, cliente.Phone, cliente.Whatsapp,
 			cliente.Message, cliente.MarketingOptIn, cliente.Status,
 		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	}
@@ -48,15 +50,16 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 
 func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	query := `
-		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
-		       status, created_at, updated_at
+		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
+		       message, marketing_opt_in, status, created_at, updated_at
 		FROM clientes
 		WHERE id = $1
 	`
 
 	cliente := &entity.Cliente{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&cliente.ID, &cliente.SalesLinkID, &cliente.Name, &cliente.Contact,
+		&cliente.ID, &cliente.SalesLinkID, &cliente.Name,
+		&cliente.Email, &cliente.Phone, &cliente.Whatsapp,
 		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
 		&cliente.CreatedAt, &cliente.UpdatedAt,
 	)
@@ -73,17 +76,18 @@ func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cl
 
 func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (*entity.Cliente, error) {
 	query := `
-		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
-		       status, created_at, updated_at
+		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
+		       message, marketing_opt_in, status, created_at, updated_at
 		FROM clientes
-		WHERE contact = $1
+		WHERE email = $1 OR phone = $1 OR whatsapp = $1
 		ORDER BY created_at DESC
 		LIMIT 1
 	`
 
 	cliente := &entity.Cliente{}
 	err := r.db.QueryRowContext(ctx, query, contact).Scan(
-		&cliente.ID, &cliente.SalesLinkID, &cliente.Name, &cliente.Contact,
+		&cliente.ID, &cliente.SalesLinkID, &cliente.Name,
+		&cliente.Email, &cliente.Phone, &cliente.Whatsapp,
 		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
 		&cliente.CreatedAt, &cliente.UpdatedAt,
 	)
@@ -100,8 +104,8 @@ func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (
 
 func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Cliente, error) {
 	query := `
-		SELECT id, COALESCE(sales_link_id::text, ''), name, contact, message, marketing_opt_in,
-		       status, created_at, updated_at
+		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
+		       message, marketing_opt_in, status, created_at, updated_at
 		FROM clientes
 		WHERE sales_link_id = $1
 		ORDER BY created_at DESC
@@ -119,73 +123,115 @@ func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID s
 func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilters) ([]entity.Cliente, int, error) {
 	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
 
-	query := psql.Select(
-		"id", "COALESCE(sales_link_id::text, '')", "name", "contact", "message",
-		"marketing_opt_in", "status", "created_at", "updated_at",
-	).From("clientes")
+	// Verifica se precisa fazer JOIN com sales_links para filtros de escopo
+	needsJoin := filters.IndustryID != nil || filters.CreatedByUserID != nil
+
+	var query sq.SelectBuilder
+	if needsJoin {
+		query = psql.Select(
+			"c.id", "COALESCE(c.sales_link_id::text, '')", "c.name", "c.email", "c.phone", "c.whatsapp",
+			"c.message", "c.marketing_opt_in", "c.status", "c.created_at", "c.updated_at",
+		).From("clientes c").
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+	} else {
+		query = psql.Select(
+			"id", "COALESCE(sales_link_id::text, '')", "name", "email", "phone", "whatsapp",
+			"message", "marketing_opt_in", "status", "created_at", "updated_at",
+		).From("clientes")
+	}
+
+	// Aplicar filtros de escopo
+	if filters.IndustryID != nil {
+		query = query.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+	}
+	if filters.CreatedByUserID != nil {
+		query = query.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+	}
+
+	// Prefixo para colunas (depende do JOIN)
+	colPrefix := ""
+	if needsJoin {
+		colPrefix = "c."
+	}
 
 	if filters.LinkID != nil {
-		query = query.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+		query = query.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
 	}
 
 	if filters.Status != nil {
-		query = query.Where(sq.Eq{"status": *filters.Status})
+		query = query.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 
 	if filters.OptIn != nil {
-		query = query.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+		query = query.Where(sq.Eq{colPrefix + "marketing_opt_in": *filters.OptIn})
 	}
 
 	if filters.Search != nil && *filters.Search != "" {
 		search := "%" + *filters.Search + "%"
 		query = query.Where(sq.Or{
-			sq.ILike{"name": search},
-			sq.ILike{"contact": search},
+			sq.ILike{colPrefix + "name": search},
+			sq.ILike{colPrefix + "email": search},
+			sq.ILike{colPrefix + "phone": search},
 		})
 	}
 
 	if filters.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
 		if err == nil {
-			query = query.Where(sq.GtOrEq{"created_at": startDate})
+			query = query.Where(sq.GtOrEq{colPrefix + "created_at": startDate})
 		}
 	}
 
 	if filters.EndDate != nil {
 		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
 		if err == nil {
-			query = query.Where(sq.LtOrEq{"created_at": endDate})
+			query = query.Where(sq.LtOrEq{colPrefix + "created_at": endDate})
 		}
 	}
 
-	// Count
-	countQuery := psql.Select("COUNT(*)").From("clientes")
+	// Count query
+	var countQuery sq.SelectBuilder
+	if needsJoin {
+		countQuery = psql.Select("COUNT(*)").From("clientes c").
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+	} else {
+		countQuery = psql.Select("COUNT(*)").From("clientes")
+	}
+
+	// Aplicar mesmos filtros de escopo no count
+	if filters.IndustryID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+	}
+	if filters.CreatedByUserID != nil {
+		countQuery = countQuery.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+	}
 	if filters.LinkID != nil {
-		countQuery = countQuery.Where(sq.Eq{"sales_link_id": *filters.LinkID})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
 	}
 	if filters.Status != nil {
-		countQuery = countQuery.Where(sq.Eq{"status": *filters.Status})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 	if filters.OptIn != nil {
-		countQuery = countQuery.Where(sq.Eq{"marketing_opt_in": *filters.OptIn})
+		countQuery = countQuery.Where(sq.Eq{colPrefix + "marketing_opt_in": *filters.OptIn})
 	}
 	if filters.Search != nil && *filters.Search != "" {
 		search := "%" + *filters.Search + "%"
 		countQuery = countQuery.Where(sq.Or{
-			sq.ILike{"name": search},
-			sq.ILike{"contact": search},
+			sq.ILike{colPrefix + "name": search},
+			sq.ILike{colPrefix + "email": search},
+			sq.ILike{colPrefix + "phone": search},
 		})
 	}
 	if filters.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
 		if err == nil {
-			countQuery = countQuery.Where(sq.GtOrEq{"created_at": startDate})
+			countQuery = countQuery.Where(sq.GtOrEq{colPrefix + "created_at": startDate})
 		}
 	}
 	if filters.EndDate != nil {
 		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
 		if err == nil {
-			countQuery = countQuery.Where(sq.LtOrEq{"created_at": endDate})
+			countQuery = countQuery.Where(sq.LtOrEq{colPrefix + "created_at": endDate})
 		}
 	}
 
@@ -197,7 +243,7 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	// Pagination
 	offset := (filters.Page - 1) * filters.Limit
-	query = query.OrderBy("created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
+	query = query.OrderBy(colPrefix + "created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()
 	if err != nil {
@@ -221,22 +267,22 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 func (r *clienteRepository) Update(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
 	query := `
 		UPDATE clientes
-		SET name = $1, contact = $2, message = $3, marketing_opt_in = $4,
-		    status = $5, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $6
+		SET name = $1, email = $2, phone = $3, whatsapp = $4,
+		    message = $5, marketing_opt_in = $6, status = $7, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $8
 		RETURNING updated_at
 	`
 
 	var err error
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
-			cliente.Name, cliente.Contact, cliente.Message, cliente.MarketingOptIn,
-			cliente.Status, cliente.ID,
+			cliente.Name, cliente.Email, cliente.Phone, cliente.Whatsapp,
+			cliente.Message, cliente.MarketingOptIn, cliente.Status, cliente.ID,
 		).Scan(&cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
-			cliente.Name, cliente.Contact, cliente.Message, cliente.MarketingOptIn,
-			cliente.Status, cliente.ID,
+			cliente.Name, cliente.Email, cliente.Phone, cliente.Whatsapp,
+			cliente.Message, cliente.MarketingOptIn, cliente.Status, cliente.ID,
 		).Scan(&cliente.UpdatedAt)
 	}
 
@@ -317,8 +363,8 @@ func (r *clienteRepository) scanClientes(rows *sql.Rows) ([]entity.Cliente, erro
 	for rows.Next() {
 		var l entity.Cliente
 		if err := rows.Scan(
-			&l.ID, &l.SalesLinkID, &l.Name, &l.Contact, &l.Message,
-			&l.MarketingOptIn, &l.Status, &l.CreatedAt, &l.UpdatedAt,
+			&l.ID, &l.SalesLinkID, &l.Name, &l.Email, &l.Phone, &l.Whatsapp,
+			&l.Message, &l.MarketingOptIn, &l.Status, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
