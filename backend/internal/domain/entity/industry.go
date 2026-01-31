@@ -14,7 +14,6 @@ type Industry struct {
 	ContactPhone   *string   `json:"contactPhone,omitempty"`
 	Whatsapp       *string   `json:"whatsapp,omitempty"`
 	Description    *string   `json:"description,omitempty"`
-	PolicyTerms    *string   `json:"policyTerms,omitempty"`
 	City           *string   `json:"city,omitempty"`
 	State          *string   `json:"state,omitempty"`
 	BannerURL      *string   `json:"bannerUrl,omitempty"`
@@ -46,7 +45,6 @@ type UpdateIndustryInput struct {
 	ContactPhone   *string `json:"contactPhone,omitempty" validate:"omitempty,max=20"`
 	Whatsapp       *string `json:"whatsapp,omitempty" validate:"omitempty,max=20"`
 	Description    *string `json:"description,omitempty" validate:"omitempty,max=2000"`
-	PolicyTerms    *string `json:"policyTerms,omitempty" validate:"omitempty,max=5000"`
 	City           *string `json:"city,omitempty" validate:"omitempty,max=100"`
 	State          *string `json:"state,omitempty" validate:"omitempty,len=2"`
 	BannerURL      *string `json:"bannerUrl,omitempty" validate:"omitempty,url,max=500"`

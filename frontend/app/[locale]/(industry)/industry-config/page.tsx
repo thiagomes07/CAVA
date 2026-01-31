@@ -42,6 +42,7 @@ export default function IndustryConfigPage() {
 
     const [selectedLogo, setSelectedLogo] = useState<File | null>(null);
     const [previewLogoUrl, setPreviewLogoUrl] = useState<string>('');
+    const [originalLogoUrl, setOriginalLogoUrl] = useState<string>('');
     const [isUploading, setIsUploading] = useState(false);
     const [useCNPJMask, setUseCNPJMask] = useState(true);
     const [showCNPJInfo, setShowCNPJInfo] = useState(false);
@@ -62,7 +63,7 @@ export default function IndustryConfigPage() {
     const watchedState = watch('addressState');
 
     // Detect if logo changed
-    const isLogoDirty = !!selectedLogo || (previewLogoUrl !== (industry?.logoUrl || ''));
+    const isLogoDirty = selectedLogo !== null || previewLogoUrl !== originalLogoUrl;
 
     // Detect if form or logo has changes
     const hasChanges = isDirty || isLogoDirty;
@@ -70,6 +71,10 @@ export default function IndustryConfigPage() {
     // Load data
     useEffect(() => {
         if (industry) {
+            const logoUrl = industry.logoUrl || '';
+            setOriginalLogoUrl(logoUrl);
+            setPreviewLogoUrl(logoUrl);
+            
             reset({
                 name: industry.name || '',
                 cnpj: industry.cnpj || '',
@@ -84,10 +89,6 @@ export default function IndustryConfigPage() {
                 addressNumber: industry.addressNumber || '',
                 addressZipCode: industry.addressZipCode || '',
             });
-
-            if (industry.logoUrl) {
-                setPreviewLogoUrl(industry.logoUrl);
-            }
         }
     }, [industry, reset]);
 
@@ -104,6 +105,11 @@ export default function IndustryConfigPage() {
     };
 
     const handleCancel = () => {
+        // Liberar memória do preview local se existir
+        if (selectedLogo && previewLogoUrl.startsWith('blob:')) {
+            URL.revokeObjectURL(previewLogoUrl);
+        }
+
         if (industry) {
             // Restore all form fields to original values
             reset({
@@ -121,12 +127,8 @@ export default function IndustryConfigPage() {
                 addressZipCode: industry.addressZipCode || '',
             });
 
-            // Restore logo preview
-            if (industry.logoUrl) {
-                setPreviewLogoUrl(industry.logoUrl);
-            } else {
-                setPreviewLogoUrl('');
-            }
+            // Restore logo preview to original
+            setPreviewLogoUrl(originalLogoUrl);
         }
 
         // Reset selected logo
@@ -153,8 +155,14 @@ export default function IndustryConfigPage() {
 
             await updateConfig.mutateAsync(payload);
 
-            // Refetch or invalidation is handled by mutation hook ideally, 
-            // but we reset local state to clean up
+            // Update original logo URL after successful save
+            if (selectedLogo && payload.logoUrl) {
+                setOriginalLogoUrl(payload.logoUrl);
+            } else if (!previewLogoUrl) {
+                setOriginalLogoUrl('');
+            }
+
+            // Reset local state to clean up
             setSelectedLogo(null);
 
             success(t('success'));
