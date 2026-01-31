@@ -93,7 +93,7 @@ export function ImageUploadWithCrop({
         setIsPanning(false);
     };
 
-    // Crop Generation
+    // Crop Generation - CORRIGIDO
     const handleConfirmCrop = async () => {
         if (!imageRef.current || !containerRef.current) return;
 
@@ -101,60 +101,87 @@ export function ImageUploadWithCrop({
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
-        // Set output resolution (e.g., 600x600 for high quality avatar)
-        const size = 600;
-        canvas.width = size;
-        canvas.height = size / aspectRatio;
+        // Set output resolution (600x600 for high quality)
+        const outputSize = 600;
+        canvas.width = outputSize;
+        canvas.height = outputSize / aspectRatio;
 
-        // Draw logic
         const image = imageRef.current;
-        const scale = zoom;
+        const container = containerRef.current;
 
-        // Calculate the relative position of the image in the container
-        // Formula: (ImageDimension * Scale) 
-        // We need to map the container center to the canvas center
-        // But simpler: draw the image with the transforms applied
-
-        // We need to calculate which part of the image is visible in the square container
-        // The container is "window" into the image
-        // 1. Image Natural Dimensions
+        // Get natural image dimensions
         const naturalWidth = image.naturalWidth;
         const naturalHeight = image.naturalHeight;
 
-        // 2. Rendered Dimensions (in the container before zoom)
-        // Checks how updateStyles fits the image (object-cover vs custom math)
-        // Here we are doing custom math with transform
-        // Let's rely on the ratio of "rendered pixels" to "natural pixels"
+        // Get container dimensions
+        const containerWidth = container.clientWidth;
+        const containerHeight = container.clientHeight;
 
-        // Simpler approach: Draw image on canvas using the same transform logic
-        // Center the context
-        ctx.translate(size / 2, (size / aspectRatio) / 2);
-        ctx.scale(scale, scale);
-        ctx.translate(pan.x / containerRef.current.clientWidth * size, pan.y / containerRef.current.clientHeight * size);
-
-        // We need to know the base scale that "fits" the image to the container "cover" style
-        const containerAspect = 1; // Square container
+        // Calculate how the image is displayed in the container (object-fit: cover behavior)
         const imageAspect = naturalWidth / naturalHeight;
+        const containerAspect = containerWidth / containerHeight;
 
-        let drawWidth, drawHeight;
+        // Calculate the rendered size of the image in the container
+        let renderedWidth: number;
+        let renderedHeight: number;
 
         if (imageAspect > containerAspect) {
-            // Image is wider, height matches container
-            drawHeight = size;
-            drawWidth = size * imageAspect;
+            // Image is wider - fit to height
+            renderedHeight = containerHeight;
+            renderedWidth = naturalWidth * (containerHeight / naturalHeight);
         } else {
-            // Image is taller, width matches container
-            drawWidth = size;
-            drawHeight = size / imageAspect;
+            // Image is taller - fit to width
+            renderedWidth = containerWidth;
+            renderedHeight = naturalHeight * (containerWidth / naturalWidth);
         }
 
-        // Center image drawing
+        // Calculate the scale from rendered pixels to natural pixels
+        const scaleToNatural = naturalWidth / renderedWidth;
+
+        // Apply zoom to the rendered dimensions
+        const zoomedWidth = renderedWidth * zoom;
+        const zoomedHeight = renderedHeight * zoom;
+
+        // Calculate the offset of the zoomed image center from container center (in rendered pixels)
+        // The image is centered, then translated by pan
+        const imageCenterX = containerWidth / 2 + pan.x;
+        const imageCenterY = containerHeight / 2 + pan.y;
+
+        // Calculate the top-left corner of the zoomed image (in rendered pixels)
+        const imageLeft = imageCenterX - (zoomedWidth / 2);
+        const imageTop = imageCenterY - (zoomedHeight / 2);
+
+        // The visible crop area is the container bounds
+        // Calculate what portion of the zoomed image is visible
+        const cropLeft = -imageLeft; // in rendered pixels of the zoomed image
+        const cropTop = -imageTop;
+        const cropWidth = containerWidth;
+        const cropHeight = containerHeight;
+
+        // Convert crop coordinates from rendered zoomed pixels to natural image pixels
+        // First, account for zoom: divide by zoom to get pre-zoom rendered coordinates
+        const preZoomCropLeft = cropLeft / zoom;
+        const preZoomCropTop = cropTop / zoom;
+        const preZoomCropWidth = cropWidth / zoom;
+        const preZoomCropHeight = cropHeight / zoom;
+
+        // Then convert from rendered pixels to natural pixels
+        const naturalCropX = preZoomCropLeft * scaleToNatural;
+        const naturalCropY = preZoomCropTop * scaleToNatural;
+        const naturalCropWidth = preZoomCropWidth * scaleToNatural;
+        const naturalCropHeight = preZoomCropHeight * scaleToNatural;
+
+        // Draw the cropped portion to canvas
         ctx.drawImage(
             image,
-            -drawWidth / 2,
-            -drawHeight / 2,
-            drawWidth,
-            drawHeight
+            naturalCropX,
+            naturalCropY,
+            naturalCropWidth,
+            naturalCropHeight,
+            0,
+            0,
+            outputSize,
+            outputSize / aspectRatio
         );
 
         canvas.toBlob((blob) => {
@@ -162,9 +189,9 @@ export function ImageUploadWithCrop({
                 const newFile = new File([blob], "logo-cropped.jpg", { type: 'image/jpeg' });
                 onChange(newFile);
                 setIsEditing(false);
-                setSelectedImage(URL.createObjectURL(blob)); // Show the cropped result properly
+                setSelectedImage(URL.createObjectURL(blob));
             }
-        }, 'image/jpeg', 0.9);
+        }, 'image/jpeg', 0.95);
     };
 
     const handleCancelCrop = () => {
@@ -192,7 +219,7 @@ export function ImageUploadWithCrop({
                         className="max-w-none absolute top-1/2 left-1/2 origin-center select-none"
                         style={{
                             transform: `translate(-50%, -50%) translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                            // Initial size logic to behave like 'cover'
+                            // Simular object-fit: cover
                             height: imageRef.current && (imageRef.current.naturalWidth / imageRef.current.naturalHeight > 1) ? '100%' : 'auto',
                             width: imageRef.current && (imageRef.current.naturalWidth / imageRef.current.naturalHeight <= 1) ? '100%' : 'auto',
                             minHeight: '100%',

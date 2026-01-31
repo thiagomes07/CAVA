@@ -1,5 +1,5 @@
 -- =============================================
--- Migration: 000011_seed_data
+-- Migration: 000006_seed_data
 -- Description: Dados iniciais para desenvolvimento
 -- ATENÇÃO: Executar apenas em ambiente de desenvolvimento!
 -- =============================================
@@ -99,7 +99,8 @@ BEGIN
     -- Inserir lotes demo
     INSERT INTO batches (
         id, product_id, industry_id, batch_code, 
-        height, width, thickness, quantity_slabs, 
+        height, width, thickness, quantity_slabs,
+        available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
         industry_price, status, origin_quarry, entry_date
     )
     VALUES 
@@ -109,6 +110,7 @@ BEGIN
         '00000000-0000-0000-0000-000000000001',
         'CAR-000001',
         280.00, 180.00, 2.00, 20,
+        20, 0, 0, 0,
         15000.00, 'DISPONIVEL', 'Pedreira Carrara - Itália',
         CURRENT_TIMESTAMP - INTERVAL '30 days'
     ),
@@ -118,6 +120,7 @@ BEGIN
         '00000000-0000-0000-0000-000000000001',
         'PSG-000001',
         300.00, 200.00, 3.00, 15,
+        15, 0, 0, 0,
         12000.00, 'DISPONIVEL', 'Pedreira São Gabriel - ES',
         CURRENT_TIMESTAMP - INTERVAL '20 days'
     ),
@@ -127,6 +130,7 @@ BEGIN
         '00000000-0000-0000-0000-000000000001',
         'AZU-000001',
         290.00, 190.00, 2.50, 18,
+        13, 5, 0, 0,
         18000.00, 'RESERVADO', 'Pedreira Macaubas - BA',
         CURRENT_TIMESTAMP - INTERVAL '15 days'
     ),
@@ -136,6 +140,7 @@ BEGIN
         '00000000-0000-0000-0000-000000000001',
         'CAR-000002',
         280.00, 180.00, 2.00, 25,
+        0, 0, 25, 0,
         16000.00, 'VENDIDO', 'Pedreira Carrara - Itália',
         CURRENT_TIMESTAMP - INTERVAL '60 days'
     );

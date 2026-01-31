@@ -76,7 +76,6 @@ type UpdateConfigInput struct {
 	ContactPhone   *string `json:"contactPhone" validate:"omitempty,max=20"`
 	Whatsapp       *string `json:"whatsapp" validate:"omitempty,max=20"`
 	Description    *string `json:"description" validate:"omitempty,max=2000"`
-	PolicyTerms    *string `json:"policyTerms" validate:"omitempty,max=5000"`
 	City           *string `json:"city" validate:"omitempty,max=100"`
 	State          *string `json:"state" validate:"omitempty,len=2"`
 	BannerURL      *string `json:"bannerUrl" validate:"omitempty,url,max=500"`
@@ -144,9 +143,6 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if input.Description != nil && strings.TrimSpace(*input.Description) == "" {
 		input.Description = nil
-	}
-	if input.PolicyTerms != nil && strings.TrimSpace(*input.PolicyTerms) == "" {
-		input.PolicyTerms = nil
 	}
 	if input.City != nil && strings.TrimSpace(*input.City) == "" {
 		input.City = nil
@@ -234,14 +230,6 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			industry.Description = nil
 		} else {
 			industry.Description = &trimmed
-		}
-	}
-	if input.PolicyTerms != nil {
-		trimmed := strings.TrimSpace(*input.PolicyTerms)
-		if trimmed == "" {
-			industry.PolicyTerms = nil
-		} else {
-			industry.PolicyTerms = &trimmed
 		}
 	}
 	if input.City != nil {

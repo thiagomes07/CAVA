@@ -1,10 +1,13 @@
 -- =============================================
--- Rollback: 000011_seed_data
+-- Migration: 000006_seed_data (DOWN)
+-- Description: Remove dados de seed
 -- =============================================
 
--- Remover dados de seed em ordem reversa (devido a foreign keys)
+-- Remover dados em ordem reversa (respeitando foreign keys)
 DELETE FROM product_medias WHERE product_id IN (
-    SELECT id FROM products WHERE industry_id = '00000000-0000-0000-0000-000000000001'
+    '00000000-0000-0000-0000-000000000021',
+    '00000000-0000-0000-0000-000000000022',
+    '00000000-0000-0000-0000-000000000023'
 );
 
 DELETE FROM batches WHERE industry_id = '00000000-0000-0000-0000-000000000001';

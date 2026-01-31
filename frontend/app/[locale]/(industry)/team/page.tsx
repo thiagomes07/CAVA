@@ -357,6 +357,19 @@ export default function TeamManagementPage() {
                             {formatPhone(seller.whatsapp)}
                           </span>
                         </a>
+                      ) : seller.phone && seller.phone.replace(/\D/g, '').length === 11 ? (
+                        <a
+                          href={`https://wa.me/55${seller.phone.replace(/\D/g, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 text-slate-400 hover:text-emerald-500 transition-colors opacity-75 hover:opacity-100"
+                          title="WhatsApp via Telefone"
+                        >
+                          <MessageCircle className="w-4 h-4" />
+                          <span className="font-mono text-sm">
+                            {formatPhone(seller.phone)}
+                          </span>
+                        </a>
                       ) : (
                         <span className="text-slate-300">-</span>
                       )}

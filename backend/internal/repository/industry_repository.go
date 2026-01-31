@@ -20,16 +20,16 @@ func NewIndustryRepository(db *DB) *industryRepository {
 func (r *industryRepository) Create(ctx context.Context, industry *entity.Industry) error {
 	query := `
 		INSERT INTO industries (id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
-			description, policy_terms, city, state, banner_url, logo_url,
+			description, city, state, banner_url, logo_url,
 			address_country, address_state, address_city, address_street, address_number, address_zip_code, is_public)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING created_at, updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		industry.ID, industry.Name, industry.CNPJ, industry.Slug,
 		industry.ContactEmail, industry.ContactPhone, industry.Whatsapp,
-		industry.Description, industry.PolicyTerms, industry.City, industry.State, industry.BannerURL, industry.LogoURL,
+		industry.Description, industry.City, industry.State, industry.BannerURL, industry.LogoURL,
 		industry.AddressCountry, industry.AddressState, industry.AddressCity, industry.AddressStreet,
 		industry.AddressNumber, industry.AddressZipCode, industry.IsPublic,
 	).Scan(&industry.CreatedAt, &industry.UpdatedAt)
@@ -54,7 +54,7 @@ func (r *industryRepository) Create(ctx context.Context, industry *entity.Indust
 func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
-		       description, policy_terms, city, state, banner_url, logo_url,
+		       description, city, state, banner_url, logo_url,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
 		       is_public, created_at, updated_at
 		FROM industries
@@ -65,7 +65,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.Whatsapp,
-		&industry.Description, &industry.PolicyTerms, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
+		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
 		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
@@ -84,7 +84,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
-		       description, policy_terms, city, state, banner_url, logo_url,
+		       description, city, state, banner_url, logo_url,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
 		       is_public, created_at, updated_at
 		FROM industries
@@ -95,7 +95,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 	err := r.db.QueryRowContext(ctx, query, slug).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.Whatsapp,
-		&industry.Description, &industry.PolicyTerms, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
+		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
 		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
@@ -114,7 +114,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
-		       description, policy_terms, city, state, banner_url, logo_url,
+		       description, city, state, banner_url, logo_url,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
 		       is_public, created_at, updated_at
 		FROM industries
@@ -125,7 +125,7 @@ func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*enti
 	err := r.db.QueryRowContext(ctx, query, cnpj).Scan(
 		&industry.ID, &industry.Name, &industry.CNPJ, &industry.Slug,
 		&industry.ContactEmail, &industry.ContactPhone, &industry.Whatsapp,
-		&industry.Description, &industry.PolicyTerms, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
+		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
 		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
@@ -145,17 +145,17 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 	query := `
 		UPDATE industries
 		SET name = $1, contact_email = $2, contact_phone = $3, whatsapp = $4,
-		    description = $5, policy_terms = $6, city = $7, state = $8, banner_url = $9,
-		    logo_url = $10, address_country = $11, address_state = $12,
-		    address_city = $13, address_street = $14, address_number = $15,
-		    address_zip_code = $16, is_public = $17, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $18
+		    description = $5, city = $6, state = $7, banner_url = $8,
+		    logo_url = $9, address_country = $10, address_state = $11,
+		    address_city = $12, address_street = $13, address_number = $14,
+		    address_zip_code = $15, is_public = $16, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $17
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		industry.Name, industry.ContactEmail, industry.ContactPhone, industry.Whatsapp,
-		industry.Description, industry.PolicyTerms, industry.City, industry.State, industry.BannerURL,
+		industry.Description, industry.City, industry.State, industry.BannerURL,
 		industry.LogoURL, industry.AddressCountry, industry.AddressState,
 		industry.AddressCity, industry.AddressStreet, industry.AddressNumber,
 		industry.AddressZipCode, industry.IsPublic, industry.ID,
@@ -198,7 +198,7 @@ func (r *industryRepository) ExistsByCNPJ(ctx context.Context, cnpj string) (boo
 func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error) {
 	query := `
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
-		       description, policy_terms, city, state, banner_url, logo_url,
+		       description, city, state, banner_url, logo_url,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
 		       is_public, created_at, updated_at
 		FROM industries
@@ -217,7 +217,7 @@ func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error
 		if err := rows.Scan(
 			&ind.ID, &ind.Name, &ind.CNPJ, &ind.Slug,
 			&ind.ContactEmail, &ind.ContactPhone, &ind.Whatsapp,
-			&ind.Description, &ind.PolicyTerms, &ind.City, &ind.State, &ind.BannerURL, &ind.LogoURL,
+			&ind.Description, &ind.City, &ind.State, &ind.BannerURL, &ind.LogoURL,
 			&ind.AddressCountry, &ind.AddressState, &ind.AddressCity, &ind.AddressStreet,
 			&ind.AddressNumber, &ind.AddressZipCode,
 			&ind.IsPublic, &ind.CreatedAt, &ind.UpdatedAt,
