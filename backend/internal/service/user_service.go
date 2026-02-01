@@ -783,3 +783,99 @@ func (s *userService) DeleteBroker(ctx context.Context, id string) error {
 	s.logger.Info("broker deletado com sucesso", zap.String("brokerId", id))
 	return nil
 }
+
+func (s *userService) UpdateSeller(ctx context.Context, id string, industryID string, input entity.UpdateSellerInput) (*entity.User, error) {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verificar se pertence à indústria
+	if user.IndustryID == nil || *user.IndustryID != industryID {
+		s.logger.Warn("tentativa de atualizar usuário de outra indústria",
+			zap.String("userId", id),
+			zap.String("requestedIndustryId", industryID),
+		)
+		return nil, domainErrors.NewForbiddenError("Usuário não pertence a esta indústria")
+	}
+
+	// Verificar se é vendedor interno ou admin
+	if user.Role != entity.RoleVendedorInterno && user.Role != entity.RoleAdminIndustria {
+		s.logger.Warn("tentativa de atualizar usuário com role incorreto",
+			zap.String("userId", id),
+			zap.String("role", string(user.Role)),
+		)
+		return nil, domainErrors.NewBadRequestError("Usuário não é um vendedor interno ou admin")
+	}
+
+	// Verificar se nome mudou e se já existe
+	if input.Name != user.Name {
+		nameExists, err := s.userRepo.ExistsByNameInIndustry(ctx, input.Name, industryID)
+		if err != nil {
+			s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+		if nameExists {
+			return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
+		}
+		user.Name = input.Name
+	}
+
+	// Atualizar telefones
+	user.Phone = input.Phone
+	user.Whatsapp = input.Whatsapp
+	user.UpdatedAt = time.Now()
+
+	// Salvar alterações
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		s.logger.Error("erro ao atualizar vendedor",
+			zap.String("userId", id),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Limpar senha antes de retornar
+	user.Password = ""
+
+	s.logger.Info("vendedor atualizado com sucesso", zap.String("userId", id))
+	return user, nil
+}
+
+func (s *userService) DeleteUser(ctx context.Context, id string, industryID string) error {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Verificar se pertence à indústria
+	if user.IndustryID == nil || *user.IndustryID != industryID {
+		s.logger.Warn("tentativa de deletar usuário de outra indústria",
+			zap.String("userId", id),
+			zap.String("requestedIndustryId", industryID),
+		)
+		return domainErrors.NewForbiddenError("Usuário não pertence a esta indústria")
+	}
+
+	// Não permitir excluir admins
+	if user.Role == entity.RoleAdminIndustria {
+		s.logger.Warn("tentativa de deletar administrador bloqueada",
+			zap.String("userId", id),
+		)
+		return domainErrors.NewForbiddenError("Não é possível excluir administradores")
+	}
+
+	// Deletar usuário
+	if err := s.userRepo.Delete(ctx, id); err != nil {
+		s.logger.Error("erro ao deletar usuário",
+			zap.String("userId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("usuário deletado com sucesso", zap.String("userId", id))
+	return nil
+}

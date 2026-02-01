@@ -284,26 +284,6 @@ export default function BrokersManagementPage() {
     }
   };
 
-  const handleDeleteBroker = async () => {
-    if (!selectedBrokerForEdit) return;
-    try {
-      setIsSubmitting(true);
-      await apiClient.delete(`/brokers/${selectedBrokerForEdit.id}`);
-      success(t('brokerDeleted'));
-      setShowBrokerModal(false);
-      setSelectedBrokerForEdit(null);
-      fetchBrokers();
-    } catch (err) {
-      if (err instanceof ApiError && err.message) {
-        error(err.message);
-      } else {
-        error(tCommon('error'));
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const canResendInvite = (broker: BrokerWithStats) => !broker.firstLoginAt;
 
   return (
@@ -772,7 +752,6 @@ export default function BrokersManagementPage() {
           setSelectedBrokerForEdit(null);
         }}
         onSave={handleUpdateBroker}
-        onDelete={handleDeleteBroker}
         initialData={selectedBrokerForEdit}
         isLoading={isSubmitting}
       />

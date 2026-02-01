@@ -586,3 +586,102 @@ func (h *UserHandler) DeleteBroker(w http.ResponseWriter, r *http.Request) {
 
 	response.NoContent(w)
 }
+
+// UpdateUser godoc
+// @Summary Atualiza informações do usuário
+// @Description Admin atualiza dados do vendedor/admin (nome, telefone, whatsapp - email não pode ser alterado)
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do usuário"
+// @Param body body entity.UpdateSellerInput true "Dados para atualização"
+// @Success 200 {object} entity.User
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/users/{id} [put]
+func (h *UserHandler) UpdateUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do usuário é obrigatório", nil)
+		return
+	}
+
+	// Obter industryID do contexto
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	var input entity.UpdateSellerInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Atualizar usuário
+	user, err := h.userService.UpdateSeller(r.Context(), id, industryID, input)
+	if err != nil {
+		h.logger.Error("erro ao atualizar usuário",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("usuário atualizado",
+		zap.String("userId", user.ID),
+		zap.String("email", user.Email),
+	)
+
+	response.OK(w, user)
+}
+
+// DeleteUser godoc
+// @Summary Deleta um usuário
+// @Description Admin deleta vendedor interno (não pode deletar admins)
+// @Tags users
+// @Produce json
+// @Param id path string true "ID do usuário"
+// @Success 204
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/users/{id} [delete]
+func (h *UserHandler) DeleteUser(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do usuário é obrigatório", nil)
+		return
+	}
+
+	// Obter industryID do contexto
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	// Deletar usuário
+	if err := h.userService.DeleteUser(r.Context(), id, industryID); err != nil {
+		h.logger.Error("erro ao deletar usuário",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("usuário deletado",
+		zap.String("userId", id),
+	)
+
+	response.NoContent(w)
+}

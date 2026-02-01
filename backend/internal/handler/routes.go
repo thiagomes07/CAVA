@@ -240,6 +240,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.User.UpdateStatus)
 				r.With(m.RBAC.RequireAdmin).Post("/{id}/resend-invite", h.User.ResendInvite)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/email", h.User.UpdateEmail)
+				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.User.UpdateUser)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.User.DeleteUser)
 			})
 
 			// ----------------------------------------

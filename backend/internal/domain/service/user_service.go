@@ -55,4 +55,10 @@ type UserService interface {
 
 	// DeleteBroker deleta um broker (se não houver dependências)
 	DeleteBroker(ctx context.Context, id string) error
+
+	// UpdateSeller atualiza informações do vendedor/admin (email não pode ser alterado)
+	UpdateSeller(ctx context.Context, id string, industryID string, input entity.UpdateSellerInput) (*entity.User, error)
+
+	// DeleteUser deleta um usuário (vendedor interno apenas, não admin)
+	DeleteUser(ctx context.Context, id string, industryID string) error
 }

@@ -2,13 +2,12 @@ import { useEffect, useState } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { User, Mail, Phone, AlertTriangle } from 'lucide-react';
+import { User, Mail, Phone, AlertTriangle, Shield, UserPlus } from 'lucide-react';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils/cn';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
-import { updateBrokerSchema, UpdateBrokerInput } from '@/lib/schemas/auth.schema';
-import type { BrokerWithStats } from '@/lib/types';
+import { inviteSellerSchema, InviteSellerInput } from '@/lib/schemas/auth.schema';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,22 +19,20 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface BrokerFormModalProps {
+interface TeamMemberInviteModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (data: UpdateBrokerInput) => Promise<void>;
-    initialData?: BrokerWithStats | null;
+    onSave: (data: InviteSellerInput) => Promise<void>;
     isLoading?: boolean;
 }
 
-export function BrokerFormModal({
+export function TeamMemberInviteModal({
     open,
     onClose,
     onSave,
-    initialData,
     isLoading
-}: BrokerFormModalProps) {
-    const t = useTranslations('brokers');
+}: TeamMemberInviteModalProps) {
+    const t = useTranslations('team');
     const tCommon = useTranslations('common');
     const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -48,13 +45,14 @@ export function BrokerFormModal({
         setValue,
         control,
         formState: { errors, isDirty },
-    } = useForm<UpdateBrokerInput>({
-        resolver: zodResolver(updateBrokerSchema),
+    } = useForm<InviteSellerInput>({
+        resolver: zodResolver(inviteSellerSchema),
         defaultValues: {
             name: '',
             email: '',
             phone: '',
             whatsapp: '',
+            isAdmin: false,
         },
     });
 
@@ -63,25 +61,19 @@ export function BrokerFormModal({
 
     const phoneValue = watch('phone');
 
-    // Reset form when modal opens or initialData changes
+    // Reset form when modal opens
     useEffect(() => {
-        if (open && initialData) {
+        if (open) {
             reset({
-                name: initialData.name,
-                email: initialData.email,
-                phone: initialData.phone ? formatPhoneInput(initialData.phone) : '',
-                whatsapp: initialData.whatsapp ? formatPhoneInput(initialData.whatsapp) : '',
+                name: '',
+                email: '',
+                phone: '',
+                whatsapp: '',
+                isAdmin: false,
             });
-
-            // Check if phone and whatsapp are the same
-            if (initialData.phone && initialData.whatsapp &&
-                initialData.phone === initialData.whatsapp) {
-                setUseSamePhoneForWhatsapp(true);
-            } else {
-                setUseSamePhoneForWhatsapp(false);
-            }
+            setUseSamePhoneForWhatsapp(false);
         }
-    }, [open, initialData, reset]);
+    }, [open, reset]);
 
     // Sync whatsapp with phone when checkbox is checked
     useEffect(() => {
@@ -117,23 +109,21 @@ export function BrokerFormModal({
         }
     };
 
-    const handleFormSubmit = async (data: UpdateBrokerInput) => {
+    const handleFormSubmit = async (data: InviteSellerInput) => {
         try {
             // Sanitize phone numbers before submitting
-            const sanitizedData: UpdateBrokerInput = {
+            const sanitizedData: InviteSellerInput = {
                 ...data,
                 phone: data.phone ? sanitizePhone(data.phone) : undefined,
                 whatsapp: data.whatsapp ? sanitizePhone(data.whatsapp) : undefined,
             };
 
             await onSave(sanitizedData);
-            reset(data); // Reset with saved values to clear dirty state
+            reset();
         } catch (error) {
-            console.error('Error saving broker:', error);
+            console.error('Error inviting team member:', error);
         }
     };
-
-    const isEditMode = !!initialData;
 
     return (
         <>
@@ -141,7 +131,7 @@ export function BrokerFormModal({
                 <ModalClose onClose={handleClose} />
                 <ModalHeader>
                     <ModalTitle>
-                        {isEditMode ? t('editBrokerTitle') : t('inviteBrokerTitle')}
+                        {t('addSellerTitle')}
                     </ModalTitle>
                 </ModalHeader>
 
@@ -181,17 +171,14 @@ export function BrokerFormModal({
                                     className="text-sm font-medium text-slate-700 flex items-center gap-2"
                                 >
                                     <Mail className="h-4 w-4" />
-                                    {tCommon('email')}
-                                    {isEditMode && <span className="ml-auto text-xs text-slate-400 font-normal">(Não editável)</span>}
+                                    {tCommon('email')} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                     {...register('email')}
                                     id="email"
                                     type="email"
-                                    disabled={isEditMode}
                                     className={cn(
                                         "w-full px-4 py-2.5 rounded-lg border transition-colors",
-                                        isEditMode && "bg-slate-100 text-slate-500 cursor-not-allowed",
                                         errors.email
                                             ? "border-red-300 focus:border-red-500 focus:ring-red-500"
                                             : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
@@ -278,6 +265,26 @@ export function BrokerFormModal({
                                     </label>
                                 </div>
                             </div>
+
+                            {/* Admin Checkbox */}
+                            <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                                <label className="flex items-start gap-3 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        {...register('isAdmin')}
+                                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
+                                            <Shield className="w-4 h-4 text-amber-600" />
+                                            {t('isAdmin')}
+                                        </span>
+                                        <span className="text-xs text-slate-400 mt-0.5">
+                                            {t('isAdminDescription')}
+                                        </span>
+                                    </div>
+                                </label>
+                            </div>
                         </div>
                     </ModalContent>
 
@@ -302,12 +309,12 @@ export function BrokerFormModal({
                                 {isLoading ? (
                                     <>
                                         <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                        {tCommon('saving')}
+                                        {tCommon('sending')}
                                     </>
                                 ) : (
                                     <>
-                                        <User className="w-4 h-4" />
-                                        {tCommon('save')}
+                                        <UserPlus className="w-4 h-4" />
+                                        {t('createAccess')}
                                     </>
                                 )}
                             </button>
@@ -317,7 +324,7 @@ export function BrokerFormModal({
             </Modal>
 
             {/* Confirmation dialog for discarding changes */}
-            <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+            <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm} onClose={() => setShowDiscardConfirm(false)}>
                 <AlertDialogContent className="w-full max-w-md p-6 mx-auto">
                     <AlertDialogHeader>
                         <div className="flex items-center gap-3">

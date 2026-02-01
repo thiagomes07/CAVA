@@ -625,12 +625,18 @@
     "resendError": "Erro ao reenviar convite",
     "newEmail": "Novo Email",
     "created": "Criado em",
+    "joinedAt": "Desde",
     "editBrokerTitle": "Editar Broker",
     "brokerUpdated": "Broker atualizado com sucesso",
-    "brokerDeleted": "Broker exclu�do com sucesso",
-    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta a��o n�o pode ser desfeita.",
-    "discardChangesTitle": "Descartar altera��es?",
-     "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
+    "brokerDeleted": "Broker excluído com sucesso",
+    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta ação não pode ser desfeita.",
+    "discardChangesTitle": "Descartar alterações?",
+    "discardChangesDescription": "Existem alterações não salvas. Deseja realmente descartá-las?",
+    "editMemberTitle": "Editar Membro",
+    "memberUpdated": "Membro atualizado com sucesso",
+    "memberDeleted": "Membro removido com sucesso",
+    "memberUpdateError": "Erro ao atualizar membro",
+    "memberDeleteError": "Erro ao excluir membro"
   },
   "brokers": {
     "title": "Parceiros (Brokers)",
@@ -674,7 +680,7 @@
     "brokerDeleted": "Broker exclu�do com sucesso",
     "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta a��o n�o pode ser desfeita.",
     "discardChangesTitle": "Descartar altera��es?",
-     "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
+    "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
   },
   "sharedInventory": {
     "title": "Estoque Compartilhado",

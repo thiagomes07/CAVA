@@ -7,8 +7,8 @@ import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose }
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils/cn';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
-import { updateBrokerSchema, UpdateBrokerInput } from '@/lib/schemas/auth.schema';
-import type { BrokerWithStats } from '@/lib/types';
+import { updateSellerSchema, UpdateSellerInput } from '@/lib/schemas/auth.schema';
+import type { User as UserType } from '@/lib/types';
 import {
     AlertDialog,
     AlertDialogAction,
@@ -20,22 +20,22 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface BrokerFormModalProps {
+interface TeamMemberFormModalProps {
     open: boolean;
     onClose: () => void;
-    onSave: (data: UpdateBrokerInput) => Promise<void>;
-    initialData?: BrokerWithStats | null;
+    onSave: (data: UpdateSellerInput) => Promise<void>;
+    initialData?: UserType | null;
     isLoading?: boolean;
 }
 
-export function BrokerFormModal({
+export function TeamMemberFormModal({
     open,
     onClose,
     onSave,
     initialData,
     isLoading
-}: BrokerFormModalProps) {
-    const t = useTranslations('brokers');
+}: TeamMemberFormModalProps) {
+    const t = useTranslations('team');
     const tCommon = useTranslations('common');
     const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
     const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -48,8 +48,8 @@ export function BrokerFormModal({
         setValue,
         control,
         formState: { errors, isDirty },
-    } = useForm<UpdateBrokerInput>({
-        resolver: zodResolver(updateBrokerSchema),
+    } = useForm<UpdateSellerInput>({
+        resolver: zodResolver(updateSellerSchema),
         defaultValues: {
             name: '',
             email: '',
@@ -117,10 +117,10 @@ export function BrokerFormModal({
         }
     };
 
-    const handleFormSubmit = async (data: UpdateBrokerInput) => {
+    const handleFormSubmit = async (data: UpdateSellerInput) => {
         try {
             // Sanitize phone numbers before submitting
-            const sanitizedData: UpdateBrokerInput = {
+            const sanitizedData: UpdateSellerInput = {
                 ...data,
                 phone: data.phone ? sanitizePhone(data.phone) : undefined,
                 whatsapp: data.whatsapp ? sanitizePhone(data.whatsapp) : undefined,
@@ -129,11 +129,9 @@ export function BrokerFormModal({
             await onSave(sanitizedData);
             reset(data); // Reset with saved values to clear dirty state
         } catch (error) {
-            console.error('Error saving broker:', error);
+            console.error('Error saving team member:', error);
         }
     };
-
-    const isEditMode = !!initialData;
 
     return (
         <>
@@ -141,7 +139,7 @@ export function BrokerFormModal({
                 <ModalClose onClose={handleClose} />
                 <ModalHeader>
                     <ModalTitle>
-                        {isEditMode ? t('editBrokerTitle') : t('inviteBrokerTitle')}
+                        {t('editMemberTitle')}
                     </ModalTitle>
                 </ModalHeader>
 
@@ -174,7 +172,7 @@ export function BrokerFormModal({
                                 )}
                             </div>
 
-                            {/* Email */}
+                            {/* Email - Read-only */}
                             <div className="space-y-2">
                                 <label
                                     htmlFor="email"
@@ -182,16 +180,16 @@ export function BrokerFormModal({
                                 >
                                     <Mail className="h-4 w-4" />
                                     {tCommon('email')}
-                                    {isEditMode && <span className="ml-auto text-xs text-slate-400 font-normal">(Não editável)</span>}
+                                    <span className="ml-auto text-xs text-slate-400 font-normal">(Não editável)</span>
                                 </label>
                                 <input
                                     {...register('email')}
                                     id="email"
                                     type="email"
-                                    disabled={isEditMode}
+                                    disabled
                                     className={cn(
                                         "w-full px-4 py-2.5 rounded-lg border transition-colors",
-                                        isEditMode && "bg-slate-100 text-slate-500 cursor-not-allowed",
+                                        "bg-slate-100 text-slate-500 cursor-not-allowed",
                                         errors.email
                                             ? "border-red-300 focus:border-red-500 focus:ring-red-500"
                                             : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
@@ -317,7 +315,7 @@ export function BrokerFormModal({
             </Modal>
 
             {/* Confirmation dialog for discarding changes */}
-            <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
+            <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm} onClose={() => setShowDiscardConfirm(false)}>
                 <AlertDialogContent className="w-full max-w-md p-6 mx-auto">
                     <AlertDialogHeader>
                         <div className="flex items-center gap-3">
