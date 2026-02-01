@@ -6,7 +6,6 @@ import { Search, X, MessageSquare, Mail, AlertTriangle } from 'lucide-react';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -57,7 +56,8 @@ export function ShareLinksModal({
   const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string>('');
+
+  const [linkMode, setLinkMode] = useState<'BATCH' | 'CATALOG'>('BATCH');
 
   // Buscar links ao abrir o modal
   useEffect(() => {
@@ -68,7 +68,6 @@ export function ShareLinksModal({
       setSelectedLinkIds(new Set());
       setCustomMessage('');
       setSearchTerm('');
-      setTypeFilter('');
     }
   }, [open]);
 
@@ -78,7 +77,7 @@ export function ShareLinksModal({
       const data = await apiClient.get<{ links: SalesLink[] }>('/sales-links', {
         params: { limit: 1000 }
       });
-      
+
       // Filtrar apenas links ativos e não expirados
       const activeLinks = filterActiveLinks(data.links);
       setLinks(activeLinks);
@@ -94,9 +93,12 @@ export function ShareLinksModal({
   const filteredLinks = useMemo(() => {
     let filtered = links;
 
-    // Filtro por tipo
-    if (typeFilter) {
-      filtered = filtered.filter(link => link.linkType === typeFilter);
+    // Filter by Mode
+    if (linkMode === 'CATALOG') {
+      filtered = filtered.filter(link => link.linkType === 'CATALOGO_COMPLETO');
+    } else {
+      // Batch Mode: Anything NOT Catalogo Completo (Lotes, Produtos, Multiplos)
+      filtered = filtered.filter(link => link.linkType !== 'CATALOGO_COMPLETO');
     }
 
     // Busca por texto
@@ -113,7 +115,7 @@ export function ShareLinksModal({
     }
 
     return filtered;
-  }, [links, typeFilter, searchTerm]);
+  }, [links, linkMode, searchTerm]);
 
   // Links selecionados para preview
   const selectedLinks = useMemo(() => {
@@ -165,7 +167,7 @@ export function ShareLinksModal({
     // Se for WhatsApp individual, redirecionar diretamente
     if (mode === 'whatsapp' && cliente && whatsappPreview) {
       if (!whatsappPreview.validation.valid) return;
-      
+
       const url = generateWhatsAppUrl(cliente.whatsapp || '', whatsappPreview.message);
       window.open(url, '_blank');
       onClose();
@@ -195,7 +197,8 @@ export function ShareLinksModal({
   };
 
   const canConfirm = selectedLinkIds.size > 0 && !isLoading;
-  const confirmDisabled = !canConfirm || (mode === 'whatsapp' && whatsappPreview && !whatsappPreview.validation.valid);
+  const whatsappInvalid = mode === 'whatsapp' && whatsappPreview ? !whatsappPreview.validation.valid : false;
+  const confirmDisabled = !canConfirm || whatsappInvalid;
 
   return (
     <Modal open={open} onClose={onClose}>
@@ -238,17 +241,30 @@ export function ShareLinksModal({
                 className="pl-10"
               />
             </div>
-            <Select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="w-48"
-            >
-              <option value="">{t('linkTypeAll')}</option>
-              <option value="LOTE_UNICO">Lote Único</option>
-              <option value="PRODUTO_GERAL">Produto</option>
-              <option value="CATALOGO_COMPLETO">Catálogo</option>
-              <option value="MULTIPLOS_LOTES">Múltiplos Lotes</option>
-            </Select>
+            <div className="flex p-1 bg-slate-100 rounded-sm border border-slate-200">
+              <button
+                onClick={() => setLinkMode('BATCH')}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-sm transition-all min-w-[80px]",
+                  linkMode === 'BATCH'
+                    ? "bg-white text-obsidian shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Lotes
+              </button>
+              <button
+                onClick={() => setLinkMode('CATALOG')}
+                className={cn(
+                  "px-3 py-1.5 text-xs font-medium rounded-sm transition-all min-w-[80px]",
+                  linkMode === 'CATALOG'
+                    ? "bg-white text-obsidian shadow-sm"
+                    : "text-slate-500 hover:text-slate-700"
+                )}
+              >
+                Catálogos
+              </button>
+            </div>
           </div>
 
           {/* Indicador de seleção */}
@@ -270,7 +286,7 @@ export function ShareLinksModal({
           <div className="border border-slate-200 rounded-sm">
             {isLoadingLinks ? (
               <div className="p-8">
-                <LoadingState variant="list" rows={3} />
+                <LoadingState variant="table" rows={3} />
               </div>
             ) : filteredLinks.length === 0 ? (
               <div className="p-8">
@@ -363,9 +379,9 @@ export function ShareLinksModal({
                 </label>
                 <span className={cn(
                   'text-xs font-mono',
-                  whatsappPreview.validation.valid 
-                    ? whatsappPreview.validation.warning 
-                      ? 'text-amber-600' 
+                  whatsappPreview.validation.valid
+                    ? whatsappPreview.validation.warning
+                      ? 'text-amber-600'
                       : 'text-slate-500'
                     : 'text-rose-600'
                 )}>
@@ -406,8 +422,8 @@ export function ShareLinksModal({
           onClick={handleConfirm}
           disabled={confirmDisabled}
           className={cn(
-            mode === 'whatsapp' 
-              ? 'bg-emerald-600 hover:bg-emerald-700' 
+            mode === 'whatsapp'
+              ? 'bg-emerald-600 hover:bg-emerald-700'
               : 'bg-blue-600 hover:bg-blue-700'
           )}
         >

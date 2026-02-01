@@ -68,7 +68,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
         const focusableElements = modal.querySelectorAll<HTMLElement>(
           'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
         );
-        
+
         const firstElement = focusableElements[0];
         const lastElement = focusableElements[focusableElements.length - 1];
 
@@ -89,7 +89,7 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
 
     return (
       <ModalContext.Provider value={{ labelId, descriptionId }}>
-        <div 
+        <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
           role="presentation"
         >
@@ -116,14 +116,16 @@ const Modal = forwardRef<HTMLDivElement, ModalProps>(
             tabIndex={-1}
             className={cn(
               'relative bg-porcelain rounded-xl shadow-premium-lg',
-              'w-full max-w-2xl max-h-[90vh] overflow-y-auto',
+              'w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden', // Changed: added flex/overflow-hidden
               'animate-in fade-in-0 zoom-in-95 duration-200',
               'focus:outline-none',
               className
             )}
             {...props}
           >
-            {children}
+            <div className="overflow-y-auto flex-1 w-full">
+              {children}
+            </div>
           </div>
         </div>
       </ModalContext.Provider>

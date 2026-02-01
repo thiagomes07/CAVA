@@ -271,7 +271,7 @@
     "exportCsv": "Exportar CSV",
     "exportStarted": "Exportação iniciada. O download começará em breve.",
     "exportError": "Erro ao exportar clientes",
-    "searchPlaceholder": "Nome ou contato",
+    "searchPlaceholder": "Nome ou Telefone",
     "allLinks": "Todos os Links",
     "allStatuses": "Todos os Status",
     "statusNew": "Novo",

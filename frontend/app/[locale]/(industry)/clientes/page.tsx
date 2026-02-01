@@ -13,6 +13,7 @@ import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { SortableTableHead } from '@/components/shared/SortableTableHead';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ShareLinksModal, ShareSelection } from '@/components/shared/ShareLinksModal';
 import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -37,6 +38,7 @@ export default function ClientesManagementPage() {
   const [salesLinks, setSalesLinks] = useState<SalesLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Modal State
   const [showClientModal, setShowClientModal] = useState(false);
@@ -111,7 +113,31 @@ export default function ClientesManagementPage() {
   // Check if client has valid email
   const isValidEmail = (contact: string) => contact.includes('@');
 
-  // selection handlers removed
+  const handleSelectCliente = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = clientes.map((c) => c.id);
+      setSelectedIds(new Set(allIds));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleBulkShare = () => {
+    if (selectedIds.size === 0) return;
+    setShareCliente(null); // Null indicates bulk mode
+    setShareMode('email'); // Force email for bulk
+    setShowShareLinksModal(true);
+  };
 
   // bulk send links removed — keep individual share functionality
 
@@ -240,16 +266,18 @@ export default function ClientesManagementPage() {
   };
 
   const handleShareLinksConfirm = async (selection: ShareSelection) => {
-    if (!shareCliente) return;
+    // Determine recipients
+    const recipientsIds = shareCliente ? [shareCliente.id] : Array.from(selectedIds);
+    if (recipientsIds.length === 0) return;
 
-    // Se for WhatsApp, o modal já redireciona automaticamente
+    // Se for WhatsApp, o modal já redireciona automaticamente (apenas individual)
     // Este handler só é chamado para Email
     if (shareMode === 'email') {
       try {
         setIsSendingLinks(true);
 
         const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-          clienteIds: [shareCliente.id],
+          clienteIds: recipientsIds,
           salesLinkIds: selection.salesLinkIds,
           customMessage: selection.customMessage,
         });
@@ -266,6 +294,7 @@ export default function ClientesManagementPage() {
 
         setShowShareLinksModal(false);
         setShareCliente(null);
+        setSelectedIds(new Set()); // Clear selection after send
         fetchClientes();
       } catch (err) {
         if (err instanceof ApiError) {
@@ -299,7 +328,7 @@ export default function ClientesManagementPage() {
               {t('subtitle')}
             </p>
           </div>
-            <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3">
             <Button variant="primary" onClick={handleOpenCreate}>
               <Plus className="w-4 h-4 mr-2" />
               {t('addCliente')}
@@ -312,8 +341,38 @@ export default function ClientesManagementPage() {
         </div>
       </div>
 
-      {/* Selection indicator */}
-      
+      {/* Bulk Actions Indicator */}
+      {selectedIds.size > 0 && (
+        <div className="px-8 pb-6">
+          <div className="flex items-center justify-between p-4 bg-obsidian text-white rounded-sm shadow-lg animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-4">
+              <span className="font-medium">
+                {selectedIds.size} {selectedIds.size === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+              </span>
+              <div className="h-4 w-px bg-white/20" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-white/70 hover:text-white hover:bg-white/10 h-8"
+              >
+                Limpar seleção
+              </Button>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleBulkShare}
+                className="bg-white text-obsidian hover:bg-slate-100 border-none"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {t('sendLinks')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="px-8 py-6">
@@ -397,7 +456,12 @@ export default function ClientesManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                      {/* selection column removed */}
+                    <TableHead className="w-[50px]">
+                      <Checkbox
+                        checked={clientes.length > 0 && selectedIds.size === clientes.length}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
+                      />
+                    </TableHead>
                     <SortableTableHead
                       field="name"
                       label={t('name')}
@@ -429,6 +493,12 @@ export default function ClientesManagementPage() {
                   {clientes.map((cliente) => {
                     return (
                       <TableRow key={cliente.id} className="cursor-pointer transition-colors" onClick={() => handleOpenEdit(cliente)}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={selectedIds.has(cliente.id)}
+                            onChange={(e) => handleSelectCliente(cliente.id, e.target.checked)}
+                          />
+                        </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
@@ -570,8 +640,9 @@ export default function ClientesManagementPage() {
         onConfirm={handleShareLinksConfirm}
         mode={shareMode}
         cliente={shareCliente || undefined}
+        multipleClientes={!shareCliente ? selectedIds.size : undefined}
         isLoading={isSendingLinks}
       />
-    </div>
+    </div >
   );
 }
