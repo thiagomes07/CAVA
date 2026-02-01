@@ -60,7 +60,8 @@ func (h *ClienteHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Criar cliente
-	cliente, err := h.clienteService.CreateManual(r.Context(), input)
+	userID := middleware.GetUserID(r.Context())
+	cliente, err := h.clienteService.CreateManual(r.Context(), input, userID)
 	if err != nil {
 		h.logger.Error("erro ao criar cliente",
 			zap.Error(err),
@@ -120,13 +121,6 @@ func (h *ClienteHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	if linkID := r.URL.Query().Get("linkId"); linkID != "" {
 		filters.LinkID = &linkID
-	}
-
-	if status := r.URL.Query().Get("status"); status != "" {
-		s := entity.ClienteStatus(status)
-		if s.IsValid() {
-			filters.Status = &s
-		}
 	}
 
 	if startDate := r.URL.Query().Get("startDate"); startDate != "" {
@@ -235,58 +229,6 @@ func (h *ClienteHandler) GetInteractions(w http.ResponseWriter, r *http.Request)
 	}
 
 	response.OK(w, interactions)
-}
-
-// UpdateStatus godoc
-// @Summary Atualiza status do cliente
-// @Description Atualiza o status de um cliente
-// @Tags clientes
-// @Accept json
-// @Produce json
-// @Param id path string true "ID do cliente"
-// @Param body body entity.UpdateClienteStatusInput true "Status do cliente"
-// @Success 200 {object} entity.Cliente
-// @Failure 400 {object} response.ErrorResponse
-// @Failure 404 {object} response.ErrorResponse
-// @Router /api/clientes/{id}/status [patch]
-func (h *ClienteHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
-	id := chi.URLParam(r, "id")
-	if id == "" {
-		response.BadRequest(w, "ID do cliente é obrigatório", nil)
-		return
-	}
-
-	var input entity.UpdateClienteStatusInput
-
-	// Parse JSON body
-	if err := response.ParseJSON(r, &input); err != nil {
-		response.HandleError(w, err)
-		return
-	}
-
-	// Validar input
-	if err := h.validator.Validate(input); err != nil {
-		response.HandleError(w, err)
-		return
-	}
-
-	// Atualizar status
-	cliente, err := h.clienteService.UpdateStatus(r.Context(), id, input.Status)
-	if err != nil {
-		h.logger.Error("erro ao atualizar status do cliente",
-			zap.String("id", id),
-			zap.Error(err),
-		)
-		response.HandleError(w, err)
-		return
-	}
-
-	h.logger.Info("status do cliente atualizado",
-		zap.String("clienteId", id),
-		zap.String("status", string(input.Status)),
-	)
-
-	response.OK(w, cliente)
 }
 
 // SendLinks godoc

@@ -687,26 +687,25 @@ func (s *batchService) Sell(ctx context.Context, userID string, input entity.Cre
 			if input.NewClient.Email != "" {
 				email = &input.NewClient.Email
 			}
-			if input.NewClient.Phone != "" {
-				phone = &input.NewClient.Phone
-			}
-			newCliente := &entity.Cliente{
-				ID:             uuid.New().String(),
-				SalesLinkID:    "", // Será convertido para NULL pelo NULLIF no repositório
-				Name:           input.NewClient.Name,
-				Email:          email,
-				Phone:          phone,
-				MarketingOptIn: false,
-				Status:         entity.ClienteStatusNovo,
-				CreatedAt:      time.Now(),
-				UpdatedAt:      time.Now(),
-			}
+		if input.NewClient.Phone != "" {
+			phone = &input.NewClient.Phone
+		}
+		newCliente := &entity.Cliente{
+			ID:             uuid.New().String(),
+			SalesLinkID:    "", // Será convertido para NULL pelo NULLIF no repositório
+			Name:           input.NewClient.Name,
+			Email:          email,
+			Phone:          phone,
+			MarketingOptIn: false,
+			CreatedAt:      time.Now(),
+			UpdatedAt:      time.Now(),
+		}
 
-			if err := s.clienteRepo.Create(ctx, tx, newCliente); err != nil {
-				s.logger.Error("erro ao criar cliente na venda", zap.Error(err))
-				return err
-			}
-			clienteID = &newCliente.ID
+		if err := s.clienteRepo.Create(ctx, tx, newCliente); err != nil {
+			s.logger.Error("erro ao criar cliente na venda", zap.Error(err))
+			return err
+		}
+		clienteID = &newCliente.ID
 			customerName = newCliente.Name
 			if newCliente.Email != nil && *newCliente.Email != "" {
 				customerContact = *newCliente.Email

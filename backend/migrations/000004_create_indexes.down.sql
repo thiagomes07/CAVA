@@ -60,7 +60,7 @@ DROP INDEX IF EXISTS idx_clientes_name_trgm;
 DROP INDEX IF EXISTS idx_clientes_created_by;
 DROP INDEX IF EXISTS idx_clientes_marketing_opt_in;
 DROP INDEX IF EXISTS idx_clientes_created_at;
-DROP INDEX IF EXISTS idx_clientes_status;
+
 DROP INDEX IF EXISTS idx_clientes_phone;
 DROP INDEX IF EXISTS idx_clientes_email;
 DROP INDEX IF EXISTS idx_clientes_sales_link;

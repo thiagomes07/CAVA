@@ -4,24 +4,6 @@ import (
 	"time"
 )
 
-// ClienteStatus representa o status de um cliente
-type ClienteStatus string
-
-const (
-	ClienteStatusNovo      ClienteStatus = "NOVO"
-	ClienteStatusContatado ClienteStatus = "CONTATADO"
-	ClienteStatusResolvido ClienteStatus = "RESOLVIDO"
-)
-
-// IsValid verifica se o status do cliente é válido
-func (l ClienteStatus) IsValid() bool {
-	switch l {
-	case ClienteStatusNovo, ClienteStatusContatado, ClienteStatusResolvido:
-		return true
-	}
-	return false
-}
-
 // InteractionType representa os tipos de interação
 type InteractionType string
 
@@ -41,10 +23,11 @@ type Cliente struct {
 	Whatsapp       *string       `json:"whatsapp,omitempty"`
 	Message        *string       `json:"message,omitempty"`
 	MarketingOptIn bool          `json:"marketingOptIn"`
-	Status         ClienteStatus `json:"status"`
 	CreatedAt      time.Time     `json:"createdAt"`
 	UpdatedAt      time.Time     `json:"updatedAt"`
 	SalesLink      *SalesLink    `json:"salesLink,omitempty"` // Populated quando necessário
+	CreatedByUserID *string      `json:"createdByUserId,omitempty"`
+	Contact        string        `json:"contact"` // Computed: email ou phone
 }
 
 // ClienteInteraction representa uma interação de um cliente
@@ -89,30 +72,24 @@ type CreateClienteManualInput struct {
 	MarketingOptIn bool    `json:"marketingOptIn"`
 }
 
-// UpdateClienteStatusInput representa os dados para atualizar o status de um cliente
-type UpdateClienteStatusInput struct {
-	Status ClienteStatus `json:"status" validate:"required,oneof=NOVO CONTATADO RESOLVIDO"`
-}
-
 // ClienteFilters representa os filtros para busca de clientes
 type ClienteFilters struct {
-	Search          *string        `json:"search,omitempty"` // Busca por nome ou contato
-	LinkID          *string        `json:"linkId,omitempty"`
-	StartDate       *string        `json:"startDate,omitempty"` // ISO date
-	EndDate         *string        `json:"endDate,omitempty"`   // ISO date
-	OptIn           *bool          `json:"optIn,omitempty"`
-	Status          *ClienteStatus `json:"status,omitempty"`
-	Page            int            `json:"page" validate:"min=1"`
-	Limit           int            `json:"limit" validate:"min=1,max=100"`
-	SortBy          string         `json:"sortBy,omitempty"`    // Campo para ordenação: name, email, created_at, status
-	SortOrder       string         `json:"sortOrder,omitempty"` // Ordem: asc ou desc
-	IndustryID      *string        `json:"-"`                   // Filtro interno: clientes de links da indústria
-	CreatedByUserID *string        `json:"-"`                   // Filtro interno: clientes de links criados pelo usuário (broker)
+	Search          *string `json:"search,omitempty"` // Busca por nome ou contato
+	LinkID          *string `json:"linkId,omitempty"`
+	StartDate       *string `json:"startDate,omitempty"` // ISO date
+	EndDate         *string `json:"endDate,omitempty"`   // ISO date
+	OptIn           *bool   `json:"optIn,omitempty"`
+	Page            int     `json:"page" validate:"min=1"`
+	Limit           int     `json:"limit" validate:"min=1,max=100"`
+	SortBy          string  `json:"sortBy,omitempty"`    // Campo para ordenação: name, email, created_at
+	SortOrder       string  `json:"sortOrder,omitempty"` // Ordem: asc ou desc
+	IndustryID      *string `json:"-"`                   // Filtro interno: clientes de links da indústria
+	CreatedByUserID *string `json:"-"`                   // Filtro interno: clientes de links criados pelo usuário (broker)
 }
 
 // ValidClienteSortFields retorna os campos válidos para ordenação de clientes
 func ValidClienteSortFields() []string {
-	return []string{"name", "email", "phone", "created_at", "status"}
+	return []string{"name", "email", "phone", "created_at"}
 }
 
 // IsValidSortField verifica se o campo de ordenação é válido

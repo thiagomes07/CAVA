@@ -27,9 +27,6 @@ type ClienteRepository interface {
 	// Update atualiza os dados do cliente
 	Update(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error
 
-	// UpdateStatus atualiza o status do cliente
-	UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) error
-
 	// UpdateLastInteraction atualiza a data da última interação
 	UpdateLastInteraction(ctx context.Context, tx *sql.Tx, id string) error
 

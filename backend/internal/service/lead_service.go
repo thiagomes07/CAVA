@@ -106,7 +106,6 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 				Whatsapp:       input.Whatsapp,
 				Message:        input.Message,
 				MarketingOptIn: input.MarketingOptIn,
-				Status:         entity.ClienteStatusNovo,
 				CreatedAt:      time.Now(),
 				UpdatedAt:      time.Now(),
 			}
@@ -153,7 +152,7 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 }
 
 // CreateManual cria um cliente manualmente (usuário autenticado)
-func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateClienteManualInput) (*entity.Cliente, error) {
+func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateClienteManualInput, createdByUserID string) (*entity.Cliente, error) {
 	// Determinar contato para busca de cliente existente (prioriza email)
 	var searchContact string
 	if input.Email != nil && *input.Email != "" {
@@ -177,17 +176,17 @@ func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateCl
 
 	// Criar novo cliente (sem SalesLinkID, criado manualmente)
 	cliente := &entity.Cliente{
-		ID:             uuid.New().String(),
-		SalesLinkID:    "", // Sem link associado
-		Name:           input.Name,
-		Email:          input.Email,
-		Phone:          input.Phone,
-		Whatsapp:       input.Whatsapp,
-		Message:        input.Message,
-		MarketingOptIn: input.MarketingOptIn,
-		Status:         entity.ClienteStatusNovo,
-		CreatedAt:      time.Now(),
-		UpdatedAt:      time.Now(),
+		ID:              uuid.New().String(),
+		SalesLinkID:     "", // Sem link associado
+		CreatedByUserID: &createdByUserID,
+		Name:            input.Name,
+		Email:           input.Email,
+		Phone:           input.Phone,
+		Whatsapp:        input.Whatsapp,
+		Message:         input.Message,
+		MarketingOptIn:  input.MarketingOptIn,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	if err := s.clienteRepo.Create(ctx, nil, cliente); err != nil {
@@ -207,6 +206,13 @@ func (s *clienteService) GetByID(ctx context.Context, id string) (*entity.Client
 	cliente, err := s.clienteRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Calcular campo Contact (email ou phone)
+	if cliente.Email != nil && *cliente.Email != "" {
+		cliente.Contact = *cliente.Email
+	} else if cliente.Phone != nil && *cliente.Phone != "" {
+		cliente.Contact = *cliente.Phone
 	}
 
 	// Buscar link de venda relacionado
@@ -235,6 +241,13 @@ func (s *clienteService) List(ctx context.Context, filters entity.ClienteFilters
 
 	// Buscar dados relacionados para cada cliente
 	for i := range clientes {
+		// Calcular campo Contact (email ou phone)
+		if clientes[i].Email != nil && *clientes[i].Email != "" {
+			clientes[i].Contact = *clientes[i].Email
+		} else if clientes[i].Phone != nil && *clientes[i].Phone != "" {
+			clientes[i].Contact = *clientes[i].Phone
+		}
+
 		if clientes[i].SalesLinkID != "" {
 			link, err := s.linkRepo.FindByID(ctx, clientes[i].SalesLinkID)
 			if err != nil {
@@ -253,31 +266,6 @@ func (s *clienteService) List(ctx context.Context, filters entity.ClienteFilters
 		Total:    total,
 		Page:     filters.Page,
 	}, nil
-}
-
-func (s *clienteService) UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) (*entity.Cliente, error) {
-	// Validar status
-	if !status.IsValid() {
-		return nil, domainErrors.ValidationError("Status inválido")
-	}
-
-	// Atualizar status
-	if err := s.clienteRepo.UpdateStatus(ctx, id, status); err != nil {
-		s.logger.Error("erro ao atualizar status do cliente",
-			zap.String("clienteId", id),
-			zap.String("status", string(status)),
-			zap.Error(err),
-		)
-		return nil, err
-	}
-
-	s.logger.Info("status do cliente atualizado",
-		zap.String("clienteId", id),
-		zap.String("status", string(status)),
-	)
-
-	// Retornar cliente atualizado
-	return s.GetByID(ctx, id)
 }
 
 func (s *clienteService) GetInteractions(ctx context.Context, clienteID string) ([]entity.ClienteInteraction, error) {

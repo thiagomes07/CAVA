@@ -56,12 +56,7 @@ CREATE TYPE finish_type_enum AS ENUM (
     'FLAMEADO'
 );
 
--- ENUM: Status de clientes
-CREATE TYPE cliente_status_type AS ENUM (
-    'NOVO',
-    'CONTATADO',
-    'RESOLVIDO'
-);
+
 
 -- ENUM: Unidade de preço
 CREATE TYPE price_unit_type AS ENUM (
@@ -77,5 +72,5 @@ COMMENT ON TYPE media_type_enum IS 'Tipos de mídia suportados';
 COMMENT ON TYPE interaction_type_enum IS 'Tipos de interação de clientes';
 COMMENT ON TYPE reservation_status_type IS 'Status de reservas de lotes';
 COMMENT ON TYPE finish_type_enum IS 'Tipos de acabamento de produtos';
-COMMENT ON TYPE cliente_status_type IS 'Status de acompanhamento de clientes';
+
 COMMENT ON TYPE price_unit_type IS 'Unidade de preço: M2 (metro quadrado) ou FT2 (pé quadrado)';

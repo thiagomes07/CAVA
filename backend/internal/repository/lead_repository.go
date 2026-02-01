@@ -21,7 +21,7 @@ func NewClienteRepository(db *DB) *clienteRepository {
 func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
 	query := `
 		INSERT INTO clientes (
-			id, sales_link_id, name, email, phone, whatsapp, message, marketing_opt_in, status
+			id, sales_link_id, name, email, phone, whatsapp, message, marketing_opt_in, created_by
 		) VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE $2::uuid END, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at, last_interaction
 	`
@@ -31,13 +31,13 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 		err = tx.QueryRowContext(ctx, query,
 			cliente.ID, cliente.SalesLinkID, cliente.Name,
 			cliente.Email, cliente.Phone, cliente.Whatsapp,
-			cliente.Message, cliente.MarketingOptIn, cliente.Status,
+			cliente.Message, cliente.MarketingOptIn, cliente.CreatedByUserID,
 		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
 			cliente.ID, cliente.SalesLinkID, cliente.Name,
 			cliente.Email, cliente.Phone, cliente.Whatsapp,
-			cliente.Message, cliente.MarketingOptIn, cliente.Status,
+			cliente.Message, cliente.MarketingOptIn, cliente.CreatedByUserID,
 		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
 	}
 
@@ -51,7 +51,7 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	query := `
 		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
-		       message, marketing_opt_in, status, created_at, updated_at
+		       message, marketing_opt_in, created_at, updated_at, created_by
 		FROM clientes
 		WHERE id = $1
 	`
@@ -60,8 +60,8 @@ func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cl
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&cliente.ID, &cliente.SalesLinkID, &cliente.Name,
 		&cliente.Email, &cliente.Phone, &cliente.Whatsapp,
-		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
-		&cliente.CreatedAt, &cliente.UpdatedAt,
+		&cliente.Message, &cliente.MarketingOptIn,
+		&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.CreatedByUserID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -77,7 +77,7 @@ func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cl
 func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (*entity.Cliente, error) {
 	query := `
 		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
-		       message, marketing_opt_in, status, created_at, updated_at
+		       message, marketing_opt_in, created_at, updated_at, created_by
 		FROM clientes
 		WHERE email = $1 OR phone = $1 OR whatsapp = $1
 		ORDER BY created_at DESC
@@ -88,8 +88,8 @@ func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (
 	err := r.db.QueryRowContext(ctx, query, contact).Scan(
 		&cliente.ID, &cliente.SalesLinkID, &cliente.Name,
 		&cliente.Email, &cliente.Phone, &cliente.Whatsapp,
-		&cliente.Message, &cliente.MarketingOptIn, &cliente.Status,
-		&cliente.CreatedAt, &cliente.UpdatedAt,
+		&cliente.Message, &cliente.MarketingOptIn,
+		&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.CreatedByUserID,
 	)
 
 	if err == sql.ErrNoRows {
@@ -105,7 +105,7 @@ func (r *clienteRepository) FindByContact(ctx context.Context, contact string) (
 func (r *clienteRepository) FindBySalesLinkID(ctx context.Context, salesLinkID string) ([]entity.Cliente, error) {
 	query := `
 		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,
-		       message, marketing_opt_in, status, created_at, updated_at
+		       message, marketing_opt_in, created_at, updated_at, created_by
 		FROM clientes
 		WHERE sales_link_id = $1
 		ORDER BY created_at DESC
@@ -128,24 +128,36 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	var query sq.SelectBuilder
 	if needsJoin {
+		// Se tem filtros de escopo, fazemos JOIN com sales_links e users
+		// LEFT JOIN sales_links sl ON c.sales_link_id = sl.id
+		// LEFT JOIN users u ON c.created_by = u.id
 		query = psql.Select(
 			"c.id", "COALESCE(c.sales_link_id::text, '')", "c.name", "c.email", "c.phone", "c.whatsapp",
-			"c.message", "c.marketing_opt_in", "c.status", "c.created_at", "c.updated_at",
+			"c.message", "c.marketing_opt_in", "c.created_at", "c.updated_at", "c.created_by",
 		).From("clientes c").
-			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id").
+			LeftJoin("users u ON c.created_by = u.id")
 	} else {
 		query = psql.Select(
 			"id", "COALESCE(sales_link_id::text, '')", "name", "email", "phone", "whatsapp",
-			"message", "marketing_opt_in", "status", "created_at", "updated_at",
+			"message", "marketing_opt_in", "created_at", "updated_at", "created_by",
 		).From("clientes")
 	}
 
 	// Aplicar filtros de escopo
 	if filters.IndustryID != nil {
-		query = query.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+		// Cliente pertence à indústria se veio de um link da indústria OU foi criado por usuário da indústria
+		query = query.Where(sq.Or{
+			sq.Eq{"sl.industry_id": *filters.IndustryID},
+			sq.Eq{"u.industry_id": *filters.IndustryID},
+		})
 	}
 	if filters.CreatedByUserID != nil {
-		query = query.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+		// Cliente pertence ao usuário se veio de um link do usuário OU foi criado pelo usuário
+		query = query.Where(sq.Or{
+			sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID},
+			sq.Eq{"c.created_by": *filters.CreatedByUserID},
+		})
 	}
 
 	// Prefixo para colunas (depende do JOIN)
@@ -156,10 +168,6 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	if filters.LinkID != nil {
 		query = query.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
-	}
-
-	if filters.Status != nil {
-		query = query.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 
 	if filters.OptIn != nil {
@@ -193,23 +201,27 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 	var countQuery sq.SelectBuilder
 	if needsJoin {
 		countQuery = psql.Select("COUNT(*)").From("clientes c").
-			LeftJoin("sales_links sl ON c.sales_link_id = sl.id")
+			LeftJoin("sales_links sl ON c.sales_link_id = sl.id").
+			LeftJoin("users u ON c.created_by = u.id")
 	} else {
 		countQuery = psql.Select("COUNT(*)").From("clientes")
 	}
 
 	// Aplicar mesmos filtros de escopo no count
 	if filters.IndustryID != nil {
-		countQuery = countQuery.Where(sq.Eq{"sl.industry_id": *filters.IndustryID})
+		countQuery = countQuery.Where(sq.Or{
+			sq.Eq{"sl.industry_id": *filters.IndustryID},
+			sq.Eq{"u.industry_id": *filters.IndustryID},
+		})
 	}
 	if filters.CreatedByUserID != nil {
-		countQuery = countQuery.Where(sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID})
+		countQuery = countQuery.Where(sq.Or{
+			sq.Eq{"sl.created_by_user_id": *filters.CreatedByUserID},
+			sq.Eq{"c.created_by": *filters.CreatedByUserID},
+		})
 	}
 	if filters.LinkID != nil {
 		countQuery = countQuery.Where(sq.Eq{colPrefix + "sales_link_id": *filters.LinkID})
-	}
-	if filters.Status != nil {
-		countQuery = countQuery.Where(sq.Eq{colPrefix + "status": *filters.Status})
 	}
 	if filters.OptIn != nil {
 		countQuery = countQuery.Where(sq.Eq{colPrefix + "marketing_opt_in": *filters.OptIn})
@@ -243,7 +255,7 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 
 	// Pagination
 	offset := (filters.Page - 1) * filters.Limit
-	
+
 	// Validate and apply sorting
 	sortBy := filters.GetSortBy()
 	sortOrder := filters.GetSortOrder()
@@ -253,7 +265,7 @@ func (r *clienteRepository) List(ctx context.Context, filters entity.ClienteFilt
 	if !filters.IsValidSortOrder() {
 		sortOrder = "desc"
 	}
-	
+
 	query = query.OrderBy(colPrefix + sortBy + " " + sortOrder).Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
 	sql, args, err := query.ToSql()
@@ -279,8 +291,8 @@ func (r *clienteRepository) Update(ctx context.Context, tx *sql.Tx, cliente *ent
 	query := `
 		UPDATE clientes
 		SET name = $1, email = $2, phone = $3, whatsapp = $4,
-		    message = $5, marketing_opt_in = $6, status = $7, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $8
+		    message = $5, marketing_opt_in = $6, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $7
 		RETURNING updated_at
 	`
 
@@ -288,12 +300,12 @@ func (r *clienteRepository) Update(ctx context.Context, tx *sql.Tx, cliente *ent
 	if tx != nil {
 		err = tx.QueryRowContext(ctx, query,
 			cliente.Name, cliente.Email, cliente.Phone, cliente.Whatsapp,
-			cliente.Message, cliente.MarketingOptIn, cliente.Status, cliente.ID,
+			cliente.Message, cliente.MarketingOptIn, cliente.ID,
 		).Scan(&cliente.UpdatedAt)
 	} else {
 		err = r.db.QueryRowContext(ctx, query,
 			cliente.Name, cliente.Email, cliente.Phone, cliente.Whatsapp,
-			cliente.Message, cliente.MarketingOptIn, cliente.Status, cliente.ID,
+			cliente.Message, cliente.MarketingOptIn, cliente.ID,
 		).Scan(&cliente.UpdatedAt)
 	}
 
@@ -302,30 +314,6 @@ func (r *clienteRepository) Update(ctx context.Context, tx *sql.Tx, cliente *ent
 	}
 	if err != nil {
 		return errors.DatabaseError(err)
-	}
-
-	return nil
-}
-
-func (r *clienteRepository) UpdateStatus(ctx context.Context, id string, status entity.ClienteStatus) error {
-	query := `
-		UPDATE clientes
-		SET status = $1, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $2
-	`
-
-	result, err := r.db.ExecContext(ctx, query, status, id)
-	if err != nil {
-		return errors.DatabaseError(err)
-	}
-
-	rows, err := result.RowsAffected()
-	if err != nil {
-		return errors.DatabaseError(err)
-	}
-
-	if rows == 0 {
-		return errors.NewNotFoundError("Cliente")
 	}
 
 	return nil
@@ -375,7 +363,7 @@ func (r *clienteRepository) scanClientes(rows *sql.Rows) ([]entity.Cliente, erro
 		var l entity.Cliente
 		if err := rows.Scan(
 			&l.ID, &l.SalesLinkID, &l.Name, &l.Email, &l.Phone, &l.Whatsapp,
-			&l.Message, &l.MarketingOptIn, &l.Status, &l.CreatedAt, &l.UpdatedAt,
+			&l.Message, &l.MarketingOptIn, &l.CreatedAt, &l.UpdatedAt, &l.CreatedByUserID,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}

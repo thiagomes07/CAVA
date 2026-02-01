@@ -4,7 +4,7 @@
 -- =============================================
 
 DROP TYPE IF EXISTS price_unit_type;
-DROP TYPE IF EXISTS cliente_status_type;
+
 DROP TYPE IF EXISTS finish_type_enum;
 DROP TYPE IF EXISTS reservation_status_type;
 DROP TYPE IF EXISTS interaction_type_enum;

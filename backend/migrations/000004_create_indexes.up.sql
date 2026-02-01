@@ -114,7 +114,7 @@ CREATE INDEX idx_sales_link_items_batch ON sales_link_items(batch_id);
 CREATE INDEX idx_clientes_sales_link ON clientes(sales_link_id);
 CREATE INDEX idx_clientes_email ON clientes(email);
 CREATE INDEX idx_clientes_phone ON clientes(phone);
-CREATE INDEX idx_clientes_status ON clientes(status);
+
 CREATE INDEX idx_clientes_created_at ON clientes(created_at DESC);
 CREATE INDEX idx_clientes_marketing_opt_in ON clientes(marketing_opt_in) WHERE marketing_opt_in = TRUE;
 CREATE INDEX idx_clientes_created_by ON clientes(created_by) WHERE created_by IS NOT NULL;

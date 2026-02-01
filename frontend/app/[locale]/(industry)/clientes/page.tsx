@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus, Send } from 'lucide-react';
+import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus, Send, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { SortableTableHead } from '@/components/shared/SortableTableHead';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
+import { ShareLinksModal, ShareSelection } from '@/components/shared/ShareLinksModal';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
@@ -27,7 +28,6 @@ import { useSendLinksToClientes } from '@/lib/api/mutations/useLeadMutations';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 import type { Cliente, SalesLink, SendLinksResponse } from '@/lib/types';
 import type { ClienteFilter } from '@/lib/schemas/lead.schema';
-import { clienteStatuses } from '@/lib/schemas/lead.schema';
 import { cn } from '@/lib/utils/cn';
 
 // Schema for creating a new cliente
@@ -71,14 +71,19 @@ export default function ClientesManagementPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showSendLinksModal, setShowSendLinksModal] = useState(false);
-  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+
+  // Share links modal state
+  const [showShareLinksModal, setShowShareLinksModal] = useState(false);
+  const [shareMode, setShareMode] = useState<'whatsapp' | 'email'>('email');
+  const [shareCliente, setShareCliente] = useState<Cliente | null>(null);
+  const [isSendingLinks, setIsSendingLinks] = useState(false);
 
   // Selection state
   const [selectedClienteIds, setSelectedClienteIds] = useState<Set<string>>(new Set());
+  const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
   const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
   const [customMessage, setCustomMessage] = useState('');
-  const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
 
   // Send links mutation
   const sendLinksMutation = useSendLinksToClientes();
@@ -112,7 +117,6 @@ export default function ClientesManagementPage() {
     startDate: '',
     endDate: '',
     optIn: undefined,
-    status: '',
     sortBy: 'created_at',
     sortOrder: 'desc',
     page: parseInt(searchParams.get('page') || '1'),
@@ -251,31 +255,12 @@ export default function ClientesManagementPage() {
     }
   };
 
-  const handleUpdateStatus = async (clienteId: string, newStatus: typeof clienteStatuses[number]) => {
-    try {
-      setIsUpdatingStatus(true);
 
-      await apiClient.patch(`/clientes/${clienteId}/status`, {
-        status: newStatus,
-      });
-
-      success(t('statusUpdated'));
-      fetchClientes();
-
-      if (selectedCliente?.id === clienteId) {
-        setSelectedCliente({ ...selectedCliente, status: newStatus });
-      }
-    } catch {
-      error(t('statusError'));
-    } finally {
-      setIsUpdatingStatus(false);
-    }
-  };
 
   const handleCreateCliente = async (data: CreateClienteForm) => {
     try {
       setIsCreating(true);
-      
+
       await apiClient.post('/clientes', {
         name: data.name,
         email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
@@ -329,7 +314,6 @@ export default function ClientesManagementPage() {
       startDate: '',
       endDate: '',
       optIn: undefined,
-      status: '',
       sortBy: 'created_at',
       sortOrder: 'desc',
       page: 1,
@@ -347,8 +331,97 @@ export default function ClientesManagementPage() {
     }
   };
 
-  const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate || filters.status;
+  const handleOpenShareModal = (cliente: Cliente, mode: 'whatsapp' | 'email') => {
+    // Verificar se o cliente tem o contato necessário
+    if (mode === 'whatsapp' && !cliente.whatsapp) {
+      error(t('noWhatsApp'));
+      return;
+    }
+    if (mode === 'email' && !cliente.email) {
+      error(t('noEmail'));
+      return;
+    }
+
+    setShareCliente(cliente);
+    setShareMode(mode);
+    setShowShareLinksModal(true);
+  };
+
+  const handleShareLinksConfirm = async (selection: ShareSelection) => {
+    if (!shareCliente) return;
+
+    // Se for WhatsApp, o modal já redireciona automaticamente
+    // Este handler só é chamado para Email
+    if (shareMode === 'email') {
+      try {
+        setIsSendingLinks(true);
+
+        const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
+          clienteIds: [shareCliente.id],
+          salesLinkIds: selection.salesLinkIds,
+          customMessage: selection.customMessage,
+        });
+
+        if (result.totalFailed === 0 && result.totalSkipped === 0) {
+          success(t('sendSuccess', { sent: result.totalSent }));
+        } else {
+          success(t('sendPartialSuccess', {
+            sent: result.totalSent,
+            failed: result.totalFailed,
+            skipped: result.totalSkipped,
+          }));
+        }
+
+        setShowShareLinksModal(false);
+        setShareCliente(null);
+        fetchClientes();
+      } catch (err) {
+        if (err instanceof ApiError) {
+          error(err.message);
+        } else {
+          error(t('sendError'));
+        }
+      } finally {
+        setIsSendingLinks(false);
+      }
+    }
+  };
+
+  const handleBulkShareLinksConfirm = async (selection: ShareSelection) => {
+    try {
+      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
+        clienteIds: Array.from(selectedClienteIds),
+        salesLinkIds: selection.salesLinkIds,
+        customMessage: selection.customMessage,
+      });
+
+      if (result.totalFailed === 0 && result.totalSkipped === 0) {
+        success(t('sendSuccess', { sent: result.totalSent }));
+      } else {
+        success(t('sendPartialSuccess', {
+          sent: result.totalSent,
+          failed: result.totalFailed,
+          skipped: result.totalSkipped,
+        }));
+      }
+
+      setShowSendLinksModal(false);
+      setSelectedClienteIds(new Set());
+      fetchClientes();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error(t('sendError'));
+      }
+    }
+  };
+
+  const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate;
   const isEmpty = clientes.length === 0;
+  const MAX_BULK_CLIENTS = 50;
+  const canSendBulk = selectedClienteIds.size > 0 && selectedClienteIds.size <= MAX_BULK_CLIENTS;
+  const exceedsBulkLimit = selectedClienteIds.size > MAX_BULK_CLIENTS;
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -368,10 +441,12 @@ export default function ClientesManagementPage() {
               <Button
                 variant="primary"
                 onClick={handleOpenSendLinksModal}
-                className="bg-emerald-600 hover:bg-emerald-700"
+                disabled={!canSendBulk}
+                className="bg-blue-600 hover:bg-blue-700"
+                title={exceedsBulkLimit ? t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS }) : undefined}
               >
-                <Send className="w-4 h-4 mr-2" />
-                {t('sendLinks')} ({selectedClienteIds.size})
+                <Mail className="w-4 h-4 mr-2" />
+                {t('shareLinks')} ({selectedClienteIds.size})
               </Button>
             )}
             <Button variant="primary" onClick={() => setShowCreateModal(true)}>
@@ -388,14 +463,30 @@ export default function ClientesManagementPage() {
 
       {/* Selection indicator */}
       {selectedClienteIds.size > 0 && (
-        <div className="bg-blue-50 border-b border-blue-200 px-8 py-3">
+        <div className={cn(
+          "border-b px-8 py-3",
+          exceedsBulkLimit ? "bg-rose-50 border-rose-200" : "bg-blue-50 border-blue-200"
+        )}>
           <div className="flex items-center justify-between">
-            <p className="text-sm text-blue-700">
-              {t('selectedClients', { count: selectedClienteIds.size })}
-            </p>
+            <div className="flex items-center gap-3">
+              <p className={cn(
+                "text-sm font-medium",
+                exceedsBulkLimit ? "text-rose-700" : "text-blue-700"
+              )}>
+                {t('selectedClients', { count: selectedClienteIds.size })}
+              </p>
+              {exceedsBulkLimit && (
+                <span className="text-sm text-rose-600">
+                  • {t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS })}
+                </span>
+              )}
+            </div>
             <button
               onClick={() => setSelectedClienteIds(new Set())}
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+              className={cn(
+                "text-sm hover:underline cursor-pointer",
+                exceedsBulkLimit ? "text-rose-600 hover:text-rose-800" : "text-blue-600 hover:text-blue-800"
+              )}
             >
               {t('deselectAll')}
             </button>
@@ -432,20 +523,6 @@ export default function ClientesManagementPage() {
                     {truncateText(link.title || link.slugToken, TRUNCATION_LIMITS.SELECT_OPTION)}
                   </option>
                 ))}
-              </Select>
-            </div>
-
-            <div className="w-full md:w-auto md:min-w-[180px]">
-              <Select
-                value={filters.status}
-                onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
-                  setFilters({ ...filters, status: e.target.value as '' | 'NOVO' | 'CONTATADO' | 'RESOLVIDO', page: 1 })
-                }
-              >
-                <option value="">{t('allStatuses')}</option>
-                <option value="NOVO">{t('statusNew')}</option>
-                <option value="CONTATADO">{t('statusContacted')}</option>
-                <option value="RESOLVIDO">{t('statusResolved')}</option>
               </Select>
             </div>
 
@@ -522,16 +599,8 @@ export default function ClientesManagementPage() {
                     />
                     <TableHead>{t('phonePlaceholder')}</TableHead>
                     <TableHead>WhatsApp</TableHead>
-                    <TableHead>{t('origin')}</TableHead>
-                    <TableHead>{t('message')}</TableHead>
+                    <TableHead>{t('observation')}</TableHead>
                     <TableHead>{t('optIn')}</TableHead>
-                    <SortableTableHead
-                      field="status"
-                      label={t('status')}
-                      sortBy={filters.sortBy}
-                      sortOrder={filters.sortOrder}
-                      onSort={handleSort}
-                    />
                     <SortableTableHead
                       field="created_at"
                       label={t('date')}
@@ -539,7 +608,6 @@ export default function ClientesManagementPage() {
                       sortOrder={filters.sortOrder}
                       onSort={handleSort}
                     />
-                    <TableHead>{t('actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -575,17 +643,29 @@ export default function ClientesManagementPage() {
                         </TableCell>
                         <TableCell>
                           {cliente.email ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleCopyContact(cliente.email!);
-                              }}
-                              className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
-                              title={cliente.email}
-                            >
-                              <Mail className="w-4 h-4" />
-                              <span>{truncateText(cliente.email, TRUNCATION_LIMITS.CONTACT)}</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCopyContact(cliente.email!);
+                                }}
+                                className="flex items-center gap-2 text-sm text-slate-600 hover:text-obsidian transition-colors"
+                                title={cliente.email}
+                              >
+                                <Mail className="w-4 h-4" />
+                                <span>{truncateText(cliente.email, TRUNCATION_LIMITS.CONTACT)}</span>
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenShareModal(cliente, 'email');
+                                }}
+                                className="p-1.5 hover:bg-blue-50 rounded-sm transition-colors"
+                                title={t('shareViaEmail')}
+                              >
+                                <Share2 className="w-4 h-4 text-blue-600" />
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
@@ -609,51 +689,38 @@ export default function ClientesManagementPage() {
                         </TableCell>
                         <TableCell>
                           {cliente.whatsapp ? (
-                            <a
-                              href={`https://wa.me/55${cliente.whatsapp.replace(/\D/g, '')}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-500 transition-colors"
-                              title={cliente.whatsapp}
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              <span>{cliente.whatsapp}</span>
-                            </a>
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={`https://wa.me/55${cliente.whatsapp.replace(/\D/g, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-2 text-sm text-slate-600 hover:text-emerald-500 transition-colors"
+                                title={cliente.whatsapp}
+                              >
+                                <MessageSquare className="w-4 h-4" />
+                                <span>{cliente.whatsapp}</span>
+                              </a>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenShareModal(cliente, 'whatsapp');
+                                }}
+                                className="p-1.5 hover:bg-emerald-50 rounded-sm transition-colors"
+                                title={t('shareViaWhatsApp')}
+                              >
+                                <Share2 className="w-4 h-4 text-emerald-600" />
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <div>
-                            <p
-                              className="text-sm text-slate-600"
-                              title={cliente.salesLink?.title || cliente.salesLink?.slugToken}
-                            >
-                              {truncateText(cliente.salesLink?.title || cliente.salesLink?.slugToken, TRUNCATION_LIMITS.LINK_TITLE) || '-'}
-                            </p>
-                            {cliente.salesLink && (
-                              <Badge
-                                variant="default"
-                                className="mt-1"
-                              >
-                                {cliente.salesLink.linkType.replace('_', ' ')}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell>
                           {cliente.message ? (
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleViewDetails(cliente);
-                              }}
-                              className="flex items-center gap-2 text-sm text-blue-600 hover:underline"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              {t('viewMessage')}
-                            </button>
+                            <span className="text-sm text-slate-600" title={cliente.message}>
+                              {truncateText(cliente.message, 50)}
+                            </span>
                           ) : (
                             <span className="text-slate-400">-</span>
                           )}
@@ -666,35 +733,9 @@ export default function ClientesManagementPage() {
                           )}
                         </TableCell>
                         <TableCell>
-                          <div onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                            <Select
-                              value={cliente.status}
-                              onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(cliente.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
-                              disabled={isUpdatingStatus}
-                              className="text-xs"
-                            >
-                              <option value="NOVO">{t('statusNew')}</option>
-                              <option value="CONTATADO">{t('statusContacted')}</option>
-                              <option value="RESOLVIDO">{t('statusResolved')}</option>
-                            </Select>
-                          </div>
-                        </TableCell>
-                        <TableCell>
                           <span className="text-sm text-slate-500">
                             {formatDate(cliente.createdAt)}
                           </span>
-                        </TableCell>
-                        <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                              e.stopPropagation();
-                              handleViewDetails(cliente);
-                            }}
-                          >
-                            {t('viewDetails')}
-                          </Button>
                         </TableCell>
                       </TableRow>
                     );
@@ -762,7 +803,7 @@ export default function ClientesManagementPage() {
               {selectedCliente.message && (
                 <div>
                   <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                    {t('message')}
+                    {t('observation')}
                   </p>
                   <div className="p-4 bg-slate-50 rounded-sm">
                     <p className="text-sm text-slate-700 whitespace-pre-wrap">
@@ -771,43 +812,6 @@ export default function ClientesManagementPage() {
                   </div>
                 </div>
               )}
-
-              {/* Origin */}
-              <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  {t('clienteOrigin')}
-                </p>
-                {selectedCliente.salesLinkId ? (
-                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-                    <p className="text-sm font-semibold text-blue-900 mb-1">
-                      {selectedCliente.salesLink?.title || t('untitledLink')}
-                    </p>
-                    <p className="text-xs text-blue-700 mb-2">
-                      /{selectedCliente.salesLink?.slugToken}
-                    </p>
-                    {selectedCliente.salesLink?.batch && (
-                      <p className="text-sm text-blue-800">
-                        {t('batch')}: {selectedCliente.salesLink.batch.batchCode} •{' '}
-                        {selectedCliente.salesLink.batch.product?.name}
-                      </p>
-                    )}
-                    {selectedCliente.salesLink?.product && (
-                      <p className="text-sm text-blue-800">
-                        {t('productLabel')}: {selectedCliente.salesLink.product.name}
-                      </p>
-                    )}
-                  </div>
-                ) : (
-                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-sm">
-                    <p className="text-sm font-semibold text-slate-700">
-                      {t('manuallyCreated')}
-                    </p>
-                    <p className="text-xs text-slate-500">
-                      {t('manuallyCreatedDescription')}
-                    </p>
-                  </div>
-                )}
-              </div>
 
               {/* Marketing Opt-in */}
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-sm">
@@ -826,22 +830,6 @@ export default function ClientesManagementPage() {
                     </p>
                   </>
                 )}
-              </div>
-
-              {/* Status */}
-              <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  {t('clienteStatus')}
-                </p>
-                <Select
-                  value={selectedCliente.status}
-                  onChange={(e: React.ChangeEvent<HTMLSelectElement>) => handleUpdateStatus(selectedCliente.id, e.target.value as 'NOVO' | 'CONTATADO' | 'RESOLVIDO')}
-                  disabled={isUpdatingStatus}
-                >
-                  <option value="NOVO">{t('statusNew')}</option>
-                  <option value="CONTATADO">{t('statusContacted')}</option>
-                  <option value="RESOLVIDO">{t('statusResolved')}</option>
-                </Select>
               </div>
 
               {/* Metadata */}
@@ -873,8 +861,8 @@ export default function ClientesManagementPage() {
                 <h2 className="font-serif text-xl">{t('addClienteTitle')}</h2>
                 <p className="text-xs text-white/50 mt-0.5">Cadastre um novo cliente manualmente</p>
               </div>
-              <button 
-                onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }} 
+              <button
+                onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }}
                 className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
               >
                 <X className="w-5 h-5" />
@@ -966,8 +954,8 @@ export default function ClientesManagementPage() {
                     disabled={useSamePhoneForWhatsapp}
                     className={cn(
                       'w-full px-3 py-2.5 border outline-none text-sm transition-colors',
-                      useSamePhoneForWhatsapp 
-                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' 
+                      useSamePhoneForWhatsapp
+                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
                         : 'bg-slate-50 focus:border-[#C2410C] focus:bg-white',
                       errors.whatsapp ? 'border-rose-500' : 'border-slate-200'
                     )}
@@ -1044,120 +1032,28 @@ export default function ClientesManagementPage() {
         </div>
       )}
 
-      {/* Send Links Modal */}
-      <Modal open={showSendLinksModal} onClose={() => setShowSendLinksModal(false)}>
-        <ModalClose onClose={() => setShowSendLinksModal(false)} />
-        <ModalHeader>
-          <ModalTitle>{t('sendLinksTitle')}</ModalTitle>
-        </ModalHeader>
-        <ModalContent>
-          <div className="space-y-6">
-            {/* Selected clients info */}
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-              <p className="text-sm font-medium text-blue-900 mb-2">
-                {t('selectedClients', { count: selectedClienteIds.size })}
-              </p>
-              <p className="text-xs text-blue-700">
-                {t('onlyEmailClients')}
-              </p>
-            </div>
+      {/* Send Links Modal (Bulk) */}
+      <ShareLinksModal
+        open={showSendLinksModal}
+        onClose={() => setShowSendLinksModal(false)}
+        onConfirm={handleBulkShareLinksConfirm}
+        mode="email"
+        multipleClientes={selectedClienteIds.size}
+        isLoading={sendLinksMutation.isPending}
+      />
 
-            {/* Links selection */}
-            <div>
-              <p className="text-sm font-medium text-obsidian mb-3">
-                {t('selectLinksToSend')} *
-              </p>
-              <p className="text-xs text-slate-500 mb-3">
-                {t('activeLinksOnly')}
-              </p>
-              <div className="space-y-2 max-h-64 overflow-y-auto border border-slate-200 rounded-sm p-3">
-                {activeLinks.length === 0 ? (
-                  <p className="text-sm text-slate-500 text-center py-4">
-                    {t('noLinksSelected')}
-                  </p>
-                ) : (
-                  activeLinks.map((link) => (
-                    <div
-                      key={link.id}
-                      className={cn(
-                        "flex items-center gap-3 p-3 rounded-sm border cursor-pointer transition-all",
-                        selectedLinkIds.has(link.id)
-                          ? "bg-blue-50 border-blue-300"
-                          : "bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50"
-                      )}
-                      onClick={() => handleSelectLink(link.id, !selectedLinkIds.has(link.id))}
-                    >
-                      <Checkbox
-                        id={`link-${link.id}`}
-                        checked={selectedLinkIds.has(link.id)}
-                        onChange={(e) => handleSelectLink(link.id, e.target.checked)}
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-obsidian truncate">
-                          {link.title || link.slugToken}
-                        </p>
-                        <p className="text-xs text-slate-500">
-                          {link.linkType.replace('_', ' ')} • /{link.slugToken}
-                        </p>
-                      </div>
-                      {link.displayPrice && link.showPrice && (
-                        <Badge variant="default">
-                          R$ {link.displayPrice.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                        </Badge>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Custom message */}
-            <div>
-              <label className="block text-sm font-medium text-obsidian mb-2">
-                {t('customMessage')}
-              </label>
-              <textarea
-                value={customMessage}
-                onChange={(e) => setCustomMessage(e.target.value)}
-                placeholder={t('customMessagePlaceholder')}
-                rows={3}
-                className={cn(
-                  'w-full px-4 py-3 rounded-sm border bg-porcelain text-obsidian border-slate-200',
-                  'placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-obsidian/20',
-                  'resize-none'
-                )}
-              />
-            </div>
-          </div>
-        </ModalContent>
-        <ModalFooter>
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => setShowSendLinksModal(false)}
-          >
-            {tCommon('cancel')}
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSendLinks}
-            disabled={sendLinksMutation.isPending || selectedLinkIds.size === 0}
-            className="bg-emerald-600 hover:bg-emerald-700"
-          >
-            {sendLinksMutation.isPending ? (
-              <>
-                <span className="animate-spin mr-2">⏳</span>
-                {t('sending')}
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-2" />
-                {t('sendLinksButton')}
-              </>
-            )}
-          </Button>
-        </ModalFooter>
-      </Modal>
+      {/* Share Links Modal (Individual) */}
+      <ShareLinksModal
+        open={showShareLinksModal}
+        onClose={() => {
+          setShowShareLinksModal(false);
+          setShareCliente(null);
+        }}
+        onConfirm={handleShareLinksConfirm}
+        mode={shareMode}
+        cliente={shareCliente || undefined}
+        isLoading={isSendingLinks}
+      />
     </div>
   );
 }

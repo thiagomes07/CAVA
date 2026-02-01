@@ -280,7 +280,7 @@ CREATE TABLE clientes (
     whatsapp VARCHAR(20),
     message TEXT,
     marketing_opt_in BOOLEAN DEFAULT FALSE,
-    status cliente_status_type DEFAULT 'NOVO',
+
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     last_interaction TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
@@ -292,7 +292,7 @@ COMMENT ON COLUMN clientes.email IS 'Email do cliente';
 COMMENT ON COLUMN clientes.phone IS 'Telefone do cliente';
 COMMENT ON COLUMN clientes.whatsapp IS 'Número do WhatsApp do cliente';
 COMMENT ON COLUMN clientes.marketing_opt_in IS 'Se aceitou receber comunicações de marketing';
-COMMENT ON COLUMN clientes.status IS 'Status de acompanhamento: NOVO, CONTATADO, RESOLVIDO';
+
 
 -- =============================================
 -- TABELA: cliente_interactions

@@ -87,7 +87,6 @@ export interface Batch {
   industryId: string;
   batchCode: string;
   height: number;
-  isPublic?: boolean;
   width: number;
   thickness: number;
   quantitySlabs: number;
@@ -156,16 +155,17 @@ export interface SalesLink {
 export interface Cliente {
   id: string;
   salesLinkId: string;
+  createdByUserId?: string;
   name: string;
   email?: string;
   phone?: string;
   whatsapp?: string;
   message?: string;
   marketingOptIn: boolean;
-  status: 'NOVO' | 'CONTATADO' | 'RESOLVIDO';
   createdAt: string;
   updatedAt: string;
   salesLink?: SalesLink;
+  contact: string; // Computed field
 }
 
 export interface Reservation {
