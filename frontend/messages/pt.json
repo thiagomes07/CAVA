@@ -42,7 +42,11 @@
     "price": "Preço",
     "total": "Total",
     "quantity": "Quantidade",
-    "poweredBy": "Powered by CAVA"
+    "poweredBy": "Powered by CAVA",
+    "confirmDeleteTitle": "Confirmar exclusão",
+    "confirmDeleteDescription": "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.",
+    "discard": "Descartar",
+    "deleting": "Excluindo..."
   },
   "metadata": {
     "title": "CAVA",
@@ -326,7 +330,6 @@
     "sendLinksTitle": "Enviar Links para Clientes",
     "selectedClients": "{count} cliente(s) selecionado(s)",
     "selectLinksToSend": "Selecione os links que deseja enviar",
-    "noLinksSelected": "Selecione pelo menos um link",
     "noClientsSelected": "Selecione pelo menos um cliente",
     "customMessage": "Mensagem personalizada (opcional)",
     "customMessagePlaceholder": "Escreva uma mensagem para acompanhar os links...",
@@ -336,7 +339,6 @@
     "sendPartialSuccess": "{sent} enviado(s), {failed} falha(s), {skipped} ignorado(s)",
     "sendError": "Erro ao enviar links",
     "invalidEmail": "Email inválido",
-    "selectAll": "Selecionar todos",
     "deselectAll": "Limpar seleção",
     "onlyEmailClients": "Apenas clientes com email válido receberão",
     "activeLinksOnly": "Links ativos",
@@ -362,7 +364,13 @@
     "selectedLinks": "{count} link(s) selecionado(s)",
     "maxClientsExceeded": "Limite de {max} clientes por envio excedido",
     "maxClientsWarning": "Você selecionou {count} clientes. Máximo permitido: {max}.",
-    "selectAll": "Selecionar todos"
+    "selectAll": "Selecionar todos",
+    "editClienteTitle": "Editar Cliente",
+    "clienteDeleted": "Cliente excluído com sucesso",
+    "discardChangesTitle": "Descartar alterações?",
+    "discardChangesDescription": "Existem alterações não salvas. Deseja realmente descartá-las?",
+    "updateError": "Erro ao atualizar cliente",
+    "deleteError": "Erro ao excluir cliente"
   },
   "links": {
     "title": "Meus Links de Venda",

@@ -307,6 +307,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAnyAuthenticated).Post("/", h.Cliente.Create)
 				r.With(m.RBAC.RequireAnyAuthenticated).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.Cliente.GetByID)
+				r.With(m.RBAC.RequireAnyAuthenticated).Put("/{id}", h.Cliente.Update)
+				r.With(m.RBAC.RequireAnyAuthenticated).Delete("/{id}", h.Cliente.Delete)
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}/interactions", h.Cliente.GetInteractions)
 			})
 
