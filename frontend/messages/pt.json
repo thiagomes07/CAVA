@@ -42,7 +42,16 @@
     "price": "Preço",
     "total": "Total",
     "quantity": "Quantidade",
-    "poweredBy": "Powered by CAVA"
+    "poweredBy": "Powered by CAVA",
+    "confirmDeleteTitle": "Confirmar exclusão",
+    "confirmDeleteDescription": "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.",
+    "discard": "Descartar",
+    "deleting": "Excluindo...",
+    "confirmDelete": "Confirmar Exclusão",
+    "useSamePhoneForWhatsapp": "Usar mesmo número para WhatsApp",
+    "namePlaceholder": "Nome completo",
+    "emailPlaceholder": "email@exemplo.com",
+    "error": "Ocorreu um erro"
   },
   "metadata": {
     "title": "CAVA",
@@ -262,7 +271,7 @@
     "exportCsv": "Exportar CSV",
     "exportStarted": "Exportação iniciada. O download começará em breve.",
     "exportError": "Erro ao exportar clientes",
-    "searchPlaceholder": "Nome ou contato",
+    "searchPlaceholder": "Nome ou Telefone",
     "allLinks": "Todos os Links",
     "allStatuses": "Todos os Status",
     "statusNew": "Novo",
@@ -318,6 +327,7 @@
     "marketingOptInDescription": "Cliente aceitou receber comunicações de marketing",
     "createCliente": "CRIAR CLIENTE",
     "clienteCreated": "Cliente criado com sucesso",
+    "clienteUpdated": "Cliente atualizado com sucesso",
     "contactAlreadyExists": "Já existe um cliente com este contato",
     "createError": "Erro ao criar cliente",
     "manuallyCreated": "Criado manualmente",
@@ -326,7 +336,6 @@
     "sendLinksTitle": "Enviar Links para Clientes",
     "selectedClients": "{count} cliente(s) selecionado(s)",
     "selectLinksToSend": "Selecione os links que deseja enviar",
-    "noLinksSelected": "Selecione pelo menos um link",
     "noClientsSelected": "Selecione pelo menos um cliente",
     "customMessage": "Mensagem personalizada (opcional)",
     "customMessagePlaceholder": "Escreva uma mensagem para acompanhar os links...",
@@ -336,7 +345,6 @@
     "sendPartialSuccess": "{sent} enviado(s), {failed} falha(s), {skipped} ignorado(s)",
     "sendError": "Erro ao enviar links",
     "invalidEmail": "Email inválido",
-    "selectAll": "Selecionar todos",
     "deselectAll": "Limpar seleção",
     "onlyEmailClients": "Apenas clientes com email válido receberão",
     "activeLinksOnly": "Links ativos",
@@ -362,7 +370,13 @@
     "selectedLinks": "{count} link(s) selecionado(s)",
     "maxClientsExceeded": "Limite de {max} clientes por envio excedido",
     "maxClientsWarning": "Você selecionou {count} clientes. Máximo permitido: {max}.",
-    "selectAll": "Selecionar todos"
+    "selectAll": "Selecionar todos",
+    "editClienteTitle": "Editar Cliente",
+    "clienteDeleted": "Cliente excluído com sucesso",
+    "discardChangesTitle": "Descartar alterações?",
+    "discardChangesDescription": "Existem alterações não salvas. Deseja realmente descartá-las?",
+    "updateError": "Erro ao atualizar cliente",
+    "deleteError": "Erro ao excluir cliente"
   },
   "links": {
     "title": "Meus Links de Venda",
@@ -609,7 +623,20 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para usuário que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email"
+    "newEmail": "Novo Email",
+    "created": "Criado em",
+    "joinedAt": "Desde",
+    "editBrokerTitle": "Editar Broker",
+    "brokerUpdated": "Broker atualizado com sucesso",
+    "brokerDeleted": "Broker excluído com sucesso",
+    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta ação não pode ser desfeita.",
+    "discardChangesTitle": "Descartar alterações?",
+    "discardChangesDescription": "Existem alterações não salvas. Deseja realmente descartá-las?",
+    "editMemberTitle": "Editar Membro",
+    "memberUpdated": "Membro atualizado com sucesso",
+    "memberDeleted": "Membro removido com sucesso",
+    "memberUpdateError": "Erro ao atualizar membro",
+    "memberDeleteError": "Erro ao excluir membro"
   },
   "brokers": {
     "title": "Parceiros (Brokers)",
@@ -646,7 +673,14 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para broker que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email"
+    "newEmail": "Novo Email",
+    "created": "Criado em",
+    "editBrokerTitle": "Editar Broker",
+    "brokerUpdated": "Broker atualizado com sucesso",
+    "brokerDeleted": "Broker exclu�do com sucesso",
+    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta a��o n�o pode ser desfeita.",
+    "discardChangesTitle": "Descartar altera��es?",
+    "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
   },
   "sharedInventory": {
     "title": "Estoque Compartilhado",

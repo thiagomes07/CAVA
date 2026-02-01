@@ -16,7 +16,7 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
 
     return (
       <div className="flex items-start gap-3">
-        <div className="relative flex items-center justify-center">
+        <label className="relative flex items-center justify-center cursor-pointer">
           <input
             type="checkbox"
             id={inputId}
@@ -45,8 +45,8 @@ export const Checkbox = forwardRef<HTMLInputElement, CheckboxProps>(
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <Check className="h-3 w-3 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
           </div>
-        </div>
-        
+        </label>
+
         {(label || description) && (
           <div className="flex flex-col">
             {label && (

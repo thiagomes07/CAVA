@@ -240,6 +240,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/status", h.User.UpdateStatus)
 				r.With(m.RBAC.RequireAdmin).Post("/{id}/resend-invite", h.User.ResendInvite)
 				r.With(m.RBAC.RequireAdmin).Patch("/{id}/email", h.User.UpdateEmail)
+				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.User.UpdateUser)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.User.DeleteUser)
 			})
 
 			// ----------------------------------------
@@ -256,6 +258,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/brokers", func(r chi.Router) {
 				r.With(m.RBAC.RequireAdmin).Get("/", h.User.ListBrokers)
 				r.With(m.RBAC.RequireAdmin).Post("/invite", h.User.InviteBroker)
+				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.User.UpdateBroker)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.User.DeleteBroker)
 				r.With(m.RBAC.RequireAdmin).Get("/{brokerId}/shared-inventory", h.SharedInventory.GetBrokerSharedInventory)
 			})
 
@@ -307,6 +311,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAnyAuthenticated).Post("/", h.Cliente.Create)
 				r.With(m.RBAC.RequireAnyAuthenticated).Post("/send-links", h.Cliente.SendLinks) // Enviar links para clientes
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}", h.Cliente.GetByID)
+				r.With(m.RBAC.RequireAnyAuthenticated).Put("/{id}", h.Cliente.Update)
+				r.With(m.RBAC.RequireAnyAuthenticated).Delete("/{id}", h.Cliente.Delete)
 				r.With(m.RBAC.RequireAnyAuthenticated).Get("/{id}/interactions", h.Cliente.GetInteractions)
 			})
 

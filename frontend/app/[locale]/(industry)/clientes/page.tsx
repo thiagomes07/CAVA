@@ -3,58 +3,29 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { useForm, useController } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, X, Plus, Send, Share2 } from 'lucide-react';
+import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy, Plus, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
+// removed Checkbox selection column — not needed
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { SortableTableHead } from '@/components/shared/SortableTableHead';
-import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
+import { Checkbox } from '@/components/ui/checkbox';
 import { ShareLinksModal, ShareSelection } from '@/components/shared/ShareLinksModal';
+import { ClientFormModal } from '@/components/clientes/ClientFormModal';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { useSendLinksToClientes } from '@/lib/api/mutations/useLeadMutations';
-import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
+import { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 import type { Cliente, SalesLink, SendLinksResponse } from '@/lib/types';
-import type { ClienteFilter } from '@/lib/schemas/lead.schema';
+import type { ClienteFilter, CreateClienteForm } from '@/lib/schemas/lead.schema';
 import { cn } from '@/lib/utils/cn';
-
-// Schema for creating a new cliente
-const createClienteSchema = z.object({
-  name: z.string().min(2, 'Nome deve ter no mínimo 2 caracteres').max(100),
-  email: z.string().email('Email inválido').optional().or(z.literal('')),
-  phone: z.string().optional().refine(
-    (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
-    'Telefone inválido'
-  ),
-  whatsapp: z.string().optional().refine(
-    (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
-    'WhatsApp inválido'
-  ),
-  message: z.string().max(500).optional(),
-  marketingOptIn: z.boolean(),
-}).refine((data) => {
-  // Pelo menos email ou telefone deve ser preenchido
-  const hasEmail = data.email && data.email.trim() !== '';
-  const hasPhone = data.phone && data.phone.replace(/\D/g, '').length >= 10;
-  return hasEmail || hasPhone;
-}, {
-  message: 'Informe pelo menos o email ou telefone',
-  path: ['email'],
-});
-
-type CreateClienteForm = z.infer<typeof createClienteSchema>;
 
 export default function ClientesManagementPage() {
   const router = useRouter();
@@ -67,11 +38,14 @@ export default function ClientesManagementPage() {
   const [salesLinks, setSalesLinks] = useState<SalesLink[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  // Modal State
+  const [showClientModal, setShowClientModal] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showSendLinksModal, setShowSendLinksModal] = useState(false);
-  const [isCreating, setIsCreating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // bulk send modal removed
 
   // Share links modal state
   const [showShareLinksModal, setShowShareLinksModal] = useState(false);
@@ -79,37 +53,11 @@ export default function ClientesManagementPage() {
   const [shareCliente, setShareCliente] = useState<Cliente | null>(null);
   const [isSendingLinks, setIsSendingLinks] = useState(false);
 
-  // Selection state
-  const [selectedClienteIds, setSelectedClienteIds] = useState<Set<string>>(new Set());
-  const [useSamePhoneForWhatsapp, setUseSamePhoneForWhatsapp] = useState(false);
-  const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
+  // selection removed: checkboxes/ bulk selection not used
   const [customMessage, setCustomMessage] = useState('');
 
   // Send links mutation
   const sendLinksMutation = useSendLinksToClientes();
-
-  const {
-    register,
-    handleSubmit,
-    reset,
-    watch,
-    setValue,
-    control,
-    formState: { errors },
-  } = useForm<CreateClienteForm>({
-    resolver: zodResolver(createClienteSchema),
-    defaultValues: {
-      name: '',
-      email: '',
-      phone: '',
-      whatsapp: '',
-      message: '',
-      marketingOptIn: false,
-    },
-  });
-
-  const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
-  const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
   const [filters, setFilters] = useState<ClienteFilter>({
     search: searchParams.get('search') || '',
@@ -162,131 +110,101 @@ export default function ClientesManagementPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters]);
 
-  // Sync whatsapp with phone when checkbox is checked
-  const phoneValue = watch('phone');
-  useEffect(() => {
-    if (useSamePhoneForWhatsapp && phoneValue) {
-      setValue('whatsapp', phoneValue);
-    }
-  }, [useSamePhoneForWhatsapp, phoneValue, setValue]);
-
-  // Filter active links only
-  const activeLinks = useMemo(() => {
-    return salesLinks.filter(link => link.isActive && (!link.expiresAt || new Date(link.expiresAt) > new Date()));
-  }, [salesLinks]);
-
   // Check if client has valid email
   const isValidEmail = (contact: string) => contact.includes('@');
 
-  // Selection handlers
-  const handleSelectCliente = (clienteId: string, checked: boolean) => {
-    const newSet = new Set(selectedClienteIds);
+  const handleSelectCliente = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
     if (checked) {
-      newSet.add(clienteId);
+      newSet.add(id);
     } else {
-      newSet.delete(clienteId);
+      newSet.delete(id);
     }
-    setSelectedClienteIds(newSet);
+    setSelectedIds(newSet);
   };
 
-  const handleSelectAllClientes = () => {
-    if (selectedClienteIds.size === clientes.length) {
-      setSelectedClienteIds(new Set());
-    } else {
-      setSelectedClienteIds(new Set(clientes.map(c => c.id)));
-    }
-  };
-
-  const handleSelectLink = (linkId: string, checked: boolean) => {
-    const newSet = new Set(selectedLinkIds);
+  const handleSelectAll = (checked: boolean) => {
     if (checked) {
-      newSet.add(linkId);
+      const allIds = clientes.map((c) => c.id);
+      setSelectedIds(new Set(allIds));
     } else {
-      newSet.delete(linkId);
+      setSelectedIds(new Set());
     }
-    setSelectedLinkIds(newSet);
   };
 
-  const handleOpenSendLinksModal = () => {
-    if (selectedClienteIds.size === 0) {
-      error(t('noClientsSelected'));
-      return;
-    }
-    setSelectedLinkIds(new Set());
-    setCustomMessage('');
-    setShowSendLinksModal(true);
+  const handleBulkShare = () => {
+    if (selectedIds.size === 0) return;
+    setShareCliente(null); // Null indicates bulk mode
+    setShareMode('email'); // Force email for bulk
+    setShowShareLinksModal(true);
   };
 
-  const handleSendLinks = async () => {
-    if (selectedLinkIds.size === 0) {
-      error(t('noLinksSelected'));
-      return;
-    }
+  // bulk send links removed — keep individual share functionality
 
+  const handleOpenCreate = () => {
+    setSelectedCliente(null);
+    setShowClientModal(true);
+  };
+
+  const handleOpenEdit = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setShowClientModal(true);
+  };
+
+  const handleSaveCliente = async (data: CreateClienteForm) => {
     try {
-      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-        clienteIds: Array.from(selectedClienteIds),
-        salesLinkIds: Array.from(selectedLinkIds),
-        customMessage: customMessage || undefined,
-      });
+      setIsSaving(true);
 
-      // Show appropriate message based on results
-      if (result.totalFailed === 0 && result.totalSkipped === 0) {
-        success(t('sendSuccess', { sent: result.totalSent }));
-      } else {
-        success(t('sendPartialSuccess', {
-          sent: result.totalSent,
-          failed: result.totalFailed,
-          skipped: result.totalSkipped,
-        }));
-      }
-
-      setShowSendLinksModal(false);
-      setSelectedClienteIds(new Set());
-      setSelectedLinkIds(new Set());
-      setCustomMessage('');
-      fetchClientes();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        error(err.message);
-      } else {
-        error(t('sendError'));
-      }
-    }
-  };
-
-
-
-  const handleCreateCliente = async (data: CreateClienteForm) => {
-    try {
-      setIsCreating(true);
-
-      await apiClient.post('/clientes', {
+      const payload = {
         name: data.name,
         email: data.email && data.email.trim() !== '' ? data.email.trim() : undefined,
         phone: data.phone ? sanitizePhone(data.phone) : undefined,
         whatsapp: data.whatsapp ? sanitizePhone(data.whatsapp) : undefined,
         message: data.message,
         marketingOptIn: data.marketingOptIn,
-      });
-      success(t('clienteCreated'));
-      setShowCreateModal(false);
-      reset();
+      };
+
+      if (selectedCliente) {
+        // Update
+        await apiClient.put(`/clientes/${selectedCliente.id}`, payload);
+        success(t('clienteUpdated') || 'Cliente atualizado com sucesso');
+      } else {
+        // Create
+        await apiClient.post('/clientes', payload);
+        success(t('clienteCreated'));
+      }
+
+      setShowClientModal(false);
       fetchClientes();
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'CONFLICT') {
-        error(t('contactAlreadyExists'));
+      if (err instanceof ApiError) {
+        error(err.message);
       } else {
-        error(t('createError'));
+        error(selectedCliente ? (t('updateError') || 'Erro ao atualizar') : t('createError'));
       }
     } finally {
-      setIsCreating(false);
+      setIsSaving(false);
     }
   };
 
-  const handleViewDetails = (cliente: Cliente) => {
-    setSelectedCliente(cliente);
-    setShowDetailModal(true);
+  const handleDeleteCliente = async () => {
+    if (!selectedCliente) return;
+
+    try {
+      setIsSaving(true);
+      await apiClient.delete(`/clientes/${selectedCliente.id}`);
+      success(t('clienteDeleted') || 'Cliente excluído com sucesso');
+      setShowClientModal(false);
+      fetchClientes();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error(t('deleteError') || 'Erro ao excluir cliente');
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleExport = async () => {
@@ -348,16 +266,18 @@ export default function ClientesManagementPage() {
   };
 
   const handleShareLinksConfirm = async (selection: ShareSelection) => {
-    if (!shareCliente) return;
+    // Determine recipients
+    const recipientsIds = shareCliente ? [shareCliente.id] : Array.from(selectedIds);
+    if (recipientsIds.length === 0) return;
 
-    // Se for WhatsApp, o modal já redireciona automaticamente
+    // Se for WhatsApp, o modal já redireciona automaticamente (apenas individual)
     // Este handler só é chamado para Email
     if (shareMode === 'email') {
       try {
         setIsSendingLinks(true);
 
         const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-          clienteIds: [shareCliente.id],
+          clienteIds: recipientsIds,
           salesLinkIds: selection.salesLinkIds,
           customMessage: selection.customMessage,
         });
@@ -374,6 +294,7 @@ export default function ClientesManagementPage() {
 
         setShowShareLinksModal(false);
         setShareCliente(null);
+        setSelectedIds(new Set()); // Clear selection after send
         fetchClientes();
       } catch (err) {
         if (err instanceof ApiError) {
@@ -387,41 +308,12 @@ export default function ClientesManagementPage() {
     }
   };
 
-  const handleBulkShareLinksConfirm = async (selection: ShareSelection) => {
-    try {
-      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-        clienteIds: Array.from(selectedClienteIds),
-        salesLinkIds: selection.salesLinkIds,
-        customMessage: selection.customMessage,
-      });
-
-      if (result.totalFailed === 0 && result.totalSkipped === 0) {
-        success(t('sendSuccess', { sent: result.totalSent }));
-      } else {
-        success(t('sendPartialSuccess', {
-          sent: result.totalSent,
-          failed: result.totalFailed,
-          skipped: result.totalSkipped,
-        }));
-      }
-
-      setShowSendLinksModal(false);
-      setSelectedClienteIds(new Set());
-      fetchClientes();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        error(err.message);
-      } else {
-        error(t('sendError'));
-      }
-    }
-  };
+  // bulk share handler removed
 
   const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate;
   const isEmpty = clientes.length === 0;
   const MAX_BULK_CLIENTS = 50;
-  const canSendBulk = selectedClienteIds.size > 0 && selectedClienteIds.size <= MAX_BULK_CLIENTS;
-  const exceedsBulkLimit = selectedClienteIds.size > MAX_BULK_CLIENTS;
+  // bulk selection removed
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -437,19 +329,7 @@ export default function ClientesManagementPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {selectedClienteIds.size > 0 && (
-              <Button
-                variant="primary"
-                onClick={handleOpenSendLinksModal}
-                disabled={!canSendBulk}
-                className="bg-blue-600 hover:bg-blue-700"
-                title={exceedsBulkLimit ? t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS }) : undefined}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                {t('shareLinks')} ({selectedClienteIds.size})
-              </Button>
-            )}
-            <Button variant="primary" onClick={() => setShowCreateModal(true)}>
+            <Button variant="primary" onClick={handleOpenCreate}>
               <Plus className="w-4 h-4 mr-2" />
               {t('addCliente')}
             </Button>
@@ -461,35 +341,35 @@ export default function ClientesManagementPage() {
         </div>
       </div>
 
-      {/* Selection indicator */}
-      {selectedClienteIds.size > 0 && (
-        <div className={cn(
-          "border-b px-8 py-3",
-          exceedsBulkLimit ? "bg-rose-50 border-rose-200" : "bg-blue-50 border-blue-200"
-        )}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <p className={cn(
-                "text-sm font-medium",
-                exceedsBulkLimit ? "text-rose-700" : "text-blue-700"
-              )}>
-                {t('selectedClients', { count: selectedClienteIds.size })}
-              </p>
-              {exceedsBulkLimit && (
-                <span className="text-sm text-rose-600">
-                  • {t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS })}
-                </span>
-              )}
+      {/* Bulk Actions Indicator */}
+      {selectedIds.size > 0 && (
+        <div className="px-8 pb-6">
+          <div className="flex items-center justify-between p-4 bg-obsidian text-white rounded-sm shadow-lg animate-in slide-in-from-top-2">
+            <div className="flex items-center gap-4">
+              <span className="font-medium">
+                {selectedIds.size} {selectedIds.size === 1 ? 'cliente selecionado' : 'clientes selecionados'}
+              </span>
+              <div className="h-4 w-px bg-white/20" />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedIds(new Set())}
+                className="text-white/70 hover:text-white hover:bg-white/10 h-8"
+              >
+                Limpar seleção
+              </Button>
             </div>
-            <button
-              onClick={() => setSelectedClienteIds(new Set())}
-              className={cn(
-                "text-sm hover:underline cursor-pointer",
-                exceedsBulkLimit ? "text-rose-600 hover:text-rose-800" : "text-blue-600 hover:text-blue-800"
-              )}
-            >
-              {t('deselectAll')}
-            </button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleBulkShare}
+                className="bg-white text-obsidian hover:bg-slate-100 border-none"
+              >
+                <Mail className="w-4 h-4 mr-2" />
+                {t('sendLinks')}
+              </Button>
+            </div>
           </div>
         </div>
       )}
@@ -576,11 +456,10 @@ export default function ClientesManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">
+                    <TableHead className="w-[50px]">
                       <Checkbox
-                        id="select-all"
-                        checked={selectedClienteIds.size === clientes.length && clientes.length > 0}
-                        onChange={handleSelectAllClientes}
+                        checked={clientes.length > 0 && selectedIds.size === clientes.length}
+                        onChange={(e) => handleSelectAll(e.target.checked)}
                       />
                     </TableHead>
                     <SortableTableHead
@@ -612,31 +491,18 @@ export default function ClientesManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {clientes.map((cliente) => {
-                    const isSelected = selectedClienteIds.has(cliente.id);
-
                     return (
-                      <TableRow
-                        key={cliente.id}
-                        className={cn(
-                          "cursor-pointer transition-colors",
-                          isSelected && "bg-blue-50"
-                        )}
-                        onClick={() => handleViewDetails(cliente)}
-                      >
-                        <TableCell onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+                      <TableRow key={cliente.id} className="cursor-pointer transition-colors" onClick={() => handleOpenEdit(cliente)}>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
                           <Checkbox
-                            id={`select-${cliente.id}`}
-                            checked={isSelected}
+                            checked={selectedIds.has(cliente.id)}
                             onChange={(e) => handleSelectCliente(cliente.id, e.target.checked)}
                           />
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
-                            <span
-                              className="font-medium text-obsidian"
-                              title={cliente.name}
-                            >
+                            <span className="font-medium text-obsidian" title={cliente.name}>
                               {truncateText(cliente.name, TRUNCATION_LIMITS.USER_NAME_SHORT)}
                             </span>
                           </div>
@@ -755,291 +621,13 @@ export default function ClientesManagementPage() {
         )}
       </div>
 
-      {/* Detail Modal */}
-      <Modal open={showDetailModal} onClose={() => setShowDetailModal(false)}>
-        <ModalClose onClose={() => setShowDetailModal(false)} />
-        <ModalHeader>
-          <ModalTitle>{t('clienteDetails')}</ModalTitle>
-        </ModalHeader>
-        <ModalContent>
-          {selectedCliente && (
-            <div className="space-y-6">
-              {/* Contact Info */}
-              <div>
-                <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                  {t('contactInfo')}
-                </p>
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3">
-                    <User className="w-5 h-5 text-slate-400" />
-                    <div>
-                      <p className="text-sm text-slate-500">{t('name')}</p>
-                      <p className="font-medium text-obsidian">{selectedCliente.name}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {selectedCliente.contact.includes('@') ? (
-                      <Mail className="w-5 h-5 text-slate-400" />
-                    ) : (
-                      <Phone className="w-5 h-5 text-slate-400" />
-                    )}
-                    <div>
-                      <p className="text-sm text-slate-500">{t('contact')}</p>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-obsidian">{selectedCliente.contact}</p>
-                        <button
-                          onClick={() => handleCopyContact(selectedCliente.contact)}
-                          className="text-blue-600 hover:text-blue-700 cursor-pointer"
-                        >
-                          <Copy className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Message */}
-              {selectedCliente.message && (
-                <div>
-                  <p className="text-xs uppercase tracking-widest text-slate-500 mb-3">
-                    {t('observation')}
-                  </p>
-                  <div className="p-4 bg-slate-50 rounded-sm">
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">
-                      {selectedCliente.message}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Marketing Opt-in */}
-              <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-sm">
-                {selectedCliente.marketingOptIn ? (
-                  <>
-                    <Check className="w-5 h-5 text-emerald-600" />
-                    <p className="text-sm text-slate-600">
-                      {t('optInAccepted')}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <X className="w-5 h-5 text-slate-400" />
-                    <p className="text-sm text-slate-600">
-                      {t('optInDeclined')}
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {/* Metadata */}
-              <div className="pt-4 border-t border-slate-200">
-                <p className="text-xs text-slate-500">
-                  {t('clienteCapturedAt', { date: formatDate(selectedCliente.createdAt, 'dd/MM/yyyy HH:mm') })}
-                </p>
-              </div>
-            </div>
-          )}
-        </ModalContent>
-        <ModalFooter>
-          <Button
-            variant="secondary"
-            onClick={() => setShowDetailModal(false)}
-          >
-            {tCommon('close')}
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      {/* Create Cliente Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
-              <div>
-                <h2 className="font-serif text-xl">{t('addClienteTitle')}</h2>
-                <p className="text-xs text-white/50 mt-0.5">Cadastre um novo cliente manualmente</p>
-              </div>
-              <button
-                onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }}
-                className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="h-1 bg-[#C2410C]" />
-
-            <form onSubmit={handleSubmit(handleCreateCliente)}>
-              <div className="px-6 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
-                {/* Name */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('name')} <span className="text-[#C2410C]">*</span>
-                  </label>
-                  <input
-                    {...register('name')}
-                    placeholder={t('namePlaceholder')}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.name ? 'border-rose-500' : 'border-slate-200'
-                    )}
-                  />
-                  {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {tCommon('email')}
-                  </label>
-                  <input
-                    {...register('email')}
-                    type="email"
-                    placeholder={t('emailPlaceholder')}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.email ? 'border-rose-500' : 'border-slate-200'
-                    )}
-                  />
-                  {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('phonePlaceholder')}
-                  </label>
-                  <input
-                    value={phoneField.value}
-                    onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
-                    placeholder="(11) 98765-4321"
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.phone ? 'border-rose-500' : 'border-slate-200'
-                    )}
-                  />
-                  <p className="mt-1 text-xs text-slate-400">{t('contactHelperText')}</p>
-                  {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
-                </div>
-
-                {/* WhatsApp */}
-                <div>
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-slate-600">
-                      WhatsApp
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={useSamePhoneForWhatsapp}
-                        onChange={(e) => {
-                          const checked = e.target.checked;
-                          setUseSamePhoneForWhatsapp(checked);
-                          if (checked && phoneField.value) {
-                            setValue('whatsapp', phoneField.value);
-                          }
-                        }}
-                        className="h-3.5 w-3.5 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
-                      />
-                      <span className="text-xs text-slate-500">{t('useSamePhone')}</span>
-                    </label>
-                  </div>
-                  <input
-                    value={whatsappField.value}
-                    onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
-                    placeholder="(11) 98765-4321"
-                    disabled={useSamePhoneForWhatsapp}
-                    className={cn(
-                      'w-full px-3 py-2.5 border outline-none text-sm transition-colors',
-                      useSamePhoneForWhatsapp
-                        ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed'
-                        : 'bg-slate-50 focus:border-[#C2410C] focus:bg-white',
-                      errors.whatsapp ? 'border-rose-500' : 'border-slate-200'
-                    )}
-                  />
-                  {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
-                </div>
-
-                {/* Message */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('noteOptional')}
-                  </label>
-                  <textarea
-                    {...register('message')}
-                    placeholder={t('notePlaceholder')}
-                    rows={3}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors resize-none',
-                      errors.message ? 'border-rose-500' : 'border-slate-200'
-                    )}
-                  />
-                  {errors.message && <p className="mt-1 text-xs text-rose-500">{errors.message.message}</p>}
-                </div>
-
-                {/* Marketing Opt-in */}
-                <div className="flex items-center justify-between p-3 bg-slate-50 border border-slate-200">
-                  <div className="flex items-center gap-2">
-                    <Mail className="w-4 h-4 text-slate-400" />
-                    <div>
-                      <p className="text-sm font-medium">{t('marketingOptInLabel')}</p>
-                      <p className="text-xs text-slate-400">{t('marketingOptInDescription')}</p>
-                    </div>
-                  </div>
-                  <input
-                    type="checkbox"
-                    {...register('marketingOptIn')}
-                    className="h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
-                  />
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => { setShowCreateModal(false); reset(); setUseSamePhoneForWhatsapp(false); }}
-                  className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
-                >
-                  {tCommon('cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isCreating}
-                  className={cn(
-                    'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                    isCreating ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
-                  )}
-                >
-                  {isCreating ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {tCommon('saving')}
-                    </>
-                  ) : (
-                    <>
-                      <User className="w-4 h-4" />
-                      {t('createCliente')}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Send Links Modal (Bulk) */}
-      <ShareLinksModal
-        open={showSendLinksModal}
-        onClose={() => setShowSendLinksModal(false)}
-        onConfirm={handleBulkShareLinksConfirm}
-        mode="email"
-        multipleClientes={selectedClienteIds.size}
-        isLoading={sendLinksMutation.isPending}
+      <ClientFormModal
+        open={showClientModal}
+        onClose={() => setShowClientModal(false)}
+        onSave={handleSaveCliente}
+        onDelete={selectedCliente ? handleDeleteCliente : undefined}
+        initialData={selectedCliente}
+        isLoading={isSaving}
       />
 
       {/* Share Links Modal (Individual) */}
@@ -1052,8 +640,9 @@ export default function ClientesManagementPage() {
         onConfirm={handleShareLinksConfirm}
         mode={shareMode}
         cliente={shareCliente || undefined}
+        multipleClientes={!shareCliente ? selectedIds.size : undefined}
         isLoading={isSendingLinks}
       />
-    </div>
+    </div >
   );
 }
