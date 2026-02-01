@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Save, Loader2, Building2, MapPin, Phone, Info, Globe } from 'lucide-react';
+import { Save, Loader2, Building2, MapPin, Phone, Info, Globe, Plus, Trash2, Instagram, Facebook, Linkedin, Twitter, Youtube, Link as LinkIcon } from 'lucide-react';
 import { useToast } from '@/lib/hooks/useToast';
 import { PhoneInput, CNPJInput, CEPInput } from '@/components/ui/masked-input';
 import { ImageUploadWithCrop } from '@/components/ui/ImageUploadWithCrop';
@@ -26,9 +26,27 @@ const formSchema = z.object({
     addressStreet: z.string().optional(),
     addressNumber: z.string().optional(),
     addressZipCode: z.string().optional(),
+    socialLinks: z.array(z.object({
+        name: z.string().min(1, 'Nome é obrigatório'),
+        url: z.string().url('URL deve ser válida').min(1, 'URL é obrigatória')
+    })).max(5, 'Máximo 5 redes sociais').optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
+
+const getSocialIcon = (url: string, name: string) => {
+    const lowerUrl = url.toLowerCase();
+    const lowerName = name.toLowerCase();
+
+    if (lowerUrl.includes('instagram') || lowerName.includes('instagram')) return <Instagram className="h-4 w-4 text-pink-600" />;
+    if (lowerUrl.includes('facebook') || lowerName.includes('facebook')) return <Facebook className="h-4 w-4 text-blue-600" />;
+    if (lowerUrl.includes('linkedin') || lowerName.includes('linkedin')) return <Linkedin className="h-4 w-4 text-blue-700" />;
+    if (lowerUrl.includes('twitter') || lowerUrl.includes('x.com') || lowerName.includes('twitter') || lowerName.includes('x')) return <Twitter className="h-4 w-4 text-sky-500" />;
+    if (lowerUrl.includes('youtube') || lowerName.includes('youtube')) return <Youtube className="h-4 w-4 text-red-600" />;
+    if (lowerUrl.includes('tiktok') || lowerName.includes('tiktok')) return <span className="font-bold text-xs">Tk</span>; // Lucide might not have tiktok
+
+    return <LinkIcon className="h-4 w-4 text-slate-400" />;
+};
 
 export default function IndustryConfigPage() {
     const t = useTranslations('industryConfig');
@@ -59,6 +77,11 @@ export default function IndustryConfigPage() {
 
     const { control, handleSubmit, watch, setValue, reset, register, formState: { errors, isDirty } } = form;
 
+    const { fields, append, remove } = useFieldArray({
+        control,
+        name: "socialLinks"
+    });
+
     const watchedCountry = watch('addressCountry');
     const watchedState = watch('addressState');
 
@@ -74,7 +97,7 @@ export default function IndustryConfigPage() {
             const logoUrl = industry.logoUrl || '';
             setOriginalLogoUrl(logoUrl);
             setPreviewLogoUrl(logoUrl);
-            
+
             reset({
                 name: industry.name || '',
                 cnpj: industry.cnpj || '',
@@ -88,6 +111,7 @@ export default function IndustryConfigPage() {
                 addressStreet: industry.addressStreet || '',
                 addressNumber: industry.addressNumber || '',
                 addressZipCode: industry.addressZipCode || '',
+                socialLinks: industry.socialLinks || [],
             });
         }
     }, [industry, reset]);
@@ -125,6 +149,7 @@ export default function IndustryConfigPage() {
                 addressStreet: industry.addressStreet || '',
                 addressNumber: industry.addressNumber || '',
                 addressZipCode: industry.addressZipCode || '',
+                socialLinks: industry.socialLinks || [],
             });
 
             // Restore logo preview to original
@@ -420,6 +445,92 @@ export default function IndustryConfigPage() {
                         </div>
                     </div>
 
+
+                    {/* Redes Sociais */}
+                    <div className="bg-white border border-slate-200 overflow-hidden">
+                        <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-[#C2410C]/10">
+                                    <Globe className="h-5 w-5 text-[#C2410C]" />
+                                </div>
+                                <div>
+                                    <h2 className="font-semibold text-[#121212]">Redes Sociais</h2>
+                                    <p className="text-xs text-slate-500">Conecte suas redes sociais (máx. 5)</p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => append({ name: '', url: '' })}
+                                disabled={fields.length >= 5}
+                                className={cn(
+                                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all",
+                                    fields.length >= 5
+                                        ? "bg-slate-100 text-slate-400 cursor-not-allowed"
+                                        : "bg-[#C2410C]/10 text-[#C2410C] hover:bg-[#C2410C]/20"
+                                )}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Adicionar
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            {fields.length === 0 ? (
+                                <div className="text-center py-6 text-slate-400 text-sm bg-slate-50 rounded-lg border border-dashed border-slate-200">
+                                    Nenhuma rede social adicionada
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {fields.map((field, index) => {
+                                        // Watch values to update icon dynamically
+                                        const currentUrl = watch(`socialLinks.${index}.url`);
+                                        const currentName = watch(`socialLinks.${index}.name`);
+
+                                        return (
+                                            <div key={field.id} className="group relative grid grid-cols-1 md:grid-cols-[200px_1fr_auto] gap-3 items-start p-3 rounded-lg border border-slate-100 bg-slate-50 hover:border-slate-200 transition-all">
+                                                <div>
+                                                    <input
+                                                        {...register(`socialLinks.${index}.name`)}
+                                                        placeholder="Nome (ex: Instagram)"
+                                                        className={cn(
+                                                            "w-full px-3 py-2 bg-white border outline-none text-sm transition-colors rounded-md",
+                                                            errors.socialLinks?.[index]?.name ? "border-rose-500" : "border-slate-200 focus:border-[#C2410C]"
+                                                        )}
+                                                    />
+                                                    {errors.socialLinks?.[index]?.name && (
+                                                        <p className="mt-1 text-[10px] text-rose-500">{errors.socialLinks[index]?.name?.message}</p>
+                                                    )}
+                                                </div>
+                                                <div className="relative">
+                                                    <div className="absolute left-3 top-2.5 pointer-events-none">
+                                                        {getSocialIcon(currentUrl || '', currentName || '')}
+                                                    </div>
+                                                    <input
+                                                        {...register(`socialLinks.${index}.url`)}
+                                                        placeholder="URL (ex: https://instagram.com/sua-empresa)"
+                                                        className={cn(
+                                                            "w-full pl-9 pr-3 py-2 bg-white border outline-none text-sm transition-colors rounded-md",
+                                                            errors.socialLinks?.[index]?.url ? "border-rose-500" : "border-slate-200 focus:border-[#C2410C]"
+                                                        )}
+                                                    />
+                                                    {errors.socialLinks?.[index]?.url && (
+                                                        <p className="mt-1 text-[10px] text-rose-500">{errors.socialLinks[index]?.url?.message}</p>
+                                                    )}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => remove(index)}
+                                                    className="p-2 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-md transition-colors"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     {/* Endereço */}
                     <div className="bg-white border border-slate-200 overflow-hidden">
                         <div className="px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white">
@@ -625,7 +736,7 @@ export default function IndustryConfigPage() {
                         </button>
                     </div>
                 </form>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 }

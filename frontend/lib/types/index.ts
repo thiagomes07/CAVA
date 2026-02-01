@@ -62,8 +62,14 @@ export interface Industry {
   addressZipCode?: string;
   policyTerms?: string;
   isActive?: boolean;
+  socialLinks?: SocialLink[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SocialLink {
+  name: string;
+  url: string;
 }
 
 export interface Media {
