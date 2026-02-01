@@ -28,12 +28,18 @@ export function useUsers(role?: UserRole) {
   });
 }
 
+interface BrokersResponse {
+  brokers: BrokerWithStats[];
+  total: number;
+  page: number;
+}
+
 export function useBrokers() {
   return useQuery({
     queryKey: userKeys.brokers(),
     queryFn: async () => {
-      const data = await apiClient.get<BrokerWithStats[]>('/brokers');
-      return data;
+      const data = await apiClient.get<BrokersResponse>('/brokers');
+      return data.brokers;
     },
   });
 }
@@ -42,10 +48,10 @@ export function useSellers() {
   return useQuery({
     queryKey: userKeys.sellers(),
     queryFn: async () => {
-      const data = await apiClient.get<User[]>('/users', {
+      const data = await apiClient.get<{ users: User[]; total: number; page: number }>('/users', {
         params: { role: 'VENDEDOR_INTERNO' },
       });
-      return data;
+      return data.users;
     },
   });
 }

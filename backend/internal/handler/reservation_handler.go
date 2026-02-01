@@ -65,8 +65,11 @@ func (h *ReservationHandler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Obter role do usuário
+	userRole := entity.UserRole(middleware.GetUserRole(r.Context()))
+
 	// Criar reserva
-	reservation, err := h.reservationService.Create(r.Context(), userID, input)
+	reservation, err := h.reservationService.Create(r.Context(), userID, userRole, input)
 	if err != nil {
 		h.logger.Error("erro ao criar reserva",
 			zap.String("batchId", input.BatchID),
@@ -184,4 +187,210 @@ func (h *ReservationHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 	)
 
 	response.OK(w, map[string]bool{"success": true})
+}
+
+// ListMy godoc
+// @Summary Lista minhas reservas
+// @Description Lista reservas ativas do usuário logado (broker)
+// @Tags reservations
+// @Produce json
+// @Success 200 {array} entity.Reservation
+// @Failure 401 {object} response.ErrorResponse
+// @Router /api/reservations/my [get]
+func (h *ReservationHandler) ListMy(w http.ResponseWriter, r *http.Request) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	reservations, err := h.reservationService.ListActive(r.Context(), userID)
+	if err != nil {
+		h.logger.Error("erro ao listar minhas reservas",
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, reservations)
+}
+
+// ListAll godoc
+// @Summary Lista todas as reservas da indústria
+// @Description Lista todas as reservas da indústria (admin)
+// @Tags reservations
+// @Produce json
+// @Success 200 {array} entity.Reservation
+// @Failure 403 {object} response.ErrorResponse
+// @Router /api/reservations [get]
+func (h *ReservationHandler) ListAll(w http.ResponseWriter, r *http.Request) {
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	reservations, err := h.reservationService.ListByIndustry(r.Context(), industryID)
+	if err != nil {
+		h.logger.Error("erro ao listar reservas da indústria",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	// Ocultar brokerSoldPrice para admin (só visível para o broker)
+	for i := range reservations {
+		reservations[i].BrokerSoldPrice = nil
+	}
+
+	response.OK(w, reservations)
+}
+
+// ListPending godoc
+// @Summary Lista reservas pendentes de aprovação
+// @Description Lista todas as reservas com status PENDENTE_APROVACAO (apenas admin)
+// @Tags reservations
+// @Produce json
+// @Success 200 {array} entity.Reservation
+// @Failure 403 {object} response.ErrorResponse
+// @Router /api/reservations/pending [get]
+func (h *ReservationHandler) ListPending(w http.ResponseWriter, r *http.Request) {
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	reservations, err := h.reservationService.ListPending(r.Context(), industryID)
+	if err != nil {
+		h.logger.Error("erro ao listar reservas pendentes",
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	// Ocultar brokerSoldPrice para admin (só visível para o broker)
+	for i := range reservations {
+		reservations[i].BrokerSoldPrice = nil
+	}
+
+	response.OK(w, reservations)
+}
+
+// Approve godoc
+// @Summary Aprova uma reserva
+// @Description Admin aprova uma reserva pendente (status: APROVADA)
+// @Tags reservations
+// @Produce json
+// @Param id path string true "ID da reserva"
+// @Success 200 {object} entity.Reservation
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/reservations/{id}/approve [post]
+func (h *ReservationHandler) Approve(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID da reserva é obrigatório", nil)
+		return
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	reservation, err := h.reservationService.Approve(r.Context(), id, userID)
+	if err != nil {
+		h.logger.Error("erro ao aprovar reserva",
+			zap.String("reservationId", id),
+			zap.String("approverId", userID),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("reserva aprovada",
+		zap.String("reservationId", id),
+		zap.String("approverId", userID),
+	)
+
+	// Ocultar brokerSoldPrice para admin
+	reservation.BrokerSoldPrice = nil
+
+	response.OK(w, reservation)
+}
+
+// RejectInput representa os dados para rejeitar uma reserva
+type RejectInput struct {
+	Reason string `json:"reason" validate:"required,min=5,max=500"`
+}
+
+// Reject godoc
+// @Summary Rejeita uma reserva
+// @Description Admin rejeita uma reserva pendente (status: REJEITADA)
+// @Tags reservations
+// @Accept json
+// @Produce json
+// @Param id path string true "ID da reserva"
+// @Param body body RejectInput true "Motivo da rejeição"
+// @Success 200 {object} entity.Reservation
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 403 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/reservations/{id}/reject [post]
+func (h *ReservationHandler) Reject(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID da reserva é obrigatório", nil)
+		return
+	}
+
+	var input RejectInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		response.Unauthorized(w, "Usuário não autenticado")
+		return
+	}
+
+	reservation, err := h.reservationService.Reject(r.Context(), id, userID, input.Reason)
+	if err != nil {
+		h.logger.Error("erro ao rejeitar reserva",
+			zap.String("reservationId", id),
+			zap.String("approverId", userID),
+			zap.String("reason", input.Reason),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("reserva rejeitada",
+		zap.String("reservationId", id),
+		zap.String("approverId", userID),
+		zap.String("reason", input.Reason),
+	)
+
+	// Ocultar brokerSoldPrice para admin
+	reservation.BrokerSoldPrice = nil
+
+	response.OK(w, reservation)
 }

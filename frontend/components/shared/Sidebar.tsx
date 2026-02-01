@@ -21,7 +21,9 @@ import {
   Building2,
   X,
   UserCircle,
-  Menu
+  Menu,
+  BarChart3,
+  ClipboardList,
 } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -65,6 +67,18 @@ const industryMenuItems: MenuItem[] = [
     href: '/sales',
     icon: Receipt,
     roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'navigation.reservations',
+    href: '/reservations',
+    icon: ClipboardList,
+    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
+  },
+  {
+    label: 'navigation.bi',
+    href: '/bi',
+    icon: BarChart3,
+    roles: ['ADMIN_INDUSTRIA'],
   },
   {
     label: 'navigation.links',
@@ -115,6 +129,12 @@ const brokerMenuItems: MenuItem[] = [
     label: 'navigation.sharedInventory',
     href: '/shared-inventory',
     icon: PackageOpen,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'navigation.reservations',
+    href: '/reservations',
+    icon: ClipboardList,
     roles: ['BROKER'],
   },
   {

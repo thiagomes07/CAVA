@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Download, FileText, Receipt, Trash2 } from 'lucide-react';
@@ -71,11 +71,11 @@ export default function SalesHistoryPage() {
 
   const fetchSellers = async () => {
     try {
-      const data = await apiClient.get<Array<{ id: string; name: string }>>(
+      const data = await apiClient.get<{ users: Array<{ id: string; name: string }>; total: number; page: number }>(
         '/users',
         { params: { role: 'VENDEDOR_INTERNO' } }
       );
-      setSellers(data);
+      setSellers(data.users || []);
     } catch (err) {
       error(t('sellersError'));
     }
@@ -282,9 +282,8 @@ export default function SalesHistoryPage() {
                 </TableHeader>
                 <TableBody>
                   {sales.map((sale) => (
-                    <>
+                    <React.Fragment key={sale.id}>
                       <TableRow
-                        key={sale.id}
                         className={cn(
                           'cursor-pointer',
                           expandedRow === sale.id && 'bg-slate-50'
@@ -405,7 +404,7 @@ export default function SalesHistoryPage() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

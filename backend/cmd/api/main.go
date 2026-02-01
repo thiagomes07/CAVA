@@ -304,6 +304,7 @@ type Repositories struct {
 	SalesHistory       domainRepo.SalesHistoryRepository
 	SharedInventory    domainRepo.SharedInventoryRepository
 	Industry           domainRepo.IndustryRepository
+	BI                 domainRepo.BIRepository
 	DB                 *repository.DB
 }
 
@@ -323,6 +324,7 @@ func initRepositories(db *repository.DB) Repositories {
 		SalesHistory:       repository.NewSalesHistoryRepository(db),
 		SharedInventory:    repository.NewSharedInventoryRepository(db),
 		Industry:           repository.NewIndustryRepository(db),
+		BI:                 repository.NewBIRepository(db),
 		DB:                 db,
 	}
 }
@@ -381,6 +383,7 @@ func initServices(
 		repos.Batch,
 		repos.Cliente,
 		repos.SalesHistory,
+		repos.User,
 		repos.DB,
 		logger,
 	)
@@ -454,6 +457,12 @@ func initServices(
 		logger,
 	)
 
+	// BI Service
+	biService := service.NewBIService(
+		repos.BI,
+		logger,
+	)
+
 	return handler.Services{
 		Auth:            authService,
 		User:            userService,
@@ -467,6 +476,7 @@ func initServices(
 		SalesHistory:    salesHistoryService,
 		SharedInventory: sharedInventoryService,
 		Storage:         storageService,
+		BI:              biService,
 		Email:           emailSender,
 		MediaRepo:       repos.Media,
 		IndustryRepo:    repos.Industry,

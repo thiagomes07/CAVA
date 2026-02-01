@@ -7,8 +7,8 @@ export * from './useBatches';
 // Dashboard
 export * from './useDashboard';
 
-// Clientes
-export * from './useClientes';
+// Leads (Clientes)
+export * from './useLeads';
 
 // Sales Links
 export * from './useSalesLinks';
@@ -21,3 +21,9 @@ export * from './useSales';
 
 // Shared Inventory
 export * from './useSharedInventory';
+
+// Reservations
+export * from './useReservations';
+
+// Business Intelligence (BI)
+export * from './useBI';

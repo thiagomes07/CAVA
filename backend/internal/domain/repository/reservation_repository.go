@@ -3,6 +3,8 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
+
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 )
 
@@ -34,4 +36,19 @@ type ReservationRepository interface {
 
 	// List lista reservas com filtros
 	List(ctx context.Context, filters entity.ReservationFilters) ([]entity.Reservation, error)
+
+	// FindByIndustry busca todas as reservas de uma indústria
+	FindByIndustry(ctx context.Context, industryID string) ([]entity.Reservation, error)
+
+	// FindPendingByIndustry busca reservas pendentes de aprovação por indústria
+	FindPendingByIndustry(ctx context.Context, industryID string) ([]entity.Reservation, error)
+
+	// FindPendingExpired busca reservas pendentes que expiraram o prazo de aprovação
+	FindPendingExpired(ctx context.Context) ([]entity.Reservation, error)
+
+	// Approve aprova uma reserva (atualiza status e campos de aprovação)
+	Approve(ctx context.Context, tx *sql.Tx, id, approverID string, expiresAt time.Time) error
+
+	// Reject rejeita uma reserva (atualiza status e motivo)
+	Reject(ctx context.Context, tx *sql.Tx, id, approverID, reason string) error
 }

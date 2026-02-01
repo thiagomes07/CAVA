@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/errors"
@@ -19,14 +20,16 @@ func NewReservationRepository(db *DB) *reservationRepository {
 func (r *reservationRepository) Create(ctx context.Context, tx *sql.Tx, reservation *entity.Reservation) error {
 	query := `
 		INSERT INTO reservations (
-			id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes, expires_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+			reserved_price, broker_sold_price, notes, expires_at
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at
 	`
 
 	err := tx.QueryRowContext(ctx, query,
 		reservation.ID, reservation.BatchID, reservation.ReservedByUserID,
-		reservation.ClienteID, reservation.QuantitySlabsReserved, reservation.Status, reservation.Notes,
+		reservation.ClienteID, reservation.QuantitySlabsReserved, reservation.Status,
+		reservation.ReservedPrice, reservation.BrokerSoldPrice, reservation.Notes,
 		reservation.ExpiresAt,
 	).Scan(&reservation.CreatedAt)
 
@@ -39,8 +42,8 @@ func (r *reservationRepository) Create(ctx context.Context, tx *sql.Tx, reservat
 
 func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
-		       expires_at, created_at, is_active
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+		       reserved_price, broker_sold_price, notes, expires_at, created_at, is_active
 		FROM reservations
 		WHERE id = $1
 	`
@@ -48,7 +51,8 @@ func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entit
 	res := &entity.Reservation{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&res.ID, &res.BatchID, &res.ReservedByUserID, &res.ClienteID,
-		&res.QuantitySlabsReserved, &res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+		&res.QuantitySlabsReserved, &res.Status, &res.ReservedPrice, &res.BrokerSoldPrice,
+		&res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
 	)
 
 	if err == sql.ErrNoRows {
@@ -63,8 +67,8 @@ func (r *reservationRepository) FindByID(ctx context.Context, id string) (*entit
 
 func (r *reservationRepository) FindByBatchID(ctx context.Context, batchID string) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
-		       expires_at, created_at, is_active
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+		       reserved_price, broker_sold_price, notes, expires_at, created_at, is_active
 		FROM reservations
 		WHERE batch_id = $1
 		ORDER BY created_at DESC
@@ -81,10 +85,10 @@ func (r *reservationRepository) FindByBatchID(ctx context.Context, batchID strin
 
 func (r *reservationRepository) FindActive(ctx context.Context, userID string) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
-		       expires_at, created_at, is_active
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+		       reserved_price, broker_sold_price, notes, expires_at, created_at, is_active
 		FROM reservations
-		WHERE reserved_by_user_id = $1 
+		WHERE reserved_by_user_id = $1
 		  AND status = 'ATIVA'
 		  AND is_active = TRUE
 		  AND expires_at > CURRENT_TIMESTAMP
@@ -102,8 +106,8 @@ func (r *reservationRepository) FindActive(ctx context.Context, userID string) (
 
 func (r *reservationRepository) FindExpired(ctx context.Context) ([]entity.Reservation, error) {
 	query := `
-		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status, notes,
-		       expires_at, created_at, is_active
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+		       reserved_price, broker_sold_price, notes, expires_at, created_at, is_active
 		FROM reservations
 		WHERE status = 'ATIVA'
 		  AND expires_at < CURRENT_TIMESTAMP
@@ -255,7 +259,158 @@ func (r *reservationRepository) scanReservations(rows *sql.Rows) ([]entity.Reser
 		var res entity.Reservation
 		if err := rows.Scan(
 			&res.ID, &res.BatchID, &res.ReservedByUserID, &res.ClienteID,
-			&res.QuantitySlabsReserved, &res.Status, &res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+			&res.QuantitySlabsReserved, &res.Status, &res.ReservedPrice, &res.BrokerSoldPrice,
+			&res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+		reservations = append(reservations, res)
+	}
+	return reservations, nil
+}
+
+func (r *reservationRepository) FindByIndustry(ctx context.Context, industryID string) ([]entity.Reservation, error) {
+	query := `
+		SELECT r.id, r.batch_id, r.reserved_by_user_id, r.cliente_id, r.quantity_slabs_reserved,
+		       r.status, r.reserved_price, r.broker_sold_price, r.notes, r.expires_at, r.created_at, r.is_active,
+		       r.industry_id, r.approved_by, r.approved_at, r.rejection_reason, r.approval_expires_at
+		FROM reservations r
+		JOIN batches b ON r.batch_id = b.id
+		WHERE b.industry_id = $1
+		ORDER BY r.created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservationsWithApproval(rows)
+}
+
+func (r *reservationRepository) FindPendingByIndustry(ctx context.Context, industryID string) ([]entity.Reservation, error) {
+	query := `
+		SELECT r.id, r.batch_id, r.reserved_by_user_id, r.cliente_id, r.quantity_slabs_reserved,
+		       r.status, r.reserved_price, r.broker_sold_price, r.notes, r.expires_at, r.created_at, r.is_active,
+		       r.industry_id, r.approved_by, r.approved_at, r.rejection_reason, r.approval_expires_at
+		FROM reservations r
+		JOIN batches b ON r.batch_id = b.id
+		WHERE r.status = 'PENDENTE_APROVACAO'
+		  AND b.industry_id = $1
+		ORDER BY r.created_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, industryID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservationsWithApproval(rows)
+}
+
+func (r *reservationRepository) FindPendingExpired(ctx context.Context) ([]entity.Reservation, error) {
+	query := `
+		SELECT r.id, r.batch_id, r.reserved_by_user_id, r.cliente_id, r.quantity_slabs_reserved,
+		       r.status, r.reserved_price, r.broker_sold_price, r.notes, r.expires_at, r.created_at, r.is_active,
+		       r.industry_id, r.approved_by, r.approved_at, r.rejection_reason, r.approval_expires_at
+		FROM reservations r
+		WHERE r.status = 'PENDENTE_APROVACAO'
+		  AND r.approval_expires_at IS NOT NULL
+		  AND r.approval_expires_at < CURRENT_TIMESTAMP
+		ORDER BY r.approval_expires_at ASC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservationsWithApproval(rows)
+}
+
+func (r *reservationRepository) Approve(ctx context.Context, tx *sql.Tx, id, approverID string, expiresAt time.Time) error {
+	query := `
+		UPDATE reservations
+		SET status = 'APROVADA',
+		    approved_by = $1,
+		    approved_at = CURRENT_TIMESTAMP,
+		    expires_at = $2
+		WHERE id = $3
+	`
+
+	var result sql.Result
+	var err error
+
+	if tx != nil {
+		result, err = tx.ExecContext(ctx, query, approverID, expiresAt, id)
+	} else {
+		result, err = r.db.ExecContext(ctx, query, approverID, expiresAt, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Reserva")
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) Reject(ctx context.Context, tx *sql.Tx, id, approverID, reason string) error {
+	query := `
+		UPDATE reservations
+		SET status = 'REJEITADA',
+		    approved_by = $1,
+		    approved_at = CURRENT_TIMESTAMP,
+		    rejection_reason = $2,
+		    is_active = FALSE
+		WHERE id = $3
+	`
+
+	var result sql.Result
+	var err error
+
+	if tx != nil {
+		result, err = tx.ExecContext(ctx, query, approverID, reason, id)
+	} else {
+		result, err = r.db.ExecContext(ctx, query, approverID, reason, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Reserva")
+	}
+
+	return nil
+}
+
+func (r *reservationRepository) scanReservationsWithApproval(rows *sql.Rows) ([]entity.Reservation, error) {
+	reservations := []entity.Reservation{}
+	for rows.Next() {
+		var res entity.Reservation
+		if err := rows.Scan(
+			&res.ID, &res.BatchID, &res.ReservedByUserID, &res.ClienteID,
+			&res.QuantitySlabsReserved, &res.Status, &res.ReservedPrice, &res.BrokerSoldPrice,
+			&res.Notes, &res.ExpiresAt, &res.CreatedAt, &res.IsActive,
+			&res.IndustryID, &res.ApprovedBy, &res.ApprovedAt, &res.RejectionReason, &res.ApprovalExpiresAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
