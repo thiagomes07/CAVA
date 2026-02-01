@@ -106,6 +106,13 @@ type InviteBrokerInput struct {
 	Whatsapp *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 }
 
+// UpdateBrokerInput representa os dados para atualizar um broker
+type UpdateBrokerInput struct {
+	Name     string  `json:"name" validate:"required,min=2,max=255"`
+	Phone    *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+}
+
 // BrokerWithStats representa um broker com estatísticas
 type BrokerWithStats struct {
 	User

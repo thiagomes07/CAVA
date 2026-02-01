@@ -260,10 +260,10 @@ export function ClientFormModal({
                                 <button
                                     type="button"
                                     onClick={() => setShowDeleteConfirm(true)}
-                                    className="p-2 text-rose-600 hover:bg-rose-50 rounded-sm transition-colors"
-                                    title={tCommon('delete')}
+                                    className="inline-flex items-center gap-2 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-sm transition-colors"
                                 >
-                                    <Trash2 className="w-5 h-5" />
+                                    <Trash2 className="w-4 h-4" />
+                                    {tCommon('delete')}
                                 </button>
                             )}
                         </div>
@@ -303,50 +303,64 @@ export function ClientFormModal({
 
             {/* Delete Confirmation */}
             <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{tCommon('confirmDeleteTitle') || 'Confirmar exclusão'}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {tCommon('confirmDeleteDescription') || 'Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.'}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel disabled={isLoading}>{tCommon('cancel')}</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={(e) => {
-                                e.preventDefault();
-                                if (onDelete) {
-                                    onDelete().then(() => setShowDeleteConfirm(false));
-                                }
-                            }}
-                            className="bg-rose-600 hover:bg-rose-700 focus:ring-rose-600"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? tCommon('deleting') : tCommon('delete')}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
+                <AlertDialogContent className="w-full max-w-md p-6 mx-auto">
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-full bg-red-100 flex-shrink-0 flex items-center justify-center">
+                                    <Trash2 className="h-4 w-4 text-red-600" />
+                                </div>
+                                <div>
+                                    <AlertDialogTitle className="text-lg font-bold text-slate-800">Confirmar Exclusão</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-sm text-slate-600 mt-1 leading-relaxed">
+                                        Tem certeza que deseja excluir este cliente? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                </div>
+                            </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="pt-4 flex justify-center gap-3">
+                            <AlertDialogCancel disabled={isLoading} className="h-8 px-4 text-sm rounded border border-slate-200">Cancelar</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    if (onDelete) {
+                                        onDelete().then(() => setShowDeleteConfirm(false));
+                                    }
+                                }}
+                                className="bg-red-600 hover:bg-red-700 h-8 px-4 text-sm rounded"
+                                disabled={isLoading}
+                            >
+                                {isLoading ? 'Excluindo...' : 'Excluir'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
 
             {/* Discard Changes Confirmation */}
             <AlertDialog open={showDiscardConfirm} onOpenChange={setShowDiscardConfirm}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>{t('discardChangesTitle') || 'Descartar alterações?'}</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            {t('discardChangesDescription') || 'Existem alterações não salvas. Deseja realmente descartá-las?'}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
+                <AlertDialogContent className="w-full max-w-md p-6 mx-auto">
+                        <AlertDialogHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-full bg-amber-100 flex-shrink-0 flex items-center justify-center">
+                                    <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                </div>
+                                <div>
+                                    <AlertDialogTitle className="text-base font-semibold">Descartar alterações?</AlertDialogTitle>
+                                    <AlertDialogDescription className="text-sm mt-1 leading-relaxed">
+                                        Existem alterações não salvas. Deseja realmente descartá-las?
+                                    </AlertDialogDescription>
+                                </div>
+                            </div>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter className="pt-4 flex justify-center gap-3">
+                        <AlertDialogCancel className="h-8 px-4 text-sm rounded border border-slate-200">Cancelar</AlertDialogCancel>
                         <AlertDialogAction
                             onClick={() => {
                                 setShowDiscardConfirm(false);
                                 onClose();
                             }}
-                            className="bg-slate-800 hover:bg-slate-900"
+                            className="bg-amber-600 hover:bg-amber-700 h-8 px-4 text-sm rounded"
                         >
-                            {tCommon('discard') || 'Descartar'}
+                            Descartar
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

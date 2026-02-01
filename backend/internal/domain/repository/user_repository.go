@@ -62,6 +62,9 @@ type UserRepository interface {
 	// SetFirstLoginAt define a data do primeiro login
 	SetFirstLoginAt(ctx context.Context, id string) error
 
+	// Delete deleta um usuário
+	Delete(ctx context.Context, id string) error
+
 	// =============================================
 	// PASSWORD RESET TOKENS
 	// =============================================

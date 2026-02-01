@@ -682,3 +682,104 @@ func (s *userService) GetBrokersWithFilters(ctx context.Context, industryID stri
 	return brokers, total, nil
 }
 
+func (s *userService) UpdateBroker(ctx context.Context, id string, input entity.UpdateBrokerInput) (*entity.User, error) {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verificar se é realmente um broker
+	if user.Role != entity.RoleBroker {
+		s.logger.Warn("tentativa de atualizar não-broker através do endpoint de broker",
+			zap.String("userId", id),
+			zap.String("role", string(user.Role)),
+		)
+		return nil, domainErrors.NewBadRequestError("Usuário não é um broker")
+	}
+
+	// Verificar se nome mudou e se já existe
+	if input.Name != user.Name {
+		nameExists, err := s.userRepo.ExistsByNameGlobally(ctx, input.Name)
+		if err != nil {
+			s.logger.Error("erro ao verificar nome existente", zap.Error(err))
+			return nil, domainErrors.InternalError(err)
+		}
+		if nameExists {
+			return nil, domainErrors.ValidationError("Já existe um usuário com este nome")
+		}
+		user.Name = input.Name
+	}
+
+	// Atualizar telefones
+	user.Phone = input.Phone
+	user.Whatsapp = input.Whatsapp
+	user.UpdatedAt = time.Now()
+
+	// Salvar alterações
+	if err := s.userRepo.Update(ctx, user); err != nil {
+		s.logger.Error("erro ao atualizar broker",
+			zap.String("brokerId", id),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Limpar senha antes de retornar
+	user.Password = ""
+
+	s.logger.Info("broker atualizado com sucesso", zap.String("brokerId", id))
+	return user, nil
+}
+
+func (s *userService) DeleteBroker(ctx context.Context, id string) error {
+	// Buscar usuário
+	user, err := s.userRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// Verificar se é realmente um broker
+	if user.Role != entity.RoleBroker {
+		s.logger.Warn("tentativa de deletar não-broker através do endpoint de broker",
+			zap.String("userId", id),
+			zap.String("role", string(user.Role)),
+		)
+		return domainErrors.NewBadRequestError("Usuário não é um broker")
+	}
+
+	// Verificar se há lotes compartilhados ativos
+	// Buscar broker específico para verificar shared batches count
+	brokers, _, err := s.userRepo.FindBrokersWithFilters(ctx, "", entity.UserFilters{
+		Page:  1,
+		Limit: 100, // Suficiente para encontrar o broker
+	})
+	if err != nil {
+		s.logger.Error("erro ao verificar lotes compartilhados",
+			zap.String("brokerId", id),
+			zap.Error(err),
+		)
+		return domainErrors.InternalError(err)
+	}
+
+	// Encontrar este broker específico na lista
+	for _, b := range brokers {
+		if b.ID == id && b.SharedBatchesCount > 0 {
+			return domainErrors.NewBadRequestError(
+				fmt.Sprintf("Não é possível excluir broker com %d lote(s) compartilhado(s) ativo(s)", b.SharedBatchesCount),
+			)
+		}
+	}
+
+	// Deletar broker
+	if err := s.userRepo.Delete(ctx, id); err != nil {
+		s.logger.Error("erro ao deletar broker",
+			zap.String("brokerId", id),
+			zap.Error(err),
+		)
+		return err
+	}
+
+	s.logger.Info("broker deletado com sucesso", zap.String("brokerId", id))
+	return nil
+}

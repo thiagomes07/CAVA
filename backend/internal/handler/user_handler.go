@@ -502,3 +502,87 @@ func (h *UserHandler) UpdateEmail(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, user)
 }
+
+// UpdateBroker godoc
+// @Summary Atualiza informações do broker
+// @Description Admin atualiza dados do broker (nome, email, telefone, whatsapp)
+// @Tags brokers
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do broker"
+// @Param body body entity.UpdateBrokerInput true "Dados para atualização"
+// @Success 200 {object} entity.User
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/brokers/{id} [put]
+func (h *UserHandler) UpdateBroker(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do broker é obrigatório", nil)
+		return
+	}
+
+	var input entity.UpdateBrokerInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Validar input
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	// Atualizar broker
+	user, err := h.userService.UpdateBroker(r.Context(), id, input)
+	if err != nil {
+		h.logger.Error("erro ao atualizar broker",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("broker atualizado",
+		zap.String("brokerId", user.ID),
+		zap.String("email", user.Email),
+	)
+
+	response.OK(w, user)
+}
+
+// DeleteBroker godoc
+// @Summary Deleta um broker
+// @Description Admin deleta broker (se não houver lotes compartilhados ativos)
+// @Tags brokers
+// @Produce json
+// @Param id path string true "ID do broker"
+// @Success 204
+// @Failure 400 {object} response.ErrorResponse
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/brokers/{id} [delete]
+func (h *UserHandler) DeleteBroker(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do broker é obrigatório", nil)
+		return
+	}
+
+	// Deletar broker
+	if err := h.userService.DeleteBroker(r.Context(), id); err != nil {
+		h.logger.Error("erro ao deletar broker",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	h.logger.Info("broker deletado",
+		zap.String("brokerId", id),
+	)
+
+	response.NoContent(w)
+}

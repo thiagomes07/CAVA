@@ -256,6 +256,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			r.Route("/brokers", func(r chi.Router) {
 				r.With(m.RBAC.RequireAdmin).Get("/", h.User.ListBrokers)
 				r.With(m.RBAC.RequireAdmin).Post("/invite", h.User.InviteBroker)
+				r.With(m.RBAC.RequireAdmin).Put("/{id}", h.User.UpdateBroker)
+				r.With(m.RBAC.RequireAdmin).Delete("/{id}", h.User.DeleteBroker)
 				r.With(m.RBAC.RequireAdmin).Get("/{brokerId}/shared-inventory", h.SharedInventory.GetBrokerSharedInventory)
 			})
 

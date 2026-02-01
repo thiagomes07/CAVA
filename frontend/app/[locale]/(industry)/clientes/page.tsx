@@ -7,7 +7,7 @@ import { Download, Search, Mail, Phone, MessageSquare, Check, User, Inbox, Copy,
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
+// removed Checkbox selection column — not needed
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/shared/Pagination';
 import { EmptyState } from '@/components/shared/EmptyState';
@@ -43,7 +43,7 @@ export default function ClientesManagementPage() {
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [showSendLinksModal, setShowSendLinksModal] = useState(false);
+  // bulk send modal removed
 
   // Share links modal state
   const [showShareLinksModal, setShowShareLinksModal] = useState(false);
@@ -51,9 +51,7 @@ export default function ClientesManagementPage() {
   const [shareCliente, setShareCliente] = useState<Cliente | null>(null);
   const [isSendingLinks, setIsSendingLinks] = useState(false);
 
-  // Selection state
-  const [selectedClienteIds, setSelectedClienteIds] = useState<Set<string>>(new Set());
-  const [selectedLinkIds, setSelectedLinkIds] = useState<Set<string>>(new Set());
+  // selection removed: checkboxes/ bulk selection not used
   const [customMessage, setCustomMessage] = useState('');
 
   // Send links mutation
@@ -113,72 +111,9 @@ export default function ClientesManagementPage() {
   // Check if client has valid email
   const isValidEmail = (contact: string) => contact.includes('@');
 
-  // Selection handlers
-  const handleSelectCliente = (clienteId: string, checked: boolean) => {
-    const newSet = new Set(selectedClienteIds);
-    if (checked) {
-      newSet.add(clienteId);
-    } else {
-      newSet.delete(clienteId);
-    }
-    setSelectedClienteIds(newSet);
-  };
+  // selection handlers removed
 
-  const handleSelectAllClientes = () => {
-    if (selectedClienteIds.size === clientes.length) {
-      setSelectedClienteIds(new Set());
-    } else {
-      setSelectedClienteIds(new Set(clientes.map(c => c.id)));
-    }
-  };
-
-  const handleOpenSendLinksModal = () => {
-    if (selectedClienteIds.size === 0) {
-      error(t('noClientsSelected'));
-      return;
-    }
-    setSelectedLinkIds(new Set());
-    setCustomMessage('');
-    setShowSendLinksModal(true);
-  };
-
-  const handleSendLinks = async () => {
-    if (selectedLinkIds.size === 0) {
-      error(t('noLinksSelected'));
-      return;
-    }
-
-    try {
-      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-        clienteIds: Array.from(selectedClienteIds),
-        salesLinkIds: Array.from(selectedLinkIds),
-        customMessage: customMessage || undefined,
-      });
-
-      // Show appropriate message based on results
-      if (result.totalFailed === 0 && result.totalSkipped === 0) {
-        success(t('sendSuccess', { sent: result.totalSent }));
-      } else {
-        success(t('sendPartialSuccess', {
-          sent: result.totalSent,
-          failed: result.totalFailed,
-          skipped: result.totalSkipped,
-        }));
-      }
-
-      setShowSendLinksModal(false);
-      setSelectedClienteIds(new Set());
-      setSelectedLinkIds(new Set());
-      setCustomMessage('');
-      fetchClientes();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        error(err.message);
-      } else {
-        error(t('sendError'));
-      }
-    }
-  };
+  // bulk send links removed — keep individual share functionality
 
   const handleOpenCreate = () => {
     setSelectedCliente(null);
@@ -344,41 +279,12 @@ export default function ClientesManagementPage() {
     }
   };
 
-  const handleBulkShareLinksConfirm = async (selection: ShareSelection) => {
-    try {
-      const result: SendLinksResponse = await sendLinksMutation.mutateAsync({
-        clienteIds: Array.from(selectedClienteIds),
-        salesLinkIds: selection.salesLinkIds,
-        customMessage: selection.customMessage,
-      });
-
-      if (result.totalFailed === 0 && result.totalSkipped === 0) {
-        success(t('sendSuccess', { sent: result.totalSent }));
-      } else {
-        success(t('sendPartialSuccess', {
-          sent: result.totalSent,
-          failed: result.totalFailed,
-          skipped: result.totalSkipped,
-        }));
-      }
-
-      setShowSendLinksModal(false);
-      setSelectedClienteIds(new Set());
-      fetchClientes();
-    } catch (err) {
-      if (err instanceof ApiError) {
-        error(err.message);
-      } else {
-        error(t('sendError'));
-      }
-    }
-  };
+  // bulk share handler removed
 
   const hasFilters = filters.search || filters.linkId || filters.startDate || filters.endDate;
   const isEmpty = clientes.length === 0;
   const MAX_BULK_CLIENTS = 50;
-  const canSendBulk = selectedClienteIds.size > 0 && selectedClienteIds.size <= MAX_BULK_CLIENTS;
-  const exceedsBulkLimit = selectedClienteIds.size > MAX_BULK_CLIENTS;
+  // bulk selection removed
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -393,19 +299,7 @@ export default function ClientesManagementPage() {
               {t('subtitle')}
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            {selectedClienteIds.size > 0 && (
-              <Button
-                variant="primary"
-                onClick={handleOpenSendLinksModal}
-                disabled={!canSendBulk}
-                className="bg-blue-600 hover:bg-blue-700"
-                title={exceedsBulkLimit ? t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS }) : undefined}
-              >
-                <Mail className="w-4 h-4 mr-2" />
-                {t('shareLinks')} ({selectedClienteIds.size})
-              </Button>
-            )}
+            <div className="flex items-center gap-3">
             <Button variant="primary" onClick={handleOpenCreate}>
               <Plus className="w-4 h-4 mr-2" />
               {t('addCliente')}
@@ -419,37 +313,7 @@ export default function ClientesManagementPage() {
       </div>
 
       {/* Selection indicator */}
-      {selectedClienteIds.size > 0 && (
-        <div className={cn(
-          "border-b px-8 py-3",
-          exceedsBulkLimit ? "bg-rose-50 border-rose-200" : "bg-blue-50 border-blue-200"
-        )}>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <p className={cn(
-                "text-sm font-medium",
-                exceedsBulkLimit ? "text-rose-700" : "text-blue-700"
-              )}>
-                {t('selectedClients', { count: selectedClienteIds.size })}
-              </p>
-              {exceedsBulkLimit && (
-                <span className="text-sm text-rose-600">
-                  • {t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS })}
-                </span>
-              )}
-            </div>
-            <button
-              onClick={() => setSelectedClienteIds(new Set())}
-              className={cn(
-                "text-sm hover:underline cursor-pointer",
-                exceedsBulkLimit ? "text-rose-600 hover:text-rose-800" : "text-blue-600 hover:text-blue-800"
-              )}
-            >
-              {t('deselectAll')}
-            </button>
-          </div>
-        </div>
-      )}
+      
 
       {/* Filters */}
       <div className="px-8 py-6">
@@ -533,13 +397,7 @@ export default function ClientesManagementPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-12">
-                      <Checkbox
-                        id="select-all"
-                        checked={selectedClienteIds.size === clientes.length && clientes.length > 0}
-                        onChange={handleSelectAllClientes}
-                      />
-                    </TableHead>
+                      {/* selection column removed */}
                     <SortableTableHead
                       field="name"
                       label={t('name')}
@@ -569,31 +427,12 @@ export default function ClientesManagementPage() {
                 </TableHeader>
                 <TableBody>
                   {clientes.map((cliente) => {
-                    const isSelected = selectedClienteIds.has(cliente.id);
-
                     return (
-                      <TableRow
-                        key={cliente.id}
-                        className={cn(
-                          "cursor-pointer transition-colors",
-                          isSelected && "bg-blue-50"
-                        )}
-                        onClick={() => handleOpenEdit(cliente)}
-                      >
-                        <TableCell onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-                          <Checkbox
-                            id={`select-${cliente.id}`}
-                            checked={isSelected}
-                            onChange={(e) => handleSelectCliente(cliente.id, e.target.checked)}
-                          />
-                        </TableCell>
+                      <TableRow key={cliente.id} className="cursor-pointer transition-colors" onClick={() => handleOpenEdit(cliente)}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <User className="w-4 h-4 text-slate-400" />
-                            <span
-                              className="font-medium text-obsidian"
-                              title={cliente.name}
-                            >
+                            <span className="font-medium text-obsidian" title={cliente.name}>
                               {truncateText(cliente.name, TRUNCATION_LIMITS.USER_NAME_SHORT)}
                             </span>
                           </div>
@@ -719,16 +558,6 @@ export default function ClientesManagementPage() {
         onDelete={selectedCliente ? handleDeleteCliente : undefined}
         initialData={selectedCliente}
         isLoading={isSaving}
-      />
-
-      {/* Send Links Modal (Bulk) */}
-      <ShareLinksModal
-        open={showSendLinksModal}
-        onClose={() => setShowSendLinksModal(false)}
-        onConfirm={handleBulkShareLinksConfirm}
-        mode="email"
-        multipleClientes={selectedClienteIds.size}
-        isLoading={sendLinksMutation.isPending}
       />
 
       {/* Share Links Modal (Individual) */}

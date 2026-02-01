@@ -46,7 +46,12 @@
     "confirmDeleteTitle": "Confirmar exclusão",
     "confirmDeleteDescription": "Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita.",
     "discard": "Descartar",
-    "deleting": "Excluindo..."
+    "deleting": "Excluindo...",
+    "confirmDelete": "Confirmar Exclusão",
+    "useSamePhoneForWhatsapp": "Usar mesmo número para WhatsApp",
+    "namePlaceholder": "Nome completo",
+    "emailPlaceholder": "email@exemplo.com",
+    "error": "Ocorreu um erro"
   },
   "metadata": {
     "title": "CAVA",
@@ -322,6 +327,7 @@
     "marketingOptInDescription": "Cliente aceitou receber comunicações de marketing",
     "createCliente": "CRIAR CLIENTE",
     "clienteCreated": "Cliente criado com sucesso",
+    "clienteUpdated": "Cliente atualizado com sucesso",
     "contactAlreadyExists": "Já existe um cliente com este contato",
     "createError": "Erro ao criar cliente",
     "manuallyCreated": "Criado manualmente",
@@ -617,7 +623,14 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para usuário que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email"
+    "newEmail": "Novo Email",
+    "created": "Criado em",
+    "editBrokerTitle": "Editar Broker",
+    "brokerUpdated": "Broker atualizado com sucesso",
+    "brokerDeleted": "Broker exclu�do com sucesso",
+    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta a��o n�o pode ser desfeita.",
+    "discardChangesTitle": "Descartar altera��es?",
+     "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
   },
   "brokers": {
     "title": "Parceiros (Brokers)",
@@ -654,7 +667,14 @@
     "inviteResent": "Convite reenviado com sucesso",
     "cannotResendAfterLogin": "Não é possível reenviar convite para broker que já acessou o sistema",
     "resendError": "Erro ao reenviar convite",
-    "newEmail": "Novo Email"
+    "newEmail": "Novo Email",
+    "created": "Criado em",
+    "editBrokerTitle": "Editar Broker",
+    "brokerUpdated": "Broker atualizado com sucesso",
+    "brokerDeleted": "Broker exclu�do com sucesso",
+    "confirmDeleteBroker": "Tem certeza que deseja excluir este broker? Esta a��o n�o pode ser desfeita.",
+    "discardChangesTitle": "Descartar altera��es?",
+     "discardChangesDescription": "Existem altera��es n�o salvas. Deseja realmente descart�-las?"
   },
   "sharedInventory": {
     "title": "Estoque Compartilhado",

@@ -721,3 +721,22 @@ func (r *userRepository) FindBrokersWithFilters(ctx context.Context, industryID 
 	return brokers, total, nil
 }
 
+func (r *userRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM users WHERE id = $1`
+
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	if rows == 0 {
+		return errors.NewNotFoundError("Usuário")
+	}
+
+	return nil
+}

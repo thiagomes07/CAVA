@@ -35,6 +35,10 @@ export interface User {
   updatedAt: string;
 }
 
+export interface BrokerWithStats extends User {
+  sharedBatchesCount: number;
+}
+
 export interface Industry {
   id: string;
   name: string;

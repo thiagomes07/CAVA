@@ -37,7 +37,7 @@ const AlertDialogContent = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-    <ModalContent ref={ref} className={cn("", className)} {...props} />
+    <ModalContent ref={ref} className={cn("p-5 gap-4", className)} {...props} />
 ))
 AlertDialogContent.displayName = "AlertDialogContent"
 
@@ -45,7 +45,7 @@ const AlertDialogHeader = React.forwardRef<
     HTMLDivElement,
     React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-    <ModalHeader ref={ref} className={cn("sm:text-left", className)} {...props} />
+    <ModalHeader ref={ref} className={cn("p-0 space-y-1", className)} {...props} />
 ))
 AlertDialogHeader.displayName = "AlertDialogHeader"
 
@@ -55,7 +55,7 @@ const AlertDialogFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
     <ModalFooter
         ref={ref}
-        className={cn("sm:flex-col-reverse sm:space-x-0 border-t-0 pt-2", className)}
+        className={cn("flex-row justify-end gap-2 p-0 pt-4 border-t-0", className)}
         {...props}
     />
 ))
@@ -98,7 +98,7 @@ const AlertDialogCancel = React.forwardRef<
     return (
         <Button
             variant="secondary"
-            className={cn("mt-2 sm:mt-0", className)}
+            className={cn("", className)}
             onClick={(e) => {
                 context?.cancel()
                 props.onClick?.(e as any)
