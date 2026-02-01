@@ -183,3 +183,38 @@ export function calculateAvailabilityPercentage(
   if (totalSlabs === 0) return 0;
   return (availableSlabs / totalSlabs) * 100;
 }
+
+/**
+ * Calcula o preço de uma chapa individual
+ * @param height - Altura em cm
+ * @param width - Largura em cm
+ * @param pricePerUnit - Preço por unidade de área
+ * @param priceUnit - Unidade do preço (M2 ou FT2)
+ * @returns Preço de uma chapa
+ */
+export function calculateSlabPrice(
+  height: number,
+  width: number,
+  pricePerUnit: number,
+  priceUnit: PriceUnit = 'M2'
+): number {
+  // Área da chapa em m² (dimensões vêm em cm)
+  const slabAreaM2 = (height * width) / 10000;
+  
+  if (priceUnit === 'FT2') {
+    const slabAreaFt2 = slabAreaM2 * M2_TO_FT2_FACTOR;
+    return slabAreaFt2 * pricePerUnit;
+  }
+  
+  return slabAreaM2 * pricePerUnit;
+}
+
+/**
+ * Obtém a área de uma chapa em m²
+ * @param height - Altura em cm
+ * @param width - Largura em cm
+ * @returns Área em m²
+ */
+export function getSlabAreaM2(height: number, width: number): number {
+  return (height * width) / 10000;
+}

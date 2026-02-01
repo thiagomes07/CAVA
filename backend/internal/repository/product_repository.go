@@ -20,14 +20,21 @@ func NewProductRepository(db *DB) *productRepository {
 func (r *productRepository) Create(ctx context.Context, product *entity.Product) error {
 	query := `
 		INSERT INTO products (id, industry_id, name, sku_code, description, 
-		                      material_type, finish_type, is_public_catalog)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		                      material_type, finish_type, base_price, price_unit, is_public_catalog)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at, updated_at
 	`
 
+	// Default price unit to M2 if not set
+	priceUnit := product.PriceUnit
+	if priceUnit == "" {
+		priceUnit = entity.PriceUnitM2
+	}
+
 	err := r.db.QueryRowContext(ctx, query,
 		product.ID, product.IndustryID, product.Name, product.SKU,
-		product.Description, product.Material, product.Finish, product.IsPublic,
+		product.Description, product.Material, product.Finish,
+		product.BasePrice, priceUnit, product.IsPublicCatalog,
 	).Scan(&product.CreatedAt, &product.UpdatedAt)
 
 	if err != nil {
@@ -40,16 +47,18 @@ func (r *productRepository) Create(ctx context.Context, product *entity.Product)
 func (r *productRepository) FindByID(ctx context.Context, id string) (*entity.Product, error) {
 	query := `
 		SELECT id, industry_id, name, sku_code, description, material_type, 
-		       finish_type, is_public_catalog, created_at, updated_at
+		       finish_type, base_price, price_unit, is_public_catalog, created_at, updated_at
 		FROM products
 		WHERE id = $1 AND deleted_at IS NULL
 	`
 
 	product := &entity.Product{IsActive: true}
+	var priceUnit sql.NullString
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&product.ID, &product.IndustryID, &product.Name, &product.SKU,
 		&product.Description, &product.Material, &product.Finish,
-		&product.IsPublic, &product.CreatedAt, &product.UpdatedAt,
+		&product.BasePrice, &priceUnit, &product.IsPublicCatalog,
+		&product.CreatedAt, &product.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -57,6 +66,13 @@ func (r *productRepository) FindByID(ctx context.Context, id string) (*entity.Pr
 	}
 	if err != nil {
 		return nil, errors.DatabaseError(err)
+	}
+
+	// Set price unit, default to M2
+	if priceUnit.Valid {
+		product.PriceUnit = entity.PriceUnit(priceUnit.String)
+	} else {
+		product.PriceUnit = entity.PriceUnitM2
 	}
 
 	return product, nil
@@ -68,7 +84,7 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 	// Query principal
 	query := psql.Select(
 		"p.id", "p.industry_id", "p.name", "p.sku_code", "p.description",
-		"p.material_type", "p.finish_type", "p.is_public_catalog",
+		"p.material_type", "p.finish_type", "p.base_price", "p.price_unit", "p.is_public_catalog",
 		"p.created_at", "p.updated_at",
 		"COALESCE(COUNT(b.id), 0) as batch_count",
 	).From("products p").
@@ -118,12 +134,12 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 	offset := (filters.Page - 1) * filters.Limit
 	query = query.OrderBy("p.created_at DESC").Limit(uint64(filters.Limit)).Offset(uint64(offset))
 
-	sql, args, err := query.ToSql()
+	sqlStr, args, err := query.ToSql()
 	if err != nil {
 		return nil, 0, errors.DatabaseError(err)
 	}
 
-	rows, err := r.db.QueryContext(ctx, sql, args...)
+	rows, err := r.db.QueryContext(ctx, sqlStr, args...)
 	if err != nil {
 		return nil, 0, errors.DatabaseError(err)
 	}
@@ -133,15 +149,21 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 	for rows.Next() {
 		var p entity.Product
 		var batchCount int
+		var priceUnit sql.NullString
 		if err := rows.Scan(
 			&p.ID, &p.IndustryID, &p.Name, &p.SKU, &p.Description,
-			&p.Material, &p.Finish, &p.IsPublic,
+			&p.Material, &p.Finish, &p.BasePrice, &priceUnit, &p.IsPublicCatalog,
 			&p.CreatedAt, &p.UpdatedAt, &batchCount,
 		); err != nil {
 			return nil, 0, errors.DatabaseError(err)
 		}
 		p.BatchCount = &batchCount
 		p.IsActive = true
+		if priceUnit.Valid {
+			p.PriceUnit = entity.PriceUnit(priceUnit.String)
+		} else {
+			p.PriceUnit = entity.PriceUnitM2
+		}
 		products = append(products, p)
 	}
 
@@ -152,15 +174,22 @@ func (r *productRepository) Update(ctx context.Context, product *entity.Product)
 	query := `
 		UPDATE products
 		SET name = $1, sku_code = $2, description = $3, 
-		    material_type = $4, finish_type = $5, is_public_catalog = $6,
-		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $7 AND deleted_at IS NULL
+		    material_type = $4, finish_type = $5, base_price = $6, price_unit = $7,
+		    is_public_catalog = $8, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $9 AND deleted_at IS NULL
 		RETURNING updated_at
 	`
 
+	// Default price unit to M2 if not set
+	priceUnit := product.PriceUnit
+	if priceUnit == "" {
+		priceUnit = entity.PriceUnitM2
+	}
+
 	err := r.db.QueryRowContext(ctx, query,
 		product.Name, product.SKU, product.Description,
-		product.Material, product.Finish, product.IsPublic, product.ID,
+		product.Material, product.Finish, product.BasePrice, priceUnit,
+		product.IsPublicCatalog, product.ID,
 	).Scan(&product.UpdatedAt)
 
 	if err == sql.ErrNoRows {

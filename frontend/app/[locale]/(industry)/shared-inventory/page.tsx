@@ -19,7 +19,8 @@ import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { isPlaceholderUrl } from '@/lib/utils/media';
-import type { Batch } from '@/lib/types';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
+import type { Batch, PriceUnit } from '@/lib/types';
 
 export default function SharedInventoryPage() {
   const router = useRouter();
@@ -115,7 +116,8 @@ export default function SharedInventoryPage() {
                   <TableHead>{tInventory('product')}</TableHead>
                   <TableHead>{tInventory('dimensions')}</TableHead>
                   <TableHead>{tInventory('available')}</TableHead>
-                  <TableHead>{tInventory('price')}</TableHead>
+                  <TableHead>Preço/m²</TableHead>
+                  <TableHead>Preço/Chapa</TableHead>
                   <TableHead>{tInventory('status')}</TableHead>
                   <TableHead>{t('sharedAt')}</TableHead>
                   <TableHead>{tInventory('actions')}</TableHead>
@@ -126,6 +128,13 @@ export default function SharedInventoryPage() {
                   const batch = share.batch;
                   const cover = batch?.medias?.[0];
                   const canReserve = batch && batch.availableSlabs > 0 && batch.status === 'DISPONIVEL';
+                  const pricePerM2 = share.negotiatedPrice ?? batch?.industryPrice ?? 0;
+                  const slabPrice = batch ? calculateSlabPrice(
+                    batch.height,
+                    batch.width,
+                    pricePerM2,
+                    (batch.priceUnit || 'M2') as PriceUnit
+                  ) : 0;
 
                   return (
                     <TableRow key={share.id}>
@@ -178,7 +187,12 @@ export default function SharedInventoryPage() {
                       </TableCell>
                       <TableCell>
                         <span className="font-serif text-obsidian">
-                          {batch ? formatCurrency(share.negotiatedPrice ?? batch.industryPrice) : '—'}
+                          {formatCurrency(pricePerM2)}/m²
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-serif font-semibold text-violet-700">
+                          {formatCurrency(slabPrice)}
                         </span>
                       </TableCell>
                       <TableCell>

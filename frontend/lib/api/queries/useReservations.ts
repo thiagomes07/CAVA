@@ -42,6 +42,20 @@ export function usePendingReservations(options?: { enabled?: boolean }) {
   });
 }
 
+export function usePendingReservationsCount(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: [...reservationKeys.pending(), 'count'] as const,
+    queryFn: async () => {
+      const data = await apiClient.get<Reservation[]>('/reservations');
+      // Filtrar apenas reservas ATIVA (pendentes de confirmação)
+      const pending = data.filter(r => r.status === 'ATIVA');
+      return pending.length;
+    },
+    enabled: options?.enabled ?? true,
+    refetchInterval: 30000, // Atualiza a cada 30 segundos
+  });
+}
+
 export function useApproveReservation() {
   const queryClient = useQueryClient();
 

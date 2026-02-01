@@ -448,7 +448,7 @@ export default function TeamManagementPage() {
                               {truncateText(seller.name, TRUNCATION_LIMITS.SELLER_NAME)}
                             </p>
                             {seller.role === 'ADMIN_INDUSTRIA' && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-200 text-slate-700 text-xs font-medium rounded-full">
                                 <Shield className="w-3 h-3" />
                                 Admin
                               </span>
@@ -538,7 +538,7 @@ export default function TeamManagementPage() {
                         </Badge>
                         {/* Indicador visual de primeiro login */}
                         {canResendInvite(seller) && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full" title={t('pendingFirstLogin')}>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-full" title={t('pendingFirstLogin')}>
                             <Clock className="w-3 h-3" />
                             {t('pendingAccess')}
                           </span>
@@ -703,7 +703,7 @@ export default function TeamManagementPage() {
                     />
                     <div className="flex flex-col">
                       <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-amber-600" />
+                        <Shield className="w-4 h-4 text-slate-600" />
                         {t('isAdmin')}
                       </span>
                       <span className="text-xs text-slate-400 mt-0.5">
@@ -761,13 +761,13 @@ export default function TeamManagementPage() {
           <ModalContent>
             <div className="space-y-4">
               {/* Info box about pending first login */}
-              <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-sm">
-                <Clock className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200 rounded-sm">
+                <Clock className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-orange-800">
+                  <p className="text-sm font-medium text-slate-700">
                     {t('pendingFirstLoginInfo', { name: selectedUser?.name || '' })}
                   </p>
-                  <p className="text-xs text-orange-700 mt-1">
+                  <p className="text-xs text-slate-600 mt-1">
                     {t('resendInviteDescription')}
                   </p>
                 </div>

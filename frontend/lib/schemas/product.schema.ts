@@ -38,6 +38,12 @@ export const productSchema = z.object({
     .max(1000, 'Descrição deve ter no máximo 1000 caracteres')
     .optional(),
   isPublic: z.boolean(),
+  basePrice: z
+    .number({ message: 'Preço base deve ser um número' })
+    .positive('Preço base deve ser maior que zero')
+    .optional()
+    .nullable(),
+  priceUnit: z.enum(['M2', 'FT2']).default('M2').optional(),
 });
 
 export const productFilterSchema = z.object({

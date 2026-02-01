@@ -10,12 +10,48 @@ type SharedInventoryBatch struct {
 	BatchID             string    `json:"batchId"`
 	SharedWithUserID    string    `json:"sharedWithUserId"` // Broker ou Vendedor Interno
 	IndustryOwnerID     string    `json:"industryOwnerId"`
-	NegotiatedPrice     *float64  `json:"negotiatedPrice,omitempty"`
-	NegotiatedPriceUnit PriceUnit `json:"negotiatedPriceUnit"` // Unidade do preço negociado
+	NegotiatedPrice     *float64  `json:"negotiatedPrice,omitempty"`     // Preço negociado por m² (se diferente do lote)
+	NegotiatedPriceUnit PriceUnit `json:"negotiatedPriceUnit"`           // Unidade do preço negociado
 	SharedAt            time.Time `json:"sharedAt"`
 	IsActive            bool      `json:"isActive"`
-	Batch               *Batch    `json:"batch,omitempty"`  // Populated quando necessário
-	SharedWith          *User     `json:"sharedWith,omitempty"` // Populated quando necessário (broker ou vendedor)
+	Batch               *Batch    `json:"batch,omitempty"`               // Populated quando necessário
+	SharedWith          *User     `json:"sharedWith,omitempty"`          // Populated quando necessário (broker ou vendedor)
+
+	// Campos calculados (não persistidos, preenchidos na API)
+	EffectivePrice     float64 `json:"effectivePrice,omitempty"`     // Preço efetivo por m² (negociado ou do lote)
+	EffectiveSlabPrice float64 `json:"effectiveSlabPrice,omitempty"` // Preço efetivo da chapa (calculado)
+}
+
+// GetEffectivePrice retorna o preço efetivo por m² (negociado se existir, senão do lote)
+func (s *SharedInventoryBatch) GetEffectivePrice() float64 {
+	if s.NegotiatedPrice != nil && *s.NegotiatedPrice > 0 {
+		// Converte para M2 se necessário
+		return ConvertPrice(*s.NegotiatedPrice, s.NegotiatedPriceUnit, PriceUnitM2)
+	}
+	if s.Batch != nil {
+		return s.Batch.GetPriceInUnit(PriceUnitM2)
+	}
+	return 0
+}
+
+// GetEffectiveSlabPrice retorna o preço efetivo da chapa
+func (s *SharedInventoryBatch) GetEffectiveSlabPrice() float64 {
+	if s.Batch == nil {
+		return 0
+	}
+	effectivePricePerM2 := s.GetEffectivePrice()
+	slabArea := s.Batch.CalculateSlabArea()
+	return effectivePricePerM2 * slabArea
+}
+
+// PopulateCalculatedFields preenche os campos calculados
+func (s *SharedInventoryBatch) PopulateCalculatedFields() {
+	s.EffectivePrice = s.GetEffectivePrice()
+	s.EffectiveSlabPrice = s.GetEffectiveSlabPrice()
+	// Também preenche os campos calculados do batch
+	if s.Batch != nil {
+		s.Batch.PopulateCalculatedFields()
+	}
 }
 
 // CreateSharedInventoryInput representa os dados para compartilhar um lote

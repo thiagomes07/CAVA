@@ -595,6 +595,8 @@
     "linksCreated": "Links Created",
     "salesCount": "Sales",
     "since": "Since {date}",
+    "sinceColumn": "Member since",
+    "joinedAt": "Joined at",
     "addSellerTitle": "Add Seller",
     "fullName": "Full Name",
     "phoneOptional": "Phone (Optional)",

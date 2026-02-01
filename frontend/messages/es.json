@@ -589,6 +589,8 @@
     "linksCreated": "Enlaces Creados",
     "salesCount": "Ventas",
     "since": "Desde {date}",
+    "sinceColumn": "Miembro desde",
+    "joinedAt": "Se unió en",
     "addSellerTitle": "Agregar Vendedor",
     "fullName": "Nombre Completo",
     "phoneOptional": "Teléfono (Opcional)",

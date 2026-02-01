@@ -133,10 +133,10 @@ export default function LinksManagementPage() {
 
   const getLinkTypeBadge = (type: LinkType) => {
     const variants: Record<LinkType, { label: string; color: string }> = {
-      LOTE_UNICO: { label: t('typeSingleBatch'), color: 'bg-blue-50 text-blue-700 border-blue-200' },
-      PRODUTO_GERAL: { label: t('typeProduct'), color: 'bg-purple-50 text-purple-700 border-purple-200' },
-      CATALOGO_COMPLETO: { label: t('typeCatalog'), color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-      MULTIPLOS_LOTES: { label: t('typeMultipleBatches') || 'Múltiplos Lotes', color: 'bg-amber-50 text-amber-700 border-amber-200' },
+      LOTE_UNICO: { label: t('typeSingleBatch'), color: 'bg-slate-100 text-slate-700 border-slate-200' },
+      PRODUTO_GERAL: { label: t('typeProduct'), color: 'bg-slate-100 text-slate-700 border-slate-200' },
+      CATALOGO_COMPLETO: { label: t('typeCatalog'), color: 'bg-slate-100 text-slate-700 border-slate-200' },
+      MULTIPLOS_LOTES: { label: t('typeMultipleBatches') || 'Múltiplos Lotes', color: 'bg-slate-100 text-slate-700 border-slate-200' },
     };
     const variant = variants[type] || variants.LOTE_UNICO;
     return (
@@ -339,10 +339,10 @@ export default function LinksManagementPage() {
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <button
                               onClick={() => window.open(`/${locale}/${link.slugToken}`, '_blank')}
-                              className="p-2 hover:bg-blue-50 rounded-sm transition-colors"
+                              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
                               title="Preview"
                             >
-                              <ExternalLink className="w-4 h-4 text-blue-600" />
+                              <ExternalLink className="w-4 h-4 text-slate-600" />
                             </button>
                             <button
                               onClick={() => handleCopyLink(link)}
@@ -408,19 +408,19 @@ export default function LinksManagementPage() {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="p-4 bg-blue-50 rounded-sm">
-                  <p className="text-xs uppercase tracking-widest text-blue-600 mb-1">
+                <div className="p-4 bg-slate-100 rounded-sm">
+                  <p className="text-xs uppercase tracking-widest text-slate-600 mb-1">
                     {t('views')}
                   </p>
-                  <p className="text-3xl font-mono font-bold text-blue-700">
+                  <p className="text-3xl font-mono font-bold text-slate-700">
                     {selectedLink.viewsCount || 0}
                   </p>
                 </div>
-                <div className="p-4 bg-emerald-50 rounded-sm">
-                  <p className="text-xs uppercase tracking-widest text-emerald-600 mb-1">
+                <div className="p-4 bg-slate-100 rounded-sm">
+                  <p className="text-xs uppercase tracking-widest text-slate-600 mb-1">
                     {t('capturedClientes')}
                   </p>
-                  <p className="text-3xl font-mono font-bold text-emerald-700">
+                  <p className="text-3xl font-mono font-bold text-slate-700">
                     0
                   </p>
                 </div>

@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Trash2, GripVertical } from 'lucide-react';
+import { Upload, X, Trash2, GripVertical, DollarSign } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -36,6 +36,7 @@ import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { productSchema, type ProductInput } from '@/lib/schemas/product.schema';
 import { materialTypes, finishTypes } from '@/lib/schemas/product.schema';
+import { MoneyInput } from '@/components/ui/masked-input';
 import type { Product, Media } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
@@ -199,6 +200,7 @@ export default function EditProductPage() {
     watch,
     setValue,
     reset,
+    control,
   } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -208,6 +210,8 @@ export default function EditProductPage() {
       finish: 'POLIDO',
       description: '',
       isPublic: true,
+      basePrice: undefined,
+      priceUnit: 'M2',
     },
   });
 
@@ -239,6 +243,8 @@ export default function EditProductPage() {
         finish: data.finish,
         description: data.description || '',
         isPublic: data.isPublic,
+        basePrice: data.basePrice || undefined,
+        priceUnit: data.priceUnit || 'M2',
       });
     } catch {
       error('Erro ao carregar produto');
@@ -357,6 +363,8 @@ export default function EditProductPage() {
         finish: data.finish,
         description: data.description || undefined,
         isPublic: data.isPublic,
+        basePrice: data.basePrice || null,
+        priceUnit: data.priceUnit || 'M2',
       };
 
       await apiClient.put(`/products/${productId}`, productData);
@@ -484,6 +492,42 @@ export default function EditProductPage() {
               error={errors.description?.message}
               disabled={isSubmitting}
             />
+          </Card>
+
+          {/* Preço Base */}
+          <Card>
+            <h2 className="text-lg font-semibold text-obsidian mb-6 flex items-center gap-2">
+              <DollarSign className="w-5 h-5" />
+              Preço Base
+            </h2>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-2">
+                  Preço por m² <span className="text-slate-400 font-normal">(opcional)</span>
+                </label>
+                <Controller
+                  name="basePrice"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      value={field.value ?? undefined}
+                      onChange={field.onChange}
+                      placeholder="Ex: 500,00"
+                      disabled={isSubmitting}
+                      className="w-full md:w-1/2 px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                    />
+                  )}
+                />
+                {errors.basePrice && (
+                  <p className="mt-1 text-xs text-rose-500">{errors.basePrice.message}</p>
+                )}
+                <p className="mt-2 text-xs text-slate-500">
+                  Este preço será usado como referência ao criar novos lotes deste produto.
+                  Lotes já existentes não serão afetados.
+                </p>
+              </div>
+            </div>
           </Card>
 
           {/* Fotos de Catálogo */}

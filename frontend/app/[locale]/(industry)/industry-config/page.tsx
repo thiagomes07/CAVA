@@ -279,7 +279,7 @@ export default function IndustryConfigPage() {
                                                     className={cn(
                                                         "flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium transition-all",
                                                         useCNPJMask
-                                                            ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
+                                                            ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
                                                             : "bg-slate-100 text-slate-600 hover:bg-slate-200"
                                                     )}
                                                 >
@@ -290,7 +290,7 @@ export default function IndustryConfigPage() {
                                         </div>
 
                                         {showCNPJInfo && (
-                                            <div className="mb-3 p-3 bg-blue-50 border border-blue-200 text-xs text-blue-800">
+                                            <div className="mb-3 p-3 bg-slate-100 border border-slate-200 text-xs text-slate-700">
                                                 Para empresas brasileiras, use o modo BR com máscara de CNPJ.
                                                 Para empresas estrangeiras, alterne para modo Internacional e insira
                                                 o número de identificação empresarial do seu país.

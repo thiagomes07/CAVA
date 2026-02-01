@@ -55,7 +55,10 @@ type Product struct {
 	Material    MaterialType `json:"material"`
 	Finish      FinishType   `json:"finish"`
 	Description *string      `json:"description,omitempty"`
+	BasePrice   *float64     `json:"basePrice,omitempty"`   // Preço base por m² definido no produto
+	PriceUnit   PriceUnit    `json:"priceUnit,omitempty"`   // Unidade do preço (M2 ou FT2)
 	IsPublic    bool         `json:"isPublic"`
+	IsPublicCatalog bool     `json:"isPublicCatalog"`       // Visível no catálogo público do depósito
 	IsActive    bool         `json:"isActive"`
 	Medias      []Media      `json:"medias,omitempty"`
 	BatchCount  *int         `json:"batchCount,omitempty"` // Contador de lotes associados
@@ -70,17 +73,23 @@ type CreateProductInput struct {
 	Material    MaterialType `json:"material" validate:"required,oneof=GRANITO MARMORE QUARTZITO LIMESTONE TRAVERTINO OUTROS"`
 	Finish      FinishType   `json:"finish" validate:"required,oneof=POLIDO LEVIGADO BRUTO APICOADO FLAMEADO"`
 	Description *string      `json:"description,omitempty" validate:"omitempty,max=1000"`
+	BasePrice   *float64     `json:"basePrice,omitempty" validate:"omitempty,gt=0"`   // Preço base por m²
+	PriceUnit   PriceUnit    `json:"priceUnit,omitempty" validate:"omitempty,oneof=M2 FT2"`
 	IsPublic    bool         `json:"isPublic"`
+	IsPublicCatalog bool     `json:"isPublicCatalog"`
 }
 
 // UpdateProductInput representa os dados para atualizar um produto
 type UpdateProductInput struct {
-	Name        *string       `json:"name,omitempty" validate:"omitempty,min=2,max=100"`
-	SKU         *string       `json:"sku,omitempty" validate:"omitempty,max=50"`
-	Material    *MaterialType `json:"material,omitempty" validate:"omitempty,oneof=GRANITO MARMORE QUARTZITO LIMESTONE TRAVERTINO OUTROS"`
-	Finish      *FinishType   `json:"finish,omitempty" validate:"omitempty,oneof=POLIDO LEVIGADO BRUTO APICOADO FLAMEADO"`
-	Description *string       `json:"description,omitempty" validate:"omitempty,max=1000"`
-	IsPublic    *bool         `json:"isPublic,omitempty"`
+	Name            *string       `json:"name,omitempty" validate:"omitempty,min=2,max=100"`
+	SKU             *string       `json:"sku,omitempty" validate:"omitempty,max=50"`
+	Material        *MaterialType `json:"material,omitempty" validate:"omitempty,oneof=GRANITO MARMORE QUARTZITO LIMESTONE TRAVERTINO OUTROS"`
+	Finish          *FinishType   `json:"finish,omitempty" validate:"omitempty,oneof=POLIDO LEVIGADO BRUTO APICOADO FLAMEADO"`
+	Description     *string       `json:"description,omitempty" validate:"omitempty,max=1000"`
+	BasePrice       *float64      `json:"basePrice,omitempty" validate:"omitempty,gt=0"`
+	PriceUnit       *PriceUnit    `json:"priceUnit,omitempty" validate:"omitempty,oneof=M2 FT2"`
+	IsPublic        *bool         `json:"isPublic,omitempty"`
+	IsPublicCatalog *bool         `json:"isPublicCatalog,omitempty"`
 }
 
 // ProductFilters representa os filtros para busca de produtos

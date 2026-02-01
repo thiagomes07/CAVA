@@ -3,9 +3,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Minus, Plus, AlertTriangle, Package, Users, DollarSign } from 'lucide-react';
 import { useClientes } from '@/lib/api/queries/useLeads';
-import { Batch } from '@/lib/types';
+import { Batch, PriceUnit } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { MoneyInput } from '@/components/ui/masked-input';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 interface ReservationModalProps {
   isOpen: boolean;
@@ -40,6 +42,7 @@ export function ReservationModal({
   const [selectedClienteId, setSelectedClienteId] = useState<string>('');
   const [reservedPrice, setReservedPrice] = useState<number | undefined>(undefined);
   const [brokerSoldPrice, setBrokerSoldPrice] = useState<number | undefined>(undefined);
+  const [brokerPriceType, setBrokerPriceType] = useState<'M2' | 'SLAB'>('M2');
   const [notes, setNotes] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +62,7 @@ export function ReservationModal({
       // Define o preço padrão como o preço do lote
       setReservedPrice(batch.industryPrice ?? undefined);
       setBrokerSoldPrice(undefined);
+      setBrokerPriceType('M2');
       setNotes('');
       setTimeout(() => inputRef.current?.focus(), 100);
     }
@@ -93,12 +97,21 @@ export function ReservationModal({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (quantity >= minQuantity && quantity <= maxQuantity) {
+    if (quantity >= minQuantity && quantity <= maxQuantity && batch) {
+      // Se o broker digitou preço por chapa, converter para preço por m²
+      let finalBrokerSoldPrice = brokerSoldPrice;
+      if (brokerSoldPrice && brokerSoldPrice > 0 && brokerPriceType === 'SLAB') {
+        const slabArea = getSlabAreaM2(batch.height, batch.width);
+        if (slabArea > 0) {
+          finalBrokerSoldPrice = brokerSoldPrice / slabArea;
+        }
+      }
+      
       onConfirm({
         quantity,
         clienteId: selectedClienteId || undefined,
         reservedPrice: reservedPrice && reservedPrice > 0 ? reservedPrice : undefined,
-        brokerSoldPrice: brokerSoldPrice && brokerSoldPrice > 0 ? brokerSoldPrice : undefined,
+        brokerSoldPrice: finalBrokerSoldPrice && finalBrokerSoldPrice > 0 ? finalBrokerSoldPrice : undefined,
         notes: notes.trim() || undefined,
       });
     }
@@ -123,7 +136,7 @@ export function ReservationModal({
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
+      <div className="bg-white w-full max-w-4xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh]">
         {/* Header */}
         <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between shrink-0">
           <div>
@@ -240,9 +253,9 @@ export function ReservationModal({
 
               {/* Max Warning */}
               {quantity === maxQuantity && (
-                <div className="flex items-start gap-3 mt-4 p-3 bg-amber-50 border border-amber-200">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                  <p className="text-sm text-amber-800">
+                <div className="flex items-start gap-3 mt-4 p-3 bg-slate-100 border border-slate-200">
+                  <AlertTriangle className="w-4 h-4 text-slate-500 shrink-0 mt-0.5" />
+                  <p className="text-sm text-slate-700">
                     Você está reservando todas as chapas disponíveis
                   </p>
                 </div>
@@ -281,26 +294,184 @@ export function ReservationModal({
                 Valores da Reserva
               </label>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-6">
                 {/* Reserved Price */}
-                <MoneyInput
-                  label="Reservado por (R$/m²)"
-                  value={reservedPrice}
-                  onChange={setReservedPrice}
-                  suffix="/m²"
-                  disabled={isLoading}
-                  helperText="Preço indicado ao admin"
-                />
+                <div className="p-4 bg-white border border-slate-200 rounded-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-xs font-medium text-slate-700">
+                      Reservado por
+                    </label>
+                    <span className="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">
+                      R$/m²
+                    </span>
+                  </div>
+                  <MoneyInput
+                    value={reservedPrice}
+                    onChange={setReservedPrice}
+                    suffix="/m²"
+                    disabled={isLoading}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2">
+                    Preço indicado ao admin
+                  </p>
+                </div>
 
-                {/* Broker Sold Price */}
-                <MoneyInput
-                  label="Vendido por (R$/m²)"
-                  value={brokerSoldPrice}
-                  onChange={setBrokerSoldPrice}
-                  suffix="/m²"
-                  disabled={isLoading}
-                  helperText="Apenas para sua dashboard"
-                />
+                {/* Broker Sold Price with Toggle */}
+                <div className="p-4 bg-white border border-slate-200 rounded-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-xs font-medium text-slate-700">
+                      Vendido por
+                    </label>
+                    <div className="flex items-center gap-0.5 bg-slate-100 rounded p-0.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (brokerPriceType !== 'M2' && brokerSoldPrice && batch) {
+                            const slabArea = getSlabAreaM2(batch.height, batch.width);
+                            if (slabArea > 0) {
+                              setBrokerSoldPrice(brokerSoldPrice / slabArea);
+                            }
+                          }
+                          setBrokerPriceType('M2');
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 text-[10px] font-medium rounded transition-colors",
+                          brokerPriceType === 'M2' 
+                            ? "bg-white text-obsidian shadow-sm" 
+                            : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        R$/m²
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (brokerPriceType !== 'SLAB' && brokerSoldPrice && batch) {
+                            const slabPrice = calculateSlabPrice(
+                              batch.height,
+                              batch.width,
+                              brokerSoldPrice,
+                              (batch.priceUnit || 'M2') as PriceUnit
+                            );
+                            setBrokerSoldPrice(slabPrice);
+                          }
+                          setBrokerPriceType('SLAB');
+                        }}
+                        className={cn(
+                          "px-2.5 py-1 text-[10px] font-medium rounded transition-colors",
+                          brokerPriceType === 'SLAB' 
+                            ? "bg-white text-obsidian shadow-sm" 
+                            : "text-slate-500 hover:text-slate-700"
+                        )}
+                      >
+                        R$/chapa
+                      </button>
+                    </div>
+                  </div>
+                  <MoneyInput
+                    value={brokerSoldPrice}
+                    onChange={setBrokerSoldPrice}
+                    suffix={brokerPriceType === 'M2' ? '/m²' : '/chapa'}
+                    disabled={isLoading}
+                  />
+                  <p className="text-[10px] text-slate-400 mt-2">
+                    Apenas para sua dashboard
+                  </p>
+                </div>
+              </div>
+
+              {/* Price Summary Preview - Unified */}
+              <div className="mt-4">
+              {(() => {
+                const slabArea = getSlabAreaM2(batch.height, batch.width);
+                
+                // Reservado
+                const reservedPriceM2 = reservedPrice || batch.industryPrice || 0;
+                const reservedPricePerSlab = calculateSlabPrice(
+                  batch.height,
+                  batch.width,
+                  reservedPriceM2,
+                  (batch.priceUnit || 'M2') as PriceUnit
+                );
+                const reservedTotal = reservedPricePerSlab * quantity;
+                
+                // Vendido
+                let soldPricePerSlab = 0;
+                let soldTotal = 0;
+                if (brokerSoldPrice && brokerSoldPrice > 0) {
+                  if (brokerPriceType === 'M2') {
+                    soldPricePerSlab = calculateSlabPrice(
+                      batch.height,
+                      batch.width,
+                      brokerSoldPrice,
+                      (batch.priceUnit || 'M2') as PriceUnit
+                    );
+                  } else {
+                    soldPricePerSlab = brokerSoldPrice;
+                  }
+                  soldTotal = soldPricePerSlab * quantity;
+                }
+                
+                return (
+                  <div className="p-4 bg-slate-50 border border-slate-200 rounded-sm">
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Reservado */}
+                      <div className="text-center p-3 bg-white rounded-sm border border-slate-100">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-3">
+                          Reservado (Admin)
+                        </p>
+                        <div className="flex items-center justify-center gap-6">
+                          <div className="min-w-[80px]">
+                            <p className="text-[10px] text-slate-400 mb-1">Chapa</p>
+                            <p className="font-serif text-lg font-semibold text-obsidian">
+                              {formatCurrency(reservedPricePerSlab)}
+                            </p>
+                          </div>
+                          <div className="text-slate-200">|</div>
+                          <div className="min-w-[100px]">
+                            <p className="text-[10px] text-slate-400 mb-1">Total ({quantity}x)</p>
+                            <p className="font-serif text-xl font-bold text-emerald-600">
+                              {formatCurrency(reservedTotal)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Vendido */}
+                      <div className="text-center p-3 bg-white rounded-sm border border-slate-100">
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-3">
+                          Vendido (Sua Dashboard)
+                        </p>
+                        {brokerSoldPrice && brokerSoldPrice > 0 ? (
+                          <div className="flex items-center justify-center gap-6">
+                            <div className="min-w-[80px]">
+                              <p className="text-[10px] text-slate-400 mb-1">Chapa</p>
+                              <p className="font-serif text-lg font-semibold text-obsidian">
+                                {formatCurrency(soldPricePerSlab)}
+                              </p>
+                            </div>
+                            <div className="text-slate-200">|</div>
+                            <div className="min-w-[100px]">
+                              <p className="text-[10px] text-slate-400 mb-1">Total ({quantity}x)</p>
+                              <p className="font-serif text-xl font-bold text-emerald-600">
+                                {formatCurrency(soldTotal)}
+                              </p>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-center gap-6 h-[52px]">
+                            <p className="text-sm text-slate-400 italic">Não informado</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <p className="text-[10px] text-slate-400 text-center mt-3">
+                      Área por chapa: {slabArea.toFixed(2)} m²
+                    </p>
+                  </div>
+                );
+              })()}
               </div>
             </div>
 

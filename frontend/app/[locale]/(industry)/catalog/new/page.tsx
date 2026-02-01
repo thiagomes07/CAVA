@@ -2,9 +2,9 @@
 
 import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Eye, EyeOff, Sparkles, GripVertical } from 'lucide-react';
+import { Upload, X, Eye, EyeOff, Sparkles, GripVertical, DollarSign } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -28,6 +28,7 @@ import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { productSchema, type ProductInput } from '@/lib/schemas/product.schema';
 import { materialTypes, finishTypes } from '@/lib/schemas/product.schema';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { cn } from '@/lib/utils/cn';
 
 interface UploadedMedia {
@@ -120,6 +121,7 @@ export default function NewProductPage() {
     formState: { errors },
     watch,
     setValue,
+    control,
   } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
@@ -129,6 +131,8 @@ export default function NewProductPage() {
       finish: 'POLIDO',
       description: '',
       isPublic: true,
+      basePrice: undefined,
+      priceUnit: 'M2',
     },
   });
 
@@ -223,6 +227,8 @@ export default function NewProductPage() {
         finish: data.finish,
         description: data.description || undefined,
         isPublic: data.isPublic,
+        basePrice: data.basePrice || null,
+        priceUnit: data.priceUnit || 'M2',
       };
 
       const product = await apiClient.post<{ id: string }>('/products', productData);
@@ -383,11 +389,47 @@ export default function NewProductPage() {
             </div>
           </div>
 
+          {/* Preço Base */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Preço Base
+              </h2>
+            </div>
+            <div className="p-6">
+              <label className="text-xs font-medium text-slate-600 block mb-2">
+                Preço por m² <span className="text-slate-400">(opcional)</span>
+              </label>
+              <Controller
+                name="basePrice"
+                control={control}
+                render={({ field }) => (
+                  <MoneyInput
+                    value={field.value ?? undefined}
+                    onChange={field.onChange}
+                    placeholder="Ex: 500,00"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full md:w-1/2 px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.basePrice ? 'border-rose-500' : 'border-slate-200',
+                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                    )}
+                  />
+                )}
+              />
+              {errors.basePrice && <p className="mt-1 text-xs text-rose-500">{errors.basePrice.message}</p>}
+              <p className="mt-2 text-xs text-slate-500">
+                Este preço será usado como referência ao criar novos lotes deste produto
+              </p>
+            </div>
+          </div>
+
           {/* Fotos de Catálogo */}
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">3</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">4</span>
                 Fotos de Catálogo
               </h2>
             </div>
@@ -485,7 +527,7 @@ export default function NewProductPage() {
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">4</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">5</span>
                 Visibilidade
               </h2>
             </div>

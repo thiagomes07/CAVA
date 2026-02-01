@@ -61,9 +61,9 @@ type Reservation struct {
 	CreatedAt             time.Time         `json:"createdAt"`
 	IsActive              bool              `json:"isActive"`
 
-	// Campos de preço do broker
-	ReservedPrice   *float64 `json:"reservedPrice,omitempty"`   // Preço indicado pelo broker (visível para admin)
-	BrokerSoldPrice *float64 `json:"brokerSoldPrice,omitempty"` // Preço interno do broker (só visível para o broker)
+	// Campos de preço do broker (todos em PREÇO POR M²)
+	ReservedPrice   *float64 `json:"reservedPrice,omitempty"`   // Preço por m² indicado pelo broker para indústria
+	BrokerSoldPrice *float64 `json:"brokerSoldPrice,omitempty"` // Preço por m² que broker vendeu ao cliente (privado)
 
 	// Campos de aprovação
 	ApprovedBy        *string    `json:"approvedBy,omitempty"`
@@ -78,6 +78,26 @@ type Reservation struct {
 	ApprovedByUser *User    `json:"approvedByUser,omitempty"`
 }
 
+// GetReservedTotalPrice retorna o valor total da reserva (preço por m² × área total reservada)
+func (r *Reservation) GetReservedTotalPrice() float64 {
+	if r.ReservedPrice == nil || r.Batch == nil {
+		return 0
+	}
+	slabArea := r.Batch.CalculateSlabArea()
+	totalArea := slabArea * float64(r.QuantitySlabsReserved)
+	return *r.ReservedPrice * totalArea
+}
+
+// GetBrokerSoldTotalPrice retorna o valor total que broker vendeu (preço por m² × área total)
+func (r *Reservation) GetBrokerSoldTotalPrice() float64 {
+	if r.BrokerSoldPrice == nil || r.Batch == nil {
+		return 0
+	}
+	slabArea := r.Batch.CalculateSlabArea()
+	totalArea := slabArea * float64(r.QuantitySlabsReserved)
+	return *r.BrokerSoldPrice * totalArea
+}
+
 // IsExpired verifica se a reserva está expirada
 func (r *Reservation) IsExpired() bool {
 	return time.Now().After(r.ExpiresAt) && r.Status == ReservationStatusAtiva
@@ -90,8 +110,8 @@ type CreateReservationInput struct {
 	ClienteID             *string  `json:"clienteId,omitempty" validate:"omitempty,uuid"`
 	CustomerName          *string  `json:"customerName,omitempty" validate:"omitempty,min=2"`
 	CustomerContact       *string  `json:"customerContact,omitempty"`
-	ReservedPrice         *float64 `json:"reservedPrice,omitempty" validate:"omitempty,gt=0"`   // Preço indicado pelo broker
-	BrokerSoldPrice       *float64 `json:"brokerSoldPrice,omitempty" validate:"omitempty,gt=0"` // Preço interno do broker
+	ReservedPrice         *float64 `json:"reservedPrice,omitempty" validate:"omitempty,gt=0"`   // Preço por m² indicado pelo broker
+	BrokerSoldPrice       *float64 `json:"brokerSoldPrice,omitempty" validate:"omitempty,gt=0"` // Preço por m² que broker vendeu
 	ExpiresAt             *string  `json:"expiresAt,omitempty"`                                 // ISO date, default +7 dias
 	Notes                 *string  `json:"notes,omitempty" validate:"omitempty,max=500"`
 }

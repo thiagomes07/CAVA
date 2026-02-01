@@ -155,7 +155,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('totalSold')}
                 </p>
-                <Receipt className="w-5 h-5 text-emerald-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.totalSales)}
@@ -167,7 +167,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('commissionsPaid')}
                 </p>
-                <Receipt className="w-5 h-5 text-blue-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.totalCommissions)}
@@ -179,7 +179,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('averageTicket')}
                 </p>
-                <Receipt className="w-5 h-5 text-amber-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.averageTicket)}
@@ -334,7 +334,7 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-semibold text-emerald-600 tabular-nums">
+                          <span className="font-semibold text-obsidian tabular-nums">
                             {formatCurrency(sale.netIndustryValue)}
                           </span>
                         </TableCell>

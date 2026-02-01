@@ -310,6 +310,13 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			sellerName = reservedByUser.Name
 		}
 
+		// Calcular valor total que o broker vendeu (preço por m² × área vendida)
+		var brokerTotalSoldPrice *float64
+		if reservation.BrokerSoldPrice != nil && *reservation.BrokerSoldPrice > 0 {
+			total := *reservation.BrokerSoldPrice * totalAreaSold
+			brokerTotalSoldPrice = &total
+		}
+
 		// 7. Criar registro de venda
 		sale = &entity.Sale{
 			ID:                uuid.New().String(),
@@ -325,7 +332,7 @@ func (s *reservationService) ConfirmSale(ctx context.Context, reservationID, use
 			PricePerUnit:      pricePerUnit,
 			PriceUnit:         priceUnit,
 			SalePrice:         salePrice,
-			BrokerSoldPrice:   reservation.BrokerSoldPrice, // Valor que o broker vendeu para o cliente final
+			BrokerSoldPrice:   brokerTotalSoldPrice, // Valor TOTAL que o broker vendeu para o cliente final
 			BrokerCommission:  0, // Sem comissão
 			NetIndustryValue:  salePrice, // Valor líquido = preço de venda
 			InvoiceURL:        input.InvoiceURL,

@@ -144,6 +144,11 @@ export default function NewBatchPage() {
   const priceUnit = watch('priceUnit') || 'M2';
   const industryPrice = watch('industryPrice');
 
+  // Área de uma única chapa (em m²)
+  const slabArea = height && width ? (height * width) / 10000 : 0;
+  // Preço por chapa calculado
+  const slabPrice = slabArea && industryPrice ? slabArea * industryPrice : 0;
+
   useEffect(() => {
     fetchProducts();
   }, []);
@@ -156,6 +161,19 @@ export default function NewBatchPage() {
       setCalculatedArea(0);
     }
   }, [height, width, quantitySlabs]);
+
+  // Preencher preço base do produto quando selecionado
+  useEffect(() => {
+    if (productId && !showNewProductForm) {
+      const product = products.find(p => p.id === productId);
+      if (product?.basePrice) {
+        setValue('industryPrice', product.basePrice);
+        if (product.priceUnit) {
+          setValue('priceUnit', product.priceUnit);
+        }
+      }
+    }
+  }, [productId, products, showNewProductForm, setValue]);
 
   const fetchProducts = async () => {
     try {
@@ -340,7 +358,7 @@ export default function NewBatchPage() {
                   </div>
 
                   {selectedProduct && (
-                    <div className="flex items-center gap-4 p-4 bg-emerald-50 border border-emerald-200">
+                    <div className="flex items-center gap-4 p-4 bg-slate-100 border border-slate-200">
                       {selectedProduct.medias?.[0] && !isPlaceholderUrl(selectedProduct.medias[0].url) && (
                         <img
                           src={selectedProduct.medias[0].url}
@@ -349,10 +367,10 @@ export default function NewBatchPage() {
                         />
                       )}
                       <div>
-                        <p className="font-medium text-emerald-900">
+                        <p className="font-medium text-slate-800">
                           {selectedProduct.name}
                         </p>
-                        <p className="text-sm text-emerald-700">
+                        <p className="text-sm text-slate-600">
                           {selectedProduct.material} • {selectedProduct.finish}
                         </p>
                       </div>
@@ -360,8 +378,8 @@ export default function NewBatchPage() {
                   )}
                 </div>
               ) : (
-                <div className="p-4 bg-blue-50 border border-blue-200 space-y-4">
-                  <p className="text-sm font-semibold text-blue-900 flex items-center gap-2">
+                <div className="p-4 bg-slate-50 border border-slate-200 space-y-4">
+                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <Package className="w-4 h-4" />
                     Novo Produto (será criado junto com o lote)
                   </p>
@@ -443,6 +461,29 @@ export default function NewBatchPage() {
                       disabled={isSubmitting}
                       className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
                     />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+                      Preço Base por m² <span className="text-slate-400">(opcional)</span>
+                    </label>
+                    <Controller
+                      name="newProduct.basePrice"
+                      control={control}
+                      render={({ field }) => (
+                        <MoneyInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Ex: 500,00"
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                        />
+                      )}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Preço de referência para novos lotes deste produto
+                    </p>
                   </div>
                 </div>
               )}
@@ -592,15 +633,15 @@ export default function NewBatchPage() {
 
               {/* Área Total Calculada */}
               {calculatedArea > 0 && (
-                <div className="mt-5 flex items-center gap-3 p-4 bg-emerald-50 border border-emerald-200">
-                  <div className="w-10 h-10 bg-emerald-100 flex items-center justify-center">
-                    <Package className="w-5 h-5 text-emerald-600" />
+                <div className="mt-5 flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                  <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-slate-600" />
                   </div>
                   <div>
-                    <p className="text-xs font-medium text-emerald-700">
+                    <p className="text-xs font-medium text-slate-600">
                       Área Total Calculada
                     </p>
-                    <p className="text-xl font-mono font-bold text-emerald-900">
+                    <p className="text-xl font-mono font-bold text-slate-800">
                       {formatArea(calculatedArea)}
                     </p>
                   </div>
@@ -619,6 +660,14 @@ export default function NewBatchPage() {
               </h2>
             </div>
             <div className="p-6 space-y-5">
+              {/* Indicador de preço herdado do produto */}
+              {selectedProduct?.basePrice && industryPrice === selectedProduct.basePrice && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 text-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Preço base do produto <strong>{selectedProduct.name}</strong> aplicado. Você pode alterá-lo abaixo.</span>
+                </div>
+              )}
+
               {/* Unidade de Preço */}
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-3">
@@ -665,7 +714,7 @@ export default function NewBatchPage() {
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
-                  Preço Base Indústria (R$/{getPriceUnitLabel(priceUnit as PriceUnit)}) <span className="text-[#C2410C]">*</span>
+                  Preço por {getPriceUnitLabel(priceUnit as PriceUnit)} <span className="text-[#C2410C]">*</span>
                 </label>
                 <Controller
                   name="industryPrice"
@@ -683,26 +732,52 @@ export default function NewBatchPage() {
                 <p className="mt-1 text-xs text-slate-400">Este é o preço de repasse para brokers</p>
               </div>
 
-              {/* Preço Total Calculado */}
-              {calculatedArea > 0 && industryPrice > 0 && (
-                <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200">
-                  <div className="w-10 h-10 bg-blue-100 flex items-center justify-center">
-                    <DollarSign className="w-5 h-5 text-blue-600" />
+              {/* Preços Calculados */}
+              {slabArea > 0 && industryPrice > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Preço por Chapa */}
+                  <div className="flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                    <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                      <Ruler className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-600">
+                        Preço por Chapa
+                      </p>
+                      <p className="text-xl font-mono font-bold text-slate-800">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(slabPrice)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {slabArea.toFixed(2)} m²
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-xs font-medium text-blue-700">
-                      Valor Total do Lote
-                    </p>
-                    <p className="text-xl font-mono font-bold text-blue-900">
-                      {new Intl.NumberFormat('pt-BR', {
-                        style: 'currency',
-                        currency: 'BRL',
-                      }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-0.5">
-                      {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {formatArea(calculatedArea)}
-                    </p>
-                  </div>
+
+                  {/* Valor Total do Lote */}
+                  {calculatedArea > 0 && (
+                    <div className="flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                      <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                        <DollarSign className="w-5 h-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-slate-600">
+                          Valor Total ({quantitySlabs} {quantitySlabs === 1 ? 'chapa' : 'chapas'})
+                        </p>
+                        <p className="text-xl font-mono font-bold text-slate-800">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(slabPrice)} × {quantitySlabs}
+                        </p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

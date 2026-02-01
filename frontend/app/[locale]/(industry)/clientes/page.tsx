@@ -442,7 +442,7 @@ export default function ClientesManagementPage() {
                 variant="primary"
                 onClick={handleOpenSendLinksModal}
                 disabled={!canSendBulk}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-emerald-600 hover:bg-emerald-700"
                 title={exceedsBulkLimit ? t('maxClientsWarning', { count: selectedClienteIds.size, max: MAX_BULK_CLIENTS }) : undefined}
               >
                 <Mail className="w-4 h-4 mr-2" />
@@ -465,13 +465,13 @@ export default function ClientesManagementPage() {
       {selectedClienteIds.size > 0 && (
         <div className={cn(
           "border-b px-8 py-3",
-          exceedsBulkLimit ? "bg-rose-50 border-rose-200" : "bg-blue-50 border-blue-200"
+          exceedsBulkLimit ? "bg-rose-50 border-rose-200" : "bg-slate-50 border-slate-200"
         )}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <p className={cn(
                 "text-sm font-medium",
-                exceedsBulkLimit ? "text-rose-700" : "text-blue-700"
+                exceedsBulkLimit ? "text-rose-700" : "text-slate-700"
               )}>
                 {t('selectedClients', { count: selectedClienteIds.size })}
               </p>
@@ -485,7 +485,7 @@ export default function ClientesManagementPage() {
               onClick={() => setSelectedClienteIds(new Set())}
               className={cn(
                 "text-sm hover:underline cursor-pointer",
-                exceedsBulkLimit ? "text-rose-600 hover:text-rose-800" : "text-blue-600 hover:text-blue-800"
+                exceedsBulkLimit ? "text-rose-600 hover:text-rose-800" : "text-slate-600 hover:text-slate-800"
               )}
             >
               {t('deselectAll')}
@@ -619,7 +619,7 @@ export default function ClientesManagementPage() {
                         key={cliente.id}
                         className={cn(
                           "cursor-pointer transition-colors",
-                          isSelected && "bg-blue-50"
+                          isSelected && "bg-slate-50"
                         )}
                         onClick={() => handleViewDetails(cliente)}
                       >
@@ -660,10 +660,10 @@ export default function ClientesManagementPage() {
                                   e.stopPropagation();
                                   handleOpenShareModal(cliente, 'email');
                                 }}
-                                className="p-1.5 hover:bg-blue-50 rounded-sm transition-colors"
+                                className="p-1.5 hover:bg-slate-100 rounded-sm transition-colors"
                                 title={t('shareViaEmail')}
                               >
-                                <Share2 className="w-4 h-4 text-blue-600" />
+                                <Share2 className="w-4 h-4 text-slate-600" />
                               </button>
                             </div>
                           ) : (

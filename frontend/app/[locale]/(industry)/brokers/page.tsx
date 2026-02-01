@@ -372,7 +372,7 @@ export default function BrokersManagementPage() {
                     <TableHead>{t('sharedBatches')}</TableHead>
                     <SortableTableHead
                       field="created_at"
-                      label={tTeam('since') || 'Desde'}
+                      label={tTeam('sinceColumn')}
                       sortBy={filters.sortBy}
                       sortOrder={filters.sortOrder}
                       onSort={handleSort}
@@ -438,7 +438,7 @@ export default function BrokersManagementPage() {
                     <TableCell>
                       <button
                         onClick={() => router.push(`/brokers/${broker.id}/shared`)}
-                        className="inline-flex items-center gap-2 text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                        className="inline-flex items-center gap-2 text-sm text-slate-600 hover:text-slate-700 transition-colors"
                       >
                         <Share2 className="w-4 h-4" />
                         <span className="font-mono">
@@ -453,7 +453,7 @@ export default function BrokersManagementPage() {
                         </Badge>
                         {/* Indicador visual de primeiro login */}
                         {canResendInvite(broker) && (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded-full" title={t('pendingFirstLogin')}>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-600 text-xs font-medium rounded-full" title={t('pendingFirstLogin')}>
                             <Clock className="w-3 h-3" />
                             {t('pendingAccess')}
                           </span>
@@ -466,7 +466,7 @@ export default function BrokersManagementPage() {
                         {canResendInvite(broker) && (
                           <button
                             onClick={() => handleOpenResendModal(broker)}
-                            className="p-2 hover:bg-blue-50 text-blue-600 rounded-sm transition-colors"
+                            className="p-2 hover:bg-slate-100 text-slate-600 rounded-sm transition-colors"
                             title={t('resendInvite')}
                           >
                             <RefreshCw className="w-4 h-4" />
@@ -660,13 +660,13 @@ export default function BrokersManagementPage() {
           <ModalContent>
             <div className="space-y-4">
               {/* Info box about pending first login */}
-              <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-sm">
-                <Clock className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200 rounded-sm">
+                <Clock className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-orange-800">
+                  <p className="text-sm font-medium text-slate-700">
                     {t('pendingFirstLoginInfo', { name: selectedBroker?.name || '' })}
                   </p>
-                  <p className="text-xs text-orange-700 mt-1">
+                  <p className="text-xs text-slate-600 mt-1">
                     {t('resendInviteDescription')}
                   </p>
                 </div>

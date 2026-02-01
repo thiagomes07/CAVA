@@ -15,7 +15,8 @@ import { formatDate } from '@/lib/utils/formatDate';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { SharedInventoryBatch, Sale } from '@/lib/types';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
+import type { SharedInventoryBatch, Sale, PriceUnit } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
@@ -139,21 +140,21 @@ export function BrokerDashboard() {
                 title={t('availableBatches')}
                 value={metrics?.availableBatches || 0}
                 subtitle={t('forMe')}
-                color="emerald"
+                color="slate"
               />
               <MetricCard
                 icon={TrendingUp}
                 title={t('monthlySales')}
                 value={formatCurrency(metrics?.monthlySales || 0)}
                 subtitle={t('myRevenue')}
-                color="amber"
+                color="slate"
               />
               <MetricCard
                 icon={Link2}
                 title={t('activeLinks')}
                 value={metrics?.activeLinks || 0}
                 subtitle={t('generated')}
-                color="blue"
+                color="slate"
               />
             </>
           )}
@@ -235,7 +236,16 @@ export function BrokerDashboard() {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {recentBatches.map((shared) => (
+              {recentBatches.map((shared) => {
+                const pricePerM2 = shared.negotiatedPrice || shared.batch.industryPrice;
+                const slabPrice = calculateSlabPrice(
+                  shared.batch.height,
+                  shared.batch.width,
+                  pricePerM2,
+                  (shared.batch.priceUnit || 'M2') as PriceUnit
+                );
+                
+                return (
                 <div
                   key={shared.id}
                   className="flex items-center gap-4 p-4 border border-slate-200 rounded-sm hover:border-obsidian transition-colors cursor-pointer"
@@ -261,10 +271,11 @@ export function BrokerDashboard() {
                     >
                       {truncateText(shared.batch.product?.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
                     </p>
-                    <p className="text-xs text-slate-500">
-                      {formatArea(shared.batch.totalArea)} •{' '}
-                      {formatCurrency(shared.negotiatedPrice || shared.batch.industryPrice)}
-                    </p>
+                    <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
+                      <span>{formatArea(shared.batch.totalArea)}</span>
+                      <span className="text-obsidian">{formatCurrency(pricePerM2)}/m²</span>
+                      <span className="font-semibold text-slate-700">{formatCurrency(slabPrice)}/chapa</span>
+                    </div>
                   </div>
                   <Button
                     variant="primary"
@@ -277,7 +288,8 @@ export function BrokerDashboard() {
                     {t('createLink')}
                   </Button>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </Card>
@@ -334,7 +346,7 @@ export function BrokerDashboard() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-emerald-600 tabular-nums">
+                        <span className="font-semibold text-obsidian tabular-nums">
                           {formatCurrency(sale.brokerCommission || 0)}
                         </span>
                       </TableCell>
@@ -360,15 +372,12 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle: string;
-  color: 'emerald' | 'blue' | 'amber' | 'purple';
+  color: 'slate';
 }
 
 function MetricCard({ icon: Icon, title, value, subtitle, color }: MetricCardProps) {
   const colorClasses = {
-    emerald: 'text-emerald-600 bg-emerald-50',
-    blue: 'text-blue-600 bg-blue-50',
-    amber: 'text-amber-600 bg-amber-50',
-    purple: 'text-purple-600 bg-purple-50',
+    slate: 'text-slate-600 bg-slate-100',
   };
 
   return (

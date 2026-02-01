@@ -30,7 +30,7 @@ import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { MoneyInput } from '@/components/ui/masked-input';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatArea, calculateTotalArea } from '@/lib/utils/formatDimensions';
-import { calculateTotalBatchPrice, formatPricePerUnit, getPriceUnitLabel } from '@/lib/utils/priceConversion';
+import { calculateTotalBatchPrice, formatPricePerUnit, getPriceUnitLabel, calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { cn } from '@/lib/utils/cn';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -1217,7 +1217,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
 
                         <div>
                           <label className="block text-sm font-medium text-slate-700 mb-2">
-                            Preço Negociado (Opcional)
+                            Preço por m² (Opcional)
                           </label>
                           <MoneyInput
                             value={negotiatedPrice}
@@ -1228,6 +1228,43 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             Deixe em branco para usar o preço padrão do lote ({formatCurrency(batch.industryPrice)}/{batch.priceUnit})
                           </p>
                         </div>
+
+                        {/* Calculated Slab Price Preview */}
+                        {(() => {
+                          const effectivePrice = negotiatedPrice || batch.industryPrice;
+                          const slabArea = getSlabAreaM2(batch.height, batch.width);
+                          const slabPrice = calculateSlabPrice(
+                            batch.height,
+                            batch.width,
+                            effectivePrice,
+                            batch.priceUnit || 'M2'
+                          );
+                          
+                          return (
+                            <div className="p-4 bg-gradient-to-r from-violet-50 to-slate-50 border border-violet-200 rounded-sm">
+                              <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Preço/m²</p>
+                                  <p className="font-serif text-lg font-semibold text-obsidian">
+                                    {formatCurrency(effectivePrice)}
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Área/Chapa</p>
+                                  <p className="font-serif text-lg text-slate-700">
+                                    {slabArea.toFixed(2)} m²
+                                  </p>
+                                </div>
+                                <div>
+                                  <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mb-1">Preço/Chapa</p>
+                                  <p className="font-serif text-lg font-bold text-violet-700">
+                                    {formatCurrency(slabPrice)}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })()}
 
                         <button
                           onClick={handleShareBatch}
@@ -1247,6 +1284,15 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                       <div className="grid grid-cols-1 gap-4">
                         {sharedBatches.map((share) => {
                           const sharedUser = availableUsers.find((u) => u.id === share.sharedWithUserId);
+                          const effectivePricePerM2 = share.negotiatedPrice || batch.industryPrice;
+                          const slabPrice = calculateSlabPrice(
+                            batch.height,
+                            batch.width,
+                            effectivePricePerM2,
+                            batch.priceUnit || 'M2'
+                          );
+                          const slabArea = getSlabAreaM2(batch.height, batch.width);
+                          
                           return (
                             <div key={share.id} className="bg-white border border-slate-200 p-6 shadow-sm flex flex-col md:flex-row md:items-center md:justify-between group hover:border-[#121212] transition-colors gap-4">
                               <div className="flex items-center gap-4">
@@ -1261,13 +1307,21 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-4 md:gap-10 text-sm items-center">
-                                {share.negotiatedPrice && (
-                                  <div className="text-center">
-                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Preço Negociado</p>
-                                    <p className="font-serif text-base md:text-lg text-slate-700">{formatCurrency(share.negotiatedPrice)}</p>
-                                  </div>
-                                )}
+                              <div className="flex flex-wrap gap-4 md:gap-6 text-sm items-center">
+                                <div className="text-center">
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Preço/m²</p>
+                                  <p className="font-serif text-base text-slate-700">{formatCurrency(effectivePricePerM2)}</p>
+                                </div>
+                                
+                                <div className="text-center">
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Área/Chapa</p>
+                                  <p className="font-serif text-base text-slate-700">{slabArea.toFixed(2)} m²</p>
+                                </div>
+                                
+                                <div className="text-center">
+                                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-1">Preço/Chapa</p>
+                                  <p className="font-serif text-base md:text-lg font-bold text-violet-700">{formatCurrency(slabPrice)}</p>
+                                </div>
 
                                 <div className="w-full md:w-auto">
                                   <button

@@ -83,7 +83,7 @@ export default function BrokerSalesPage() {
               <p className="text-sm text-slate-500 uppercase tracking-widest">
                 {t('totalSold')}
               </p>
-              <TrendingUp className="w-5 h-5 text-emerald-600" />
+              <TrendingUp className="w-5 h-5 text-slate-400" />
             </div>
             <p className="font-serif text-4xl text-obsidian">
               {formatCurrency(summary.totalSales)}
@@ -95,7 +95,7 @@ export default function BrokerSalesPage() {
               <p className="text-sm text-slate-500 uppercase tracking-widest">
                 {t('totalSalesCount')}
               </p>
-              <Receipt className="w-5 h-5 text-blue-600" />
+              <Receipt className="w-5 h-5 text-slate-400" />
             </div>
             <p className="font-serif text-4xl text-obsidian">
               {summary.count}
@@ -107,7 +107,7 @@ export default function BrokerSalesPage() {
               <p className="text-sm text-slate-500 uppercase tracking-widest">
                 {t('totalSlabsSold')}
               </p>
-              <Receipt className="w-5 h-5 text-purple-600" />
+              <Receipt className="w-5 h-5 text-slate-400" />
             </div>
             <p className="font-serif text-4xl text-obsidian">
               {summary.totalSlabs}
@@ -119,7 +119,7 @@ export default function BrokerSalesPage() {
               <p className="text-sm text-slate-500 uppercase tracking-widest">
                 {t('totalAreaSold')}
               </p>
-              <Receipt className="w-5 h-5 text-amber-600" />
+              <Receipt className="w-5 h-5 text-slate-400" />
             </div>
             <p className="font-serif text-4xl text-obsidian">
               {formatArea(summary.totalArea)}
@@ -206,7 +206,7 @@ export default function BrokerSalesPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-semibold text-emerald-600 tabular-nums">
+                        <span className="font-semibold text-obsidian tabular-nums">
                           {formatCurrency(sale.brokerSoldPrice || sale.salePrice || 0)}
                         </span>
                       </TableCell>

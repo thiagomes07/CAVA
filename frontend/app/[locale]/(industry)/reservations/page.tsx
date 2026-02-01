@@ -8,6 +8,10 @@ import {
   Trash2,
   AlertCircle,
   RefreshCcw,
+  User,
+  Building2,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -42,6 +46,7 @@ import {
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatDimensions } from '@/lib/utils/formatDimensions';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
 import type { Reservation, ReservationStatus } from '@/lib/types';
 
 type TabType = 'all' | 'pending';
@@ -124,12 +129,12 @@ export default function ReservationsPage() {
     setSellingReservation(reservation);
     setSaleQuantity(reservation.quantitySlabsReserved);
     
-    // Se houver preço sugerido pelo broker (reservedPrice), calcular o valor total sugerido
+    // Calcular o valor total baseado no preço reservado
     if (reservation.reservedPrice && reservation.batch) {
-      const areaPerSlab = (reservation.batch.height * reservation.batch.width) / 10000;
-      const totalArea = areaPerSlab * reservation.quantitySlabsReserved;
-      const suggestedTotal = reservation.reservedPrice * totalArea;
-      setSalePrice(Math.round(suggestedTotal * 100) / 100);
+      const slabArea = getSlabAreaM2(reservation.batch.height, reservation.batch.width);
+      const totalArea = slabArea * reservation.quantitySlabsReserved;
+      const calculatedTotal = reservation.reservedPrice * totalArea;
+      setSalePrice(Math.round(calculatedTotal * 100) / 100);
     } else {
       setSalePrice(0);
     }
@@ -143,13 +148,27 @@ export default function ReservationsPage() {
     try {
       await confirmSale.mutateAsync({
         reservationId: sellingReservation.id,
-        quantitySlabsSold: saleQuantity,
+        quantitySlabsSold: sellingReservation.quantitySlabsReserved, // Sempre vende toda a reserva
         finalSoldPrice: salePrice,
       });
       success(t('saleSuccess') || 'Venda confirmada com sucesso!');
       setSaleModalOpen(false);
+      setSellingReservation(null);
     } catch (err) {
       error(t('saleError') || 'Erro ao confirmar venda');
+    }
+  };
+
+  const handleRejectSale = async () => {
+    if (!sellingReservation) return;
+
+    try {
+      await cancelReservation.mutateAsync(sellingReservation.id);
+      success(t('rejectSuccess') || 'Reserva rejeitada');
+      setSaleModalOpen(false);
+      setSellingReservation(null);
+    } catch (err) {
+      error(t('rejectError') || 'Erro ao rejeitar reserva');
     }
   };
 
@@ -200,14 +219,14 @@ export default function ReservationsPage() {
               onClick={() => setActiveTab('pending')}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
                 activeTab === 'pending'
-                  ? 'bg-amber-100 text-amber-700'
+                  ? 'bg-slate-200 text-slate-800'
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
               <Package className="w-4 h-4" />
               {t('pending') || 'Pendentes'}
               {pendingCount > 0 && (
-                <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className="bg-slate-600 text-white text-xs px-2 py-0.5 rounded-full">
                   {pendingCount}
                 </span>
               )}
@@ -360,7 +379,7 @@ export default function ReservationsPage() {
       </div>
 
       {/* Confirm Sale Modal */}
-      <Modal open={saleModalOpen} onClose={() => setSaleModalOpen(false)}>
+      <Modal open={saleModalOpen} onClose={() => setSaleModalOpen(false)} size="md">
         <ModalHeader>
           <ModalTitle>{t('saleTitle') || 'Confirmar Venda'}</ModalTitle>
           <ModalClose onClose={() => setSaleModalOpen(false)} />
@@ -368,71 +387,113 @@ export default function ReservationsPage() {
         <ModalContent>
           {sellingReservation && (
             <div className="space-y-4">
-              {/* Calcular área e preço mínimo */}
               {(() => {
                 const batch = sellingReservation.batch;
-                const areaPerSlab = batch ? (batch.height * batch.width) / 10000 : 0; // cm² para m²
-                const totalArea = areaPerSlab * saleQuantity;
-                const suggestedTotalPrice = sellingReservation.reservedPrice 
-                  ? sellingReservation.reservedPrice * totalArea 
-                  : null;
+                const slabArea = batch ? getSlabAreaM2(batch.height, batch.width) : 0;
+                const totalArea = slabArea * sellingReservation.quantitySlabsReserved;
+                const pricePerM2 = sellingReservation.reservedPrice || 0;
+                const pricePerSlab = pricePerM2 > 0 && slabArea > 0 
+                  ? calculateSlabPrice(pricePerM2, batch?.height || 0, batch?.width || 0)
+                  : 0;
+                const totalPrice = pricePerM2 * totalArea;
                 
                 return (
                   <>
-                    <div className="bg-slate-50 rounded-lg p-4">
-                      <p className="font-medium">
-                        {batch?.product?.name}
+                    {/* Informações do Produto */}
+                    <div className="bg-slate-50 rounded-lg p-4 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-slate-500" />
+                        <span className="font-medium text-slate-900">
+                          {batch?.product?.name}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-600 ml-6">
+                        Lote: <span className="font-medium">{batch?.batchCode}</span>
                       </p>
-                      <p className="text-sm text-slate-500">
-                        Lote: {batch?.batchCode}
-                      </p>
-                      <p className="text-sm text-slate-500">
-                        Reservado: {sellingReservation.quantitySlabsReserved} chapas
-                      </p>
-                      {sellingReservation.reservedBy && (
-                        <p className="text-xs text-slate-400 mt-1">
-                          Por: {sellingReservation.reservedBy.name}
+                      {batch && (
+                        <p className="text-sm text-slate-500 ml-6">
+                          Dimensões: {formatDimensions(batch.height, batch.width)}
                         </p>
                       )}
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {t('saleQuantity') || 'Quantidade a vender'}
-                      </label>
-                      <Input
-                        type="number"
-                        value={saleQuantity}
-                        onChange={(e) => setSaleQuantity(parseInt(e.target.value) || 1)}
-                        min={1}
-                        max={sellingReservation.quantitySlabsReserved}
-                      />
-                      {totalArea > 0 && (
-                        <p className="text-xs text-slate-500 mt-1">
-                          Área total: {totalArea.toFixed(2)} m²
+                    {/* Detalhes da Reserva */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 rounded-lg p-3">
+                        <p className="text-xs text-slate-500 mb-1">Quantidade</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {sellingReservation.quantitySlabsReserved} chapas
                         </p>
-                      )}
+                        <p className="text-xs text-slate-500">
+                          {totalArea.toFixed(2)} m² total
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 rounded-lg p-3">
+                        <p className="text-xs text-slate-500 mb-1">Área por chapa</p>
+                        <p className="text-lg font-semibold text-slate-900">
+                          {slabArea.toFixed(2)} m²
+                        </p>
+                      </div>
                     </div>
 
-                    <div>
-                      <label className="block text-sm font-medium text-slate-700 mb-1">
-                        {t('salePrice') || 'Valor total da venda (R$)'}
-                      </label>
-                      <MoneyInput
-                        value={salePrice}
-                        onChange={setSalePrice}
-                        prefix="R$"
-                      />
+                    {/* Preços */}
+                    <div className="border border-slate-200 rounded-lg divide-y divide-slate-200">
+                      <div className="p-3 flex justify-between items-center">
+                        <span className="text-sm text-slate-600">Preço por m²</span>
+                        <span className="font-medium text-slate-900">
+                          {formatCurrency(pricePerM2)}
+                        </span>
+                      </div>
+                      <div className="p-3 flex justify-between items-center">
+                        <span className="text-sm text-slate-600">Preço por chapa</span>
+                        <span className="font-medium text-slate-900">
+                          {formatCurrency(pricePerSlab)}
+                        </span>
+                      </div>
+                      <div className="p-3 flex justify-between items-center bg-emerald-50">
+                        <span className="text-sm font-medium text-emerald-800">Valor Total</span>
+                        <span className="text-lg font-bold text-emerald-700">
+                          {formatCurrency(totalPrice)}
+                        </span>
+                      </div>
                     </div>
 
-                    {/* Preço sugerido pelo broker */}
-                    {suggestedTotalPrice && suggestedTotalPrice > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm">
-                        <p className="text-green-800">
-                          <strong>Valor sugerido pelo broker:</strong> {formatCurrency(suggestedTotalPrice)}
-                        </p>
-                        <p className="text-green-600 text-xs mt-1">
-                          ({formatCurrency(sellingReservation.reservedPrice!)}/m² × {totalArea.toFixed(2)} m²)
+                    {/* Broker */}
+                    {sellingReservation.reservedBy && (
+                      <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                          <User className="w-4 h-4 text-slate-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Broker</p>
+                          <p className="font-medium text-slate-900">
+                            {sellingReservation.reservedBy.name}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Cliente (se informado) */}
+                    {sellingReservation.cliente && (
+                      <div className="flex items-center gap-3 bg-slate-50 rounded-lg p-3">
+                        <div className="w-8 h-8 bg-slate-200 rounded-full flex items-center justify-center">
+                          <Building2 className="w-4 h-4 text-slate-600" />
+                        </div>
+                        <div>
+                          <p className="text-xs text-slate-500">Cliente</p>
+                          <p className="font-medium text-slate-900">
+                            {sellingReservation.cliente.name}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Aviso se não tiver preço */}
+                    {pricePerM2 <= 0 && (
+                      <div className="flex items-start gap-2 bg-slate-100 border border-slate-200 rounded-lg p-3">
+                        <AlertCircle className="w-4 h-4 text-slate-500 mt-0.5 shrink-0" />
+                        <p className="text-sm text-slate-700">
+                          Esta reserva não possui preço definido. Entre em contato com o broker.
                         </p>
                       </div>
                     )}
@@ -442,7 +503,17 @@ export default function ReservationsPage() {
             </div>
           )}
         </ModalContent>
-        <ModalFooter>
+        <ModalFooter className="flex gap-2">
+          <Button
+            variant="danger"
+            onClick={handleRejectSale}
+            loading={cancelReservation.isPending}
+            className="flex items-center gap-2"
+          >
+            <XCircle className="w-4 h-4" />
+            {t('reject') || 'Recusar'}
+          </Button>
+          <div className="flex-1" />
           <Button variant="secondary" onClick={() => setSaleModalOpen(false)}>
             {t('cancel') || 'Cancelar'}
           </Button>
@@ -451,7 +522,9 @@ export default function ReservationsPage() {
             onClick={handleConfirmSale}
             disabled={salePrice <= 0}
             loading={confirmSale.isPending}
+            className="flex items-center gap-2"
           >
+            <CheckCircle2 className="w-4 h-4" />
             {t('confirmSaleButton') || 'Confirmar Venda'}
           </Button>
         </ModalFooter>

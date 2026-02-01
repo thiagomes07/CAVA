@@ -54,17 +54,25 @@ func (s *productService) Create(ctx context.Context, industryID string, input en
 
 	// Criar produto
 	product := &entity.Product{
-		ID:          uuid.New().String(),
-		IndustryID:  industryID,
-		Name:        input.Name,
-		SKU:         input.SKU,
-		Material:    input.Material,
-		Finish:      input.Finish,
-		Description: input.Description,
-		IsPublic:    input.IsPublic,
-		IsActive:    true,
-		CreatedAt:   time.Now(),
-		UpdatedAt:   time.Now(),
+		ID:              uuid.New().String(),
+		IndustryID:      industryID,
+		Name:            input.Name,
+		SKU:             input.SKU,
+		Material:        input.Material,
+		Finish:          input.Finish,
+		Description:     input.Description,
+		BasePrice:       input.BasePrice,
+		PriceUnit:       input.PriceUnit,
+		IsPublic:        input.IsPublic,
+		IsPublicCatalog: input.IsPublicCatalog,
+		IsActive:        true,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
+	}
+
+	// Se não definiu PriceUnit, usar M2 como padrão
+	if product.PriceUnit == "" {
+		product.PriceUnit = entity.PriceUnitM2
 	}
 
 	if err := s.productRepo.Create(ctx, product); err != nil {
@@ -205,8 +213,20 @@ func (s *productService) Update(ctx context.Context, id string, input entity.Upd
 		product.Description = input.Description
 	}
 
+	if input.BasePrice != nil {
+		product.BasePrice = input.BasePrice
+	}
+
+	if input.PriceUnit != nil {
+		product.PriceUnit = *input.PriceUnit
+	}
+
 	if input.IsPublic != nil {
 		product.IsPublic = *input.IsPublic
+	}
+
+	if input.IsPublicCatalog != nil {
+		product.IsPublicCatalog = *input.IsPublicCatalog
 	}
 
 	product.UpdatedAt = time.Now()

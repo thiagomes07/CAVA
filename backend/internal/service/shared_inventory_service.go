@@ -205,6 +205,8 @@ func (s *sharedInventoryService) GetUserInventory(ctx context.Context, userID st
 			}
 
 			shared[i].Batch = batch
+			// Populate calculated fields (effectivePrice, effectiveSlabPrice)
+			shared[i].PopulateCalculatedFields()
 		}
 
 		// Buscar usuário com quem foi compartilhado

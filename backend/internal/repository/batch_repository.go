@@ -23,8 +23,8 @@ func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error
 		INSERT INTO batches (
 			id, product_id, industry_id, batch_code, height, width, thickness,
 			quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-			industry_price, price_unit, origin_quarry, entry_date, status, is_public
-			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+			industry_price, price_unit, price_override, origin_quarry, entry_date, status, is_public
+			) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING created_at, updated_at, net_area
 	`
 
@@ -32,7 +32,7 @@ func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error
 		batch.ID, batch.ProductID, batch.IndustryID, batch.BatchCode,
 		batch.Height, batch.Width, batch.Thickness, batch.QuantitySlabs,
 		batch.AvailableSlabs, batch.ReservedSlabs, batch.SoldSlabs, batch.InactiveSlabs,
-		batch.IndustryPrice, batch.PriceUnit, batch.OriginQuarry, batch.EntryDate, batch.Status, batch.IsPublic,
+		batch.IndustryPrice, batch.PriceUnit, batch.PriceOverride, batch.OriginQuarry, batch.EntryDate, batch.Status, batch.IsPublic,
 	).Scan(&batch.CreatedAt, &batch.UpdatedAt, &batch.TotalArea)
 
 	if err != nil {
@@ -44,6 +44,9 @@ func (r *batchRepository) Create(ctx context.Context, batch *entity.Batch) error
 		return errors.DatabaseError(err)
 	}
 
+	// Populate calculated fields
+	batch.PopulateCalculatedFields()
+
 	return nil
 }
 
@@ -51,7 +54,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 	query := `
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-		       net_area, industry_price, price_unit, origin_quarry, 
+		       net_area, industry_price, price_unit, COALESCE(price_override, FALSE), origin_quarry, 
 		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE id = $1
@@ -62,7 +65,7 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 		&batch.ID, &batch.ProductID, &batch.IndustryID, &batch.BatchCode,
 		&batch.Height, &batch.Width, &batch.Thickness, &batch.QuantitySlabs,
 		&batch.AvailableSlabs, &batch.ReservedSlabs, &batch.SoldSlabs, &batch.InactiveSlabs,
-		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit,
+		&batch.TotalArea, &batch.IndustryPrice, &batch.PriceUnit, &batch.PriceOverride,
 		&batch.OriginQuarry, &batch.EntryDate, &batch.Status, &batch.IsActive, &batch.IsPublic,
 		&batch.CreatedAt, &batch.UpdatedAt, &batch.DeletedAt,
 	)
@@ -73,6 +76,9 @@ func (r *batchRepository) FindByID(ctx context.Context, id string) (*entity.Batc
 	if err != nil {
 		return nil, errors.DatabaseError(err)
 	}
+
+	// Populate calculated fields
+	batch.PopulateCalculatedFields()
 
 	return batch, nil
 }
@@ -112,7 +118,7 @@ func (r *batchRepository) FindByProductID(ctx context.Context, productID string)
 	query := `
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-		       net_area, industry_price, price_unit, origin_quarry, 
+		       net_area, industry_price, price_unit, COALESCE(price_override, FALSE), origin_quarry, 
 		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE product_id = $1 AND is_active = TRUE AND deleted_at IS NULL
@@ -132,7 +138,7 @@ func (r *batchRepository) FindByStatus(ctx context.Context, industryID string, s
 	query := `
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-		       net_area, industry_price, price_unit, origin_quarry, 
+		       net_area, industry_price, price_unit, COALESCE(price_override, FALSE), origin_quarry, 
 		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND status = $2 AND is_active = TRUE AND deleted_at IS NULL
@@ -152,7 +158,7 @@ func (r *batchRepository) FindAvailable(ctx context.Context, industryID string) 
 	query := `
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-		       net_area, industry_price, price_unit, origin_quarry, 
+		       net_area, industry_price, price_unit, COALESCE(price_override, FALSE), origin_quarry, 
 		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND status = 'DISPONIVEL' AND is_active = TRUE AND available_slabs > 0 AND deleted_at IS NULL
@@ -172,7 +178,7 @@ func (r *batchRepository) FindByCode(ctx context.Context, industryID, code strin
 	query := `
 		SELECT id, product_id, industry_id, batch_code, height, width, thickness,
 		       quantity_slabs, available_slabs, reserved_slabs, sold_slabs, inactive_slabs,
-		       net_area, industry_price, price_unit, origin_quarry, 
+		       net_area, industry_price, price_unit, COALESCE(price_override, FALSE), origin_quarry, 
 		       entry_date, status, is_active, is_public, created_at, updated_at, deleted_at
 		FROM batches
 		WHERE industry_id = $1 AND batch_code ILIKE $2 AND is_active = TRUE AND deleted_at IS NULL
@@ -195,7 +201,7 @@ func (r *batchRepository) List(ctx context.Context, industryID string, filters e
 	query := psql.Select(
 		"id", "product_id", "industry_id", "batch_code", "height", "width",
 		"thickness", "quantity_slabs", "available_slabs", "reserved_slabs", "sold_slabs", "inactive_slabs", "net_area", "industry_price", "price_unit",
-		"origin_quarry", "entry_date", "status", "is_active", "is_public", "created_at", "updated_at", "deleted_at",
+		"COALESCE(price_override, FALSE)", "origin_quarry", "entry_date", "status", "is_active", "is_public", "created_at", "updated_at", "deleted_at",
 	).From("batches").
 		Where(sq.Eq{"industry_id": industryID})
 
@@ -328,15 +334,15 @@ func (r *batchRepository) Update(ctx context.Context, batch *entity.Batch) error
 		UPDATE batches
 		SET batch_code = $1, height = $2, width = $3, thickness = $4,
 		    quantity_slabs = $5, available_slabs = $6, industry_price = $7, price_unit = $8,
-		    origin_quarry = $9, is_public = $10, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $11
+		    price_override = $9, origin_quarry = $10, is_public = $11, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $12
 		RETURNING updated_at, net_area
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		batch.BatchCode, batch.Height, batch.Width, batch.Thickness,
 		batch.QuantitySlabs, batch.AvailableSlabs, batch.IndustryPrice, batch.PriceUnit,
-		batch.OriginQuarry, batch.IsPublic, batch.ID,
+		batch.PriceOverride, batch.OriginQuarry, batch.IsPublic, batch.ID,
 	).Scan(&batch.UpdatedAt, &batch.TotalArea)
 
 	if err == sql.ErrNoRows {
@@ -551,11 +557,13 @@ func (r *batchRepository) scanBatches(rows *sql.Rows) ([]entity.Batch, error) {
 			&b.ID, &b.ProductID, &b.IndustryID, &b.BatchCode,
 			&b.Height, &b.Width, &b.Thickness, &b.QuantitySlabs,
 			&b.AvailableSlabs, &b.ReservedSlabs, &b.SoldSlabs, &b.InactiveSlabs, &b.TotalArea, &b.IndustryPrice, &b.PriceUnit,
-			&b.OriginQuarry, &b.EntryDate, &b.Status, &b.IsActive, &b.IsPublic,
+			&b.PriceOverride, &b.OriginQuarry, &b.EntryDate, &b.Status, &b.IsActive, &b.IsPublic,
 			&b.CreatedAt, &b.UpdatedAt, &b.DeletedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
+		// Populate calculated fields
+		b.PopulateCalculatedFields()
 		batches = append(batches, b)
 	}
 	return batches, nil

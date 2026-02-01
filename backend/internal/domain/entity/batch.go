@@ -108,8 +108,9 @@ type Batch struct {
 	SoldSlabs      int         `json:"soldSlabs"`      // quantidade de chapas vendidas
 	InactiveSlabs  int         `json:"inactiveSlabs"`  // quantidade de chapas inativas
 	TotalArea      float64     `json:"totalArea"`      // m² (calculado)
-	IndustryPrice  float64     `json:"industryPrice"`  // preço por unidade de área
+	IndustryPrice  float64     `json:"industryPrice"`  // preço por unidade de área (m² ou ft²)
 	PriceUnit      PriceUnit   `json:"priceUnit"`      // unidade de preço (M2 ou FT2)
+	PriceOverride  bool        `json:"priceOverride"`  // se TRUE, preço foi definido manualmente; se FALSE, usa preço do produto
 	OriginQuarry   *string     `json:"originQuarry,omitempty"`
 	EntryDate      time.Time   `json:"entryDate"`
 	Status         BatchStatus `json:"status"`
@@ -120,6 +121,10 @@ type Batch struct {
 	CreatedAt      time.Time   `json:"createdAt"`
 	UpdatedAt      time.Time   `json:"updatedAt"`
 	DeletedAt      *time.Time  `json:"deletedAt,omitempty"` // soft delete
+
+	// Campos calculados (não persistidos, preenchidos na API)
+	SlabArea  float64 `json:"slabArea,omitempty"`  // área de uma chapa em m² (calculado)
+	SlabPrice float64 `json:"slabPrice,omitempty"` // preço de uma chapa (calculado: industryPrice × slabArea)
 }
 
 // CalculateTotalArea calcula a área total do lote
@@ -132,6 +137,19 @@ func (b *Batch) CalculateTotalArea() {
 // CalculateSlabArea calcula a área de uma chapa individual em m²
 func (b *Batch) CalculateSlabArea() float64 {
 	return (b.Height * b.Width) / 10000
+}
+
+// CalculateSlabPrice calcula o preço de uma chapa individual
+func (b *Batch) CalculateSlabPrice() float64 {
+	slabArea := b.CalculateSlabArea()
+	pricePerM2 := b.GetPriceInUnit(PriceUnitM2)
+	return pricePerM2 * slabArea
+}
+
+// PopulateCalculatedFields preenche os campos calculados
+func (b *Batch) PopulateCalculatedFields() {
+	b.SlabArea = b.CalculateSlabArea()
+	b.SlabPrice = b.CalculateSlabPrice()
 }
 
 // IsAvailable verifica se o lote está disponível (tem chapas disponíveis)

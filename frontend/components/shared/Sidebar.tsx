@@ -31,6 +31,7 @@ import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { useAuthStore } from '@/store/auth.store';
 import { useUIStore } from '@/store/ui.store';
 import { useToast } from '@/lib/hooks/useToast';
+import { usePendingReservationsCount } from '@/lib/api/queries/useReservations';
 import { LanguageSwitcher } from './LanguageSwitcher';
 import type { UserRole } from '@/lib/types';
 
@@ -166,6 +167,12 @@ export function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
+  // Buscar contagem de reservas pendentes (apenas para admin e vendedor interno)
+  const isIndustryUser = user?.role === 'ADMIN_INDUSTRIA' || user?.role === 'VENDEDOR_INTERNO';
+  const { data: pendingCount = 0 } = usePendingReservationsCount({ 
+    enabled: isIndustryUser 
+  });
+
   // Handle click outside to close user menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -271,6 +278,7 @@ export function Sidebar() {
               {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const showPendingIndicator = item.href === '/reservations' && pendingCount > 0;
 
                 return (
                   <Link
@@ -283,16 +291,26 @@ export function Sidebar() {
                         : 'text-slate-400 hover:text-white hover:bg-white/5'
                     )}
                   >
-                    <Icon className={cn(
-                      'w-5 h-5',
-                      active ? 'text-[#C2410C]' : 'text-slate-500'
-                    )} />
+                    <div className="relative">
+                      <Icon className={cn(
+                        'w-5 h-5',
+                        active ? 'text-[#C2410C]' : 'text-slate-500'
+                      )} />
+                      {showPendingIndicator && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                      )}
+                    </div>
                     <span className={cn(
-                      'text-base',
+                      'text-base flex-1',
                       active && 'font-semibold'
                     )}>
                       {t(item.label)}
                     </span>
+                    {showPendingIndicator && (
+                      <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full">
+                        {pendingCount}
+                      </span>
+                    )}
                   </Link>
                 );
               })}
@@ -386,6 +404,7 @@ export function Sidebar() {
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const showPendingIndicator = item.href === '/reservations' && pendingCount > 0;
 
             return (
               <Link
@@ -402,17 +421,29 @@ export function Sidebar() {
                 {active && (
                   <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-[#C2410C] shadow-[0_0_10px_#C2410C]" />
                 )}
-                <Icon className={cn(
-                  'w-5 h-5 transition-colors duration-300 shrink-0',
-                  active ? 'text-[#C2410C]' : 'text-slate-500 group-hover:text-slate-300'
-                )} />
+                <div className="relative shrink-0">
+                  <Icon className={cn(
+                    'w-5 h-5 transition-colors duration-300',
+                    active ? 'text-[#C2410C]' : 'text-slate-500 group-hover:text-slate-300'
+                  )} />
+                  {showPendingIndicator && (
+                    <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+                  )}
+                </div>
                 {sidebarOpen && (
-                  <span className={cn(
-                    'font-medium text-sm tracking-wide truncate',
-                    active && 'font-semibold'
-                  )}>
-                    {t(item.label)}
-                  </span>
+                  <>
+                    <span className={cn(
+                      'font-medium text-sm tracking-wide truncate flex-1',
+                      active && 'font-semibold'
+                    )}>
+                      {t(item.label)}
+                    </span>
+                    {showPendingIndicator && (
+                      <span className="px-2 py-0.5 bg-red-500/20 text-red-400 text-xs font-medium rounded-full">
+                        {pendingCount}
+                      </span>
+                    )}
+                  </>
                 )}
               </Link>
             );

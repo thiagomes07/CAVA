@@ -86,6 +86,8 @@ export interface Product {
   isActive: boolean;
   medias: Media[];
   batchCount?: number;
+  basePrice?: number | null;
+  priceUnit?: PriceUnit;
   createdAt: string;
   updatedAt: string;
 }
@@ -106,6 +108,9 @@ export interface Batch {
   totalArea: number;
   industryPrice: number;
   priceUnit: PriceUnit;
+  priceOverride?: boolean;
+  slabArea?: number;      // Área de uma chapa (calculado: height * width / 10000)
+  slabPrice?: number;     // Preço por chapa (calculado: industryPrice * slabArea)
   originQuarry?: string;
   entryDate: string;
   status: BatchStatus;
@@ -123,6 +128,8 @@ export interface SharedInventoryBatch {
   sharedWithUserId: string; // Broker ou Vendedor Interno
   negotiatedPrice?: number;
   negotiatedPriceUnit?: PriceUnit;
+  effectivePrice?: number;      // Preço efetivo (negociado ou do lote)
+  effectiveSlabPrice?: number;  // Preço por chapa efetivo (calculado)
   sharedAt: string;
   batch: Batch;
   sharedWith: User; // Broker ou Vendedor Interno
@@ -334,10 +341,10 @@ export interface ProductMetric {
   productName: string;
   material: MaterialType;
   salesCount: number;
-  totalRevenue: number;
-  totalSlabs: number;
-  totalArea: number;
-  rank: number;
+  revenue: number;
+  slabsSold: number;
+  areaSold: number;
+  rank?: number;
 }
 
 export interface BIDashboard {

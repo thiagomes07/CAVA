@@ -307,9 +307,9 @@ export function SellBatchModal({
                 <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 overflow-hidden">
                     <div className="px-6 py-6 space-y-6 overflow-y-auto flex-1">
                         {/* Warning */}
-                        <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200">
-                            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                            <p className="text-sm text-amber-800">
+                        <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200">
+                            <AlertTriangle className="w-5 h-5 text-slate-600 shrink-0 mt-0.5" />
+                            <p className="text-sm text-slate-700">
                                 Você está vendendo <strong>{safeQuantitySlabs} chapa{safeQuantitySlabs > 1 ? 's' : ''}</strong>.
                                 Para desfazer, acesse a página de Vendas.
                             </p>
