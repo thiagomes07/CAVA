@@ -10,6 +10,7 @@ import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { nanoid } from 'nanoid';
 import { QRCodeCanvas } from 'qrcode.react';
@@ -412,13 +413,11 @@ export default function CreateSalesLinkPage() {
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-slate-500">Preço unit.:</span>
                                     <div className="flex items-center border border-slate-200 rounded px-2 py-1">
-                                      <span className="text-xs text-slate-400 mr-1">R$</span>
-                                      <input
-                                        type="number"
+                                      <MoneyInput
                                         value={item.unitPrice}
-                                        onChange={(e) => handleUpdatePrice(item.batch.id, parseFloat(e.target.value) || 0)}
-                                        step="0.01"
-                                        className="w-20 text-sm outline-none"
+                                        onChange={(val) => handleUpdatePrice(item.batch.id, val)}
+                                        variant="minimal"
+                                        className="w-20 text-sm"
                                       />
                                     </div>
                                   </div>

@@ -213,6 +213,7 @@ export interface Sale {
   customerName: string;
   customerContact: string;
   salePrice: number;
+  brokerSoldPrice?: number;
   quantitySlabsSold: number;
   totalAreaSold: number;
   pricePerUnit: number;

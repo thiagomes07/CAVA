@@ -21,8 +21,8 @@ import { isPlaceholderUrl } from '@/lib/utils/media';
 
 interface BrokerMetrics {
   availableBatches: number;
+  monthlySales: number;
   activeLinks: number;
-  clientesCount: number;
   monthlyCommission: number;
 }
 
@@ -62,8 +62,8 @@ export function BrokerDashboard() {
       // Use default values instead of showing error
       setMetrics({
         availableBatches: 0,
+        monthlySales: 0,
         activeLinks: 0,
-        clientesCount: 0,
         monthlyCommission: 0,
       });
     } finally {
@@ -125,10 +125,9 @@ export function BrokerDashboard() {
 
       <div className="max-w-7xl mx-auto px-8 py-8">
         {/* Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {isLoadingMetrics ? (
             <>
-              <MetricCardSkeleton />
               <MetricCardSkeleton />
               <MetricCardSkeleton />
               <MetricCardSkeleton />
@@ -143,25 +142,18 @@ export function BrokerDashboard() {
                 color="emerald"
               />
               <MetricCard
+                icon={TrendingUp}
+                title={t('monthlySales')}
+                value={formatCurrency(metrics?.monthlySales || 0)}
+                subtitle={t('myRevenue')}
+                color="amber"
+              />
+              <MetricCard
                 icon={Link2}
                 title={t('activeLinks')}
                 value={metrics?.activeLinks || 0}
                 subtitle={t('generated')}
                 color="blue"
-              />
-              <MetricCard
-                icon={Inbox}
-                title={t('capturedClientes')}
-                value={metrics?.clientesCount || 0}
-                subtitle={t('total')}
-                color="purple"
-              />
-              <MetricCard
-                icon={TrendingUp}
-                title={t('monthlyCommission')}
-                value={formatCurrency(metrics?.monthlyCommission || 0)}
-                subtitle={t('revenue')}
-                color="amber"
               />
             </>
           )}

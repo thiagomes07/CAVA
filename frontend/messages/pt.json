@@ -155,6 +155,7 @@
     "total": "TOTAL",
     "monthlyCommission": "Comissão do Mês",
     "revenue": "FATURAMENTO",
+    "myRevenue": "MEU FATURAMENTO",
     "sharedWithMe": "Lotes compartilhados comigo",
     "createLink": "Criar Link",
     "generateSaleLink": "Gerar link de venda",
@@ -168,7 +169,12 @@
     "myCommission": "Minha Comissão",
     "noSalesYet": "Nenhuma venda registrada ainda",
     "subtitleSeller": "Visão geral das suas vendas",
-    "generatedByMe": "GERADOS POR MIM"
+    "generatedByMe": "GERADOS POR MIM",
+    "publicCatalog": "Catálogo Público",
+    "publicCatalogDescription": "Compartilhe seu catálogo de produtos públicos com clientes e parceiros.",
+    "copyLink": "Copiar Link",
+    "linkCopied": "Link copiado!",
+    "openCatalog": "Abrir Catálogo"
   },
   "inventory": {
     "title": "Estoque de Lotes",
@@ -233,10 +239,15 @@
   "sales": {
     "title": "Histórico de Vendas",
     "subtitle": "Consulte todas as vendas realizadas",
+    "brokerSalesTitle": "Minhas Vendas",
+    "brokerSalesSubtitle": "Histórico de vendas confirmadas",
     "exportReport": "Exportar Relatório",
     "exportStarted": "Exportação iniciada. O download começará em breve.",
     "exportError": "Erro ao exportar relatório",
     "totalSold": "Total Vendido",
+    "totalSalesCount": "Nº de Vendas",
+    "totalSlabsSold": "Chapas Vendidas",
+    "totalAreaSold": "Área Vendida",
     "commissionsPaid": "Comissões Pagas",
     "averageTicket": "Ticket Médio",
     "startDate": "Data Início",
@@ -245,6 +256,8 @@
     "allSellers": "Todos os Vendedores",
     "emptyTitle": "Nenhuma venda registrada",
     "emptyDescription": "O histórico de vendas aparecerá aqui",
+    "emptyBrokerTitle": "Nenhuma venda confirmada ainda",
+    "emptyBrokerDescription": "Suas vendas aparecerão aqui quando forem confirmadas pela indústria",
     "saleNumber": "Nº Venda",
     "batch": "Lote",
     "customer": "Cliente",
@@ -257,7 +270,13 @@
     "customerContact": "Contato Cliente",
     "notes": "Observações",
     "loadError": "Erro ao carregar vendas",
-    "sellersError": "Erro ao carregar vendedores"
+    "sellersError": "Erro ao carregar vendedores",
+    "quantity": "Quantidade",
+    "area": "Área",
+    "mySalePrice": "Meu Valor de Venda",
+    "industryPrice": "Preço Indústria",
+    "pricePerUnit": "Preço por Unidade",
+    "slabs": "chapas"
   },
   "clientes": {
     "title": "Meus Clientes",

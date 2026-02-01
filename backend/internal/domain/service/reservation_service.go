@@ -23,6 +23,9 @@ type ReservationService interface {
 	// ListActive lista reservas ativas do usuário
 	ListActive(ctx context.Context, userID string) ([]entity.Reservation, error)
 
+	// ListByUser lista todas as reservas do usuário (broker)
+	ListByUser(ctx context.Context, userID string) ([]entity.Reservation, error)
+
 	// ListByIndustry lista todas as reservas da indústria (admin)
 	ListByIndustry(ctx context.Context, industryID string) ([]entity.Reservation, error)
 

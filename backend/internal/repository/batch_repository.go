@@ -635,13 +635,13 @@ func (r *batchRepository) Delete(ctx context.Context, id string) error {
 
 func (r *batchRepository) FindPublicBatchesByIndustrySlug(ctx context.Context, slug string) ([]entity.PublicBatch, error) {
 	query := `
-		SELECT b.batch_code, b.height, b.width, b.thickness, b.net_area, b.origin_quarry,
-		       p.name, p.material, p.finish
+		SELECT b.batch_code, b.height, b.width, b.thickness, b.net_area, b.available_slabs, b.origin_quarry,
+		       p.name, p.material_type, p.finish_type
 		FROM batches b
 		INNER JOIN industries i ON b.industry_id = i.id
 		LEFT JOIN products p ON b.product_id = p.id
 		WHERE i.slug = $1
-			AND b.is_public = TRUE
+			AND (b.is_public = TRUE OR COALESCE(p.is_public_catalog, FALSE) = TRUE)
 			AND b.deleted_at IS NULL
 			AND b.is_active = TRUE
 		ORDER BY b.entry_date DESC
@@ -658,15 +658,18 @@ func (r *batchRepository) FindPublicBatchesByIndustrySlug(ctx context.Context, s
 
 	for rows.Next() {
 		var pb entity.PublicBatch
-		var productName, material, finish sql.NullString
+		var productName, material, finish, originQuarry sql.NullString
 
 		if err := rows.Scan(
-			&pb.BatchCode, &pb.Height, &pb.Width, &pb.Thickness, &pb.TotalArea, &pb.OriginQuarry,
+			&pb.BatchCode, &pb.Height, &pb.Width, &pb.Thickness, &pb.TotalArea, &pb.AvailableSlabs, &originQuarry,
 			&productName, &material, &finish,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
 
+		if originQuarry.Valid {
+			pb.OriginQuarry = &originQuarry.String
+		}
 		if productName.Valid {
 			pb.ProductName = productName.String
 		}

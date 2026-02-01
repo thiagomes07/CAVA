@@ -447,6 +447,8 @@ func initServices(
 		repos.SharedInventory,
 		repos.Batch,
 		repos.User,
+		repos.Media,
+		repos.Product,
 		logger,
 	)
 

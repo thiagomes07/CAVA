@@ -104,6 +104,24 @@ func (r *reservationRepository) FindActive(ctx context.Context, userID string) (
 	return r.scanReservations(rows)
 }
 
+func (r *reservationRepository) FindByUser(ctx context.Context, userID string) ([]entity.Reservation, error) {
+	query := `
+		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,
+		       reserved_price, broker_sold_price, notes, expires_at, created_at, is_active
+		FROM reservations
+		WHERE reserved_by_user_id = $1
+		ORDER BY created_at DESC
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	return r.scanReservations(rows)
+}
+
 func (r *reservationRepository) FindExpired(ctx context.Context) ([]entity.Reservation, error) {
 	query := `
 		SELECT id, batch_id, reserved_by_user_id, cliente_id, quantity_slabs_reserved, status,

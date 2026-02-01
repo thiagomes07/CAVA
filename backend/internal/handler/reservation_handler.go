@@ -191,7 +191,7 @@ func (h *ReservationHandler) Cancel(w http.ResponseWriter, r *http.Request) {
 
 // ListMy godoc
 // @Summary Lista minhas reservas
-// @Description Lista reservas ativas do usuário logado (broker)
+// @Description Lista todas as reservas do usuário logado (broker)
 // @Tags reservations
 // @Produce json
 // @Success 200 {array} entity.Reservation
@@ -204,7 +204,7 @@ func (h *ReservationHandler) ListMy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reservations, err := h.reservationService.ListActive(r.Context(), userID)
+	reservations, err := h.reservationService.ListByUser(r.Context(), userID)
 	if err != nil {
 		h.logger.Error("erro ao listar minhas reservas",
 			zap.String("userId", userID),

@@ -29,6 +29,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { batchSchema, type BatchInput, priceUnits } from '@/lib/schemas/batch.schema';
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
 import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import { MoneyInput } from '@/components/ui/masked-input';
 import type { Product, PriceUnit, MaterialType, FinishType } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
@@ -666,19 +667,20 @@ export default function NewBatchPage() {
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   Preço Base Indústria (R$/{getPriceUnitLabel(priceUnit as PriceUnit)}) <span className="text-[#C2410C]">*</span>
                 </label>
-                <input
-                  {...register('industryPrice', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  placeholder="150.00"
-                  disabled={isSubmitting}
-                  className={cn(
-                    'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                    errors.industryPrice ? 'border-rose-500' : 'border-slate-200'
+                <Controller
+                  name="industryPrice"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      suffix={`/${priceUnit === 'M2' ? 'm²' : 'ft²'}`}
+                      disabled={isSubmitting}
+                      error={errors.industryPrice?.message}
+                    />
                   )}
                 />
                 <p className="mt-1 text-xs text-slate-400">Este é o preço de repasse para brokers</p>
-                {errors.industryPrice && <p className="mt-1 text-xs text-rose-500">{errors.industryPrice.message}</p>}
               </div>
 
               {/* Preço Total Calculado */}

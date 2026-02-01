@@ -27,6 +27,21 @@ export function parseCurrency(value: string): number {
   return parseFloat(cleaned) || 0;
 }
 
+/**
+ * Converte string para número com precisão de 2 casas decimais
+ * Evita problemas de ponto flutuante como 1234.56 virar 1234.5600000001
+ */
+export function parsePrice(value: string | number): number {
+  if (typeof value === 'number') {
+    return Math.round(value * 100) / 100;
+  }
+  const cleaned = value.replace(/[^\d,.-]/g, '').replace(',', '.');
+  const parsed = parseFloat(cleaned);
+  if (isNaN(parsed)) return 0;
+  // Arredonda para 2 casas decimais para evitar problemas de precisão
+  return Math.round(parsed * 100) / 100;
+}
+
 export function formatCurrencyInput(value: string, locale: CurrencyLocale = 'pt'): string {
   const number = parseCurrency(value);
   return formatCurrency(number, locale);

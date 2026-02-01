@@ -434,6 +434,40 @@ func (s *reservationService) ListActive(ctx context.Context, userID string) ([]e
 	return reservations, nil
 }
 
+func (s *reservationService) ListByUser(ctx context.Context, userID string) ([]entity.Reservation, error) {
+	reservations, err := s.reservationRepo.FindByUser(ctx, userID)
+	if err != nil {
+		s.logger.Error("erro ao listar reservas do usuário",
+			zap.String("userId", userID),
+			zap.Error(err),
+		)
+		return nil, err
+	}
+
+	// Buscar dados relacionados
+	for i := range reservations {
+		if reservations[i].BatchID != "" {
+			batch, err := s.batchRepo.FindByID(ctx, reservations[i].BatchID)
+			if err != nil {
+				s.logger.Warn("erro ao buscar batch", zap.Error(err))
+			} else {
+				reservations[i].Batch = batch
+			}
+		}
+
+		if reservations[i].ClienteID != nil {
+			cliente, err := s.clienteRepo.FindByID(ctx, *reservations[i].ClienteID)
+			if err != nil {
+				s.logger.Warn("erro ao buscar cliente", zap.Error(err))
+			} else {
+				reservations[i].Cliente = cliente
+			}
+		}
+	}
+
+	return reservations, nil
+}
+
 func (s *reservationService) ExpireReservations(ctx context.Context) (int, error) {
 	// Buscar reservas expiradas
 	expiredReservations, err := s.reservationRepo.FindExpired(ctx)

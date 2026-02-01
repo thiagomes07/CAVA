@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
 import { Toggle } from '@/components/ui/toggle';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { z } from 'zod';
@@ -57,6 +58,7 @@ export default function EditSalesLinkPage() {
   const {
     register,
     handleSubmit,
+    control,
     formState: { errors },
     watch,
     setValue,
@@ -181,14 +183,23 @@ export default function EditSalesLinkPage() {
                 disabled={isSubmitting}
               />
 
-              <Input
-                {...register('displayPrice', { valueAsNumber: true })}
-                type="number"
-                step="0.01"
-                label="Preço de Exibição (R$)"
-                error={errors.displayPrice?.message}
-                disabled={isSubmitting}
-              />
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-slate-600 block">
+                  Preço de Exibição (R$)
+                </label>
+                <Controller
+                  name="displayPrice"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      disabled={isSubmitting}
+                      error={errors.displayPrice?.message}
+                    />
+                  )}
+                />
+              </div>
 
               <Toggle
                 {...register('showPrice')}

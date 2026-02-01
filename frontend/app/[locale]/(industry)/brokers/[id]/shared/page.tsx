@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { ArrowLeft, Plus, X, Search, Package } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { Badge } from '@/components/ui/badge';
 import { Toggle } from '@/components/ui/toggle';
 import { Card } from '@/components/ui/card';
@@ -47,7 +48,7 @@ export default function BrokerSharedInventoryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { register, handleSubmit, reset } = useForm<{ negotiatedPrice?: number }>();
+  const { register, handleSubmit, reset, control } = useForm<{ negotiatedPrice?: number }>();
 
   useEffect(() => {
     fetchBrokerData();
@@ -437,14 +438,23 @@ export default function BrokerSharedInventoryPage() {
 
               {/* Negotiated Price */}
               {selectedBatch && (
-                <Input
-                  {...register('negotiatedPrice', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  label="Preço de Repasse para este Broker (R$)"
-                  helperText="Deixe vazio para usar o preço padrão do lote"
-                  disabled={isSubmitting}
-                />
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-600 block">
+                    Preço de Repasse para este Broker (R$)
+                  </label>
+                  <Controller
+                    name="negotiatedPrice"
+                    control={control}
+                    render={({ field }) => (
+                      <MoneyInput
+                        value={field.value}
+                        onChange={field.onChange}
+                        disabled={isSubmitting}
+                      />
+                    )}
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Deixe vazio para usar o preço padrão do lote</p>
+                </div>
               )}
             </div>
           </ModalContent>

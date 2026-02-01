@@ -81,18 +81,6 @@ const industryMenuItems: MenuItem[] = [
     roles: ['ADMIN_INDUSTRIA'],
   },
   {
-    label: 'navigation.links',
-    href: '/links',
-    icon: Link2,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
-  },
-  {
-    label: 'navigation.catalogos',
-    href: '/catalogos',
-    icon: BookOpen,
-    roles: ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO'],
-  },
-  {
     label: 'navigation.clientes',
     href: '/clientes',
     icon: Inbox,
@@ -135,6 +123,12 @@ const brokerMenuItems: MenuItem[] = [
     label: 'navigation.reservations',
     href: '/reservations',
     icon: ClipboardList,
+    roles: ['BROKER'],
+  },
+  {
+    label: 'navigation.sales',
+    href: '/broker-sales',
+    icon: Receipt,
     roles: ['BROKER'],
   },
   {

@@ -288,6 +288,230 @@ export const CurrencyInput = forwardRef<HTMLInputElement, CurrencyInputProps>(
 
 CurrencyInput.displayName = 'CurrencyInput';
 
+// Money Input Component - More flexible for price inputs (R$/m², etc.)
+export interface MoneyInputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 'onChange' | 'value'> {
+  label?: string;
+  error?: string;
+  helperText?: string;
+  value?: number | string;
+  onChange?: (value: number) => void;
+  prefix?: string;
+  suffix?: string;
+  allowDecimals?: boolean;
+  decimalPlaces?: number;
+  variant?: 'default' | 'minimal';
+}
+
+export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
+  ({ 
+    className, 
+    label, 
+    error, 
+    helperText, 
+    id, 
+    value, 
+    onChange, 
+    prefix = 'R$',
+    suffix,
+    allowDecimals = true,
+    decimalPlaces = 2,
+    variant = 'default',
+    disabled,
+    ...props 
+  }, ref) => {
+    const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    // Formata número para exibição brasileira (1.234,56)
+    const formatDisplay = (val: number | string | undefined): string => {
+      if (val === undefined || val === '' || val === null) return '';
+      
+      const numVal = typeof val === 'string' ? parseFloat(val) : val;
+      if (isNaN(numVal)) return '';
+      
+      return new Intl.NumberFormat('pt-BR', {
+        minimumFractionDigits: allowDecimals ? decimalPlaces : 0,
+        maximumFractionDigits: allowDecimals ? decimalPlaces : 0,
+      }).format(numVal);
+    };
+
+    // Parse de string formatada para número
+    const parseValue = (val: string): number => {
+      if (!val) return 0;
+      // Remove tudo exceto dígitos e vírgula
+      let cleaned = val.replace(/[^\d,]/g, '');
+      // Substitui vírgula por ponto para parseFloat
+      cleaned = cleaned.replace(',', '.');
+      const parsed = parseFloat(cleaned);
+      if (isNaN(parsed)) return 0;
+      // Arredonda para evitar problemas de ponto flutuante
+      return Math.round(parsed * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
+    };
+
+    const [displayValue, setDisplayValue] = useState(() => formatDisplay(value));
+    const [isFocused, setIsFocused] = useState(false);
+
+    // Atualiza quando valor externo muda (e não está focado)
+    useEffect(() => {
+      if (!isFocused) {
+        setDisplayValue(formatDisplay(value));
+      }
+    }, [value, isFocused]);
+
+    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(true);
+      // Remove formatação quando foca (deixa só o número)
+      const numVal = typeof value === 'string' ? parseFloat(value) : value;
+      if (numVal !== undefined && !isNaN(numVal) && numVal !== 0) {
+        setDisplayValue(numVal.toString().replace('.', ','));
+      }
+      props.onFocus?.(e);
+    };
+
+    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
+      setIsFocused(false);
+      // Reformata ao sair do foco
+      const parsed = parseValue(displayValue);
+      setDisplayValue(formatDisplay(parsed));
+      props.onBlur?.(e);
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let inputValue = e.target.value;
+      
+      // Permite apenas dígitos, vírgula e ponto
+      inputValue = inputValue.replace(/[^\d.,]/g, '');
+      
+      // Converte pontos para vírgulas (padrão brasileiro)
+      inputValue = inputValue.replace('.', ',');
+      
+      // Permite apenas uma vírgula
+      const parts = inputValue.split(',');
+      if (parts.length > 2) {
+        inputValue = parts[0] + ',' + parts.slice(1).join('');
+      }
+      
+      // Limita casas decimais
+      if (parts.length === 2 && parts[1].length > decimalPlaces) {
+        inputValue = parts[0] + ',' + parts[1].substring(0, decimalPlaces);
+      }
+      
+      setDisplayValue(inputValue);
+      
+      // Notifica mudança
+      const numericValue = parseValue(inputValue);
+      onChange?.(numericValue);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+      // Permite: backspace, delete, tab, escape, enter, setas
+      if ([8, 46, 9, 27, 13, 37, 38, 39, 40].includes(e.keyCode)) {
+        return;
+      }
+      // Permite Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
+      if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) {
+        return;
+      }
+      // Permite dígitos
+      if (/^\d$/.test(e.key)) {
+        return;
+      }
+      // Permite vírgula e ponto (serão convertidos para vírgula)
+      if (e.key === ',' || e.key === '.') {
+        if (!allowDecimals) {
+          e.preventDefault();
+          return;
+        }
+        if (displayValue.includes(',')) {
+          e.preventDefault();
+        }
+        return;
+      }
+      // Bloqueia qualquer outra tecla
+      e.preventDefault();
+    };
+
+    const baseInputClass = variant === 'minimal' 
+      ? cn(
+          'w-full bg-transparent border-0 p-0 text-sm outline-none',
+          'disabled:text-slate-300 disabled:cursor-not-allowed',
+          className
+        )
+      : cn(
+          'w-full border rounded-sm px-4 py-3 text-sm transition-all duration-200',
+          'focus:outline-none focus:ring-2 focus:ring-obsidian/20',
+          'disabled:bg-slate-50 disabled:text-slate-300 disabled:cursor-not-allowed',
+          error
+            ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
+            : 'border-slate-200 bg-white focus:border-obsidian',
+          (prefix || suffix) && 'pl-10',
+          className
+        );
+
+    const inputElement = (
+      <div className="relative">
+        {prefix && variant !== 'minimal' && (
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none">
+            {prefix}
+          </span>
+        )}
+        {prefix && variant === 'minimal' && (
+          <span className="text-sm text-slate-400 mr-1">{prefix}</span>
+        )}
+        <input
+          ref={ref || inputRef}
+          id={inputId}
+          type="text"
+          inputMode="decimal"
+          value={displayValue}
+          onChange={handleChange}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          onKeyDown={handleKeyDown}
+          placeholder="0,00"
+          disabled={disabled}
+          className={baseInputClass}
+          {...props}
+        />
+        {suffix && (
+          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none">
+            {suffix}
+          </span>
+        )}
+      </div>
+    );
+
+    if (variant === 'minimal') {
+      return inputElement;
+    }
+
+    return (
+      <div className="w-full">
+        {label && (
+          <label
+            htmlFor={inputId}
+            className={cn(
+              'block uppercase tracking-widest text-[10px] font-semibold mb-2',
+              error ? 'text-rose-600' : 'text-slate-500'
+            )}
+          >
+            {label}
+          </label>
+        )}
+        {inputElement}
+        {error && (
+          <p className="mt-1 text-xs text-rose-600">{error}</p>
+        )}
+        {helperText && !error && (
+          <p className="mt-1 text-xs text-slate-400">{helperText}</p>
+        )}
+      </div>
+    );
+  }
+);
+
+MoneyInput.displayName = 'MoneyInput';
+
 // Batch Code Input - AAA-999999
 export const BatchCodeInput = forwardRef<HTMLInputElement, Omit<MaskedInputProps, 'mask'>>(
   (props, ref) => (

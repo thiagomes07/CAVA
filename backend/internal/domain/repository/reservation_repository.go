@@ -22,6 +22,9 @@ type ReservationRepository interface {
 	// FindActive busca reservas ativas (não expiradas)
 	FindActive(ctx context.Context, userID string) ([]entity.Reservation, error)
 
+	// FindByUser busca todas as reservas de um usuário (broker)
+	FindByUser(ctx context.Context, userID string) ([]entity.Reservation, error)
+
 	// FindExpired busca reservas expiradas para job de limpeza
 	FindExpired(ctx context.Context) ([]entity.Reservation, error)
 

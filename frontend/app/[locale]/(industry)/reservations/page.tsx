@@ -30,10 +30,12 @@ import {
   ModalClose,
 } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { useAuth } from '@/lib/hooks/useAuth';
 import { useToast } from '@/lib/hooks/useToast';
 import {
   useAllReservations,
+  useMyReservations,
   useCancelReservation,
   useConfirmSale,
 } from '@/lib/api/queries/useReservations';
@@ -63,10 +65,15 @@ export default function ReservationsPage() {
   const { success, error } = useToast();
 
   const isAdmin = user?.role === 'ADMIN_INDUSTRIA';
+  const isBroker = user?.role === 'BROKER';
   const [activeTab, setActiveTab] = useState<TabType>('pending');
 
-  // Query para buscar todas as reservas
+  // Query para buscar reservas - admin vê todas, broker vê as próprias
   const allReservationsQuery = useAllReservations({ enabled: isAdmin });
+  const myReservationsQuery = useMyReservations();
+  
+  // Usar a query correta baseado no role
+  const reservationsQuery = isAdmin ? allReservationsQuery : myReservationsQuery;
 
   // Mutations
   const cancelReservation = useCancelReservation();
@@ -75,25 +82,39 @@ export default function ReservationsPage() {
   // Modals
   const [saleModalOpen, setSaleModalOpen] = useState(false);
   const [sellingReservation, setSellingReservation] = useState<Reservation | null>(null);
-  const [salePrice, setSalePrice] = useState('');
+  const [salePrice, setSalePrice] = useState<number>(0);
   const [saleQuantity, setSaleQuantity] = useState(1);
-
-  // Filtrar reservas baseado na aba ativa
-  const allReservations = allReservationsQuery.data ?? [];
   
-  const reservations = activeTab === 'pending'
-    ? allReservations.filter(r => r.status === 'ATIVA')
-    : allReservations;
+  // Cancel Modal
+  const [cancelModalOpen, setCancelModalOpen] = useState(false);
+  const [cancellingReservation, setCancellingReservation] = useState<Reservation | null>(null);
+
+  // Filtrar reservas baseado na aba ativa (apenas para admin)
+  const allReservations = reservationsQuery.data ?? [];
+  
+  // Broker vê todas as suas reservas, admin pode filtrar
+  const reservations = isBroker 
+    ? allReservations
+    : (activeTab === 'pending'
+      ? allReservations.filter(r => r.status === 'ATIVA')
+      : allReservations);
   
   const pendingCount = allReservations.filter(r => r.status === 'ATIVA').length;
 
   // Handlers
-  const handleCancel = async (id: string) => {
-    if (!confirm(t('confirmCancel') || 'Deseja cancelar esta reserva?')) return;
+  const handleOpenCancel = (reservation: Reservation) => {
+    setCancellingReservation(reservation);
+    setCancelModalOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancellingReservation) return;
 
     try {
-      await cancelReservation.mutateAsync(id);
+      await cancelReservation.mutateAsync(cancellingReservation.id);
       success(t('cancelSuccess') || 'Reserva cancelada');
+      setCancelModalOpen(false);
+      setCancellingReservation(null);
     } catch (err) {
       error(t('cancelError') || 'Erro ao cancelar reserva');
     }
@@ -108,22 +129,22 @@ export default function ReservationsPage() {
       const areaPerSlab = (reservation.batch.height * reservation.batch.width) / 10000;
       const totalArea = areaPerSlab * reservation.quantitySlabsReserved;
       const suggestedTotal = reservation.reservedPrice * totalArea;
-      setSalePrice(suggestedTotal.toFixed(2));
+      setSalePrice(Math.round(suggestedTotal * 100) / 100);
     } else {
-      setSalePrice('');
+      setSalePrice(0);
     }
     
     setSaleModalOpen(true);
   };
 
   const handleConfirmSale = async () => {
-    if (!sellingReservation || !salePrice) return;
+    if (!sellingReservation || salePrice <= 0) return;
 
     try {
       await confirmSale.mutateAsync({
         reservationId: sellingReservation.id,
         quantitySlabsSold: saleQuantity,
-        finalSoldPrice: parseFloat(salePrice),
+        finalSoldPrice: salePrice,
       });
       success(t('saleSuccess') || 'Venda confirmada com sucesso!');
       setSaleModalOpen(false);
@@ -146,7 +167,7 @@ export default function ReservationsPage() {
   };
 
   const refetchAll = () => {
-    allReservationsQuery.refetch();
+    reservationsQuery.refetch();
   };
 
   return (
@@ -165,50 +186,52 @@ export default function ReservationsPage() {
           <Button
             variant="secondary"
             onClick={refetchAll}
-            loading={allReservationsQuery.isFetching}
+            loading={reservationsQuery.isFetching}
           >
             <RefreshCcw className="w-4 h-4 mr-2" />
             {t('refresh') || 'Atualizar'}
           </Button>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-4 mt-6">
-          <button
-            onClick={() => setActiveTab('pending')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
-              activeTab === 'pending'
-                ? 'bg-amber-100 text-amber-700'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            <Package className="w-4 h-4" />
-            {t('pending') || 'Pendentes'}
-            {pendingCount > 0 && (
-              <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
-                {pendingCount}
-              </span>
-            )}
-          </button>
+        {/* Tabs - apenas para admin */}
+        {isAdmin && (
+          <div className="flex gap-4 mt-6">
+            <button
+              onClick={() => setActiveTab('pending')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors flex items-center gap-2 ${
+                activeTab === 'pending'
+                  ? 'bg-amber-100 text-amber-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <Package className="w-4 h-4" />
+              {t('pending') || 'Pendentes'}
+              {pendingCount > 0 && (
+                <span className="bg-amber-500 text-white text-xs px-2 py-0.5 rounded-full">
+                  {pendingCount}
+                </span>
+              )}
+            </button>
 
-          <button
-            onClick={() => setActiveTab('all')}
-            className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-              activeTab === 'all'
-                ? 'bg-slate-200 text-slate-700'
-                : 'text-slate-600 hover:bg-slate-100'
-            }`}
-          >
-            {t('allReservations') || 'Todas'}
-          </button>
-        </div>
+            <button
+              onClick={() => setActiveTab('all')}
+              className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeTab === 'all'
+                  ? 'bg-slate-200 text-slate-700'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {t('allReservations') || 'Todas'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}
       <div className="px-8 py-6">
-        {allReservationsQuery.isLoading ? (
+        {reservationsQuery.isLoading ? (
           <LoadingState variant="table" rows={5} columns={7} />
-        ) : allReservationsQuery.isError ? (
+        ) : reservationsQuery.isError ? (
           <EmptyState
             icon={AlertCircle}
             title={t('loadError') || 'Erro ao carregar'}
@@ -320,7 +343,7 @@ export default function ReservationsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => handleCancel(reservation.id)}
+                            onClick={() => handleOpenCancel(reservation)}
                             loading={cancelReservation.isPending}
                           >
                             <Trash2 className="w-4 h-4" />
@@ -395,12 +418,10 @@ export default function ReservationsPage() {
                       <label className="block text-sm font-medium text-slate-700 mb-1">
                         {t('salePrice') || 'Valor total da venda (R$)'}
                       </label>
-                      <Input
-                        type="number"
+                      <MoneyInput
                         value={salePrice}
-                        onChange={(e) => setSalePrice(e.target.value)}
-                        placeholder="0.00"
-                        step="0.01"
+                        onChange={setSalePrice}
+                        prefix="R$"
                       />
                     </div>
 
@@ -428,10 +449,77 @@ export default function ReservationsPage() {
           <Button
             variant="primary"
             onClick={handleConfirmSale}
-            disabled={!salePrice || parseFloat(salePrice) <= 0}
+            disabled={salePrice <= 0}
             loading={confirmSale.isPending}
           >
             {t('confirmSaleButton') || 'Confirmar Venda'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Cancel Reservation Modal */}
+      <Modal open={cancelModalOpen} onClose={() => setCancelModalOpen(false)}>
+        <ModalHeader>
+          <ModalTitle>Cancelar Reserva</ModalTitle>
+          <ModalClose onClose={() => setCancelModalOpen(false)} />
+        </ModalHeader>
+        <ModalContent>
+          {cancellingReservation && (
+            <div className="space-y-4">
+              {/* Warning */}
+              <div className="flex items-start gap-3 p-4 bg-rose-50 border border-rose-200 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-medium text-rose-800">
+                    Atenção: Esta ação não pode ser desfeita
+                  </p>
+                  <p className="text-sm text-rose-600 mt-1">
+                    As chapas reservadas voltarão a estar disponíveis no estoque.
+                  </p>
+                </div>
+              </div>
+
+              {/* Reservation Info */}
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Lote</p>
+                    <p className="font-mono text-sm">{cancellingReservation.batch?.batchCode || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Produto</p>
+                    <p className="text-sm font-medium">{cancellingReservation.batch?.product?.name || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Quantidade</p>
+                    <p className="text-sm font-medium text-emerald-600">{cancellingReservation.quantitySlabsReserved} chapas</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Reservado por</p>
+                    <p className="text-sm">{cancellingReservation.reservedBy?.name || '-'}</p>
+                  </div>
+                </div>
+                {cancellingReservation.reservedPrice && (
+                  <div className="pt-3 border-t border-slate-200">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Preço Indicado</p>
+                    <p className="text-sm font-medium">{formatCurrency(cancellingReservation.reservedPrice)}/m²</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </ModalContent>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setCancelModalOpen(false)}>
+            Voltar
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmCancel}
+            loading={cancelReservation.isPending}
+          >
+            <Trash2 className="w-4 h-4 mr-2" />
+            Cancelar Reserva
           </Button>
         </ModalFooter>
       </Modal>

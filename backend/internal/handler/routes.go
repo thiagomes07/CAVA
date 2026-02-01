@@ -139,8 +139,12 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Captura de clientes
 			r.Post("/clientes/interest", h.Public.CaptureClienteInterest)
 
-			// Catálogo público
+			// Catálogo público (por link gerado)
 			r.Get("/catalogo/{slug}", h.CatalogLink.GetPublicBySlug)
+
+			// Catálogo público da indústria (por slug da indústria)
+			r.Get("/deposits/{slug}", h.Public.GetPublicDepositBySlug)
+			r.Get("/deposits/{slug}/batches", h.Public.GetPublicDepositBatches)
 		})
 
 		// ============================================

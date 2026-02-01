@@ -15,6 +15,8 @@ type sharedInventoryService struct {
 	sharedRepo  repository.SharedInventoryRepository
 	batchRepo   repository.BatchRepository
 	userRepo    repository.UserRepository
+	mediaRepo   repository.MediaRepository
+	productRepo repository.ProductRepository
 	logger      *zap.Logger
 }
 
@@ -22,13 +24,17 @@ func NewSharedInventoryService(
 	sharedRepo repository.SharedInventoryRepository,
 	batchRepo repository.BatchRepository,
 	userRepo repository.UserRepository,
+	mediaRepo repository.MediaRepository,
+	productRepo repository.ProductRepository,
 	logger *zap.Logger,
 ) *sharedInventoryService {
 	return &sharedInventoryService{
-		sharedRepo: sharedRepo,
-		batchRepo:  batchRepo,
-		userRepo:   userRepo,
-		logger:     logger,
+		sharedRepo:  sharedRepo,
+		batchRepo:   batchRepo,
+		userRepo:    userRepo,
+		mediaRepo:   mediaRepo,
+		productRepo: productRepo,
+		logger:      logger,
 	}
 }
 
@@ -175,6 +181,29 @@ func (s *sharedInventoryService) GetUserInventory(ctx context.Context, userID st
 				zap.Error(err),
 			)
 		} else {
+			// Buscar mídias do lote
+			medias, err := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+			if err != nil {
+				s.logger.Warn("erro ao buscar mídias do lote",
+					zap.String("batchId", batch.ID),
+					zap.Error(err),
+				)
+				medias = []entity.Media{}
+			}
+			batch.Medias = medias
+
+			// Buscar produto do lote
+			product, err := s.productRepo.FindByID(ctx, batch.ProductID)
+			if err != nil {
+				s.logger.Warn("erro ao buscar produto do lote",
+					zap.String("batchId", batch.ID),
+					zap.String("productId", batch.ProductID),
+					zap.Error(err),
+				)
+			} else {
+				batch.Product = product
+			}
+
 			shared[i].Batch = batch
 		}
 
