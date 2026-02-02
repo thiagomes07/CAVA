@@ -9,6 +9,9 @@ DROP INDEX IF EXISTS idx_sales_history_reservation;
 DROP INDEX IF EXISTS idx_sales_history_source;
 DROP INDEX IF EXISTS idx_clientes_source_batch;
 DROP INDEX IF EXISTS idx_reservations_industry;
+-- Indices movidos da 000027
+DROP INDEX IF EXISTS idx_reservations_pending_approval;
+DROP INDEX IF EXISTS idx_reservations_approved;
 
 -- Remover colunas de batches
 ALTER TABLE batches DROP COLUMN IF EXISTS total_views;

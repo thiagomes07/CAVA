@@ -14,18 +14,4 @@ ALTER TABLE reservations ADD COLUMN IF NOT EXISTS approved_at TIMESTAMP WITH TIM
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
 ALTER TABLE reservations ADD COLUMN IF NOT EXISTS approval_expires_at TIMESTAMP WITH TIME ZONE;
 
--- Indice para reservas pendentes de aprovacao
-CREATE INDEX IF NOT EXISTS idx_reservations_pending_approval
-ON reservations(status, created_at)
-WHERE status = 'PENDENTE_APROVACAO';
 
--- Indice para reservas aprovadas
-CREATE INDEX IF NOT EXISTS idx_reservations_approved
-ON reservations(status, approved_at)
-WHERE status = 'APROVADA';
-
--- Comentarios
-COMMENT ON COLUMN reservations.approved_by IS 'Usuario admin que aprovou a reserva';
-COMMENT ON COLUMN reservations.approved_at IS 'Data/hora da aprovacao';
-COMMENT ON COLUMN reservations.rejection_reason IS 'Motivo da rejeicao (quando rejeitada)';
-COMMENT ON COLUMN reservations.approval_expires_at IS 'Prazo para admin aprovar a reserva';

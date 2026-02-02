@@ -52,3 +52,20 @@ COMMENT ON COLUMN clientes.created_by_user_id IS 'Usuario que cadastrou o client
 COMMENT ON COLUMN clientes.total_purchases IS 'Total de compras realizadas';
 COMMENT ON COLUMN clientes.total_spent IS 'Valor total gasto em compras';
 COMMENT ON COLUMN clientes.source_batch_id IS 'Lote que gerou o interesse do cliente';
+
+-- --- MOVIDO DA MIGRATION 000027 PARA EVITAR CONFLITO DE TRANSACAO COM ENUM ---
+-- Indice para reservas pendentes de aprovacao
+CREATE INDEX IF NOT EXISTS idx_reservations_pending_approval
+ON reservations(status, created_at)
+WHERE status = 'PENDENTE_APROVACAO';
+
+-- Indice para reservas aprovadas
+CREATE INDEX IF NOT EXISTS idx_reservations_approved
+ON reservations(status, approved_at)
+WHERE status = 'APROVADA';
+
+-- Comentarios
+COMMENT ON COLUMN reservations.approved_by IS 'Usuario admin que aprovou a reserva';
+COMMENT ON COLUMN reservations.approved_at IS 'Data/hora da aprovacao';
+COMMENT ON COLUMN reservations.rejection_reason IS 'Motivo da rejeicao (quando rejeitada)';
+COMMENT ON COLUMN reservations.approval_expires_at IS 'Prazo para admin aprovar a reserva';
