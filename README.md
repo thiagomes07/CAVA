@@ -70,7 +70,7 @@ O sistema possui 3 tipos de usuários (seeds automáticos criados no primeiro ru
 
 | Role | Email | Senha | Permissões |
 |------|-------|-------|------------|
-| Admin Indústria | admin@pedrasdemo.com | anti | Acesso total |
+| Admin Indústria | admin@pedrasdemo.com | Admin@123 | Acesso total |
 | Vendedor Interno | vendedor@pedrasdemo.com | Vendedor@123 | Gestão de estoque e vendas |
 | Broker | broker@example.com | Broker@123 | Estoque compartilhado e clientes |
 

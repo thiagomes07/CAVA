@@ -156,9 +156,10 @@ func (c *Config) Validate() error {
 	if len(c.Auth.CSRFSecret) < 32 {
 		return fmt.Errorf("CSRF_SECRET deve ter pelo menos 32 caracteres")
 	}
-	if c.Auth.CookieDomain == "" {
-		return fmt.Errorf("COOKIE_DOMAIN é obrigatório")
-	}
+	// CookieDomain pode ser vazio (HostOnly cookie) para facilitar deploy em IPs dinâmicos
+	// if c.Auth.CookieDomain == "" {
+	// 	return fmt.Errorf("COOKIE_DOMAIN é obrigatório")
+	// }
 
 	// Server
 	if c.Server.FrontendURL == "" {

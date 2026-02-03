@@ -135,7 +135,7 @@ async function attemptRefresh(request: NextRequest, pathname: string, locale: Lo
     return NextResponse.redirect(loginUrl);
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
     method: 'POST',
     headers: {

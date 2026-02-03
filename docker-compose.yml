@@ -1,0 +1,171 @@
+
+
+services:
+  # =============================================
+  # PROXY (NGINX) - Entry Point
+  # =============================================
+  nginx:
+    image: nginx:alpine
+    container_name: cava-nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - frontend
+      - api
+    networks:
+      - cava-network
+
+  # =============================================
+  # FRONTEND (Next.js)
+  # =============================================
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Build-time var: use relative path so browser hits Nginx which proxies to Backend
+        NEXT_PUBLIC_API_URL: /api
+    container_name: cava-frontend
+    restart: always
+    environment:
+      # Runtime var for Server-Side Rendering (internal docker network)
+      INTERNAL_API_URL: http://api:3001/api
+    networks:
+      - cava-network
+
+  # =============================================
+  # BACKEND API (Go)
+  # =============================================
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cava-api
+    restart: unless-stopped
+    environment:
+      # DB Config
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: cava_user
+      DB_PASSWORD: cava_password_dev
+      DB_NAME: cava_db
+      DB_SSL_MODE: disable
+      
+      # Storage Config
+      STORAGE_TYPE: minio
+      STORAGE_ENDPOINT: http://minio:9000
+      STORAGE_ACCESS_KEY: minio_access_key
+      STORAGE_SECRET_KEY: minio_secret_key
+      STORAGE_BUCKET_NAME: cava-media
+      STORAGE_REGION: us-east-1
+      STORAGE_PUBLIC_URL: http://localhost:80/minio/cava-media # Note: You might need to adjust MinIO for public access if needed, or proxy via Nginx too. For now keeping simple.
+      
+      # Auth
+      JWT_SECRET: "your-super-secret-jwt-key-change-this-in-production-min-32-chars"
+      PASSWORD_PEPPER: "your-password-pepper-never-change-after-production"
+      CSRF_SECRET: "your-csrf-secret-key-change-this"
+      COOKIE_DOMAIN: "" # Empty means HostOnly cookie (works on any IP/Domain)
+      COOKIE_SECURE: "false"
+      
+      # App
+      APP_ENV: development
+      APP_PORT: 3001
+      FRONTEND_URL: http://localhost # This allows redirects to root. If accessing via IP, this might be okay.
+      PUBLIC_LINK_BASE_URL: http://localhost
+      ALLOWED_ORIGINS: "http://localhost,http://frontend:3000"
+      
+      # SES (Email)
+      # Set USE_SES=true only if you have verified the sender email in AWS SES or are out of Sandbox
+      USE_SES: "false" 
+      SES_REGION: "us-east-1"
+      SES_SENDER_EMAIL: "noreply@example.com"
+      
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # =============================================
+  # DATABASE (Postgres)
+  # =============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: cava-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: cava_user
+      POSTGRES_PASSWORD: cava_password_dev
+      POSTGRES_DB: cava_db
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cava_user -d cava_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # =============================================
+  # MINIO (S3)
+  # =============================================
+  minio:
+    image: minio/minio:latest
+    container_name: cava-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_access_key
+      MINIO_ROOT_PASSWORD: minio_secret_key
+    volumes:
+      - minio-data:/data
+    networks:
+      - cava-network
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+      start_period: 20s
+
+  # =============================================
+  # MINIO INIT
+  # =============================================
+  minio-init:
+    image: minio/mc:latest
+    container_name: cava-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      echo 'Aguardando MinIO estar pronto...';
+      sleep 5;
+      mc alias set minio http://minio:9000 minio_access_key minio_secret_key;
+      mc mb --ignore-existing minio/cava-media;
+      mc anonymous set download minio/cava-media;
+      echo 'Bucket cava-media criado e configurado com sucesso!';
+      exit 0;
+      "
+    networks:
+      - cava-network
+
+networks:
+  cava-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+  minio-data:

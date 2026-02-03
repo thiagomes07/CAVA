@@ -72,7 +72,12 @@ class ApiClient {
   }
 
   private buildURL(endpoint: string, params?: Record<string, string | number | boolean | undefined>): string {
-    const url = new URL(endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`);
+    const path = endpoint.startsWith('http') ? endpoint : `${this.baseURL}${endpoint}`;
+    
+    // Provide a valid base for relative URLs (required by URL constructor)
+    // If the path is absolute, the base argument is ignored
+    const base = typeof window !== 'undefined' ? window.location.origin : 'http://localhost';
+    const url = new URL(path, base);
 
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
