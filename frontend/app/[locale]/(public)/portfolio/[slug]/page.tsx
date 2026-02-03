@@ -314,7 +314,9 @@ export default function PublicPortfolioPage() {
                     className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
                   >
                     <Mail className="w-4 h-4" />
-                    <span>{truncateSingleLine(industry.contact.email, 40)}</span>
+                    <span>
+                      {truncateSingleLine(industry.contact.email, 40)}
+                    </span>
                   </a>
                 )}
                 {industry.contact?.phone && (
@@ -323,7 +325,9 @@ export default function PublicPortfolioPage() {
                     className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
                   >
                     <Phone className="w-4 h-4" />
-                    <span>{truncateSingleLine(industry.contact.phone, 30)}</span>
+                    <span>
+                      {truncateSingleLine(industry.contact.phone, 30)}
+                    </span>
                   </a>
                 )}
               </div>
@@ -341,23 +345,26 @@ export default function PublicPortfolioPage() {
                     >
                       <SocialIcon url={link.url} name={link.name} />
                       <span className="text-sm text-slate-600">
-                        {truncateSingleLine(getSocialNetworkName(link.url, link.name), 20)}
-                      <a
-                        href={`mailto:${industry.contact.email}`}
-                        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                      >
+                        {truncateSingleLine(
+                          getSocialNetworkName(link.url, link.name),
+                          20,
+                        )}
+                      </span>
+                    </a>
+                  ))}
+                </div>
               )}
             </div>
 
             <div className="shrink-0">
               <Button
-                      <a
-                        href={`tel:${industry.contact.phone}`}
-                        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
-                      >
-                        <Phone className="w-4 h-4" />
-                        <span>{truncateSingleLine(industry.contact.phone, 30)}</span>
-                      </a>
+                size="lg"
+                onClick={() => {
+                  setSelectedProduct(null);
+                  setShowContactModal(true);
+                }}
+                className="shadow-lg"
+              >
                 <MessageCircle className="w-5 h-5 mr-2" />
                 {t("contactUs")}
               </Button>
@@ -726,7 +733,9 @@ export default function PublicPortfolioPage() {
                       {truncateSingleLine(selectedProduct.material, 30)}
                     </Badge>
                     {selectedProduct.finish && (
-                      <Badge variant="outline">{truncateSingleLine(selectedProduct.finish, 30)}</Badge>
+                      <Badge variant="outline">
+                        {truncateSingleLine(selectedProduct.finish, 30)}
+                      </Badge>
                     )}
                   </div>
 
@@ -906,7 +915,9 @@ function ProductCard({
           <h3 className="font-medium text-slate-900 text-sm">
             {truncateSingleLine(product.name, 50)}
           </h3>
-          <p className="text-xs text-slate-500">{truncateSingleLine(product.material, 30)}</p>
+          <p className="text-xs text-slate-500">
+            {truncateSingleLine(product.material, 30)}
+          </p>
         </div>
       </button>
     );
@@ -948,8 +959,10 @@ function ProductCard({
         )}
       </button>
 
-        <div className="p-4">
-        <p className="text-xs text-slate-400 mb-1">{truncateSingleLine(product.sku, 30)}</p>
+      <div className="p-4">
+        <p className="text-xs text-slate-400 mb-1">
+          {truncateSingleLine(product.sku, 30)}
+        </p>
         <h3 className="font-semibold text-slate-900 mb-2">
           {truncateSingleLine(product.name, 60)}
         </h3>
@@ -1007,20 +1020,30 @@ function SocialIcon({ url, name }: { url: string; name: string }) {
 }
 
 function getSocialNetworkName(url: string, name: string) {
-  const lowerUrl = (url || '').toLowerCase();
-  const lowerName = (name || '').toLowerCase();
+  const lowerUrl = (url || "").toLowerCase();
+  const lowerName = (name || "").toLowerCase();
 
-  if (lowerUrl.includes('instagram') || lowerName.includes('instagram')) return 'Instagram';
-  if (lowerUrl.includes('facebook') || lowerName.includes('facebook')) return 'Facebook';
-  if (lowerUrl.includes('linkedin') || lowerName.includes('linkedin')) return 'LinkedIn';
-  if (lowerUrl.includes('twitter') || lowerUrl.includes('x.com') || lowerName.includes('twitter')) return 'Twitter';
-  if (lowerUrl.includes('youtube') || lowerName.includes('youtube')) return 'YouTube';
-  if (lowerUrl.includes('tiktok') || lowerName.includes('tiktok')) return 'TikTok';
+  if (lowerUrl.includes("instagram") || lowerName.includes("instagram"))
+    return "Instagram";
+  if (lowerUrl.includes("facebook") || lowerName.includes("facebook"))
+    return "Facebook";
+  if (lowerUrl.includes("linkedin") || lowerName.includes("linkedin"))
+    return "LinkedIn";
+  if (
+    lowerUrl.includes("twitter") ||
+    lowerUrl.includes("x.com") ||
+    lowerName.includes("twitter")
+  )
+    return "Twitter";
+  if (lowerUrl.includes("youtube") || lowerName.includes("youtube"))
+    return "YouTube";
+  if (lowerUrl.includes("tiktok") || lowerName.includes("tiktok"))
+    return "TikTok";
 
   // fallback to provided name or derive from url hostname
   if (name && name.trim().length > 0) return name;
   try {
-    const hostname = new URL(url).hostname.replace('www.', '');
+    const hostname = new URL(url).hostname.replace("www.", "");
     return hostname;
   } catch {
     return url;
