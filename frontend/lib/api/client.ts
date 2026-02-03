@@ -182,6 +182,10 @@ class ApiClient {
         );
       }
 
+      if (response.status === 204) {
+        return null as T;
+      }
+
       const data: ApiResponse<T> = await response.json();
       return data.data;
     } catch (error) {

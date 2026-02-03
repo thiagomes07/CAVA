@@ -29,4 +29,10 @@ type ClienteService interface {
 	// SendLinksToClientes envia links de lotes para clientes selecionados via email
 	// Apenas clientes com email válido como contato receberão o email
 	SendLinksToClientes(ctx context.Context, input entity.SendLinksToClientesInput) (*entity.SendLinksResponse, error)
+
+	// Update atualiza os dados de um cliente manualmente (usuário autenticado)
+	Update(ctx context.Context, id string, input entity.CreateClienteManualInput) (*entity.Cliente, error)
+
+	// Delete remove um cliente (usuário autenticado)
+	Delete(ctx context.Context, id string) error
 }

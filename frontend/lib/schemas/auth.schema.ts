@@ -162,6 +162,88 @@ export const inviteBrokerSchema = z.object({
     ),
 });
 
+export const updateBrokerSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Nome é obrigatório')
+    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
+    .transform((v) => v.trim()),
+  email: z
+    .string()
+    .min(1, 'Email é obrigatório')
+    .email('Email inválido')
+    .transform((v) => v.trim()),
+  phone: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'Telefone inválido'
+    ),
+  whatsapp: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'WhatsApp inválido'
+    ),
+});
+
+export const updateSellerSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Nome é obrigatório')
+    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
+    .transform((v) => v.trim()),
+  email: z
+    .string()
+    .min(1, 'Email é obrigatório')
+    .email('Email inválido')
+    .transform((v) => v.trim()),
+  phone: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'Telefone inválido'
+    ),
+  whatsapp: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'WhatsApp inválido'
+    ),
+});
+
+export const inviteSellerSchema = z.object({
+  name: z
+    .string()
+    .min(1, 'Nome é obrigatório')
+    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
+    .transform((v) => v.trim()),
+  email: z
+    .string()
+    .min(1, 'Email é obrigatório')
+    .email('Email inválido')
+    .transform((v) => v.trim()),
+  phone: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'Telefone inválido'
+    ),
+  whatsapp: z
+    .string()
+    .optional()
+    .refine(
+      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
+      'WhatsApp inválido'
+    ),
+  isAdmin: z.boolean().default(false),
+});
+
 export const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Senha atual é obrigatória'),
   newPassword: z
@@ -180,4 +262,8 @@ export const changePasswordSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type InviteBrokerInput = z.infer<typeof inviteBrokerSchema>;
+export type UpdateBrokerInput = z.infer<typeof updateBrokerSchema>;
+export type UpdateSellerInput = z.infer<typeof updateSellerSchema>;
+export type InviteSellerInput = z.infer<typeof inviteSellerSchema>;
 export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
+

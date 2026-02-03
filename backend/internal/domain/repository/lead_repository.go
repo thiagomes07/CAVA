@@ -35,4 +35,7 @@ type ClienteRepository interface {
 
 	// CountByIndustry conta clientes de uma indústria
 	CountByIndustry(ctx context.Context, industryID string) (int, error)
+
+	// Delete remove um cliente
+	Delete(ctx context.Context, tx *sql.Tx, id string) error
 }

@@ -568,3 +568,59 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 
 	return s.emailSender.Send(ctx, msg)
 }
+
+func (s *clienteService) Update(ctx context.Context, id string, input entity.CreateClienteManualInput) (*entity.Cliente, error) {
+	// Verificar se cliente existe
+	// Verificar se cliente existe
+	existing, err := s.clienteRepo.FindByID(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	// Verificar conflito de email/telefone com OUTRO cliente
+	var searchContact string
+	if input.Email != nil && *input.Email != "" {
+		searchContact = *input.Email
+	} else if input.Phone != nil && *input.Phone != "" {
+		searchContact = *input.Phone
+	}
+
+	if searchContact != "" {
+		conflict, err := s.clienteRepo.FindByContact(ctx, searchContact)
+		if err == nil && conflict != nil && conflict.ID != id {
+			return nil, domainErrors.NewConflictError("Cliente com este contato já existe")
+		}
+	}
+
+	// Atualizar campos
+	existing.Name = input.Name
+	existing.Email = input.Email
+	existing.Phone = input.Phone
+	existing.Whatsapp = input.Whatsapp
+	existing.Message = input.Message
+	existing.MarketingOptIn = input.MarketingOptIn
+	// Keep existing metadata like SalesLinkID, CreatedByUserID
+
+	if err := s.clienteRepo.Update(ctx, nil, existing); err != nil {
+		s.logger.Error("erro ao atualizar cliente", zap.Error(err))
+		return nil, err
+	}
+
+	return existing, nil
+}
+
+func (s *clienteService) Delete(ctx context.Context, id string) error {
+	// Verificar se existe
+	// Verificar se existe
+	_, err := s.clienteRepo.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	if err := s.clienteRepo.Delete(ctx, nil, id); err != nil {
+		s.logger.Error("erro ao deletar cliente", zap.String("id", id), zap.Error(err))
+		return err
+	}
+
+	return nil
+}

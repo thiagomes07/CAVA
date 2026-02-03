@@ -277,3 +277,74 @@ func (h *ClienteHandler) SendLinks(w http.ResponseWriter, r *http.Request) {
 
 	response.OK(w, result)
 }
+
+// Update godoc
+// @Summary Atualiza um cliente
+// @Description Atualiza os dados de um cliente existente
+// @Tags clientes
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do cliente"
+// @Param body body entity.CreateClienteManualInput true "Dados do cliente"
+// @Success 200 {object} entity.Cliente
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/clientes/{id} [put]
+func (h *ClienteHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do cliente é obrigatório", nil)
+		return
+	}
+
+	var input entity.CreateClienteManualInput
+	if err := response.ParseJSON(r, &input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	if err := h.validator.Validate(input); err != nil {
+		response.HandleError(w, err)
+		return
+	}
+
+	cliente, err := h.clienteService.Update(r.Context(), id, input)
+	if err != nil {
+		h.logger.Error("erro ao atualizar cliente",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, cliente)
+}
+
+// Delete godoc
+// @Summary Remove um cliente
+// @Description Remove um cliente existente
+// @Tags clientes
+// @Produce json
+// @Param id path string true "ID do cliente"
+// @Success 204
+// @Failure 404 {object} response.ErrorResponse
+// @Router /api/clientes/{id} [delete]
+func (h *ClienteHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+	if id == "" {
+		response.BadRequest(w, "ID do cliente é obrigatório", nil)
+		return
+	}
+
+	err := h.clienteService.Delete(r.Context(), id)
+	if err != nil {
+		h.logger.Error("erro ao deletar cliente",
+			zap.String("id", id),
+			zap.Error(err),
+		)
+		response.HandleError(w, err)
+		return
+	}
+
+	response.NoContent(w)
+}

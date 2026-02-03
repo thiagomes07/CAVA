@@ -12,58 +12,58 @@ export function formatWhatsAppMessage(
   customMessage?: string,
   locale: string = 'pt'
 ): string {
-  const greeting = `Olá ${clienteName}! 👋\n\n`;
-  
+  const greeting = `Olá ${clienteName}! \uD83D\uDC4B\n\n`; // Emoji encoded
+
   const customPart = customMessage ? `${customMessage}\n\n` : '';
-  
-  const intro = locale === 'pt' 
+
+  const intro = locale === 'pt'
     ? 'Confira os produtos disponíveis:\n\n'
     : locale === 'es'
-    ? 'Mira los productos disponibles:\n\n'
-    : 'Check out the available products:\n\n';
-  
+      ? 'Mira los productos disponibles:\n\n'
+      : 'Check out the available products:\n\n';
+
   const linksText = links.map((link, index) => {
     const title = link.title || link.batch?.product?.name || link.product?.name || 'Link';
     const linkType = formatLinkType(link.linkType, locale);
-    
-    let details = `🔹 ${title}\n`;
-    details += `📋 ${linkType}`;
-    
+
+    let details = `\uD83D\uDD39 ${title}\n`; // Small blue diamond
+    details += `\uD83D\uDCCB ${linkType}`; // Clipboard
+
     // Adicionar informações de preço se disponível
     if (link.showPrice && link.displayPrice) {
       const price = link.displayPrice.toLocaleString('pt-BR', {
         style: 'currency',
         currency: 'BRL'
       });
-      details += ` | 💰 ${price}`;
+      details += ` | \uD83D\uDCB0 ${price}`; // Money bag
     }
-    
+
     // Adicionar informações do lote se existir
     if (link.batch) {
       const dimensions = `${link.batch.width}x${link.batch.height}x${link.batch.thickness}cm`;
-      details += `\n📏 ${dimensions}`;
+      details += `\n\uD83D\uDCCF ${dimensions}`; // Straight ruler
       if (link.batch.availableSlabs > 0) {
         details += ` | ${link.batch.availableSlabs} chapas`;
       }
     }
-    
+
     // Construir URL do link
-    const baseUrl = typeof window !== 'undefined' 
-      ? window.location.origin 
+    const baseUrl = typeof window !== 'undefined'
+      ? window.location.origin
       : 'https://cava.app'; // fallback
     const linkUrl = `${baseUrl}/${locale}/${link.slugToken}`;
-    
-    details += `\n🔗 ${linkUrl}\n`;
-    
+
+    details += `\n\uD83D\uDD17 ${linkUrl}\n`; // Link symbol
+
     return details;
   }).join('\n');
-  
+
   const footer = locale === 'pt'
     ? '\nQualquer dúvida, estou à disposição!'
     : locale === 'es'
-    ? '\n¡Cualquier duda, estoy a tu disposición!'
-    : '\nAny questions, feel free to ask!';
-  
+      ? '\n¡Cualquier duda, estoy a tu disposición!'
+      : '\nAny questions, feel free to ask!';
+
   return greeting + customPart + intro + linksText + footer;
 }
 
@@ -93,7 +93,7 @@ function formatLinkType(linkType: string, locale: string): string {
       en: 'Multiple Batches'
     }
   };
-  
+
   return types[linkType]?.[locale] || linkType;
 }
 
@@ -107,7 +107,7 @@ export function validateWhatsAppMessage(message: string): {
   warning: boolean;
 } {
   const length = message.length;
-  
+
   return {
     valid: length <= WHATSAPP_MAX_LENGTH,
     length,
@@ -130,16 +130,16 @@ export function prepareEmailLinks(salesLinkIds: string[]): string[] {
 export function generateWhatsAppUrl(phone: string, message: string): string {
   // Remove caracteres não numéricos do telefone
   const cleanPhone = phone.replace(/\D/g, '');
-  
+
   // Adiciona código do país se não tiver (Brasil = 55)
   const phoneWithCountry = cleanPhone.length === 11 || cleanPhone.length === 10
     ? `55${cleanPhone}`
     : cleanPhone;
-  
+
   // Encode da mensagem para URL
   const encodedMessage = encodeURIComponent(message);
-  
-  return `https://wa.me/${phoneWithCountry}?text=${encodedMessage}`;
+
+  return `https://api.whatsapp.com/send?phone=${phoneWithCountry}&text=${encodedMessage}`;
 }
 
 /**
@@ -147,17 +147,17 @@ export function generateWhatsAppUrl(phone: string, message: string): string {
  */
 export function filterActiveLinks(links: SalesLink[]): SalesLink[] {
   const now = new Date();
-  
+
   return links.filter(link => {
     // Link deve estar ativo
     if (!link.isActive) return false;
-    
+
     // Se tem data de expiração, verificar se não expirou
     if (link.expiresAt) {
       const expiresAt = new Date(link.expiresAt);
       if (expiresAt < now) return false;
     }
-    
+
     return true;
   });
 }

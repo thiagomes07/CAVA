@@ -48,14 +48,8 @@ export interface User {
   updatedAt: string;
 }
 
-export interface PortfolioDisplaySettings {
-  showName: boolean;
-  showDescription: boolean;
-  showLogo: boolean;
-  showContact: boolean;
-  showLocation: boolean;
-  locationLevel: "none" | "country" | "state" | "city" | "full";
-  isPublished: boolean;
+export interface BrokerWithStats extends User {
+  sharedBatchesCount: number;
 }
 
 export interface Industry {

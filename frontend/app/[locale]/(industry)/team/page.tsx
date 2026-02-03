@@ -34,30 +34,9 @@ import type { User } from '@/lib/types';
 import { z } from 'zod';
 import { cn } from '@/lib/utils/cn';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
-
-const inviteSellerSchema = z.object({
-  name: z
-    .string()
-    .min(1, 'Nome é obrigatório')
-    .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
-    .transform((v) => v.trim()),
-  email: z.string().min(1, 'Email é obrigatório').email('Email inválido').transform((v) => v.trim()),
-  phone: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
-      'Telefone inválido'
-    ),
-  whatsapp: z
-    .string()
-    .optional()
-    .refine(
-      (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
-      'WhatsApp inválido'
-    ),
-  isAdmin: z.boolean(),
-});
+import { TeamMemberFormModal } from '@/components/team/TeamMemberFormModal';
+import { TeamMemberInviteModal } from '@/components/team/TeamMemberInviteModal';
+import type { UpdateSellerInput, InviteSellerInput } from '@/lib/schemas/auth.schema';
 
 // Schema for resend invite modal (optional new email)
 const resendInviteSchema = z.object({
@@ -74,7 +53,6 @@ const resendInviteSchema = z.object({
   path: ['newEmail'],
 });
 
-type InviteSellerInput = z.infer<typeof inviteSellerSchema>;
 type ResendInviteInput = z.infer<typeof resendInviteSchema>;
 
 export default function TeamManagementPage() {
@@ -89,6 +67,8 @@ export default function TeamManagementPage() {
   const [showResendModal, setShowResendModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Filters state
   const [filters, setFilters] = useState({
@@ -100,22 +80,6 @@ export default function TeamManagementPage() {
     page: 1,
     limit: 50,
   });
-
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-    reset,
-    control,
-  } = useForm<InviteSellerInput>({
-    resolver: zodResolver(inviteSellerSchema),
-    defaultValues: {
-      isAdmin: false,
-    },
-  });
-
-  const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
-  const { field: whatsappField } = useController({ name: 'whatsapp', control, defaultValue: '' });
 
   // Form for resend invite modal
   const {
@@ -142,7 +106,7 @@ export default function TeamManagementPage() {
   const fetchSellers = useCallback(async () => {
     try {
       setIsLoading(true);
-      
+
       // Build query params
       const params: Record<string, string> = {
         page: filters.page.toString(),
@@ -166,7 +130,7 @@ export default function TeamManagementPage() {
         total: number;
         page: number;
       }>('/users', { params });
-      
+
       setSellers(data.users);
       setTotalItems(data.total);
     } catch {
@@ -202,7 +166,7 @@ export default function TeamManagementPage() {
   const hasFilters = filters.search || filters.isActive !== undefined || filters.role;
   const isEmpty = sellers.length === 0;
 
-  const onSubmit = async (data: InviteSellerInput) => {
+  const handleInviteUser = async (data: InviteSellerInput) => {
     try {
       setIsSubmitting(true);
 
@@ -216,7 +180,6 @@ export default function TeamManagementPage() {
 
       success(data.isAdmin ? t('adminCreated') : t('sellerCreated'));
       setShowInviteModal(false);
-      reset();
       fetchSellers();
     } catch (err) {
       if (err instanceof ApiError && err.code === 'EMAIL_EXISTS') {
@@ -227,6 +190,7 @@ export default function TeamManagementPage() {
       } else {
         error(t('sellerCreateError'));
       }
+      throw err; // Re-throw to keep modal open (handled by modal)
     } finally {
       setIsSubmitting(false);
     }
@@ -304,6 +268,36 @@ export default function TeamManagementPage() {
 
   // Check if user can have invite resent (never logged in)
   const canResendInvite = (user: User) => !user.firstLoginAt;
+
+  // Handle opening edit modal
+  const handleOpenEditModal = (user: User) => {
+    setEditingUser(user);
+    setShowEditModal(true);
+  };
+
+  // Handle save user from edit modal
+  const handleSaveUser = async (data: UpdateSellerInput) => {
+    if (!editingUser) return;
+
+    try {
+      await apiClient.put(`/users/${editingUser.id}`, {
+        name: data.name,
+        phone: data.phone || null,
+        whatsapp: data.whatsapp || null,
+      });
+      success(t('memberUpdated'));
+      setShowEditModal(false);
+      setEditingUser(null);
+      fetchSellers();
+    } catch (err) {
+      if (err instanceof ApiError) {
+        error(err.message);
+      } else {
+        error(t('memberUpdateError'));
+      }
+      throw err; // Re-throw to keep modal open
+    }
+  };
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -390,53 +384,57 @@ export default function TeamManagementPage() {
 
       {/* Content */}
       <div className="px-8 pb-8">{isLoading ? (
-          <LoadingState variant="table" rows={5} columns={6} />
-        ) : isEmpty ? (
-          <EmptyState
-            icon={hasFilters ? Plus : Plus}
-            title={hasFilters ? 'Nenhum resultado encontrado' : t('noSellers')}
-            description={hasFilters ? 'Ajuste os filtros para ver mais resultados' : t('noSellersDescription')}
-            actionLabel={hasFilters ? 'Limpar Filtros' : t('addSellerButton')}
-            onAction={hasFilters ? handleClearFilters : () => setShowInviteModal(true)}
-          />
-        ) : (
-          <>
-            <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <SortableTableHead
-                      field="name"
-                      label={tCommon('name')}
-                      sortBy={filters.sortBy}
-                      sortOrder={filters.sortOrder}
-                      onSort={handleSort}
-                    />
-                    <SortableTableHead
-                      field="email"
-                      label={tCommon('email')}
-                      sortBy={filters.sortBy}
-                      sortOrder={filters.sortOrder}
-                      onSort={handleSort}
-                    />
-                    <TableHead>{tCommon('phone')}</TableHead>
-                    <TableHead>WhatsApp</TableHead>
-                    <TableHead>{t('linksCreated')}</TableHead>
-                    <TableHead>{t('salesCount')}</TableHead>
-                    <SortableTableHead
-                      field="created_at"
-                      label={t('joinedAt') || 'Desde'}
-                      sortBy={filters.sortBy}
-                      sortOrder={filters.sortOrder}
-                      onSort={handleSort}
-                    />
-                    <TableHead>{tCommon('status')}</TableHead>
-                    <TableHead>{tCommon('actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
+        <LoadingState variant="table" rows={5} columns={6} />
+      ) : isEmpty ? (
+        <EmptyState
+          icon={hasFilters ? Plus : Plus}
+          title={hasFilters ? 'Nenhum resultado encontrado' : t('noSellers')}
+          description={hasFilters ? 'Ajuste os filtros para ver mais resultados' : t('noSellersDescription')}
+          actionLabel={hasFilters ? 'Limpar Filtros' : t('addSellerButton')}
+          onAction={hasFilters ? handleClearFilters : () => setShowInviteModal(true)}
+        />
+      ) : (
+        <>
+          <div className="bg-porcelain rounded-sm border border-slate-100 overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <SortableTableHead
+                    field="name"
+                    label={tCommon('name')}
+                    sortBy={filters.sortBy}
+                    sortOrder={filters.sortOrder}
+                    onSort={handleSort}
+                  />
+                  <SortableTableHead
+                    field="email"
+                    label={tCommon('email')}
+                    sortBy={filters.sortBy}
+                    sortOrder={filters.sortOrder}
+                    onSort={handleSort}
+                  />
+                  <TableHead>{tCommon('phone')}</TableHead>
+                  <TableHead>WhatsApp</TableHead>
+                  <TableHead>{t('linksCreated')}</TableHead>
+                  <TableHead>{t('salesCount')}</TableHead>
+                  <SortableTableHead
+                    field="created_at"
+                    label={t('joinedAt') || 'Desde'}
+                    sortBy={filters.sortBy}
+                    sortOrder={filters.sortOrder}
+                    onSort={handleSort}
+                  />
+                  <TableHead>{tCommon('status')}</TableHead>
+                  <TableHead>{tCommon('actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
               <TableBody>
                 {sellers.map((seller) => (
-                  <TableRow key={seller.id}>
+                  <TableRow
+                    key={seller.id}
+                    className="cursor-pointer hover:bg-slate-50 transition-colors"
+                    onClick={() => handleOpenEditModal(seller)}
+                  >
                     <TableCell>
                       <div className="flex items-center gap-2">
                         <div>
@@ -546,7 +544,7 @@ export default function TeamManagementPage() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                         {/* Reenviar convite - apenas se nunca logou */}
                         {canResendInvite(seller) && (
                           <button
@@ -589,166 +587,16 @@ export default function TeamManagementPage() {
             onPageChange={(page: number) => setFilters((prev) => ({ ...prev, page }))}
           />
         </>
-        )}
+      )}
       </div>
 
       {/* Invite Modal */}
-      {showInviteModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div className="bg-white w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="px-6 py-5 bg-[#121212] text-white flex items-center justify-between">
-              <div>
-                <h2 className="font-serif text-xl">{t('addSellerTitle')}</h2>
-                <p className="text-xs text-white/50 mt-0.5">Adicione um novo membro à equipe</p>
-              </div>
-              <button 
-                onClick={() => setShowInviteModal(false)} 
-                className="p-2 -mr-2 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Progress Bar */}
-            <div className="h-1 bg-[#C2410C]" />
-
-            <form onSubmit={handleSubmit(onSubmit)}>
-              <div className="px-6 py-6 space-y-5 max-h-[60vh] overflow-y-auto">
-                {/* Name */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('fullName')} <span className="text-[#C2410C]">*</span>
-                  </label>
-                  <input
-                    {...register('name')}
-                    placeholder="João Silva"
-                    disabled={isSubmitting}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.name ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
-                    )}
-                  />
-                  {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
-                </div>
-
-                {/* Email */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {tCommon('email')} <span className="text-[#C2410C]">*</span>
-                  </label>
-                  <input
-                    {...register('email')}
-                    type="email"
-                    placeholder="joao@exemplo.com"
-                    disabled={isSubmitting}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.email ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
-                    )}
-                  />
-                  <p className="mt-1 text-xs text-slate-400">{t('emailHelperText')}</p>
-                  {errors.email && <p className="mt-1 text-xs text-rose-500">{errors.email.message}</p>}
-                </div>
-
-                {/* Phone */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('phoneOptional')}
-                  </label>
-                  <input
-                    value={phoneField.value}
-                    onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
-                    placeholder="(11) 98765-4321"
-                    disabled={isSubmitting}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.phone ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
-                    )}
-                  />
-                  {errors.phone && <p className="mt-1 text-xs text-rose-500">{errors.phone.message}</p>}
-                </div>
-
-                {/* WhatsApp */}
-                <div>
-                  <label className="text-xs font-medium text-slate-600 block mb-2">
-                    {t('whatsappOptional')}
-                  </label>
-                  <input
-                    value={whatsappField.value}
-                    onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
-                    placeholder="(11) 98765-4321"
-                    disabled={isSubmitting}
-                    className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.whatsapp ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
-                    )}
-                  />
-                  <p className="mt-1 text-xs text-slate-400">{t('whatsappHelperText')}</p>
-                  {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
-                </div>
-
-                {/* Admin Checkbox */}
-                <div className="p-4 bg-slate-50 border border-slate-200">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      {...register('isAdmin')}
-                      className="mt-0.5 h-4 w-4 rounded border-slate-300 text-[#C2410C] focus:ring-[#C2410C]"
-                      disabled={isSubmitting}
-                    />
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-slate-700 flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-slate-600" />
-                        {t('isAdmin')}
-                      </span>
-                      <span className="text-xs text-slate-400 mt-0.5">
-                        {t('isAdminDescription')}
-                      </span>
-                    </div>
-                  </label>
-                </div>
-              </div>
-
-              {/* Footer */}
-              <div className="px-6 py-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowInviteModal(false)}
-                  disabled={isSubmitting}
-                  className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors disabled:opacity-50"
-                >
-                  {tCommon('cancel')}
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={cn(
-                    'flex items-center gap-1.5 px-5 py-2.5 text-white text-sm font-medium transition-all',
-                    isSubmitting ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
-                  )}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4" />
-                      {t('createAccess')}
-                    </>
-                  )}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <TeamMemberInviteModal
+        open={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onSave={handleInviteUser}
+        isLoading={isSubmitting}
+      />
 
       {/* Resend Invite Confirmation Modal */}
       <Modal open={showResendModal} onClose={() => setShowResendModal(false)}>
@@ -820,6 +668,18 @@ export default function TeamManagementPage() {
           </ModalFooter>
         </form>
       </Modal>
+
+      {/* Edit Member Modal */}
+      <TeamMemberFormModal
+        open={showEditModal}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingUser(null);
+        }}
+        onSave={handleSaveUser}
+        initialData={editingUser}
+        isLoading={isSubmitting}
+      />
     </div >
   );
 }

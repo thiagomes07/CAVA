@@ -43,9 +43,11 @@
     "prices": "Prices",
     "total": "Total",
     "quantity": "Quantity",
-    "share": "Share",
-    "refresh": "Refresh",
-    "poweredBy": "Powered by CAVA"
+    "poweredBy": "Powered by CAVA",
+    "confirmDeleteTitle": "Confirm Deletion",
+    "confirmDeleteDescription": "Are you sure you want to delete this item? This action cannot be undone.",
+    "discard": "Discard",
+    "deleting": "Deleting..."
   },
   "metadata": {
     "title": "CAVA",
@@ -374,7 +376,6 @@
     "sendLinksTitle": "Send Links to Clientes",
     "selectedClients": "{count} cliente(s) selected",
     "selectLinksToSend": "Select the links you want to send",
-    "noLinksSelected": "Select at least one link",
     "noClientsSelected": "Select at least one cliente",
     "customMessage": "Custom message (optional)",
     "customMessagePlaceholder": "Write a message to accompany the links...",
@@ -384,7 +385,6 @@
     "sendPartialSuccess": "{sent} sent, {failed} failed, {skipped} skipped",
     "sendError": "Error sending links",
     "invalidEmail": "Invalid email",
-    "selectAll": "Select all",
     "deselectAll": "Clear selection",
     "onlyEmailClients": "Only clientes with valid email will receive",
     "activeLinksOnly": "Active links",
@@ -410,7 +410,13 @@
     "selectedLinks": "{count} link(s) selected",
     "maxClientsExceeded": "Limit of {max} clientes per send exceeded",
     "maxClientsWarning": "You selected {count} clientes. Maximum allowed: {max}.",
-    "selectAll": "Select all"
+    "selectAll": "Select all",
+    "editClienteTitle": "Edit Client",
+    "clienteDeleted": "Client deleted successfully",
+    "discardChangesTitle": "Discard changes?",
+    "discardChangesDescription": "There are unsaved changes. Do you really want to discard them?",
+    "updateError": "Error updating client",
+    "deleteError": "Error deleting client"
   },
   "links": {
     "title": "My Sales Links",

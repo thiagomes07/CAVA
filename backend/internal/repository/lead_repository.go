@@ -414,3 +414,20 @@ func (r *clienteRepository) scanClientes(rows *sql.Rows) ([]entity.Cliente, erro
 	}
 	return clientes, nil
 }
+
+func (r *clienteRepository) Delete(ctx context.Context, tx *sql.Tx, id string) error {
+	query := `DELETE FROM clientes WHERE id = $1`
+
+	var err error
+	if tx != nil {
+		_, err = tx.ExecContext(ctx, query, id)
+	} else {
+		_, err = r.db.ExecContext(ctx, query, id)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
