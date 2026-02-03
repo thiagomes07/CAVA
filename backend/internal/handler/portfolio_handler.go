@@ -418,23 +418,84 @@ func (h *PortfolioHandler) CapturePortfolioLead(w http.ResponseWriter, r *http.R
 // buildPublicIndustryInfo constrói info pública da indústria baseado nas configurações
 func buildPublicIndustryInfo(industry *entity.Industry) map[string]interface{} {
 	info := make(map[string]interface{})
+	settings := industry.PortfolioDisplaySettings
 
-	// Por padrão, sempre mostrar nome e descrição se disponíveis
-	if industry.Name != nil {
+	// Nome da empresa
+	if settings.ShowName && industry.Name != nil {
 		info["name"] = *industry.Name
 	}
-	if industry.Description != nil {
+
+	// Descrição
+	if settings.ShowDescription && industry.Description != nil {
 		info["description"] = *industry.Description
 	}
-	if industry.LogoURL != nil {
+
+	// Logo
+	if settings.ShowLogo && industry.LogoURL != nil {
 		info["logoUrl"] = *industry.LogoURL
 	}
+
+	// Slug (sempre incluir para navegação)
 	if industry.Slug != nil {
 		info["slug"] = *industry.Slug
 	}
 
-	// TODO: Implementar lógica baseada em portfolio_display_settings
-	// quando o campo for adicionado à entity Industry
+	// Contato
+	if settings.ShowContact {
+		contact := make(map[string]interface{})
+		if industry.ContactEmail != nil {
+			contact["email"] = *industry.ContactEmail
+		}
+		if industry.ContactPhone != nil {
+			contact["phone"] = *industry.ContactPhone
+		}
+		if industry.Whatsapp != nil {
+			contact["whatsapp"] = *industry.Whatsapp
+		}
+		if len(contact) > 0 {
+			info["contact"] = contact
+		}
+	}
+
+	// Localização
+	if settings.ShowLocation {
+		location := make(map[string]interface{})
+		switch settings.LocationLevel {
+		case "full":
+			if industry.AddressStreet != nil {
+				location["street"] = *industry.AddressStreet
+			}
+			if industry.AddressNumber != nil {
+				location["number"] = *industry.AddressNumber
+			}
+			if industry.AddressZipCode != nil {
+				location["zipCode"] = *industry.AddressZipCode
+			}
+			fallthrough
+		case "city":
+			if industry.AddressCity != nil {
+				location["city"] = *industry.AddressCity
+			}
+			fallthrough
+		case "state":
+			if industry.AddressState != nil {
+				location["state"] = *industry.AddressState
+			}
+			fallthrough
+		case "country":
+			if industry.AddressCountry != nil {
+				location["country"] = *industry.AddressCountry
+			}
+		}
+		if len(location) > 0 {
+			info["location"] = location
+		}
+	}
+
+	// Redes sociais (se houver)
+	if len(industry.SocialLinks) > 0 {
+		info["socialLinks"] = industry.SocialLinks
+	}
 
 	return info
 }

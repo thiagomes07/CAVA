@@ -173,8 +173,16 @@ export default function IndustryConfigPage() {
   const hasName = Boolean(watchedName?.trim());
   const hasDescription = Boolean(watchedDescription?.trim());
   const hasLogo = Boolean(previewLogoUrl);
-  const hasContact = Boolean(watchedContactEmail?.trim() || watchedContactPhone?.trim() || watchedWhatsapp?.trim());
-  const hasLocation = Boolean(watch("addressCountry")?.trim() || watch("addressState")?.trim() || watch("addressCity")?.trim());
+  const hasContact = Boolean(
+    watchedContactEmail?.trim() ||
+    watchedContactPhone?.trim() ||
+    watchedWhatsapp?.trim(),
+  );
+  const hasLocation = Boolean(
+    watch("addressCountry")?.trim() ||
+    watch("addressState")?.trim() ||
+    watch("addressCity")?.trim(),
+  );
 
   // Detect if logo changed
   const isLogoDirty =
@@ -978,13 +986,17 @@ export default function IndustryConfigPage() {
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
                           !hasName && "opacity-50 cursor-not-allowed",
-                          field.value && hasName ? "bg-[#C2410C]" : "bg-slate-300",
+                          field.value && hasName
+                            ? "bg-[#C2410C]"
+                            : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value && hasName ? "translate-x-5" : "translate-x-1",
+                            field.value && hasName
+                              ? "translate-x-5"
+                              : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1015,13 +1027,17 @@ export default function IndustryConfigPage() {
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
                           !hasDescription && "opacity-50 cursor-not-allowed",
-                          field.value && hasDescription ? "bg-[#C2410C]" : "bg-slate-300",
+                          field.value && hasDescription
+                            ? "bg-[#C2410C]"
+                            : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value && hasDescription ? "translate-x-5" : "translate-x-1",
+                            field.value && hasDescription
+                              ? "translate-x-5"
+                              : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1093,13 +1109,17 @@ export default function IndustryConfigPage() {
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
                           !hasContact && "opacity-50 cursor-not-allowed",
-                          field.value && hasContact ? "bg-[#C2410C]" : "bg-slate-300",
+                          field.value && hasContact
+                            ? "bg-[#C2410C]"
+                            : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value && hasContact ? "translate-x-5" : "translate-x-1",
+                            field.value && hasContact
+                              ? "translate-x-5"
+                              : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1130,13 +1150,17 @@ export default function IndustryConfigPage() {
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
                           !hasLocation && "opacity-50 cursor-not-allowed",
-                          field.value && hasLocation ? "bg-[#C2410C]" : "bg-slate-300",
+                          field.value && hasLocation
+                            ? "bg-[#C2410C]"
+                            : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value && hasLocation ? "translate-x-5" : "translate-x-1",
+                            field.value && hasLocation
+                              ? "translate-x-5"
+                              : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1145,85 +1169,96 @@ export default function IndustryConfigPage() {
                 </div>
 
                 {/* Location Level */}
-                {watch("portfolioDisplaySettings.showLocation") && hasLocation && (
-                  <div className="ml-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
-                    <label className="text-xs font-medium text-slate-600 block mb-2">
-                      {t("portfolioVisibility.locationLevel")}
-                    </label>
-                    <Controller
-                      name="portfolioDisplaySettings.locationLevel"
-                      control={control}
-                      render={({ field }) => (
-                        <select
-                          {...field}
-                          className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors rounded-md"
-                        >
-                          <option value="country">
-                            {t("portfolioVisibility.levelCountry")}
-                          </option>
-                          <option value="state">
-                            {t("portfolioVisibility.levelState")}
-                          </option>
-                          <option value="city">
-                            {t("portfolioVisibility.levelCity")}
-                          </option>
-                          <option value="full">
-                            {t("portfolioVisibility.levelFull")}
-                          </option>
-                        </select>
-                      )}
-                    />
-                    <p className="text-xs text-slate-500 mt-2">
-                      {t("portfolioVisibility.locationLevelDesc")}
-                    </p>
-                  </div>
-                )}
+                {watch("portfolioDisplaySettings.showLocation") &&
+                  hasLocation && (
+                    <div className="ml-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <label className="text-xs font-medium text-slate-600 block mb-2">
+                        {t("portfolioVisibility.locationLevel")}
+                      </label>
+                      <Controller
+                        name="portfolioDisplaySettings.locationLevel"
+                        control={control}
+                        render={({ field }) => (
+                          <select
+                            {...field}
+                            className="w-full px-3 py-2 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors rounded-md"
+                          >
+                            <option value="country">
+                              {t("portfolioVisibility.levelCountry")}
+                            </option>
+                            <option value="state">
+                              {t("portfolioVisibility.levelState")}
+                            </option>
+                            <option value="city">
+                              {t("portfolioVisibility.levelCity")}
+                            </option>
+                            <option value="full">
+                              {t("portfolioVisibility.levelFull")}
+                            </option>
+                          </select>
+                        )}
+                      />
+                      <p className="text-xs text-slate-500 mt-2">
+                        {t("portfolioVisibility.locationLevelDesc")}
+                      </p>
+                    </div>
+                  )}
               </div>
 
               {/* Portfolio URL Box */}
               {watchedSlug && (
-                <div className={cn(
-                  "flex items-start gap-3 p-4 border rounded-lg",
-                  watchedIsPublished 
-                    ? "bg-emerald-50 border-emerald-100" 
-                    : "bg-slate-50 border-slate-200"
-                )}>
+                <div
+                  className={cn(
+                    "flex items-start gap-3 p-4 border rounded-lg",
+                    watchedIsPublished
+                      ? "bg-emerald-50 border-emerald-100"
+                      : "bg-slate-50 border-slate-200",
+                  )}
+                >
                   {watchedIsPublished ? (
                     <Eye className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
                   ) : (
                     <EyeOff className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
                   )}
-                  <div className={cn(
-                    "text-xs flex-1",
-                    watchedIsPublished ? "text-emerald-700" : "text-slate-600"
-                  )}>
+                  <div
+                    className={cn(
+                      "text-xs flex-1",
+                      watchedIsPublished
+                        ? "text-emerald-700"
+                        : "text-slate-600",
+                    )}
+                  >
                     <div className="flex items-center gap-2 mb-1">
                       <p className="font-medium">
                         {t("portfolioVisibility.portfolioUrl")}
                       </p>
-                      <span className={cn(
-                        "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                        watchedIsPublished 
-                          ? "bg-emerald-200 text-emerald-800" 
-                          : "bg-slate-200 text-slate-600"
-                      )}>
-                        {watchedIsPublished 
-                          ? t("portfolioVisibility.statusPublished") 
+                      <span
+                        className={cn(
+                          "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                          watchedIsPublished
+                            ? "bg-emerald-200 text-emerald-800"
+                            : "bg-slate-200 text-slate-600",
+                        )}
+                      >
+                        {watchedIsPublished
+                          ? t("portfolioVisibility.statusPublished")
                           : t("portfolioVisibility.statusUnpublished")}
                       </span>
                     </div>
                     <p className="text-xs mb-2">
-                      {watchedIsPublished 
+                      {watchedIsPublished
                         ? t("portfolioVisibility.urlVisibleDesc")
                         : t("portfolioVisibility.urlHiddenDesc")}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <code className={cn(
-                        "px-2 py-1 rounded font-mono text-xs break-all",
-                        watchedIsPublished 
-                          ? "bg-emerald-100 text-emerald-800" 
-                          : "bg-slate-200 text-slate-500"
-                      )}>
+                      <code
+                        className={cn(
+                          "px-2 py-1 rounded font-mono text-xs break-all",
+                          watchedIsPublished
+                            ? "bg-emerald-100 text-emerald-800"
+                            : "bg-slate-200 text-slate-500",
+                        )}
+                      >
                         {typeof window !== "undefined"
                           ? `${window.location.origin}/portfolio/${watchedSlug}`
                           : `/portfolio/${watchedSlug}`}
@@ -1234,9 +1269,9 @@ export default function IndustryConfigPage() {
                         rel="noopener noreferrer"
                         className={cn(
                           "inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors",
-                          watchedIsPublished 
-                            ? "bg-emerald-600 text-white hover:bg-emerald-700" 
-                            : "bg-slate-300 text-slate-600 hover:bg-slate-400"
+                          watchedIsPublished
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
+                            : "bg-slate-300 text-slate-600 hover:bg-slate-400",
                         )}
                       >
                         <Eye className="h-3 w-3" />

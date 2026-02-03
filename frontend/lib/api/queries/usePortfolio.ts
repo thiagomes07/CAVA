@@ -34,6 +34,20 @@ export interface PublicPortfolioResponse {
     description?: string;
     logoUrl?: string;
     slug?: string;
+    contact?: {
+      email?: string;
+      phone?: string;
+      whatsapp?: string;
+    };
+    location?: {
+      country?: string;
+      state?: string;
+      city?: string;
+      street?: string;
+      number?: string;
+      zipCode?: string;
+    };
+    socialLinks?: Array<{ name: string; url: string }>;
   };
   products: PublicProduct[];
   total: number;
