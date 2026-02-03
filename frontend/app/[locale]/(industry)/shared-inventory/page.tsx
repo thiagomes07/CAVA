@@ -1,32 +1,72 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { PackageOpen, RefreshCcw } from 'lucide-react';
+import { PackageOpen, RefreshCcw, ShoppingCart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { Badge } from '@/components/ui/badge';
+import { ReservationModal, type ReservationData } from '@/components/inventory/ReservationModal';
 import { useSharedInventory } from '@/lib/api/queries/useSharedInventory';
+import { useCreateReservation } from '@/lib/api/queries/useReservations';
+import { useToast } from '@/lib/hooks/useToast';
 import { formatArea, formatDimensions } from '@/lib/utils/formatDimensions';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
 import { isPlaceholderUrl } from '@/lib/utils/media';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
+import type { Batch, PriceUnit } from '@/lib/types';
 
 export default function SharedInventoryPage() {
   const router = useRouter();
   const t = useTranslations('sharedInventory');
   const tInventory = useTranslations('inventory');
+  const { success, error } = useToast();
+
+  const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const filters = useMemo(() => ({ limit: 200 }), []);
   const { data, isLoading, isError, refetch, isFetching } = useSharedInventory(filters);
+  const createReservation = useCreateReservation();
 
   const sharedBatches = data ?? [];
   const isEmpty = !sharedBatches.length;
+
+  const handleOpenReservation = (batch: Batch) => {
+    setSelectedBatch(batch);
+    setIsModalOpen(true);
+  };
+
+  const handleCloseModal = () => {
+    setIsModalOpen(false);
+    setSelectedBatch(null);
+  };
+
+  const handleConfirmReservation = async (data: ReservationData) => {
+    if (!selectedBatch) return;
+
+    try {
+      await createReservation.mutateAsync({
+        batchId: selectedBatch.id,
+        quantitySlabsReserved: data.quantity,
+        clienteId: data.clienteId,
+        reservedPrice: data.reservedPrice,
+        brokerSoldPrice: data.brokerSoldPrice,
+        notes: data.notes,
+      });
+      success(t('reservationSuccess') || `Reserva de ${data.quantity} chapa(s) criada com sucesso!`);
+      handleCloseModal();
+      refetch();
+    } catch (err) {
+      error(t('reservationError') || 'Erro ao criar reserva. Tente novamente.');
+    }
+  };
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -51,7 +91,7 @@ export default function SharedInventoryPage() {
       {/* Content */}
       <div className="px-8 py-6">
         {isLoading ? (
-          <LoadingState variant="table" rows={8} columns={7} />
+          <LoadingState variant="table" rows={8} columns={8} />
         ) : isError ? (
           <EmptyState
             icon={PackageOpen}
@@ -75,16 +115,27 @@ export default function SharedInventoryPage() {
                   <TableHead>{tInventory('code')}</TableHead>
                   <TableHead>{tInventory('product')}</TableHead>
                   <TableHead>{tInventory('dimensions')}</TableHead>
-                  <TableHead>{tInventory('totalArea')}</TableHead>
-                  <TableHead>{tInventory('price')}</TableHead>
+                  <TableHead>{tInventory('available')}</TableHead>
+                  <TableHead>Preço/m²</TableHead>
+                  <TableHead>Preço/Chapa</TableHead>
                   <TableHead>{tInventory('status')}</TableHead>
                   <TableHead>{t('sharedAt')}</TableHead>
+                  <TableHead>{tInventory('actions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {sharedBatches.map((share) => {
                   const batch = share.batch;
                   const cover = batch?.medias?.[0];
+                  const canReserve = batch && batch.availableSlabs > 0 && batch.status === 'DISPONIVEL';
+                  const pricePerM2 = share.negotiatedPrice ?? batch?.industryPrice ?? 0;
+                  const slabPrice = batch ? calculateSlabPrice(
+                    batch.height,
+                    batch.width,
+                    pricePerM2,
+                    (batch.priceUnit || 'M2') as PriceUnit
+                  ) : 0;
+
                   return (
                     <TableRow key={share.id}>
                       <TableCell>
@@ -104,7 +155,7 @@ export default function SharedInventoryPage() {
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span 
+                        <span
                           className="font-mono text-sm text-obsidian"
                           title={batch?.batchCode}
                         >
@@ -112,7 +163,7 @@ export default function SharedInventoryPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span 
+                        <span
                           className="text-sm text-slate-600"
                           title={batch?.product?.name}
                         >
@@ -125,13 +176,23 @@ export default function SharedInventoryPage() {
                         </span>
                       </TableCell>
                       <TableCell>
-                        <span className="font-mono text-sm text-slate-600">
-                          {batch ? formatArea(batch.totalArea) : '—'}
+                        <span className="font-mono text-sm font-medium text-emerald-600">
+                          {batch?.availableSlabs ?? 0} chapas
                         </span>
+                        {batch && (
+                          <span className="text-xs text-slate-400 block">
+                            {formatArea(batch.availableSlabs * batch.height * batch.width / 10000)}
+                          </span>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="font-serif text-obsidian">
-                          {batch ? formatCurrency(share.negotiatedPrice ?? batch.industryPrice) : '—'}
+                          {formatCurrency(pricePerM2)}/m²
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-serif font-semibold text-violet-700">
+                          {formatCurrency(slabPrice)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -146,6 +207,25 @@ export default function SharedInventoryPage() {
                           {formatDate(share.sharedAt, 'dd/MM/yyyy')}
                         </span>
                       </TableCell>
+                      <TableCell>
+                        {canReserve ? (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            onClick={() => handleOpenReservation(batch)}
+                          >
+                            <ShoppingCart className="w-4 h-4 mr-1" />
+                            {t('reserve') || 'Reservar'}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-slate-400">
+                            {batch?.availableSlabs === 0
+                              ? (t('noStock') || 'Sem estoque')
+                              : (t('unavailable') || 'Indisponivel')
+                            }
+                          </span>
+                        )}
+                      </TableCell>
                     </TableRow>
                   );
                 })}
@@ -154,6 +234,15 @@ export default function SharedInventoryPage() {
           </div>
         )}
       </div>
+
+      {/* Reservation Modal */}
+      <ReservationModal
+        isOpen={isModalOpen}
+        onClose={handleCloseModal}
+        onConfirm={handleConfirmReservation}
+        batch={selectedBatch}
+        isLoading={createReservation.isPending}
+      />
     </div>
   );
 }

@@ -17,6 +17,7 @@ CREATE TABLE industries (
     description TEXT,
     logo_url VARCHAR(500),
     banner_url VARCHAR(500),
+    social_links JSONB DEFAULT '[]'::JSONB,
     address_country VARCHAR(100),
     address_state VARCHAR(100),
     address_city VARCHAR(255),

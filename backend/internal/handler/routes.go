@@ -22,6 +22,7 @@ type Handler struct {
 	Batch           *BatchHandler
 	Reservation     *ReservationHandler
 	Dashboard       *DashboardHandler
+	BI              *BIHandler
 	SalesLink       *SalesLinkHandler
 	CatalogLink     *CatalogLinkHandler
 	Cliente         *ClienteHandler
@@ -30,6 +31,7 @@ type Handler struct {
 	Upload          *UploadHandler
 	Public          *PublicHandler
 	Industry        *IndustryHandler
+	Portfolio       *PortfolioHandler
 	Health          *HealthHandler
 }
 
@@ -47,22 +49,26 @@ type Config struct {
 
 // Services agrupa todos os serviços necessários
 type Services struct {
-	Auth            service.AuthService
-	User            service.UserService
-	Product         service.ProductService
-	Batch           service.BatchService
-	Reservation     service.ReservationService
-	Dashboard       service.DashboardService
-	SalesLink       service.SalesLinkService
-	CatalogLink     service.CatalogLinkService
-	Cliente         service.ClienteService
-	SalesHistory    service.SalesHistoryService
-	SharedInventory service.SharedInventoryService
-	Storage         service.StorageService
-	Email           service.EmailSender
-	MediaRepo       repository.MediaRepository
-	IndustryRepo    repository.IndustryRepository
-	BatchRepo       repository.BatchRepository
+	Auth                  service.AuthService
+	User                  service.UserService
+	Product               service.ProductService
+	Batch                 service.BatchService
+	Reservation           service.ReservationService
+	Dashboard             service.DashboardService
+	BI                    service.BIService
+	SalesLink             service.SalesLinkService
+	CatalogLink           service.CatalogLinkService
+	Cliente               service.ClienteService
+	SalesHistory          service.SalesHistoryService
+	SharedInventory       service.SharedInventoryService
+	Storage               service.StorageService
+	Email                 service.EmailSender
+	MediaRepo             repository.MediaRepository
+	IndustryRepo          repository.IndustryRepository
+	BatchRepo             repository.BatchRepository
+	UserRepo              repository.UserRepository
+	ProductRepo           repository.ProductRepository
+	SharedCatalogPermRepo repository.SharedCatalogPermissionRepository
 }
 
 // NewHandler cria uma nova instância de Handler com todos os handlers
@@ -74,6 +80,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Batch:           NewBatchHandler(services.Batch, services.SharedInventory, cfg.Validator, cfg.Logger),
 		Reservation:     NewReservationHandler(services.Reservation, cfg.Validator, cfg.Logger),
 		Dashboard:       NewDashboardHandler(services.Dashboard, cfg.Logger),
+		BI:              NewBIHandler(services.BI, cfg.Logger),
 		SalesLink:       NewSalesLinkHandler(services.SalesLink, cfg.Validator, cfg.Logger),
 		CatalogLink:     NewCatalogLinkHandler(services.CatalogLink, cfg.Validator, cfg.Logger),
 		Cliente:         NewClienteHandler(services.Cliente, cfg.Validator, cfg.Logger),
@@ -82,6 +89,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
 		Public:          NewPublicHandler(services.SalesLink, services.Cliente, services.IndustryRepo, services.BatchRepo, cfg.Validator, cfg.Logger),
 		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
+		Portfolio:       NewPortfolioHandler(services.SharedCatalogPermRepo, services.UserRepo, services.IndustryRepo, services.ProductRepo, services.Cliente, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -136,8 +144,16 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Captura de clientes
 			r.Post("/clientes/interest", h.Public.CaptureClienteInterest)
 
-			// Catálogo público
+			// Catálogo público (por link gerado)
 			r.Get("/catalogo/{slug}", h.CatalogLink.GetPublicBySlug)
+
+			// Catálogo público da indústria (por slug da indústria)
+			r.Get("/deposits/{slug}", h.Public.GetPublicDepositBySlug)
+			r.Get("/deposits/{slug}/batches", h.Public.GetPublicDepositBatches)
+
+			// Portfolio público da indústria
+			r.Get("/portfolio/{slug}", h.Portfolio.GetPublicPortfolio)
+			r.Post("/portfolio/{slug}/lead", h.Portfolio.CapturePortfolioLead)
 		})
 
 		// ============================================
@@ -188,6 +204,20 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			})
 
 			// ----------------------------------------
+			// BI (Business Intelligence)
+			// ----------------------------------------
+			r.Route("/bi", func(r chi.Router) {
+				r.With(m.RBAC.RequireIndustryUser).Get("/dashboard", h.BI.GetDashboard)
+				r.With(m.RBAC.RequireIndustryUser).Get("/sales", h.BI.GetSalesMetrics)
+				r.With(m.RBAC.RequireIndustryUser).Get("/conversion", h.BI.GetConversionMetrics)
+				r.With(m.RBAC.RequireIndustryUser).Get("/inventory", h.BI.GetInventoryMetrics)
+				r.With(m.RBAC.RequireIndustryUser).Get("/brokers", h.BI.GetBrokerRanking)
+				r.With(m.RBAC.RequireIndustryUser).Get("/trends/sales", h.BI.GetSalesTrend)
+				r.With(m.RBAC.RequireIndustryUser).Get("/products", h.BI.GetTopProducts)
+				r.With(m.RBAC.RequireAdmin).Post("/refresh", h.BI.RefreshViews)
+			})
+
+			// ----------------------------------------
 			// PRODUCTS
 			// ----------------------------------------
 			r.Route("/products", func(r chi.Router) {
@@ -224,6 +254,11 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// ----------------------------------------
 			r.Route("/reservations", func(r chi.Router) {
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Post("/", h.Reservation.Create)
+				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Get("/my", h.Reservation.ListMy)
+				r.With(m.RBAC.RequireAdmin).Get("/", h.Reservation.ListAll)
+				r.With(m.RBAC.RequireAdmin).Get("/pending", h.Reservation.ListPending)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/approve", h.Reservation.Approve)
+				r.With(m.RBAC.RequireAdmin).Post("/{id}/reject", h.Reservation.Reject)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Post("/{id}/confirm-sale", h.Reservation.ConfirmSale)
 				r.With(m.RBAC.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno, entity.RoleBroker)).Delete("/{id}", h.Reservation.Cancel)
 			})
@@ -353,6 +388,22 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Get("/", h.Industry.GetConfig)
 				r.With(m.RBAC.RequireAdmin).Patch("/", h.Industry.UpdateConfig)
 				r.With(m.RBAC.RequireAdmin).Delete("/logo", h.Industry.DeleteLogo)
+			})
+
+			// ----------------------------------------
+			// PORTFOLIO SHARING (Admin)
+			// ----------------------------------------
+			r.Route("/portfolio/share", func(r chi.Router) {
+				r.With(m.RBAC.RequireAdmin).Get("/", h.Portfolio.ListSharedBrokers)
+				r.With(m.RBAC.RequireAdmin).Post("/", h.Portfolio.ShareWithBrokers)
+				r.With(m.RBAC.RequireAdmin).Delete("/{brokerId}", h.Portfolio.UnshareWithBroker)
+			})
+
+			// ----------------------------------------
+			// SHARED PORTFOLIOS (Broker)
+			// ----------------------------------------
+			r.Route("/broker/shared-portfolios", func(r chi.Router) {
+				r.With(m.RBAC.RequireBroker).Get("/", h.Portfolio.GetSharedPortfolios)
 			})
 		})
 	})

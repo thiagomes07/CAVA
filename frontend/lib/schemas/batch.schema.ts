@@ -26,6 +26,11 @@ export const batchSchema = z.object({
       finish: z.enum(['POLIDO', 'LEVIGADO', 'BRUTO', 'APICOADO', 'FLAMEADO']),
       description: z.string().optional(),
       isPublic: z.boolean().default(true),
+      basePrice: z
+        .number({ message: 'Preço base deve ser um número' })
+        .positive('Preço base deve ser maior que zero')
+        .optional(),
+      priceUnit: z.enum(['M2', 'FT2']).default('M2'),
     })
     .optional(),
   batchCode: z

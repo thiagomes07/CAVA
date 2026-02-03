@@ -11,6 +11,9 @@ type ClienteService interface {
 	// CaptureInterest captura cliente de landing page (cria cliente e interação em transação)
 	CaptureInterest(ctx context.Context, input entity.CreateClienteInput) error
 
+	// CreateFromPortfolio cria cliente capturado via portfolio público
+	CreateFromPortfolio(ctx context.Context, cliente *entity.Cliente, productID *string) error
+
 	// CreateManual cria cliente manualmente (usuário autenticado)
 	CreateManual(ctx context.Context, input entity.CreateClienteManualInput, createdByUserID string) (*entity.Cliente, error)
 

@@ -448,19 +448,19 @@ export default function InventoryPage() {
                         <div className="flex flex-col">
                           <span className={cn(
                             "font-mono text-sm font-semibold",
-                            batch.availableSlabs === 0 ? "text-rose-600" : 
-                            batch.availableSlabs === batch.quantitySlabs ? "text-emerald-600" : 
-                            "text-amber-600"
+                            batch.availableSlabs === 0 ? "text-rose-600" :
+                            batch.availableSlabs === batch.quantitySlabs ? "text-emerald-600" :
+                            "text-slate-600"
                           )}>
                             {batch.availableSlabs}/{batch.quantitySlabs}
                           </span>
                           <div className="w-16 h-1.5 bg-slate-200 rounded-full mt-1">
-                            <div 
+                            <div
                               className={cn(
                                 "h-full rounded-full transition-all",
                                 availabilityPct === 0 ? "bg-rose-500" :
                                 availabilityPct === 100 ? "bg-emerald-500" :
-                                "bg-amber-500"
+                                "bg-slate-500"
                               )}
                               style={{ width: `${availabilityPct}%` }}
                             />
@@ -490,7 +490,7 @@ export default function InventoryPage() {
                             {batch.isActive ? (
                               <button
                                 onClick={() => handleArchive(batch.id)}
-                                className="p-2 text-slate-300 hover:text-amber-500 transition-colors"
+                                className="p-2 text-slate-300 hover:text-slate-600 transition-colors"
                                 title={t('archive')}
                               >
                                 <Archive className="w-4 h-4" />

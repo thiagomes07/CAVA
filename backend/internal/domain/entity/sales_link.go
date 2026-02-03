@@ -134,18 +134,19 @@ type CreateSalesLinkResponse struct {
 
 // PublicBatch representa dados seguros de um lote para exibição pública
 type PublicBatch struct {
-	BatchCode    string   `json:"batchCode"`
-	Height       float64  `json:"height"`
-	Width        float64  `json:"width"`
-	Thickness    float64  `json:"thickness"`
-	TotalArea    float64  `json:"totalArea"`
-	OriginQuarry *string  `json:"originQuarry,omitempty"`
-	Medias       []Media  `json:"medias"`
-	ProductName  string   `json:"productName,omitempty"`
-	Material     string   `json:"material,omitempty"`
-	Finish       string   `json:"finish,omitempty"`
-	IndustryID   string   `json:"industryId,omitempty"`
-	IndustryName string   `json:"industryName,omitempty"`
+	BatchCode      string   `json:"batchCode"`
+	Height         float64  `json:"height"`
+	Width          float64  `json:"width"`
+	Thickness      float64  `json:"thickness"`
+	TotalArea      float64  `json:"totalArea"`
+	AvailableSlabs int      `json:"availableSlabs"`
+	OriginQuarry   *string  `json:"originQuarry,omitempty"`
+	Medias         []Media  `json:"medias"`
+	ProductName    string   `json:"productName,omitempty"`
+	Material       string   `json:"material,omitempty"`
+	Finish         string   `json:"finish,omitempty"`
+	IndustryID     string   `json:"industryId,omitempty"`
+	IndustryName   string   `json:"industryName,omitempty"`
 }
 
 // PublicProduct representa dados seguros de um produto para exibição pública

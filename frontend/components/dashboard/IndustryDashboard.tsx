@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Package, TrendingUp, Clock, Plus, Eye, Receipt } from 'lucide-react';
+import { Package, TrendingUp, Clock, Plus, Eye, Receipt, Globe, Copy, ExternalLink } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -14,16 +14,18 @@ import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
+import { useIndustryConfig } from '@/lib/api/queries/industryApi';
 import type { DashboardMetrics, Activity } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 
 export function IndustryDashboard() {
   const router = useRouter();
-  const { error } = useToast();
+  const { error, success } = useToast();
   const t = useTranslations('dashboard');
   const tActivities = useTranslations('activities');
   const tSales = useTranslations('sales');
 
+  const { data: industry } = useIndustryConfig();
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
@@ -86,21 +88,21 @@ export function IndustryDashboard() {
                 title={t('availableStock')}
                 value={metrics?.availableBatches || 0}
                 subtitle={t('activeBatches')}
-                color="emerald"
+                color="slate"
               />
               <MetricCard
                 icon={TrendingUp}
                 title={t('monthlySales')}
                 value={formatCurrency(metrics?.monthlySales || 0)}
                 subtitle={t('monthlyRevenue')}
-                color="blue"
+                color="slate"
               />
               <MetricCard
                 icon={Clock}
                 title={t('reservedBatches')}
                 value={metrics?.reservedBatches || 0}
                 subtitle={t('awaitingConfirmation')}
-                color="amber"
+                color="slate"
               />
             </>
           )}
@@ -155,6 +157,59 @@ export function IndustryDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Public Catalog Card */}
+        {industry?.slug && (
+          <div className="mb-8">
+            <Card className="bg-slate-50 border-slate-200">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-slate-200 rounded-lg">
+                    <Globe className="w-6 h-6 text-slate-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-obsidian mb-1">
+                      {t('publicCatalog') || 'Catálogo Público'}
+                    </h3>
+                    <p className="text-sm text-slate-600 mb-2">
+                      {t('publicCatalogDescription') || 'Compartilhe seu catálogo de produtos públicos com clientes e parceiros.'}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-white/60 px-3 py-1.5 rounded-md w-fit">
+                      <code className="font-mono">
+                        {typeof window !== 'undefined' 
+                          ? `${window.location.origin}/deposito/${industry.slug}`
+                          : `/deposito/${industry.slug}`
+                        }
+                      </code>
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-auto">
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const url = `${window.location.origin}/deposito/${industry.slug}`;
+                      navigator.clipboard.writeText(url);
+                      success(t('linkCopied') || 'Link copiado!');
+                    }}
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    {t('copyLink') || 'Copiar Link'}
+                  </Button>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => window.open(`/deposito/${industry.slug}`, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    {t('openCatalog') || 'Abrir Catálogo'}
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          </div>
+        )}
 
         {/* Recent Activities */}
         <Card>
@@ -242,14 +297,12 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle: string;
-  color: 'emerald' | 'blue' | 'amber';
+  color: 'slate';
 }
 
 function MetricCard({ icon: Icon, title, value, subtitle, color }: MetricCardProps) {
   const colorClasses = {
-    emerald: 'text-emerald-600 bg-emerald-50',
-    blue: 'text-blue-600 bg-blue-50',
-    amber: 'text-amber-600 bg-amber-50',
+    slate: 'text-slate-600 bg-slate-100',
   };
 
   return (
@@ -288,9 +341,9 @@ function MetricCardSkeleton() {
 
 function ActivityBadge({ action, t }: { action: Activity['action']; t: (key: string) => string }) {
   const variants: Record<Activity['action'], { labelKey: string; color: string }> = {
-    RESERVADO: { labelKey: 'reserved', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    RESERVADO: { labelKey: 'reserved', color: 'bg-slate-100 text-slate-700 border-slate-200' },
     VENDIDO: { labelKey: 'sold', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    COMPARTILHADO: { labelKey: 'shared', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+    COMPARTILHADO: { labelKey: 'shared', color: 'bg-slate-100 text-slate-700 border-slate-200' },
     CRIADO: { labelKey: 'created', color: 'bg-slate-50 text-slate-700 border-slate-200' },
   };
 

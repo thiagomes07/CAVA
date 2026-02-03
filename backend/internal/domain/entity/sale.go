@@ -18,7 +18,8 @@ type Sale struct {
 	TotalAreaSold     float64   `json:"totalAreaSold"`     // Área total vendida em m²
 	PricePerUnit      float64   `json:"pricePerUnit"`      // Preço por unidade de área na venda
 	PriceUnit         PriceUnit `json:"priceUnit"`         // Unidade de preço usada na venda
-	SalePrice         float64   `json:"salePrice"`         // Preço final pago pelo cliente
+	SalePrice         float64   `json:"salePrice"`         // Preço final pago pelo cliente (valor da indústria)
+	BrokerSoldPrice   *float64  `json:"brokerSoldPrice,omitempty"` // Valor que o broker vendeu para o cliente final
 	BrokerCommission  float64   `json:"brokerCommission"`  // Comissão do broker/vendedor
 	NetIndustryValue  float64   `json:"netIndustryValue"`  // Valor líquido para indústria
 	SaleDate          time.Time `json:"saleDate"`

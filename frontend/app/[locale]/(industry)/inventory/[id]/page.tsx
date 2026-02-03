@@ -50,13 +50,14 @@ export default function EditBatchPage() {
 
   const fetchAvailableUsers = async () => {
     try {
-      const [brokers, sellers] = await Promise.all([
-        apiClient.get<User[]>('/brokers'),
-        apiClient.get<User[]>('/users', { params: { role: 'VENDEDOR_INTERNO' } }),
+      const [brokersResponse, sellersResponse] = await Promise.all([
+        apiClient.get<{ brokers: User[]; total: number; page: number }>('/brokers'),
+        apiClient.get<{ users: User[]; total: number; page: number }>('/users', { params: { role: 'VENDEDOR_INTERNO' } }),
       ]);
-      setAvailableUsers([...brokers, ...sellers]);
+      setAvailableUsers([...brokersResponse.brokers, ...(sellersResponse.users || [])]);
     } catch (err) {
       // Ignorar erro
+      console.error('Error fetching available users:', err);
     }
   };
 

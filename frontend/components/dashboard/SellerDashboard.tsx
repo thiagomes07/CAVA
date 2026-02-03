@@ -86,21 +86,21 @@ export function SellerDashboard() {
                 title={t('availableStock')}
                 value={metrics?.availableBatches || 0}
                 subtitle={t('activeBatches')}
-                color="emerald"
+                color="slate"
               />
               <MetricCard
                 icon={TrendingUp}
                 title={t('monthlySales')}
                 value={formatCurrency(metrics?.monthlySales || 0)}
                 subtitle={t('monthlyRevenue')}
-                color="blue"
+                color="slate"
               />
               <MetricCard
                 icon={Link2}
                 title={t('activeLinks')}
                 value={metrics?.activeLinks || 0}
                 subtitle={t('generatedByMe')}
-                color="purple"
+                color="slate"
               />
             </>
           )}
@@ -242,14 +242,12 @@ interface MetricCardProps {
   title: string;
   value: string | number;
   subtitle: string;
-  color: 'emerald' | 'blue' | 'purple';
+  color: 'slate';
 }
 
 function MetricCard({ icon: Icon, title, value, subtitle, color }: MetricCardProps) {
   const colorClasses = {
-    emerald: 'text-emerald-600 bg-emerald-50',
-    blue: 'text-blue-600 bg-blue-50',
-    purple: 'text-purple-600 bg-purple-50',
+    slate: 'text-slate-600 bg-slate-100',
   };
 
   return (
@@ -288,9 +286,9 @@ function MetricCardSkeleton() {
 
 function ActivityBadge({ action, t }: { action: Activity['action']; t: (key: string) => string }) {
   const variants: Record<Activity['action'], { labelKey: string; color: string }> = {
-    RESERVADO: { labelKey: 'reserved', color: 'bg-blue-50 text-blue-700 border-blue-200' },
+    RESERVADO: { labelKey: 'reserved', color: 'bg-slate-100 text-slate-700 border-slate-200' },
     VENDIDO: { labelKey: 'sold', color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-    COMPARTILHADO: { labelKey: 'shared', color: 'bg-purple-50 text-purple-700 border-purple-200' },
+    COMPARTILHADO: { labelKey: 'shared', color: 'bg-slate-100 text-slate-700 border-slate-200' },
     CRIADO: { labelKey: 'created', color: 'bg-slate-50 text-slate-700 border-slate-200' },
   };
 

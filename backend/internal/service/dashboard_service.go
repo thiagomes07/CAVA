@@ -164,10 +164,10 @@ func (s *dashboardService) GetBrokerMetrics(ctx context.Context, brokerID string
 		mu.Unlock()
 	}()
 
-	// 2. Vendas mensais
+	// 2. Vendas mensais (usando o valor que o broker vendeu para o cliente final)
 	go func() {
 		defer wg.Done()
-		total, err := s.salesRepo.SumMonthlySales(ctx, brokerID, currentMonth)
+		total, err := s.salesRepo.SumMonthlyBrokerSales(ctx, brokerID, currentMonth)
 		if err != nil {
 			s.logger.Error("erro ao calcular vendas mensais do broker", zap.Error(err))
 			errChan <- err

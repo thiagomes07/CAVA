@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Download, FileText, Receipt, Trash2 } from 'lucide-react';
@@ -71,11 +71,11 @@ export default function SalesHistoryPage() {
 
   const fetchSellers = async () => {
     try {
-      const data = await apiClient.get<Array<{ id: string; name: string }>>(
+      const data = await apiClient.get<{ users: Array<{ id: string; name: string }>; total: number; page: number }>(
         '/users',
         { params: { role: 'VENDEDOR_INTERNO' } }
       );
-      setSellers(data);
+      setSellers(data.users || []);
     } catch (err) {
       error(t('sellersError'));
     }
@@ -155,7 +155,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('totalSold')}
                 </p>
-                <Receipt className="w-5 h-5 text-emerald-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.totalSales)}
@@ -167,7 +167,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('commissionsPaid')}
                 </p>
-                <Receipt className="w-5 h-5 text-blue-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.totalCommissions)}
@@ -179,7 +179,7 @@ export default function SalesHistoryPage() {
                 <p className="text-sm text-slate-500 uppercase tracking-widest">
                   {t('averageTicket')}
                 </p>
-                <Receipt className="w-5 h-5 text-amber-600" />
+                <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
                 {formatCurrency(summary.averageTicket)}
@@ -282,9 +282,8 @@ export default function SalesHistoryPage() {
                 </TableHeader>
                 <TableBody>
                   {sales.map((sale) => (
-                    <>
+                    <React.Fragment key={sale.id}>
                       <TableRow
-                        key={sale.id}
                         className={cn(
                           'cursor-pointer',
                           expandedRow === sale.id && 'bg-slate-50'
@@ -335,7 +334,7 @@ export default function SalesHistoryPage() {
                           </span>
                         </TableCell>
                         <TableCell>
-                          <span className="font-semibold text-emerald-600 tabular-nums">
+                          <span className="font-semibold text-obsidian tabular-nums">
                             {formatCurrency(sale.netIndustryValue)}
                           </span>
                         </TableCell>
@@ -405,7 +404,7 @@ export default function SalesHistoryPage() {
                           </TableCell>
                         </TableRow>
                       )}
-                    </>
+                    </React.Fragment>
                   ))}
                 </TableBody>
               </Table>

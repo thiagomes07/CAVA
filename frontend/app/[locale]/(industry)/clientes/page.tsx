@@ -526,10 +526,10 @@ export default function ClientesManagementPage() {
                                   e.stopPropagation();
                                   handleOpenShareModal(cliente, 'email');
                                 }}
-                                className="p-1.5 hover:bg-blue-50 rounded-sm transition-colors"
+                                className="p-1.5 hover:bg-slate-100 rounded-sm transition-colors"
                                 title={t('shareViaEmail')}
                               >
-                                <Share2 className="w-4 h-4 text-blue-600" />
+                                <Share2 className="w-4 h-4 text-slate-600" />
                               </button>
                             </div>
                           ) : (

@@ -23,16 +23,16 @@ func (r *salesHistoryRepository) Create(ctx context.Context, tx *sql.Tx, sale *e
 		INSERT INTO sales_history (
 			id, batch_id, sold_by_user_id, seller_name, industry_id, cliente_id,
 			customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
-			price_per_unit, price_unit, sale_price, broker_commission,
+			price_per_unit, price_unit, sale_price, broker_sold_price, broker_commission,
 			net_industry_value, invoice_url, notes, sold_at
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING created_at
 	`
 
 	err := tx.QueryRowContext(ctx, query,
 		sale.ID, sale.BatchID, sale.SoldByUserID, sale.SellerName, sale.IndustryID, sale.ClienteID,
 		sale.CustomerName, sale.CustomerContact, sale.QuantitySlabsSold, sale.TotalAreaSold,
-		sale.PricePerUnit, sale.PriceUnit, sale.SalePrice,
+		sale.PricePerUnit, sale.PriceUnit, sale.SalePrice, sale.BrokerSoldPrice,
 		sale.BrokerCommission, sale.NetIndustryValue, sale.InvoiceURL,
 		sale.Notes, sale.SaleDate,
 	).Scan(&sale.CreatedAt)
@@ -48,7 +48,7 @@ func (r *salesHistoryRepository) FindByID(ctx context.Context, id string) (*enti
 	query := `
 		SELECT id, batch_id, sold_by_user_id, COALESCE(seller_name, ''), industry_id, cliente_id,
 		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
-		       price_per_unit, price_unit, sale_price, broker_commission,
+		       price_per_unit, price_unit, sale_price, broker_sold_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE id = $1
@@ -58,7 +58,7 @@ func (r *salesHistoryRepository) FindByID(ctx context.Context, id string) (*enti
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&sale.ID, &sale.BatchID, &sale.SoldByUserID, &sale.SellerName, &sale.IndustryID, &sale.ClienteID,
 		&sale.CustomerName, &sale.CustomerContact, &sale.QuantitySlabsSold, &sale.TotalAreaSold,
-		&sale.PricePerUnit, &sale.PriceUnit, &sale.SalePrice,
+		&sale.PricePerUnit, &sale.PriceUnit, &sale.SalePrice, &sale.BrokerSoldPrice,
 		&sale.BrokerCommission, &sale.NetIndustryValue, &sale.InvoiceURL,
 		&sale.Notes, &sale.SaleDate, &sale.CreatedAt,
 	)
@@ -85,7 +85,7 @@ func (r *salesHistoryRepository) FindByBrokerID(ctx context.Context, brokerID st
 	query := `
 		SELECT id, batch_id, sold_by_user_id, COALESCE(seller_name, ''), industry_id, cliente_id,
 		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
-		       price_per_unit, price_unit, sale_price, broker_commission,
+		       price_per_unit, price_unit, sale_price, broker_sold_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE sold_by_user_id = $1
@@ -106,7 +106,7 @@ func (r *salesHistoryRepository) FindByPeriod(ctx context.Context, industryID st
 	query := `
 		SELECT id, batch_id, sold_by_user_id, COALESCE(seller_name, ''), industry_id, cliente_id,
 		       customer_name, customer_contact, quantity_slabs_sold, total_area_sold,
-		       price_per_unit, price_unit, sale_price, broker_commission,
+		       price_per_unit, price_unit, sale_price, broker_sold_price, broker_commission,
 		       net_industry_value, invoice_url, notes, sold_at, created_at
 		FROM sales_history
 		WHERE industry_id = $1 
@@ -134,7 +134,7 @@ func (r *salesHistoryRepository) listWithFilters(ctx context.Context, sellerID, 
 	query := psql.Select(
 		"id", "batch_id", "sold_by_user_id", "COALESCE(seller_name, '') as seller_name", "industry_id", "cliente_id",
 		"customer_name", "customer_contact", "quantity_slabs_sold", "total_area_sold",
-		"price_per_unit", "price_unit", "sale_price", "broker_commission",
+		"price_per_unit", "price_unit", "sale_price", "broker_sold_price", "broker_commission",
 		"net_industry_value", "invoice_url", "notes", "sold_at", "created_at",
 	).From("sales_history")
 
@@ -301,6 +301,28 @@ func (r *salesHistoryRepository) SumMonthlyCommission(ctx context.Context, broke
 	return total, nil
 }
 
+// SumMonthlyBrokerSales soma as vendas do broker no mês usando broker_sold_price
+func (r *salesHistoryRepository) SumMonthlyBrokerSales(ctx context.Context, brokerID string, month time.Time) (float64, error) {
+	query := `
+		SELECT COALESCE(SUM(broker_sold_price), 0)
+		FROM sales_history
+		WHERE sold_by_user_id = $1
+		  AND sold_at >= $2
+		  AND sold_at < $3
+	`
+
+	startOfMonth := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, time.UTC)
+	endOfMonth := startOfMonth.AddDate(0, 1, 0)
+
+	var total float64
+	err := r.db.QueryRowContext(ctx, query, brokerID, startOfMonth, endOfMonth).Scan(&total)
+	if err != nil {
+		return 0, errors.DatabaseError(err)
+	}
+
+	return total, nil
+}
+
 func (r *salesHistoryRepository) scanSales(rows *sql.Rows) ([]entity.Sale, error) {
 	sales := []entity.Sale{}
 	for rows.Next() {
@@ -308,7 +330,7 @@ func (r *salesHistoryRepository) scanSales(rows *sql.Rows) ([]entity.Sale, error
 		if err := rows.Scan(
 			&s.ID, &s.BatchID, &s.SoldByUserID, &s.SellerName, &s.IndustryID, &s.ClienteID,
 			&s.CustomerName, &s.CustomerContact, &s.QuantitySlabsSold, &s.TotalAreaSold,
-			&s.PricePerUnit, &s.PriceUnit, &s.SalePrice,
+			&s.PricePerUnit, &s.PriceUnit, &s.SalePrice, &s.BrokerSoldPrice,
 			&s.BrokerCommission, &s.NetIndustryValue, &s.InvoiceURL,
 			&s.Notes, &s.SaleDate, &s.CreatedAt,
 		); err != nil {

@@ -11,12 +11,15 @@ const (
 	InteractionInteresseLote     InteractionType = "INTERESSE_LOTE"
 	InteractionInteresseCatalogo InteractionType = "INTERESSE_CATALOGO"
 	InteractionDuvidaGeral       InteractionType = "DUVIDA_GERAL"
+	InteractionPortfolioLead     InteractionType = "PORTFOLIO_LEAD"
 )
 
 // Cliente representa um cliente potencial
 type Cliente struct {
 	ID             string        `json:"id"`
 	SalesLinkID    string        `json:"salesLinkId"`
+	IndustryID     *string       `json:"industryId,omitempty"`   // Para leads vindos diretamente (portfolio)
+	Source         string        `json:"source"`                  // MANUAL, PORTFOLIO, SALES_LINK
 	Name           string        `json:"name"`
 	Email          *string       `json:"email,omitempty"`
 	Phone          *string       `json:"phone,omitempty"`
@@ -53,7 +56,8 @@ type ClienteSubscription struct {
 
 // CreateClienteInput representa os dados para capturar um cliente (público)
 type CreateClienteInput struct {
-	SalesLinkID    string  `json:"salesLinkId" validate:"required,uuid"`
+	SalesLinkID    string  `json:"salesLinkId,omitempty" validate:"omitempty,uuid"`
+	ProductID      *string `json:"productId,omitempty" validate:"omitempty,uuid"` // Produto de interesse (para portfolio)
 	Name           string  `json:"name" validate:"required,min=2,max=100"`
 	Email          *string `json:"email,omitempty" validate:"omitempty,email"`
 	Phone          *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`

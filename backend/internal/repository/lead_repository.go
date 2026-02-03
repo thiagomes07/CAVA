@@ -48,6 +48,49 @@ func (r *clienteRepository) Create(ctx context.Context, tx *sql.Tx, cliente *ent
 	return nil
 }
 
+func (r *clienteRepository) CreateFromPortfolio(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error {
+	query := `
+		INSERT INTO clientes (
+			id, sales_link_id, name, email, phone, whatsapp, message, 
+			marketing_opt_in, created_by, source, industry_id
+		) VALUES (
+			$1, 
+			CASE WHEN $2 = '' THEN NULL ELSE $2::uuid END, 
+			$3, $4, $5, $6, $7, $8, $9, $10,
+			CASE WHEN $11 = '' THEN NULL ELSE $11::uuid END
+		)
+		RETURNING created_at, updated_at, last_interaction
+	`
+
+	var industryID string
+	if cliente.IndustryID != nil {
+		industryID = *cliente.IndustryID
+	}
+
+	var err error
+	if tx != nil {
+		err = tx.QueryRowContext(ctx, query,
+			cliente.ID, cliente.SalesLinkID, cliente.Name,
+			cliente.Email, cliente.Phone, cliente.Whatsapp,
+			cliente.Message, cliente.MarketingOptIn, cliente.CreatedByUserID,
+			cliente.Source, industryID,
+		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
+	} else {
+		err = r.db.QueryRowContext(ctx, query,
+			cliente.ID, cliente.SalesLinkID, cliente.Name,
+			cliente.Email, cliente.Phone, cliente.Whatsapp,
+			cliente.Message, cliente.MarketingOptIn, cliente.CreatedByUserID,
+			cliente.Source, industryID,
+		).Scan(&cliente.CreatedAt, &cliente.UpdatedAt, &cliente.UpdatedAt)
+	}
+
+	if err != nil {
+		return errors.DatabaseError(err)
+	}
+
+	return nil
+}
+
 func (r *clienteRepository) FindByID(ctx context.Context, id string) (*entity.Cliente, error) {
 	query := `
 		SELECT id, COALESCE(sales_link_id::text, ''), name, email, phone, whatsapp,

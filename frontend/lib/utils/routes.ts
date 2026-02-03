@@ -1,4 +1,4 @@
-import type { UserRole } from '@/lib/types';
+import type { UserRole } from "@/lib/types";
 
 /**
  * Rotas canônicas do sistema CAVA
@@ -6,7 +6,7 @@ import type { UserRole } from '@/lib/types';
  * Esta função é mantida para compatibilidade, mas apenas valida e retorna o pathname.
  */
 export function toCanonicalPath(pathname: string): string {
-  if (!pathname.startsWith('/')) return '/dashboard';
+  if (!pathname.startsWith("/")) return "/dashboard";
   return pathname;
 }
 
@@ -17,30 +17,30 @@ type RoleRouteMap = Record<UserRole, string[]>;
  */
 export const routesByRole: RoleRouteMap = {
   ADMIN_INDUSTRIA: [
-    '/dashboard',
-    '/catalog',
-    '/inventory',
-    '/brokers',
-    '/sales',
-    '/team',
-    '/links',
-    '/catalogos',
-    '/clientes',
+    "/dashboard",
+    "/portfolio",
+    "/inventory",
+    "/brokers",
+    "/sales",
+    "/team",
+    "/links",
+    "/catalogos",
+    "/clientes",
   ],
   VENDEDOR_INTERNO: [
-    '/dashboard',
-    '/inventory',
-    '/sales',
-    '/links',
-    '/catalogos',
-    '/clientes',
+    "/dashboard",
+    "/inventory",
+    "/sales",
+    "/links",
+    "/catalogos",
+    "/clientes",
   ],
   BROKER: [
-    '/dashboard',
-    '/shared-inventory',
-    '/links',
-    '/catalogos',
-    '/clientes',
+    "/dashboard",
+    "/shared-inventory",
+    "/links",
+    "/catalogos",
+    "/clientes",
   ],
 };
 
@@ -50,7 +50,9 @@ export const routesByRole: RoleRouteMap = {
 export function canRoleAccessRoute(role: UserRole, pathname: string): boolean {
   const routes = routesByRole[role];
   if (!routes) return false;
-  return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+  return routes.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  );
 }
 
 /**
@@ -58,11 +60,11 @@ export function canRoleAccessRoute(role: UserRole, pathname: string): boolean {
  */
 export function getDashboardForRole(role: UserRole): string {
   switch (role) {
-    case 'ADMIN_INDUSTRIA':
-    case 'VENDEDOR_INTERNO':
-    case 'BROKER':
-      return '/dashboard';
+    case "ADMIN_INDUSTRIA":
+    case "VENDEDOR_INTERNO":
+    case "BROKER":
+      return "/dashboard";
     default:
-      return '/login';
+      return "/login";
   }
 }

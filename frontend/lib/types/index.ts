@@ -1,25 +1,38 @@
-export type UserRole = 'ADMIN_INDUSTRIA' | 'BROKER' | 'VENDEDOR_INTERNO';
+export type UserRole = "ADMIN_INDUSTRIA" | "BROKER" | "VENDEDOR_INTERNO";
 
-export type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO';
+export type BatchStatus = "DISPONIVEL" | "RESERVADO" | "VENDIDO" | "INATIVO";
 
-export type PriceUnit = 'M2' | 'FT2';
+export type PriceUnit = "M2" | "FT2";
 
 export type MaterialType =
-  | 'GRANITO'
-  | 'MARMORE'
-  | 'QUARTZITO'
-  | 'LIMESTONE'
-  | 'TRAVERTINO'
-  | 'OUTROS';
+  | "GRANITO"
+  | "MARMORE"
+  | "QUARTZITO"
+  | "LIMESTONE"
+  | "TRAVERTINO"
+  | "OUTROS";
 
 export type FinishType =
-  | 'POLIDO'
-  | 'LEVIGADO'
-  | 'BRUTO'
-  | 'APICOADO'
-  | 'FLAMEADO';
+  | "POLIDO"
+  | "LEVIGADO"
+  | "BRUTO"
+  | "APICOADO"
+  | "FLAMEADO";
 
-export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO' | 'MULTIPLOS_LOTES';
+export type LinkType =
+  | "LOTE_UNICO"
+  | "PRODUTO_GERAL"
+  | "CATALOGO_COMPLETO"
+  | "MULTIPLOS_LOTES";
+
+export type ReservationStatus =
+  | "ATIVA"
+  | "PENDENTE_APROVACAO"
+  | "APROVADA"
+  | "REJEITADA"
+  | "CONFIRMADA_VENDA"
+  | "EXPIRADA"
+  | "CANCELADA";
 
 export interface User {
   id: string;
@@ -57,8 +70,15 @@ export interface Industry {
   addressZipCode?: string;
   policyTerms?: string;
   isActive?: boolean;
+  socialLinks?: SocialLink[];
+  portfolioDisplaySettings?: PortfolioDisplaySettings;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SocialLink {
+  name: string;
+  url: string;
 }
 
 export interface Media {
@@ -81,6 +101,8 @@ export interface Product {
   isActive: boolean;
   medias: Media[];
   batchCount?: number;
+  basePrice?: number | null;
+  priceUnit?: PriceUnit;
   createdAt: string;
   updatedAt: string;
 }
@@ -101,6 +123,9 @@ export interface Batch {
   totalArea: number;
   industryPrice: number;
   priceUnit: PriceUnit;
+  priceOverride?: boolean;
+  slabArea?: number; // Área de uma chapa (calculado: height * width / 10000)
+  slabPrice?: number; // Preço por chapa (calculado: industryPrice * slabArea)
   originQuarry?: string;
   entryDate: string;
   status: BatchStatus;
@@ -118,6 +143,8 @@ export interface SharedInventoryBatch {
   sharedWithUserId: string; // Broker ou Vendedor Interno
   negotiatedPrice?: number;
   negotiatedPriceUnit?: PriceUnit;
+  effectivePrice?: number; // Preço efetivo (negociado ou do lote)
+  effectiveSlabPrice?: number; // Preço por chapa efetivo (calculado)
   sharedAt: string;
   batch: Batch;
   sharedWith: User; // Broker ou Vendedor Interno
@@ -175,16 +202,28 @@ export interface Cliente {
 export interface Reservation {
   id: string;
   batchId: string;
+  industryId?: string;
   clienteId?: string;
   reservedByUserId: string;
   quantitySlabsReserved: number;
+  status: ReservationStatus;
   expiresAt: string;
   notes?: string;
   isActive: boolean;
   createdAt: string;
+  // Campos de preço do broker
+  reservedPrice?: number; // Preço indicado pelo broker (visível para admin)
+  brokerSoldPrice?: number; // Preço interno do broker (só visível para o broker)
+  // Campos de aprovação
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectionReason?: string;
+  approvalExpiresAt?: string;
+  // Relacionamentos
   batch?: Batch;
   cliente?: Cliente;
   reservedBy?: User;
+  approvedByUser?: User;
 }
 
 export interface Sale {
@@ -196,6 +235,7 @@ export interface Sale {
   customerName: string;
   customerContact: string;
   salePrice: number;
+  brokerSoldPrice?: number;
   quantitySlabsSold: number;
   totalAreaSold: number;
   pricePerUnit: number;
@@ -225,7 +265,7 @@ export interface Activity {
   batchCode: string;
   productName: string;
   sellerName: string;
-  action: 'RESERVADO' | 'VENDIDO' | 'COMPARTILHADO' | 'CRIADO';
+  action: "RESERVADO" | "VENDIDO" | "COMPARTILHADO" | "CRIADO";
   date: string;
 }
 
@@ -251,4 +291,104 @@ export interface SendLinksResponse {
   totalSkipped: number;
   results: SendLinkResult[];
   linksIncluded: number;
+}
+
+// ====================================
+// BI (Business Intelligence) Types
+// ====================================
+
+export interface SalesMetrics {
+  totalRevenue: number;
+  totalCommissions: number;
+  netRevenue: number;
+  salesCount: number;
+  averageTicket: number;
+  totalSlabs: number;
+  totalArea: number;
+  commissionRate: number;
+}
+
+export interface ConversionMetrics {
+  totalReservations: number;
+  totalApproved: number;
+  totalRejected: number;
+  totalConverted: number;
+  totalExpired: number;
+  approvalRate: number;
+  conversionRate: number;
+  avgHoursToApprove: number;
+  avgDaysToConvert: number;
+}
+
+export interface InventoryMetrics {
+  totalBatches: number;
+  totalSlabs: number;
+  availableSlabs: number;
+  reservedSlabs: number;
+  soldSlabs: number;
+  inventoryValue: number;
+  avgDaysInStock: number;
+  lowStockCount: number;
+  staleBatchCount: number;
+  turnover: number;
+}
+
+export interface BrokerPerformance {
+  brokerId: string;
+  brokerName: string;
+  salesCount: number;
+  totalRevenue: number;
+  totalCommission: number;
+  averageTicket: number;
+  approvalRate: number;
+  conversionRate: number;
+  rank: number;
+}
+
+export interface TrendPoint {
+  date: string;
+  value: number;
+  count: number;
+}
+
+export interface ProductMetric {
+  productId: string;
+  productName: string;
+  material: MaterialType;
+  salesCount: number;
+  revenue: number;
+  slabsSold: number;
+  areaSold: number;
+  rank?: number;
+}
+
+export interface BIDashboard {
+  period: string;
+  sales: SalesMetrics;
+  conversion: ConversionMetrics;
+  inventory: InventoryMetrics;
+  topBrokers: BrokerPerformance[];
+  salesTrend: TrendPoint[];
+  topProducts: ProductMetric[];
+  pendingApprovals: number;
+  lastRefresh?: string;
+}
+
+export interface BIFilters {
+  startDate?: string;
+  endDate?: string;
+  brokerId?: string;
+  productId?: string;
+  granularity?: "day" | "week" | "month";
+  limit?: number;
+}
+
+// Input types for reservation approval
+export interface ApproveReservationInput {
+  reservationId: string;
+}
+
+export interface RejectReservationInput {
+  reservationId: string;
+  reason: string;
 }

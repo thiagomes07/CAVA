@@ -9,7 +9,7 @@ import { routing, locales, defaultLocale, type Locale } from '@/i18n/routing';
 const authRoutes = ['/login'];
 
 // Prefixos de rotas públicas
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo'];
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo', '/deposito'];
 
 // Prefixos reservados (rotas internas) derivados do mapa de permissões
 const reservedPrefixes = Array.from(

@@ -151,6 +151,90 @@ func (s *clienteService) CaptureInterest(ctx context.Context, input entity.Creat
 	})
 }
 
+// CreateFromPortfolio cria cliente capturado via portfolio público
+func (s *clienteService) CreateFromPortfolio(ctx context.Context, cliente *entity.Cliente, productID *string) error {
+	// Determinar contato para busca de cliente existente (prioriza email)
+	var searchContact string
+	if cliente.Email != nil && *cliente.Email != "" {
+		searchContact = *cliente.Email
+	} else if cliente.Phone != nil && *cliente.Phone != "" {
+		searchContact = *cliente.Phone
+	}
+
+	// Verificar se cliente já existe por contato
+	var existingCliente *entity.Cliente
+	var err error
+	if searchContact != "" {
+		existingCliente, err = s.clienteRepo.FindByContact(ctx, searchContact)
+		if err != nil && !isNotFoundError(err) {
+			s.logger.Error("erro ao buscar cliente por contato", zap.Error(err))
+			return domainErrors.InternalError(err)
+		}
+	}
+
+	// Executar em transação
+	return s.db.ExecuteInTx(ctx, func(tx interface{}) error {
+		var clienteID string
+
+		if existingCliente != nil {
+			// Cliente já existe, apenas atualizar última interação
+			clienteID = existingCliente.ID
+			if err := s.clienteRepo.UpdateLastInteraction(ctx, nil, clienteID); err != nil {
+				return err
+			}
+			s.logger.Info("cliente existente atualizado via portfolio", zap.String("clienteId", clienteID))
+		} else {
+			// Criar novo cliente
+			cliente.ID = uuid.New().String()
+			cliente.Source = "PORTFOLIO"
+			cliente.CreatedAt = time.Now()
+			cliente.UpdatedAt = time.Now()
+
+			if err := s.clienteRepo.CreateFromPortfolio(ctx, nil, cliente); err != nil {
+				s.logger.Error("erro ao criar cliente do portfolio", zap.Error(err))
+				return err
+			}
+
+			clienteID = cliente.ID
+			s.logger.Info("novo cliente criado via portfolio", zap.String("clienteId", clienteID))
+		}
+
+		// Criar interação do tipo PORTFOLIO_LEAD
+		interaction := &entity.ClienteInteraction{
+			ID:              uuid.New().String(),
+			ClienteID:       clienteID,
+			SalesLinkID:     "", // Sem link - veio do portfolio
+			Message:         cliente.Message,
+			InteractionType: entity.InteractionPortfolioLead,
+			CreatedAt:       time.Now(),
+		}
+
+		// Adicionar referência de produto se especificado
+		if productID != nil {
+			interaction.TargetProductID = productID
+		}
+
+		if err := s.interactionRepo.Create(ctx, nil, interaction); err != nil {
+			s.logger.Error("erro ao criar interação do portfolio", zap.Error(err))
+			return err
+		}
+
+		s.logger.Info("lead capturado via portfolio",
+			zap.String("clienteId", clienteID),
+			zap.String("industryId", stringValue(cliente.IndustryID)),
+		)
+
+		return nil
+	})
+}
+
+func stringValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
 // CreateManual cria um cliente manualmente (usuário autenticado)
 func (s *clienteService) CreateManual(ctx context.Context, input entity.CreateClienteManualInput, createdByUserID string) (*entity.Cliente, error) {
 	// Determinar contato para busca de cliente existente (prioriza email)

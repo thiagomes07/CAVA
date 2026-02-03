@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
@@ -70,23 +71,26 @@ func (h *IndustryHandler) GetMyIndustry(w http.ResponseWriter, r *http.Request) 
 
 // UpdateConfigInput representa os dados para atualização da configuração
 type UpdateConfigInput struct {
-	Name           *string `json:"name" validate:"omitempty"`
-	CNPJ           *string `json:"cnpj" validate:"omitempty"`
-	ContactEmail   *string `json:"contactEmail" validate:"omitempty"`
-	ContactPhone   *string `json:"contactPhone" validate:"omitempty,max=20"`
-	Whatsapp       *string `json:"whatsapp" validate:"omitempty,max=20"`
-	Description    *string `json:"description" validate:"omitempty,max=2000"`
-	City           *string `json:"city" validate:"omitempty,max=100"`
-	State          *string `json:"state" validate:"omitempty,len=2"`
-	BannerURL      *string `json:"bannerUrl" validate:"omitempty,url,max=500"`
-	LogoURL        *string `json:"logoUrl" validate:"omitempty,max=500"`
-	AddressCountry *string `json:"addressCountry" validate:"omitempty,max=100"`
-	AddressState   *string `json:"addressState" validate:"omitempty,max=100"`
-	AddressCity    *string `json:"addressCity" validate:"omitempty,max=255"`
-	AddressStreet  *string `json:"addressStreet" validate:"omitempty,max=255"`
-	AddressNumber  *string `json:"addressNumber" validate:"omitempty,max=50"`
-	AddressZipCode *string `json:"addressZipCode" validate:"omitempty,max=20"`
-	IsPublic       *bool   `json:"isPublic"`
+	Name                     *string                        `json:"name" validate:"omitempty"`
+	Slug                     *string                        `json:"slug" validate:"omitempty,min=3,max=100"`
+	CNPJ                     *string                        `json:"cnpj" validate:"omitempty"`
+	ContactEmail             *string                        `json:"contactEmail" validate:"omitempty"`
+	ContactPhone             *string                        `json:"contactPhone" validate:"omitempty,max=20"`
+	Whatsapp                 *string                        `json:"whatsapp" validate:"omitempty,max=20"`
+	Description              *string                        `json:"description" validate:"omitempty,max=2000"`
+	City                     *string                        `json:"city" validate:"omitempty,max=100"`
+	State                    *string                        `json:"state" validate:"omitempty,len=2"`
+	BannerURL                *string                        `json:"bannerUrl" validate:"omitempty,url,max=500"`
+	LogoURL                  *string                        `json:"logoUrl" validate:"omitempty,max=500"`
+	AddressCountry           *string                        `json:"addressCountry" validate:"omitempty,max=100"`
+	AddressState             *string                        `json:"addressState" validate:"omitempty,max=100"`
+	AddressCity              *string                        `json:"addressCity" validate:"omitempty,max=255"`
+	AddressStreet            *string                        `json:"addressStreet" validate:"omitempty,max=255"`
+	AddressNumber            *string                        `json:"addressNumber" validate:"omitempty,max=50"`
+	AddressZipCode           *string                        `json:"addressZipCode" validate:"omitempty,max=20"`
+	SocialLinks              *entity.SocialLinkList         `json:"socialLinks" validate:"omitempty,dive"`
+	PortfolioDisplaySettings *entity.PortfolioDisplaySettings `json:"portfolioDisplaySettings"`
+	IsPublic                 *bool                          `json:"isPublic"`
 }
 
 // UpdateConfig godoc
@@ -191,6 +195,17 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		} else {
 			industry.Name = &trimmed
 		}
+	}
+	if input.Slug != nil {
+		trimmed := strings.TrimSpace(*input.Slug)
+		if trimmed == "" {
+			response.Error(w, http.StatusBadRequest, "INVALID_SLUG", "Slug cannot be empty", nil)
+			return
+		}
+		// Normalizar o slug: lowercase e substituir espaços por hífens
+		trimmed = strings.ToLower(trimmed)
+		trimmed = strings.ReplaceAll(trimmed, " ", "-")
+		industry.Slug = &trimmed
 	}
 	if input.CNPJ != nil {
 		trimmed := strings.TrimSpace(*input.CNPJ)
@@ -314,6 +329,12 @@ func (h *IndustryHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	}
 	if input.IsPublic != nil {
 		industry.IsPublic = *input.IsPublic
+	}
+	if input.SocialLinks != nil {
+		industry.SocialLinks = *input.SocialLinks
+	}
+	if input.PortfolioDisplaySettings != nil {
+		industry.PortfolioDisplaySettings = *input.PortfolioDisplaySettings
 	}
 
 	// Salvar

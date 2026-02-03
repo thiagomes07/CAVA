@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { ArrowLeft, Plus, X, Search, Package } from 'lucide-react';
+import { useForm, Controller } from 'react-hook-form';
+import { ArrowLeft, Plus, X, Search, Package, DollarSign, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { MoneyInput } from '@/components/ui/masked-input';
 import { Badge } from '@/components/ui/badge';
 import { Toggle } from '@/components/ui/toggle';
 import { Card } from '@/components/ui/card';
@@ -26,8 +27,9 @@ import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDimensions, formatArea } from '@/lib/utils/formatDimensions';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
+import { calculateSlabPrice, getSlabAreaM2 } from '@/lib/utils/priceConversion';
 import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { User, Batch, SharedInventoryBatch } from '@/lib/types';
+import type { User, Batch, SharedInventoryBatch, PriceUnit } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
@@ -47,7 +49,7 @@ export default function BrokerSharedInventoryPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
 
-  const { register, handleSubmit, reset } = useForm<{ negotiatedPrice?: number }>();
+  const { register, handleSubmit, reset, control, watch } = useForm<{ negotiatedPrice?: number }>();
 
   useEffect(() => {
     fetchBrokerData();
@@ -223,13 +225,22 @@ export default function BrokerSharedInventoryPage() {
                         <TableHead>Lote</TableHead>
                         <TableHead>Produto</TableHead>
                         <TableHead>Dimensões</TableHead>
-                        <TableHead>Preço Negociado</TableHead>
+                        <TableHead>Preço/m²</TableHead>
+                        <TableHead>Preço/Chapa</TableHead>
                         <TableHead>Compartilhado em</TableHead>
                         <TableHead>Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {sharedBatches.map((shared) => (
+                      {sharedBatches.map((shared) => {
+                        const pricePerM2 = shared.negotiatedPrice || shared.batch.industryPrice || 0;
+                        const slabPrice = calculateSlabPrice(
+                          shared.batch.height || 0,
+                          shared.batch.width || 0,
+                          pricePerM2,
+                          (shared.batch.priceUnit || 'M2') as PriceUnit
+                        );
+                        return (
                         <TableRow key={shared.id}>
                           <TableCell>
                             <span 
@@ -258,9 +269,12 @@ export default function BrokerSharedInventoryPage() {
                           </TableCell>
                           <TableCell>
                             <span className="font-serif text-obsidian">
-                              {formatCurrency(
-                                shared.negotiatedPrice || shared.batch.industryPrice
-                              )}
+                              {formatCurrency(pricePerM2)}/m²
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-serif font-semibold text-slate-700">
+                              {formatCurrency(slabPrice)}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -278,7 +292,8 @@ export default function BrokerSharedInventoryPage() {
                             </button>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        );
+                      })}
                     </TableBody>
                   </Table>
                 </div>
@@ -361,7 +376,7 @@ export default function BrokerSharedInventoryPage() {
                       }}
                       className={cn(
                         'w-full p-4 border-b border-slate-100 hover:bg-slate-50 transition-colors text-left',
-                        selectedBatch?.id === batch.id && 'bg-blue-50'
+                        selectedBatch?.id === batch.id && 'bg-slate-100'
                       )}
                     >
                       <div className="flex items-center gap-4">
@@ -398,8 +413,8 @@ export default function BrokerSharedInventoryPage() {
 
               {/* Selected Batch Preview */}
               {selectedBatch && (
-                <div className="p-4 bg-blue-50 border border-blue-200 rounded-sm">
-                  <p className="text-xs uppercase tracking-widest text-blue-600 mb-2">
+                <div className="p-4 bg-slate-100 border border-slate-200 rounded-sm">
+                  <p className="text-xs uppercase tracking-widest text-slate-600 mb-2">
                     Lote Selecionado
                   </p>
                   <div className="flex items-center gap-4">
@@ -410,14 +425,14 @@ export default function BrokerSharedInventoryPage() {
                         className="w-20 h-20 rounded-sm object-cover"
                       />
                     )}
-                    <div>
-                      <p 
+                    <div className="flex-1">
+                      <p
                         className="font-mono font-semibold text-obsidian"
                         title={selectedBatch.batchCode}
                       >
                         {truncateText(selectedBatch.batchCode, TRUNCATION_LIMITS.BATCH_CODE)}
                       </p>
-                      <p 
+                      <p
                         className="text-sm text-slate-600"
                         title={selectedBatch.product?.name}
                       >
@@ -430,6 +445,23 @@ export default function BrokerSharedInventoryPage() {
                           selectedBatch.thickness
                         )}
                       </p>
+                      {/* Price Info */}
+                      <div className="mt-2 pt-2 border-t border-slate-200 flex gap-4">
+                        <div className="flex items-center gap-1">
+                          <DollarSign className="w-3 h-3 text-slate-600" />
+                          <span className="text-xs text-slate-600">Preço/m²:</span>
+                          <span className="text-sm font-semibold text-obsidian">
+                            {formatCurrency(selectedBatch.industryPrice)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Ruler className="w-3 h-3 text-slate-600" />
+                          <span className="text-xs text-slate-600">Área/Chapa:</span>
+                          <span className="text-sm font-medium text-slate-700">
+                            {getSlabAreaM2(selectedBatch.height, selectedBatch.width).toFixed(2)} m²
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -437,14 +469,53 @@ export default function BrokerSharedInventoryPage() {
 
               {/* Negotiated Price */}
               {selectedBatch && (
-                <Input
-                  {...register('negotiatedPrice', { valueAsNumber: true })}
-                  type="number"
-                  step="0.01"
-                  label="Preço de Repasse para este Broker (R$)"
-                  helperText="Deixe vazio para usar o preço padrão do lote"
-                  disabled={isSubmitting}
-                />
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-slate-600 block">
+                      Preço por m² para este Broker (R$)
+                    </label>
+                    <Controller
+                      name="negotiatedPrice"
+                      control={control}
+                      render={({ field }) => (
+                        <MoneyInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isSubmitting}
+                        />
+                      )}
+                    />
+                    <p className="text-xs text-slate-500 mt-1">Deixe vazio para usar o preço padrão do lote</p>
+                  </div>
+                  
+                  {/* Calculated Slab Price Preview */}
+                  {(() => {
+                    const pricePerM2 = watch('negotiatedPrice') || selectedBatch.industryPrice;
+                    const slabArea = getSlabAreaM2(selectedBatch.height, selectedBatch.width);
+                    const slabPrice = calculateSlabPrice(
+                      selectedBatch.height,
+                      selectedBatch.width,
+                      pricePerM2,
+                      (selectedBatch.priceUnit || 'M2') as PriceUnit
+                    );
+                    
+                    return (
+                      <div className="p-3 bg-slate-100 border border-slate-200 rounded-sm">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-slate-500">Preço calculado por chapa</p>
+                            <p className="text-lg font-serif font-bold text-slate-700">
+                              {formatCurrency(slabPrice)}
+                            </p>
+                          </div>
+                          <div className="text-right text-xs text-slate-500">
+                            <p>{formatCurrency(pricePerM2)}/m² × {slabArea.toFixed(2)} m²</p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               )}
             </div>
           </ModalContent>

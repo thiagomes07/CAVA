@@ -1,40 +1,40 @@
-'use client';
+"use client";
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useTranslations } from 'next-intl';
-import { Plus, Search, Eye, Edit2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
-import { Toggle } from '@/components/ui/toggle';
-import { Badge } from '@/components/ui/badge';
-import { EmptyState } from '@/components/shared/EmptyState';
-import { LoadingState } from '@/components/shared/LoadingState';
-import { Pagination } from '@/components/shared/Pagination';
-import { apiClient } from '@/lib/api/client';
-import { useToast } from '@/lib/hooks/useToast';
-import { truncateText } from '@/lib/utils/truncateText';
-import { TRUNCATION_LIMITS } from '@/lib/config/truncationLimits';
-import type { Product } from '@/lib/types';
-import type { ProductFilter } from '@/lib/schemas/product.schema';
-import { materialTypes } from '@/lib/schemas/product.schema';
-import { cn } from '@/lib/utils/cn';
-import { isPlaceholderUrl } from '@/lib/utils/media';
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
+import { Plus, Search, Eye, Edit2, Share2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { Toggle } from "@/components/ui/toggle";
+import { Badge } from "@/components/ui/badge";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { LoadingState } from "@/components/shared/LoadingState";
+import { Pagination } from "@/components/shared/Pagination";
+import { apiClient } from "@/lib/api/client";
+import { useToast } from "@/lib/hooks/useToast";
+import { truncateText } from "@/lib/utils/truncateText";
+import { TRUNCATION_LIMITS } from "@/lib/config/truncationLimits";
+import type { Product } from "@/lib/types";
+import type { ProductFilter } from "@/lib/schemas/product.schema";
+import { materialTypes } from "@/lib/schemas/product.schema";
+import { cn } from "@/lib/utils/cn";
+import { isPlaceholderUrl } from "@/lib/utils/media";
 
-export default function CatalogPage() {
+export default function PortfolioPage() {
   const router = useRouter();
   const { error } = useToast();
-  const t = useTranslations('catalog');
-  const tCommon = useTranslations('common');
+  const t = useTranslations("portfolio");
+  const tCommon = useTranslations("common");
 
   const [products, setProducts] = useState<Product[]>([]);
   const [totalProducts, setTotalProducts] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
+  const [searchInput, setSearchInput] = useState("");
   const [filters, setFilters] = useState<ProductFilter>({
-    search: '',
-    material: '',
+    search: "",
+    material: "",
     includeInactive: false,
     page: 1,
     limit: 24,
@@ -56,20 +56,21 @@ export default function CatalogPage() {
     try {
       setIsLoading(true);
       const data = await apiClient.get<{ products: Product[]; total: number }>(
-        '/products',
-        { params: filters }
+        "/products",
+        { params: filters },
       );
       setProducts(data.products);
       setTotalProducts(data.total);
     } catch (err) {
-      error(t('loadError'));
-      setProducts([]); 
+      error(t("loadError"));
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const hasFilters = filters.search || filters.material || filters.includeInactive;
+  const hasFilters =
+    filters.search || filters.material || filters.includeInactive;
   const isEmpty = products.length === 0;
 
   return (
@@ -79,19 +80,26 @@ export default function CatalogPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">
-              {t('title')}
+              {t("title")}
             </h1>
-            <p className="text-sm text-slate-500">
-              {t('subtitle')}
-            </p>
+            <p className="text-sm text-slate-500">{t("subtitle")}</p>
           </div>
-          <Button
-            variant="primary"
-            onClick={() => router.push('/catalog/new')}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            {t('newProduct')}
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => router.push("/portfolio/share")}
+            >
+              <Share2 className="w-4 h-4 mr-2" />
+              {tCommon("share")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => router.push("/portfolio/new")}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              {t("newProduct")}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -101,7 +109,7 @@ export default function CatalogPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Input
-                placeholder={t('searchPlaceholder')}
+                placeholder={t("searchPlaceholder")}
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
               />
@@ -111,14 +119,14 @@ export default function CatalogPage() {
             <Select
               value={filters.material}
               onChange={(e) =>
-                setFilters({ 
-                  ...filters, 
-                  material: e.target.value as ProductFilter['material'], 
-                  page: 1 
+                setFilters({
+                  ...filters,
+                  material: e.target.value as ProductFilter["material"],
+                  page: 1,
                 })
               }
             >
-              <option value="">{t('allMaterials')}</option>
+              <option value="">{t("allMaterials")}</option>
               {materialTypes.map((material) => (
                 <option key={material} value={material}>
                   {material}
@@ -136,7 +144,7 @@ export default function CatalogPage() {
                     page: 1,
                   })
                 }
-                label={t('showInactive')}
+                label={t("showInactive")}
               />
             </div>
           </div>
@@ -152,26 +160,24 @@ export default function CatalogPage() {
             icon={hasFilters ? Search : Plus}
             title={
               hasFilters
-                ? t('noResults', { search: filters.search || '' })
-                : t('emptyTitle')
+                ? t("noResults", { search: filters.search || "" })
+                : t("emptyTitle")
             }
             description={
-              hasFilters
-                ? t('adjustFilters')
-                : t('emptyDescription')
+              hasFilters ? t("adjustFilters") : t("emptyDescription")
             }
-            actionLabel={hasFilters ? tCommon('clearFilters') : t('newProduct')}
+            actionLabel={hasFilters ? tCommon("clearFilters") : t("newProduct")}
             onAction={() => {
               if (hasFilters) {
                 setFilters({
-                  search: '',
-                  material: '',
+                  search: "",
+                  material: "",
                   includeInactive: false,
                   page: 1,
                   limit: 24,
                 });
               } else {
-                router.push('/catalog/new');
+                router.push("/portfolio/new");
               }
             }}
           />
@@ -182,20 +188,23 @@ export default function CatalogPage() {
                 <ProductCard
                   key={product.id}
                   product={product}
-                  onView={() => router.push(`/inventory?productId=${product.id}`)}
-                  onEdit={() => router.push(`/catalog/${product.id}`)}
+                  onView={() =>
+                    router.push(`/inventory?productId=${product.id}`)
+                  }
+                  onEdit={() => router.push(`/portfolio/${product.id}`)}
                   translations={{
-                    noPhoto: t('noPhoto'),
-                    edit: t('edit'),
-                    viewBatches: t('viewBatches'),
-                    active: t('active'),
-                    inactive: t('inactive'),
-                    batches: (count: number) => `${count} ${count === 1 ? t('batch') : t('batchesPlural')}`
+                    noPhoto: t("noPhoto"),
+                    edit: t("edit"),
+                    viewBatches: t("viewBatches"),
+                    active: t("active"),
+                    inactive: t("inactive"),
+                    batches: (count: number) =>
+                      `${count} ${count === 1 ? t("batch") : t("batchesPlural")}`,
                   }}
                 />
               ))}
             </div>
-            
+
             {/* Pagination */}
             <Pagination
               currentPage={filters.page || 1}
@@ -225,7 +234,12 @@ interface ProductCardProps {
   };
 }
 
-function ProductCard({ product, onView, onEdit, translations }: ProductCardProps) {
+function ProductCard({
+  product,
+  onView,
+  onEdit,
+  translations,
+}: ProductCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   // A capa é a primeira mídia (já ordenada por displayOrder no backend)
   const coverImage = product.medias?.[0];
@@ -247,7 +261,9 @@ function ProductCard({ product, onView, onEdit, translations }: ProductCardProps
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-slate-400 text-sm">{translations.noPhoto}</span>
+            <span className="text-slate-400 text-sm">
+              {translations.noPhoto}
+            </span>
           </div>
         )}
 
@@ -269,19 +285,16 @@ function ProductCard({ product, onView, onEdit, translations }: ProductCardProps
       {/* Footer */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-2">
-          <h3 
-            className="font-serif text-xl text-obsidian"
-            title={product.name}
-          >
+          <h3 className="font-serif text-xl text-obsidian" title={product.name}>
             {truncateText(product.name, TRUNCATION_LIMITS.PRODUCT_NAME_SHORT)}
           </h3>
-          <Badge variant={product.isActive ? 'DISPONIVEL' : 'INATIVO'}>
+          <Badge variant={product.isActive ? "DISPONIVEL" : "INATIVO"}>
             {product.isActive ? translations.active : translations.inactive}
           </Badge>
         </div>
 
         {product.sku && (
-          <p 
+          <p
             className="font-mono text-xs text-slate-400 mb-3"
             title={product.sku}
           >
@@ -290,10 +303,7 @@ function ProductCard({ product, onView, onEdit, translations }: ProductCardProps
         )}
 
         <div className="flex items-center justify-between text-sm">
-          <span 
-            className="text-slate-600"
-            title={product.material}
-          >
+          <span className="text-slate-600" title={product.material}>
             {truncateText(product.material, TRUNCATION_LIMITS.MATERIAL_NAME)}
           </span>
           <span className="text-slate-500">

@@ -685,13 +685,13 @@ export default function BrokersManagementPage() {
           <ModalContent>
             <div className="space-y-4">
               {/* Info box about pending first login */}
-              <div className="flex items-start gap-3 p-4 bg-orange-50 border border-orange-200 rounded-sm">
-                <Clock className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex items-start gap-3 p-4 bg-slate-100 border border-slate-200 rounded-sm">
+                <Clock className="w-5 h-5 text-slate-600 flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-orange-800">
+                  <p className="text-sm font-medium text-slate-700">
                     {t('pendingFirstLoginInfo', { name: selectedBroker?.name || '' })}
                   </p>
-                  <p className="text-xs text-orange-700 mt-1">
+                  <p className="text-xs text-slate-600 mt-1">
                     {t('resendInviteDescription')}
                   </p>
                 </div>
