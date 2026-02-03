@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useForm, useController } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useTranslations } from 'next-intl';
-import { User, Mail, Phone, AlertTriangle } from 'lucide-react';
+import { User, Phone, AlertTriangle } from 'lucide-react';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils/cn';
@@ -52,7 +52,6 @@ export function BrokerFormModal({
         resolver: zodResolver(updateBrokerSchema),
         defaultValues: {
             name: '',
-            email: '',
             phone: '',
             whatsapp: '',
         },
@@ -68,7 +67,6 @@ export function BrokerFormModal({
         if (open && initialData) {
             reset({
                 name: initialData.name,
-                email: initialData.email,
                 phone: initialData.phone ? formatPhoneInput(initialData.phone) : '',
                 whatsapp: initialData.whatsapp ? formatPhoneInput(initialData.whatsapp) : '',
             });
@@ -171,35 +169,6 @@ export function BrokerFormModal({
                                 />
                                 {errors.name && (
                                     <p className="text-sm text-red-600">{errors.name.message}</p>
-                                )}
-                            </div>
-
-                            {/* Email */}
-                            <div className="space-y-2">
-                                <label
-                                    htmlFor="email"
-                                    className="text-sm font-medium text-slate-700 flex items-center gap-2"
-                                >
-                                    <Mail className="h-4 w-4" />
-                                    {tCommon('email')}
-                                    {isEditMode && <span className="ml-auto text-xs text-slate-400 font-normal">(Não editável)</span>}
-                                </label>
-                                <input
-                                    {...register('email')}
-                                    id="email"
-                                    type="email"
-                                    disabled={isEditMode}
-                                    className={cn(
-                                        "w-full px-4 py-2.5 rounded-lg border transition-colors",
-                                        isEditMode && "bg-slate-100 text-slate-500 cursor-not-allowed",
-                                        errors.email
-                                            ? "border-red-300 focus:border-red-500 focus:ring-red-500"
-                                            : "border-slate-300 focus:border-blue-500 focus:ring-blue-500"
-                                    )}
-                                    placeholder={tCommon('emailPlaceholder')}
-                                />
-                                {errors.email && (
-                                    <p className="text-sm text-red-600">{errors.email.message}</p>
                                 )}
                             </div>
 

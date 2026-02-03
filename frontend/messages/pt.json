@@ -52,7 +52,10 @@
     "useSamePhoneForWhatsapp": "Usar mesmo número para WhatsApp",
     "namePlaceholder": "Nome completo",
     "emailPlaceholder": "email@exemplo.com",
-    "error": "Ocorreu um erro"
+    "error": "Ocorreu um erro",
+    "refresh": "Atualizar",
+    "share": "Compartilhar",
+    "sending": "Enviando..."
   },
   "metadata": {
     "title": "CAVA",

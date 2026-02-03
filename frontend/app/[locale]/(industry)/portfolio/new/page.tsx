@@ -479,7 +479,7 @@ export default function NewProductPage() {
                 <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">
                   4
                 </span>
-                Fotos de Catálogo
+                Fotos de Produto
               </h2>
             </div>
             <div className="p-6">

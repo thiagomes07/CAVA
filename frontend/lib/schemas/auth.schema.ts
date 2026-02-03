@@ -168,11 +168,6 @@ export const updateBrokerSchema = z.object({
     .min(1, 'Nome é obrigatório')
     .refine((v) => v.trim().length >= 2, 'Nome deve ter no mínimo 2 caracteres')
     .transform((v) => v.trim()),
-  email: z
-    .string()
-    .min(1, 'Email é obrigatório')
-    .email('Email inválido')
-    .transform((v) => v.trim()),
   phone: z
     .string()
     .optional()
