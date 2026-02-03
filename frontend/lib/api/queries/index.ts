@@ -1,29 +1,32 @@
 // Products
-export * from './useProducts';
+export * from "./useProducts";
 
 // Batches
-export * from './useBatches';
+export * from "./useBatches";
 
 // Dashboard
-export * from './useDashboard';
+export * from "./useDashboard";
 
 // Leads (Clientes)
-export * from './useLeads';
+export * from "./useLeads";
 
 // Sales Links
-export * from './useSalesLinks';
+export * from "./useSalesLinks";
 
 // Users (Brokers & Sellers)
-export * from './useUsers';
+export * from "./useUsers";
 
 // Sales History
-export * from './useSales';
+export * from "./useSales";
 
 // Shared Inventory
-export * from './useSharedInventory';
+export * from "./useSharedInventory";
 
 // Reservations
-export * from './useReservations';
+export * from "./useReservations";
 
 // Business Intelligence (BI)
-export * from './useBI';
+export * from "./useBI";
+
+// Portfolio Sharing
+export * from "./usePortfolio";

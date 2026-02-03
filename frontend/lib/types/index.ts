@@ -1,34 +1,38 @@
-export type UserRole = 'ADMIN_INDUSTRIA' | 'BROKER' | 'VENDEDOR_INTERNO';
+export type UserRole = "ADMIN_INDUSTRIA" | "BROKER" | "VENDEDOR_INTERNO";
 
-export type BatchStatus = 'DISPONIVEL' | 'RESERVADO' | 'VENDIDO' | 'INATIVO';
+export type BatchStatus = "DISPONIVEL" | "RESERVADO" | "VENDIDO" | "INATIVO";
 
-export type PriceUnit = 'M2' | 'FT2';
+export type PriceUnit = "M2" | "FT2";
 
 export type MaterialType =
-  | 'GRANITO'
-  | 'MARMORE'
-  | 'QUARTZITO'
-  | 'LIMESTONE'
-  | 'TRAVERTINO'
-  | 'OUTROS';
+  | "GRANITO"
+  | "MARMORE"
+  | "QUARTZITO"
+  | "LIMESTONE"
+  | "TRAVERTINO"
+  | "OUTROS";
 
 export type FinishType =
-  | 'POLIDO'
-  | 'LEVIGADO'
-  | 'BRUTO'
-  | 'APICOADO'
-  | 'FLAMEADO';
+  | "POLIDO"
+  | "LEVIGADO"
+  | "BRUTO"
+  | "APICOADO"
+  | "FLAMEADO";
 
-export type LinkType = 'LOTE_UNICO' | 'PRODUTO_GERAL' | 'CATALOGO_COMPLETO' | 'MULTIPLOS_LOTES';
+export type LinkType =
+  | "LOTE_UNICO"
+  | "PRODUTO_GERAL"
+  | "CATALOGO_COMPLETO"
+  | "MULTIPLOS_LOTES";
 
 export type ReservationStatus =
-  | 'ATIVA'
-  | 'PENDENTE_APROVACAO'
-  | 'APROVADA'
-  | 'REJEITADA'
-  | 'CONFIRMADA_VENDA'
-  | 'EXPIRADA'
-  | 'CANCELADA';
+  | "ATIVA"
+  | "PENDENTE_APROVACAO"
+  | "APROVADA"
+  | "REJEITADA"
+  | "CONFIRMADA_VENDA"
+  | "EXPIRADA"
+  | "CANCELADA";
 
 export interface User {
   id: string;
@@ -42,6 +46,16 @@ export interface User {
   firstLoginAt?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PortfolioDisplaySettings {
+  showName: boolean;
+  showDescription: boolean;
+  showLogo: boolean;
+  showContact: boolean;
+  showLocation: boolean;
+  locationLevel: "none" | "country" | "state" | "city" | "full";
+  isPublished: boolean;
 }
 
 export interface Industry {
@@ -63,6 +77,7 @@ export interface Industry {
   policyTerms?: string;
   isActive?: boolean;
   socialLinks?: SocialLink[];
+  portfolioDisplaySettings?: PortfolioDisplaySettings;
   createdAt: string;
   updatedAt: string;
 }
@@ -115,8 +130,8 @@ export interface Batch {
   industryPrice: number;
   priceUnit: PriceUnit;
   priceOverride?: boolean;
-  slabArea?: number;      // Área de uma chapa (calculado: height * width / 10000)
-  slabPrice?: number;     // Preço por chapa (calculado: industryPrice * slabArea)
+  slabArea?: number; // Área de uma chapa (calculado: height * width / 10000)
+  slabPrice?: number; // Preço por chapa (calculado: industryPrice * slabArea)
   originQuarry?: string;
   entryDate: string;
   status: BatchStatus;
@@ -134,8 +149,8 @@ export interface SharedInventoryBatch {
   sharedWithUserId: string; // Broker ou Vendedor Interno
   negotiatedPrice?: number;
   negotiatedPriceUnit?: PriceUnit;
-  effectivePrice?: number;      // Preço efetivo (negociado ou do lote)
-  effectiveSlabPrice?: number;  // Preço por chapa efetivo (calculado)
+  effectivePrice?: number; // Preço efetivo (negociado ou do lote)
+  effectiveSlabPrice?: number; // Preço por chapa efetivo (calculado)
   sharedAt: string;
   batch: Batch;
   sharedWith: User; // Broker ou Vendedor Interno
@@ -203,8 +218,8 @@ export interface Reservation {
   isActive: boolean;
   createdAt: string;
   // Campos de preço do broker
-  reservedPrice?: number;    // Preço indicado pelo broker (visível para admin)
-  brokerSoldPrice?: number;  // Preço interno do broker (só visível para o broker)
+  reservedPrice?: number; // Preço indicado pelo broker (visível para admin)
+  brokerSoldPrice?: number; // Preço interno do broker (só visível para o broker)
   // Campos de aprovação
   approvedBy?: string;
   approvedAt?: string;
@@ -256,7 +271,7 @@ export interface Activity {
   batchCode: string;
   productName: string;
   sellerName: string;
-  action: 'RESERVADO' | 'VENDIDO' | 'COMPARTILHADO' | 'CRIADO';
+  action: "RESERVADO" | "VENDIDO" | "COMPARTILHADO" | "CRIADO";
   date: string;
 }
 
@@ -370,7 +385,7 @@ export interface BIFilters {
   endDate?: string;
   brokerId?: string;
   productId?: string;
-  granularity?: 'day' | 'week' | 'month';
+  granularity?: "day" | "week" | "month";
   limit?: number;
 }
 

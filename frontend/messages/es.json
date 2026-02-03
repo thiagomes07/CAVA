@@ -40,8 +40,11 @@
     "description": "Descripción",
     "notes": "Observaciones",
     "price": "Precio",
+    "prices": "Precios",
     "total": "Total",
     "quantity": "Cantidad",
+    "share": "Compartir",
+    "refresh": "Actualizar",
     "poweredBy": "Powered by CAVA"
   },
   "metadata": {
@@ -106,9 +109,10 @@
   },
   "navigation": {
     "dashboard": "Panel",
-    "catalog": "Catálogo",
+    "portfolio": "Portafolio",
     "inventory": "Inventario",
     "sharedInventory": "Inventario Compartido",
+    "sharedPortfolios": "Portafolios Compartidos",
     "sales": "Ventas",
     "reservations": "Reservas",
     "bi": "Inteligencia",
@@ -210,8 +214,8 @@
     "deleteConfirmWarning": "Esta acción no se puede deshacer. El lote será eliminado permanentemente.",
     "cancel": "Cancelar"
   },
-  "catalog": {
-    "title": "Catálogo",
+  "portfolio": {
+    "title": "Portafolio",
     "subtitle": "Gestiona tus productos y tipos de piedra",
     "newProduct": "NUEVO PRODUCTO",
     "searchPlaceholder": "Buscar por nombre o SKU",
@@ -228,7 +232,29 @@
     "inactive": "Inactivo",
     "batch": "lote",
     "batchesPlural": "lotes",
-    "loadError": "Error al cargar productos"
+    "loadError": "Error al cargar productos",
+    "share": {
+      "title": "Compartir Portafolio",
+      "subtitle": "Gestiona qué representantes pueden ver tu portafolio",
+      "shareBroker": "Compartir con Representantes",
+      "selectBrokers": "Selecciona los representantes para compartir",
+      "canShowPrices": "Permitir que los representantes vean precios",
+      "canShowPricesHint": "Si está habilitado, los representantes verán los precios de los productos",
+      "sharedWith": "Compartido con {count} representante(s)",
+      "noShares": "Portafolio no compartido",
+      "noSharesDescription": "Comparte tu portafolio con representantes para que puedan ver y vender tus productos",
+      "removeAccess": "Quitar acceso",
+      "confirmRemove": "¿Estás seguro de que deseas quitar el acceso de {name} a tu portafolio?",
+      "shareSuccess": "Portafolio compartido con {count} representante(s)",
+      "shareError": "Error al compartir portafolio",
+      "removeSuccess": "Acceso eliminado correctamente",
+      "removeError": "Error al eliminar acceso",
+      "noBrokersSelected": "Selecciona al menos un representante",
+      "allBrokersShared": "Todos los representantes disponibles ya tienen acceso",
+      "sharedSince": "Compartido desde",
+      "pricesVisible": "Precios visibles",
+      "pricesHidden": "Precios ocultos"
+    }
   },
   "sales": {
     "title": "Historial de Ventas",
@@ -682,6 +708,16 @@
     "noStock": "Sin stock",
     "unavailable": "No disponible"
   },
+  "sharedPortfolios": {
+    "title": "Portafolios Compartidos",
+    "subtitle": "Catálogos de productos compartidos contigo por las industrias",
+    "noPortfolios": "No hay portafolios compartidos",
+    "noPortfoliosDescription": "Cuando una industria comparta su portafolio contigo, aparecerá aquí.",
+    "products": "productos",
+    "pricesVisible": "Precios visibles",
+    "pricesHidden": "Precios ocultos",
+    "viewPortfolio": "Ver Portafolio"
+  },
   "reservations": {
     "title": "Reservas",
     "subtitle": "Gestiona tus reservas de placas",
@@ -769,6 +805,8 @@
     "logoDeleted": "Logotipo eliminado exitosamente",
     "logoDeleteError": "Error al eliminar logotipo",
     "companyName": "Nombre de la Empresa",
+    "portfolioSlug": "Slug del Portafolio",
+    "portfolioSlugHint": "Use letras minúsculas, números y guiones. Ej: mi-empresa",
     "cnpj": "CNPJ",
     "businessId": "ID Empresarial",
     "cnpjReadOnly": "El CNPJ no se puede cambiar.",
@@ -787,6 +825,52 @@
     "street": "Calle",
     "number": "Número",
     "success": "Datos actualizados exitosamente",
-    "error": "Error al actualizar datos"
+    "error": "Error al actualizar datos",
+    "portfolioVisibility": {
+      "title": "Visibilidad del Portafolio",
+      "subtitle": "Configure qué información se muestra en su portafolio público",
+      "isPublished": "Portafolio Publicado",
+      "isPublishedDesc": "Cuando está activado, su portafolio es accesible públicamente",
+      "displayOptions": "Opciones de Visualización",
+      "showName": "Mostrar Nombre de la Empresa",
+      "showDescription": "Mostrar Descripción de la Empresa",
+      "showLogo": "Mostrar Logo de la Empresa",
+      "showContact": "Mostrar Información de Contacto",
+      "showLocation": "Mostrar Ubicación",
+      "noLogoWarning": "Agregue un logo primero",
+      "locationLevel": "Nivel de Detalle de Ubicación",
+      "locationLevelDesc": "Elija cuánto detalle de ubicación mostrar públicamente",
+      "levelCountry": "Solo país",
+      "levelState": "País y estado",
+      "levelCity": "País, estado y ciudad",
+      "levelFull": "Dirección completa",
+      "infoTitle": "Sobre el Portafolio Público",
+      "infoDesc": "La URL de su portafolio público se basa en el slug de su empresa. Compártala con clientes potenciales para mostrar sus productos.",
+      "portfolioUrl": "Enlace de su Portafolio Público",
+      "viewPortfolio": "Ver"
+    }
+  },
+  "publicPortfolio": {
+    "portfolio": "Portafolio",
+    "notFound": "Portafolio no encontrado",
+    "notFoundDescription": "Este portafolio puede no estar disponible públicamente",
+    "searchProducts": "Buscar productos...",
+    "allMaterials": "Todos los Materiales",
+    "products": "productos",
+    "noProducts": "No se encontraron productos",
+    "noProductsDescription": "Intenta ajustar los filtros de búsqueda",
+    "inStock": "En Stock",
+    "contactUs": "Contáctenos",
+    "requestInfo": "Solicitar Información",
+    "requestInfoFor": "Solicitar información sobre {product}",
+    "yourName": "Tu Nombre",
+    "message": "Mensaje",
+    "contactNote": "Por favor, proporciona email o teléfono para que podamos contactarte.",
+    "contactRequired": "Por favor, indica tu nombre y al menos email o teléfono",
+    "contactSuccess": "¡Gracias! Te contactaremos pronto.",
+    "contactError": "Error al enviar mensaje. Inténtalo de nuevo.",
+    "details": "Detalles",
+    "contact": "Contacto",
+    "send": "Enviar"
   }
 }

@@ -12,6 +12,9 @@ type ClienteRepository interface {
 	// Create cria um novo cliente
 	Create(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error
 
+	// CreateFromPortfolio cria um cliente capturado via portfolio público
+	CreateFromPortfolio(ctx context.Context, tx *sql.Tx, cliente *entity.Cliente) error
+
 	// FindByID busca cliente por ID
 	FindByID(ctx context.Context, id string) (*entity.Cliente, error)
 

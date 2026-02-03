@@ -31,6 +31,7 @@ type Handler struct {
 	Upload          *UploadHandler
 	Public          *PublicHandler
 	Industry        *IndustryHandler
+	Portfolio       *PortfolioHandler
 	Health          *HealthHandler
 }
 
@@ -48,23 +49,26 @@ type Config struct {
 
 // Services agrupa todos os serviços necessários
 type Services struct {
-	Auth            service.AuthService
-	User            service.UserService
-	Product         service.ProductService
-	Batch           service.BatchService
-	Reservation     service.ReservationService
-	Dashboard       service.DashboardService
-	BI              service.BIService
-	SalesLink       service.SalesLinkService
-	CatalogLink     service.CatalogLinkService
-	Cliente         service.ClienteService
-	SalesHistory    service.SalesHistoryService
-	SharedInventory service.SharedInventoryService
-	Storage         service.StorageService
-	Email           service.EmailSender
-	MediaRepo       repository.MediaRepository
-	IndustryRepo    repository.IndustryRepository
-	BatchRepo       repository.BatchRepository
+	Auth                  service.AuthService
+	User                  service.UserService
+	Product               service.ProductService
+	Batch                 service.BatchService
+	Reservation           service.ReservationService
+	Dashboard             service.DashboardService
+	BI                    service.BIService
+	SalesLink             service.SalesLinkService
+	CatalogLink           service.CatalogLinkService
+	Cliente               service.ClienteService
+	SalesHistory          service.SalesHistoryService
+	SharedInventory       service.SharedInventoryService
+	Storage               service.StorageService
+	Email                 service.EmailSender
+	MediaRepo             repository.MediaRepository
+	IndustryRepo          repository.IndustryRepository
+	BatchRepo             repository.BatchRepository
+	UserRepo              repository.UserRepository
+	ProductRepo           repository.ProductRepository
+	SharedCatalogPermRepo repository.SharedCatalogPermissionRepository
 }
 
 // NewHandler cria uma nova instância de Handler com todos os handlers
@@ -85,6 +89,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
 		Public:          NewPublicHandler(services.SalesLink, services.Cliente, services.IndustryRepo, services.BatchRepo, cfg.Validator, cfg.Logger),
 		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
+		Portfolio:       NewPortfolioHandler(services.SharedCatalogPermRepo, services.UserRepo, services.IndustryRepo, services.ProductRepo, services.Cliente, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -145,6 +150,10 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// Catálogo público da indústria (por slug da indústria)
 			r.Get("/deposits/{slug}", h.Public.GetPublicDepositBySlug)
 			r.Get("/deposits/{slug}/batches", h.Public.GetPublicDepositBatches)
+
+			// Portfolio público da indústria
+			r.Get("/portfolio/{slug}", h.Portfolio.GetPublicPortfolio)
+			r.Post("/portfolio/{slug}/lead", h.Portfolio.CapturePortfolioLead)
 		})
 
 		// ============================================
@@ -373,6 +382,22 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 				r.With(m.RBAC.RequireAdmin).Get("/", h.Industry.GetConfig)
 				r.With(m.RBAC.RequireAdmin).Patch("/", h.Industry.UpdateConfig)
 				r.With(m.RBAC.RequireAdmin).Delete("/logo", h.Industry.DeleteLogo)
+			})
+
+			// ----------------------------------------
+			// PORTFOLIO SHARING (Admin)
+			// ----------------------------------------
+			r.Route("/portfolio/share", func(r chi.Router) {
+				r.With(m.RBAC.RequireAdmin).Get("/", h.Portfolio.ListSharedBrokers)
+				r.With(m.RBAC.RequireAdmin).Post("/", h.Portfolio.ShareWithBrokers)
+				r.With(m.RBAC.RequireAdmin).Delete("/{brokerId}", h.Portfolio.UnshareWithBroker)
+			})
+
+			// ----------------------------------------
+			// SHARED PORTFOLIOS (Broker)
+			// ----------------------------------------
+			r.Route("/broker/shared-portfolios", func(r chi.Router) {
+				r.With(m.RBAC.RequireBroker).Get("/", h.Portfolio.GetSharedPortfolios)
 			})
 		})
 	})

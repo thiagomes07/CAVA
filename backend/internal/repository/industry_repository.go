@@ -56,7 +56,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
 		       description, city, state, banner_url, logo_url, social_links,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
-		       is_public, created_at, updated_at
+		       portfolio_display_settings, is_public, created_at, updated_at
 		FROM industries
 		WHERE id = $1
 	`
@@ -68,7 +68,7 @@ func (r *industryRepository) FindByID(ctx context.Context, id string) (*entity.I
 		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.SocialLinks,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
-		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
+		&industry.PortfolioDisplaySettings, &industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -86,7 +86,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
 		       description, city, state, banner_url, logo_url, social_links,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
-		       is_public, created_at, updated_at
+		       portfolio_display_settings, is_public, created_at, updated_at
 		FROM industries
 		WHERE slug = $1
 	`
@@ -98,7 +98,7 @@ func (r *industryRepository) FindBySlug(ctx context.Context, slug string) (*enti
 		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.SocialLinks,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
-		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
+		&industry.PortfolioDisplaySettings, &industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -116,7 +116,7 @@ func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*enti
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
 		       description, city, state, banner_url, logo_url, social_links,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
-		       is_public, created_at, updated_at
+		       portfolio_display_settings, is_public, created_at, updated_at
 		FROM industries
 		WHERE cnpj = $1
 	`
@@ -128,7 +128,7 @@ func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*enti
 		&industry.Description, &industry.City, &industry.State, &industry.BannerURL, &industry.LogoURL, &industry.SocialLinks,
 		&industry.AddressCountry, &industry.AddressState, &industry.AddressCity, &industry.AddressStreet,
 		&industry.AddressNumber, &industry.AddressZipCode,
-		&industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
+		&industry.PortfolioDisplaySettings, &industry.IsPublic, &industry.CreatedAt, &industry.UpdatedAt,
 	)
 
 	if err == sql.ErrNoRows {
@@ -148,8 +148,8 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 		    description = $5, city = $6, state = $7, banner_url = $8,
 		    logo_url = $9, social_links = $10, address_country = $11, address_state = $12,
 		    address_city = $13, address_street = $14, address_number = $15,
-		    address_zip_code = $16, is_public = $17, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $18
+		    address_zip_code = $16, portfolio_display_settings = $17, is_public = $18, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $19
 		RETURNING updated_at
 	`
 
@@ -158,7 +158,7 @@ func (r *industryRepository) Update(ctx context.Context, industry *entity.Indust
 		industry.Description, industry.City, industry.State, industry.BannerURL,
 		industry.LogoURL, industry.SocialLinks, industry.AddressCountry, industry.AddressState,
 		industry.AddressCity, industry.AddressStreet, industry.AddressNumber,
-		industry.AddressZipCode, industry.IsPublic, industry.ID,
+		industry.AddressZipCode, industry.PortfolioDisplaySettings, industry.IsPublic, industry.ID,
 	).Scan(&industry.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -200,7 +200,7 @@ func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error
 		SELECT id, name, cnpj, slug, contact_email, contact_phone, whatsapp,
 		       description, city, state, banner_url, logo_url, social_links,
 		       address_country, address_state, address_city, address_street, address_number, address_zip_code,
-		       is_public, created_at, updated_at
+		       portfolio_display_settings, is_public, created_at, updated_at
 		FROM industries
 		ORDER BY name
 	`
@@ -220,7 +220,7 @@ func (r *industryRepository) List(ctx context.Context) ([]entity.Industry, error
 			&ind.Description, &ind.City, &ind.State, &ind.BannerURL, &ind.LogoURL, &ind.SocialLinks,
 			&ind.AddressCountry, &ind.AddressState, &ind.AddressCity, &ind.AddressStreet,
 			&ind.AddressNumber, &ind.AddressZipCode,
-			&ind.IsPublic, &ind.CreatedAt, &ind.UpdatedAt,
+			&ind.PortfolioDisplaySettings, &ind.IsPublic, &ind.CreatedAt, &ind.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}

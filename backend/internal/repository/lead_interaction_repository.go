@@ -21,7 +21,11 @@ func (r *clienteInteractionRepository) Create(ctx context.Context, tx *sql.Tx, i
 		INSERT INTO cliente_interactions (
 			id, cliente_id, sales_link_id, target_batch_id, target_product_id,
 			message, interaction_type
-		) VALUES ($1, $2, $3, $4, $5, $6, $7)
+		) VALUES (
+			$1, $2, 
+			CASE WHEN $3 = '' THEN NULL ELSE $3::uuid END, 
+			$4, $5, $6, $7
+		)
 		RETURNING created_at
 	`
 

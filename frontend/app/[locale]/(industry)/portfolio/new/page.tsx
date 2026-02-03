@@ -1,10 +1,18 @@
-'use client';
+"use client";
 
-import { useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload, X, Eye, EyeOff, Sparkles, GripVertical, DollarSign } from 'lucide-react';
+import { useState, useCallback } from "react";
+import { useRouter } from "next/navigation";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Upload,
+  X,
+  Eye,
+  EyeOff,
+  Sparkles,
+  GripVertical,
+  DollarSign,
+} from "lucide-react";
 import {
   DndContext,
   closestCenter,
@@ -14,22 +22,22 @@ import {
   useSensors,
   DragEndEvent,
   DragOverlay,
-} from '@dnd-kit/core';
+} from "@dnd-kit/core";
 import {
   arrayMove,
   SortableContext,
   sortableKeyboardCoordinates,
   rectSortingStrategy,
   useSortable,
-} from '@dnd-kit/sortable';
-import { restrictToParentElement } from '@dnd-kit/modifiers';
-import { CSS } from '@dnd-kit/utilities';
-import { apiClient } from '@/lib/api/client';
-import { useToast } from '@/lib/hooks/useToast';
-import { productSchema, type ProductInput } from '@/lib/schemas/product.schema';
-import { materialTypes, finishTypes } from '@/lib/schemas/product.schema';
-import { MoneyInput } from '@/components/ui/masked-input';
-import { cn } from '@/lib/utils/cn';
+} from "@dnd-kit/sortable";
+import { restrictToParentElement } from "@dnd-kit/modifiers";
+import { CSS } from "@dnd-kit/utilities";
+import { apiClient } from "@/lib/api/client";
+import { useToast } from "@/lib/hooks/useToast";
+import { productSchema, type ProductInput } from "@/lib/schemas/product.schema";
+import { materialTypes, finishTypes } from "@/lib/schemas/product.schema";
+import { MoneyInput } from "@/components/ui/masked-input";
+import { cn } from "@/lib/utils/cn";
 
 interface UploadedMedia {
   id: string;
@@ -41,7 +49,7 @@ interface UploadedMedia {
 function SortableMediaItem({
   item,
   onRemove,
-  isFirst
+  isFirst,
 }: {
   item: UploadedMedia;
   onRemove: (id: string) => void;
@@ -67,8 +75,10 @@ function SortableMediaItem({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'relative aspect-square overflow-hidden border group',
-        isDragging ? 'opacity-50 shadow-xl border-[#C2410C]' : 'border-slate-200'
+        "relative aspect-square overflow-hidden border group",
+        isDragging
+          ? "opacity-50 shadow-xl border-[#C2410C]"
+          : "border-slate-200",
       )}
     >
       <img
@@ -125,18 +135,18 @@ export default function NewProductPage() {
   } = useForm<ProductInput>({
     resolver: zodResolver(productSchema),
     defaultValues: {
-      name: '',
-      sku: '',
-      material: 'GRANITO',
-      finish: 'POLIDO',
-      description: '',
+      name: "",
+      sku: "",
+      material: "GRANITO",
+      finish: "POLIDO",
+      description: "",
       isPublic: true,
       basePrice: undefined,
-      priceUnit: 'M2',
+      priceUnit: "M2",
     },
   });
 
-  const isPublic = watch('isPublic');
+  const isPublic = watch("isPublic");
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -147,16 +157,21 @@ export default function NewProductPage() {
     }),
     useSensor(KeyboardSensor, {
       coordinateGetter: sortableKeyboardCoordinates,
-    })
+    }),
   );
 
   // State for active dragging item
   const [activeId, setActiveId] = useState<string | null>(null);
-  const activeItem = activeId ? medias.find(item => item.id === activeId) : null;
+  const activeItem = activeId
+    ? medias.find((item) => item.id === activeId)
+    : null;
 
-  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
-    setActiveId(String(event.active.id));
-  }, []);
+  const handleDragStart = useCallback(
+    (event: { active: { id: string | number } }) => {
+      setActiveId(String(event.active.id));
+    },
+    [],
+  );
 
   const handleDragEnd = useCallback((event: DragEndEvent) => {
     const { active, over } = event;
@@ -179,18 +194,18 @@ export default function NewProductPage() {
     const totalPhotos = medias.length + files.length;
 
     if (totalPhotos > 10) {
-      error('Máximo de 10 fotos por produto');
+      error("Máximo de 10 fotos por produto");
       return;
     }
 
     files.forEach((file) => {
-      if (!file.type.startsWith('image/')) {
-        error('Formato não suportado. Use JPG, PNG ou WebP');
+      if (!file.type.startsWith("image/")) {
+        error("Formato não suportado. Use JPG, PNG ou WebP");
         return;
       }
 
       if (file.size > 5 * 1024 * 1024) {
-        error('Arquivo excede o limite de 5MB');
+        error("Arquivo excede o limite de 5MB");
         return;
       }
 
@@ -208,7 +223,7 @@ export default function NewProductPage() {
       reader.readAsDataURL(file);
     });
 
-    e.target.value = '';
+    e.target.value = "";
   };
 
   const handleRemoveMedia = useCallback((id: string) => {
@@ -228,29 +243,32 @@ export default function NewProductPage() {
         description: data.description || undefined,
         isPublic: data.isPublic,
         basePrice: data.basePrice || null,
-        priceUnit: data.priceUnit || 'M2',
+        priceUnit: data.priceUnit || "M2",
       };
 
-      const product = await apiClient.post<{ id: string }>('/products', productData);
+      const product = await apiClient.post<{ id: string }>(
+        "/products",
+        productData,
+      );
 
       // 2. Se houver mídias, fazer upload com o productId
       if (medias.length > 0 && product.id) {
         const formData = new FormData();
-        formData.append('productId', product.id);
+        formData.append("productId", product.id);
         medias.forEach((media) => {
-          formData.append('medias', media.file);
+          formData.append("medias", media.file);
         });
 
         await apiClient.upload<{ urls: string[] }>(
-          '/upload/product-medias',
-          formData
+          "/upload/product-medias",
+          formData,
         );
       }
 
-      success('Produto cadastrado com sucesso');
-      router.push('/catalog');
+      success("Produto cadastrado com sucesso");
+      router.push("/portfolio");
     } catch {
-      error('Erro ao cadastrar produto');
+      error("Erro ao cadastrar produto");
     } finally {
       setIsSubmitting(false);
     }
@@ -273,7 +291,9 @@ export default function NewProductPage() {
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">1</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">
+                  1
+                </span>
                 Informações Básicas
               </h2>
             </div>
@@ -283,16 +303,20 @@ export default function NewProductPage() {
                   Nome do Produto <span className="text-[#C2410C]">*</span>
                 </label>
                 <input
-                  {...register('name')}
+                  {...register("name")}
                   placeholder="Ex: Granito Preto São Gabriel"
                   disabled={isSubmitting}
                   className={cn(
-                    'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                    errors.name ? 'border-rose-500' : 'border-slate-200',
-                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                    "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors",
+                    errors.name ? "border-rose-500" : "border-slate-200",
+                    isSubmitting && "opacity-50 cursor-not-allowed",
                   )}
                 />
-                {errors.name && <p className="mt-1 text-xs text-rose-500">{errors.name.message}</p>}
+                {errors.name && (
+                  <p className="mt-1 text-xs text-rose-500">
+                    {errors.name.message}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -300,16 +324,20 @@ export default function NewProductPage() {
                   Código SKU <span className="text-slate-400">(opcional)</span>
                 </label>
                 <input
-                  {...register('sku')}
+                  {...register("sku")}
                   placeholder="Ex: GRN-PSG-001"
                   disabled={isSubmitting}
                   className={cn(
-                    'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                    errors.sku ? 'border-rose-500' : 'border-slate-200',
-                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                    "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors",
+                    errors.sku ? "border-rose-500" : "border-slate-200",
+                    isSubmitting && "opacity-50 cursor-not-allowed",
                   )}
                 />
-                {errors.sku && <p className="mt-1 text-xs text-rose-500">{errors.sku.message}</p>}
+                {errors.sku && (
+                  <p className="mt-1 text-xs text-rose-500">
+                    {errors.sku.message}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -318,12 +346,12 @@ export default function NewProductPage() {
                     Tipo de Material <span className="text-[#C2410C]">*</span>
                   </label>
                   <select
-                    {...register('material')}
+                    {...register("material")}
                     disabled={isSubmitting}
                     className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.material ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                      "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors",
+                      errors.material ? "border-rose-500" : "border-slate-200",
+                      isSubmitting && "opacity-50 cursor-not-allowed",
                     )}
                   >
                     <option value="">Selecione...</option>
@@ -333,7 +361,11 @@ export default function NewProductPage() {
                       </option>
                     ))}
                   </select>
-                  {errors.material && <p className="mt-1 text-xs text-rose-500">{errors.material.message}</p>}
+                  {errors.material && (
+                    <p className="mt-1 text-xs text-rose-500">
+                      {errors.material.message}
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -341,12 +373,12 @@ export default function NewProductPage() {
                     Acabamento <span className="text-[#C2410C]">*</span>
                   </label>
                   <select
-                    {...register('finish')}
+                    {...register("finish")}
                     disabled={isSubmitting}
                     className={cn(
-                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.finish ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                      "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors",
+                      errors.finish ? "border-rose-500" : "border-slate-200",
+                      isSubmitting && "opacity-50 cursor-not-allowed",
                     )}
                   >
                     <option value="">Selecione...</option>
@@ -356,7 +388,11 @@ export default function NewProductPage() {
                       </option>
                     ))}
                   </select>
-                  {errors.finish && <p className="mt-1 text-xs text-rose-500">{errors.finish.message}</p>}
+                  {errors.finish && (
+                    <p className="mt-1 text-xs text-rose-500">
+                      {errors.finish.message}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -366,7 +402,9 @@ export default function NewProductPage() {
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">2</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">
+                  2
+                </span>
                 Descrição Técnica
               </h2>
             </div>
@@ -375,17 +413,21 @@ export default function NewProductPage() {
                 Descrição <span className="text-slate-400">(opcional)</span>
               </label>
               <textarea
-                {...register('description')}
+                {...register("description")}
                 placeholder="Características técnicas, origem, recomendações de uso..."
                 rows={4}
                 disabled={isSubmitting}
                 className={cn(
-                  'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors resize-none',
-                  errors.description ? 'border-rose-500' : 'border-slate-200',
-                  isSubmitting && 'opacity-50 cursor-not-allowed'
+                  "w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors resize-none",
+                  errors.description ? "border-rose-500" : "border-slate-200",
+                  isSubmitting && "opacity-50 cursor-not-allowed",
                 )}
               />
-              {errors.description && <p className="mt-1 text-xs text-rose-500">{errors.description.message}</p>}
+              {errors.description && (
+                <p className="mt-1 text-xs text-rose-500">
+                  {errors.description.message}
+                </p>
+              )}
             </div>
           </div>
 
@@ -411,16 +453,21 @@ export default function NewProductPage() {
                     placeholder="Ex: 500,00"
                     disabled={isSubmitting}
                     className={cn(
-                      'w-full md:w-1/2 px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
-                      errors.basePrice ? 'border-rose-500' : 'border-slate-200',
-                      isSubmitting && 'opacity-50 cursor-not-allowed'
+                      "w-full md:w-1/2 px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors",
+                      errors.basePrice ? "border-rose-500" : "border-slate-200",
+                      isSubmitting && "opacity-50 cursor-not-allowed",
                     )}
                   />
                 )}
               />
-              {errors.basePrice && <p className="mt-1 text-xs text-rose-500">{errors.basePrice.message}</p>}
+              {errors.basePrice && (
+                <p className="mt-1 text-xs text-rose-500">
+                  {errors.basePrice.message}
+                </p>
+              )}
               <p className="mt-2 text-xs text-slate-500">
-                Este preço será usado como referência ao criar novos lotes deste produto
+                Este preço será usado como referência ao criar novos lotes deste
+                produto
               </p>
             </div>
           </div>
@@ -429,7 +476,9 @@ export default function NewProductPage() {
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">4</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">
+                  4
+                </span>
                 Fotos de Catálogo
               </h2>
             </div>
@@ -438,11 +487,12 @@ export default function NewProductPage() {
               <label
                 htmlFor="file-upload"
                 className={cn(
-                  'flex flex-col items-center justify-center w-full py-12',
-                  'border-2 border-dashed border-slate-200',
-                  'cursor-pointer transition-all',
-                  'hover:border-[#C2410C] hover:bg-orange-50/30',
-                  (isSubmitting || medias.length >= 10) && 'opacity-50 cursor-not-allowed'
+                  "flex flex-col items-center justify-center w-full py-12",
+                  "border-2 border-dashed border-slate-200",
+                  "cursor-pointer transition-all",
+                  "hover:border-[#C2410C] hover:bg-orange-50/30",
+                  (isSubmitting || medias.length >= 10) &&
+                    "opacity-50 cursor-not-allowed",
                 )}
               >
                 <div className="w-14 h-14 bg-slate-100 flex items-center justify-center mb-4">
@@ -480,7 +530,7 @@ export default function NewProductPage() {
                   onDragEnd={handleDragEnd}
                 >
                   <SortableContext
-                    items={medias.map(item => item.id)}
+                    items={medias.map((item) => item.id)}
                     strategy={rectSortingStrategy}
                   >
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
@@ -527,20 +577,22 @@ export default function NewProductPage() {
           <div className="bg-white border border-slate-200 overflow-hidden">
             <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="font-semibold text-[#121212] flex items-center gap-2">
-                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">5</span>
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">
+                  5
+                </span>
                 Visibilidade
               </h2>
             </div>
             <div className="p-6">
               <button
                 type="button"
-                onClick={() => setValue('isPublic', !isPublic)}
+                onClick={() => setValue("isPublic", !isPublic)}
                 disabled={isSubmitting}
                 className={cn(
-                  'w-full flex items-center justify-between p-4 border transition-all',
-                  isPublic 
-                    ? 'border-[#C2410C] bg-orange-50/50' 
-                    : 'border-slate-200 bg-slate-50'
+                  "w-full flex items-center justify-between p-4 border transition-all",
+                  isPublic
+                    ? "border-[#C2410C] bg-orange-50/50"
+                    : "border-slate-200 bg-slate-50",
                 )}
               >
                 <div className="flex items-center gap-3">
@@ -551,23 +603,27 @@ export default function NewProductPage() {
                   )}
                   <div className="text-left">
                     <p className="text-sm font-medium text-slate-700">
-                      {isPublic ? 'Visível no catálogo' : 'Oculto do catálogo'}
+                      {isPublic ? "Visível no catálogo" : "Oculto do catálogo"}
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      {isPublic 
-                        ? 'Este produto será visível em links de catálogo compartilhados' 
-                        : 'Este produto não aparecerá nos links compartilhados'}
+                      {isPublic
+                        ? "Este produto será visível em links de catálogo compartilhados"
+                        : "Este produto não aparecerá nos links compartilhados"}
                     </p>
                   </div>
                 </div>
-                <div className={cn(
-                  'w-10 h-6 rounded-full transition-colors relative',
-                  isPublic ? 'bg-[#C2410C]' : 'bg-slate-300'
-                )}>
-                  <div className={cn(
-                    'absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm',
-                    isPublic ? 'left-5' : 'left-1'
-                  )} />
+                <div
+                  className={cn(
+                    "w-10 h-6 rounded-full transition-colors relative",
+                    isPublic ? "bg-[#C2410C]" : "bg-slate-300",
+                  )}
+                >
+                  <div
+                    className={cn(
+                      "absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm",
+                      isPublic ? "left-5" : "left-1",
+                    )}
+                  />
                 </div>
               </button>
             </div>
@@ -587,8 +643,10 @@ export default function NewProductPage() {
               type="submit"
               disabled={isSubmitting}
               className={cn(
-                'flex items-center gap-2 px-6 py-3 text-white text-sm font-medium transition-all',
-                isSubmitting ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+                "flex items-center gap-2 px-6 py-3 text-white text-sm font-medium transition-all",
+                isSubmitting
+                  ? "bg-slate-300 cursor-not-allowed"
+                  : "bg-[#C2410C] hover:bg-[#a03609]",
               )}
             >
               {isSubmitting ? (

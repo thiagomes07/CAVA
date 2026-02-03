@@ -40,8 +40,11 @@
     "description": "Description",
     "notes": "Notes",
     "price": "Price",
+    "prices": "Prices",
     "total": "Total",
     "quantity": "Quantity",
+    "share": "Share",
+    "refresh": "Refresh",
     "poweredBy": "Powered by CAVA"
   },
   "metadata": {
@@ -106,9 +109,10 @@
   },
   "navigation": {
     "dashboard": "Dashboard",
-    "catalog": "Catalog",
+    "portfolio": "Portfolio",
     "inventory": "Inventory",
     "sharedInventory": "Shared Inventory",
+    "sharedPortfolios": "Shared Portfolios",
     "sales": "Sales",
     "reservations": "Reservations",
     "bi": "Intelligence",
@@ -216,8 +220,8 @@
     "deleteConfirmWarning": "This action cannot be undone. The batch will be permanently removed.",
     "cancel": "Cancel"
   },
-  "catalog": {
-    "title": "Catalog",
+  "portfolio": {
+    "title": "Portfolio",
     "subtitle": "Manage your products and stone types",
     "newProduct": "NEW PRODUCT",
     "searchPlaceholder": "Search by name or SKU",
@@ -234,7 +238,29 @@
     "inactive": "Inactive",
     "batch": "batch",
     "batchesPlural": "batches",
-    "loadError": "Error loading products"
+    "loadError": "Error loading products",
+    "share": {
+      "title": "Portfolio Sharing",
+      "subtitle": "Manage which brokers can view your portfolio",
+      "shareBroker": "Share with Brokers",
+      "selectBrokers": "Select brokers to share with",
+      "canShowPrices": "Allow brokers to see prices",
+      "canShowPricesHint": "If enabled, brokers will see product prices",
+      "sharedWith": "Shared with {count} broker(s)",
+      "noShares": "Portfolio not shared",
+      "noSharesDescription": "Share your portfolio with brokers so they can view and sell your products",
+      "removeAccess": "Remove access",
+      "confirmRemove": "Are you sure you want to remove {name}'s access to your portfolio?",
+      "shareSuccess": "Portfolio shared with {count} broker(s)",
+      "shareError": "Error sharing portfolio",
+      "removeSuccess": "Access removed successfully",
+      "removeError": "Error removing access",
+      "noBrokersSelected": "Select at least one broker",
+      "allBrokersShared": "All available brokers already have access",
+      "sharedSince": "Shared since",
+      "pricesVisible": "Prices visible",
+      "pricesHidden": "Prices hidden"
+    }
   },
   "sales": {
     "title": "Sales History",
@@ -688,6 +714,16 @@
     "noStock": "No stock",
     "unavailable": "Unavailable"
   },
+  "sharedPortfolios": {
+    "title": "Shared Portfolios",
+    "subtitle": "Product catalogs shared with you by industries",
+    "noPortfolios": "No shared portfolios",
+    "noPortfoliosDescription": "When an industry shares their portfolio with you, it will appear here.",
+    "products": "products",
+    "pricesVisible": "Prices visible",
+    "pricesHidden": "Prices hidden",
+    "viewPortfolio": "View Portfolio"
+  },
   "reservations": {
     "title": "Reservations",
     "subtitle": "Manage your slab reservations",
@@ -778,6 +814,8 @@
     "logoDeleted": "Logo removed successfully",
     "logoDeleteError": "Error removing logo",
     "companyName": "Company Name",
+    "portfolioSlug": "Portfolio Slug",
+    "portfolioSlugHint": "Use lowercase letters, numbers and hyphens. E.g.: my-company",
     "cnpj": "Tax ID (CNPJ)",
     "businessId": "Business ID / Tax ID",
     "cnpjReadOnly": "CNPJ cannot be changed.",
@@ -796,6 +834,52 @@
     "street": "Street",
     "number": "Number",
     "success": "Data updated successfully",
-    "error": "Error updating data"
+    "error": "Error updating data",
+    "portfolioVisibility": {
+      "title": "Portfolio Visibility",
+      "subtitle": "Configure what information is shown on your public portfolio",
+      "isPublished": "Portfolio Published",
+      "isPublishedDesc": "When enabled, your portfolio is publicly accessible",
+      "displayOptions": "Display Options",
+      "showName": "Show Company Name",
+      "showDescription": "Show Company Description",
+      "showLogo": "Show Company Logo",
+      "showContact": "Show Contact Information",
+      "showLocation": "Show Location",
+      "noLogoWarning": "Add a logo first",
+      "locationLevel": "Location Detail Level",
+      "locationLevelDesc": "Choose how much location detail to display publicly",
+      "levelCountry": "Country only",
+      "levelState": "Country and State",
+      "levelCity": "Country, State, and City",
+      "levelFull": "Full Address",
+      "infoTitle": "About Public Portfolio",
+      "infoDesc": "Your public portfolio URL is based on your company slug. Share it with potential clients to showcase your products.",
+      "portfolioUrl": "Your Public Portfolio Link",
+      "viewPortfolio": "View"
+    }
+  },
+  "publicPortfolio": {
+    "portfolio": "Portfolio",
+    "notFound": "Portfolio not found",
+    "notFoundDescription": "This portfolio may not be publicly available",
+    "searchProducts": "Search products...",
+    "allMaterials": "All Materials",
+    "products": "products",
+    "noProducts": "No products found",
+    "noProductsDescription": "Try adjusting your search filters",
+    "inStock": "In Stock",
+    "contactUs": "Contact Us",
+    "requestInfo": "Request Information",
+    "requestInfoFor": "Request information about {product}",
+    "yourName": "Your Name",
+    "message": "Message",
+    "contactNote": "Please provide at least email or phone so we can contact you.",
+    "contactRequired": "Please provide your name and at least email or phone",
+    "contactSuccess": "Thank you! We will contact you soon.",
+    "contactError": "Error sending message. Please try again.",
+    "details": "Details",
+    "contact": "Contact",
+    "send": "Send"
   }
 }

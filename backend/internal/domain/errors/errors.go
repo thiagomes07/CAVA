@@ -116,6 +116,14 @@ func ConflictError(message string, details map[string]interface{}) *AppError {
 	}
 }
 
+// IsDuplicateError verifica se o erro é um erro de duplicata/conflito
+func IsDuplicateError(err error) bool {
+	if appErr, ok := err.(*AppError); ok {
+		return appErr.Code == "CONFLICT" || appErr.StatusCode == http.StatusConflict
+	}
+	return false
+}
+
 // =============================================
 // ERROS DE AUTENTICAÇÃO
 // =============================================

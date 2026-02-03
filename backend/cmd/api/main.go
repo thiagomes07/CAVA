@@ -291,41 +291,43 @@ func initLogger() *zap.Logger {
 
 // Repositories agrupa todos os repositories
 type Repositories struct {
-	User               domainRepo.UserRepository
-	Session            domainRepo.SessionRepository
-	Product            domainRepo.ProductRepository
-	Batch              domainRepo.BatchRepository
-	Media              domainRepo.MediaRepository
-	Reservation        domainRepo.ReservationRepository
-	SalesLink          domainRepo.SalesLinkRepository
-	CatalogLink        domainRepo.CatalogLinkRepository
-	Cliente            domainRepo.ClienteRepository
-	ClienteInteraction domainRepo.ClienteInteractionRepository
-	SalesHistory       domainRepo.SalesHistoryRepository
-	SharedInventory    domainRepo.SharedInventoryRepository
-	Industry           domainRepo.IndustryRepository
-	BI                 domainRepo.BIRepository
-	DB                 *repository.DB
+	User                    domainRepo.UserRepository
+	Session                 domainRepo.SessionRepository
+	Product                 domainRepo.ProductRepository
+	Batch                   domainRepo.BatchRepository
+	Media                   domainRepo.MediaRepository
+	Reservation             domainRepo.ReservationRepository
+	SalesLink               domainRepo.SalesLinkRepository
+	CatalogLink             domainRepo.CatalogLinkRepository
+	Cliente                 domainRepo.ClienteRepository
+	ClienteInteraction      domainRepo.ClienteInteractionRepository
+	SalesHistory            domainRepo.SalesHistoryRepository
+	SharedInventory         domainRepo.SharedInventoryRepository
+	Industry                domainRepo.IndustryRepository
+	BI                      domainRepo.BIRepository
+	SharedCatalogPermission domainRepo.SharedCatalogPermissionRepository
+	DB                      *repository.DB
 }
 
 // initRepositories inicializa todos os repositories
 func initRepositories(db *repository.DB) Repositories {
 	return Repositories{
-		User:               repository.NewUserRepository(db),
-		Session:            repository.NewSessionRepository(db),
-		Product:            repository.NewProductRepository(db),
-		Batch:              repository.NewBatchRepository(db),
-		Media:              repository.NewMediaRepository(db),
-		Reservation:        repository.NewReservationRepository(db),
-		SalesLink:          repository.NewSalesLinkRepository(db),
-		CatalogLink:        repository.NewCatalogLinkRepository(db),
-		Cliente:            repository.NewClienteRepository(db),
-		ClienteInteraction: repository.NewClienteInteractionRepository(db),
-		SalesHistory:       repository.NewSalesHistoryRepository(db),
-		SharedInventory:    repository.NewSharedInventoryRepository(db),
-		Industry:           repository.NewIndustryRepository(db),
-		BI:                 repository.NewBIRepository(db),
-		DB:                 db,
+		User:                    repository.NewUserRepository(db),
+		Session:                 repository.NewSessionRepository(db),
+		Product:                 repository.NewProductRepository(db),
+		Batch:                   repository.NewBatchRepository(db),
+		Media:                   repository.NewMediaRepository(db),
+		Reservation:             repository.NewReservationRepository(db),
+		SalesLink:               repository.NewSalesLinkRepository(db),
+		CatalogLink:             repository.NewCatalogLinkRepository(db),
+		Cliente:                 repository.NewClienteRepository(db),
+		ClienteInteraction:      repository.NewClienteInteractionRepository(db),
+		SalesHistory:            repository.NewSalesHistoryRepository(db),
+		SharedInventory:         repository.NewSharedInventoryRepository(db),
+		Industry:                repository.NewIndustryRepository(db),
+		BI:                      repository.NewBIRepository(db),
+		SharedCatalogPermission: repository.NewSharedCatalogPermissionRepository(db),
+		DB:                      db,
 	}
 }
 
@@ -466,23 +468,26 @@ func initServices(
 	)
 
 	return handler.Services{
-		Auth:            authService,
-		User:            userService,
-		Product:         productService,
-		Batch:           batchService,
-		Reservation:     reservationService,
-		Dashboard:       dashboardService,
-		SalesLink:       salesLinkService,
-		CatalogLink:     catalogLinkService,
-		Cliente:         clienteService,
-		SalesHistory:    salesHistoryService,
-		SharedInventory: sharedInventoryService,
-		Storage:         storageService,
-		BI:              biService,
-		Email:           emailSender,
-		MediaRepo:       repos.Media,
-		IndustryRepo:    repos.Industry,
-		BatchRepo:       repos.Batch,
+		Auth:                  authService,
+		User:                  userService,
+		Product:               productService,
+		Batch:                 batchService,
+		Reservation:           reservationService,
+		Dashboard:             dashboardService,
+		SalesLink:             salesLinkService,
+		CatalogLink:           catalogLinkService,
+		Cliente:               clienteService,
+		SalesHistory:          salesHistoryService,
+		SharedInventory:       sharedInventoryService,
+		Storage:               storageService,
+		BI:                    biService,
+		Email:                 emailSender,
+		MediaRepo:             repos.Media,
+		IndustryRepo:          repos.Industry,
+		BatchRepo:             repos.Batch,
+		UserRepo:              repos.User,
+		ProductRepo:           repos.Product,
+		SharedCatalogPermRepo: repos.SharedCatalogPermission,
 	}
 }
 

@@ -94,11 +94,16 @@ type UpdateProductInput struct {
 
 // ProductFilters representa os filtros para busca de produtos
 type ProductFilters struct {
-	Search          *string       `json:"search,omitempty"`
-	Material        *MaterialType `json:"material,omitempty"`
-	IncludeInactive bool          `json:"includeInactive"`
-	Page            int           `json:"page" validate:"min=1"`
-	Limit           int           `json:"limit" validate:"min=1,max=100"`
+	Search             *string       `json:"search,omitempty"`
+	Material           *MaterialType `json:"material,omitempty"`
+	Finish             *FinishType   `json:"finish,omitempty"`
+	HasAvailableBatches *bool        `json:"hasAvailableBatches,omitempty"`
+	OnlyPublic         bool          `json:"onlyPublic,omitempty"`
+	IncludeInactive    bool          `json:"includeInactive"`
+	SortBy             *string       `json:"sortBy,omitempty"`     // name, created_at, batch_count, availability
+	SortOrder          *string       `json:"sortOrder,omitempty"`  // asc, desc
+	Page               int           `json:"page" validate:"min=1"`
+	Limit              int           `json:"limit" validate:"min=1,max=100"`
 }
 
 // ProductListResponse representa a resposta de listagem de produtos
