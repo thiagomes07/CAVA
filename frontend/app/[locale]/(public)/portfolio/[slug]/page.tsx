@@ -336,28 +336,28 @@ export default function PublicPortfolioPage() {
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-2 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-full bg-slate-100 hover:bg-slate-200 px-3 py-2 transition-colors cursor-pointer"
                       title={link.name}
                     >
                       <SocialIcon url={link.url} name={link.name} />
                       <span className="text-sm text-slate-600">
                         {truncateSingleLine(getSocialNetworkName(link.url, link.name), 20)}
-                      </span>
-                    </a>
-                  ))}
-                </div>
+                      <a
+                        href={`mailto:${industry.contact.email}`}
+                        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                      >
               )}
             </div>
 
             <div className="shrink-0">
               <Button
-                size="lg"
-                onClick={() => {
-                  setSelectedProduct(null);
-                  setShowContactModal(true);
-                }}
-                className="shadow-lg"
-              >
+                      <a
+                        href={`tel:${industry.contact.phone}`}
+                        className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors cursor-pointer"
+                      >
+                        <Phone className="w-4 h-4" />
+                        <span>{truncateSingleLine(industry.contact.phone, 30)}</span>
+                      </a>
                 <MessageCircle className="w-5 h-5 mr-2" />
                 {t("contactUs")}
               </Button>
@@ -382,7 +382,7 @@ export default function PublicPortfolioPage() {
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery("")}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -393,7 +393,7 @@ export default function PublicPortfolioPage() {
               <button
                 onClick={() => setShowFilters(!showFilters)}
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all",
+                  "flex items-center gap-2 px-4 py-3 rounded-xl border text-sm font-medium transition-all cursor-pointer",
                   showFilters || hasActiveFilters
                     ? "bg-slate-900 text-white border-slate-900"
                     : "bg-white text-slate-700 border-slate-200 hover:border-slate-300",
@@ -427,7 +427,7 @@ export default function PublicPortfolioPage() {
                 <button
                   onClick={() => setViewMode("grid")}
                   className={cn(
-                    "p-2 rounded-lg transition-all",
+                    "p-2 rounded-lg transition-all cursor-pointer",
                     viewMode === "grid"
                       ? "bg-white shadow-sm text-slate-900"
                       : "text-slate-500 hover:text-slate-700",
@@ -438,7 +438,7 @@ export default function PublicPortfolioPage() {
                 <button
                   onClick={() => setViewMode("compact")}
                   className={cn(
-                    "p-2 rounded-lg transition-all",
+                    "p-2 rounded-lg transition-all cursor-pointer",
                     viewMode === "compact"
                       ? "bg-white shadow-sm text-slate-900"
                       : "text-slate-500 hover:text-slate-700",
@@ -464,7 +464,7 @@ export default function PublicPortfolioPage() {
                           key={material}
                           onClick={() => toggleMaterialFilter(material)}
                           className={cn(
-                            "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                            "px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer",
                             materialFilter.includes(material)
                               ? "bg-slate-900 text-white"
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -488,7 +488,7 @@ export default function PublicPortfolioPage() {
                           key={finish}
                           onClick={() => toggleFinishFilter(finish)}
                           className={cn(
-                            "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                            "px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer",
                             finishFilter.includes(finish)
                               ? "bg-slate-900 text-white"
                               : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -508,7 +508,7 @@ export default function PublicPortfolioPage() {
                   <button
                     onClick={() => setOnlyInStock(!onlyInStock)}
                     className={cn(
-                      "px-3 py-1.5 rounded-full text-sm font-medium transition-all",
+                      "px-3 py-1.5 rounded-full text-sm font-medium transition-all cursor-pointer",
                       onlyInStock
                         ? "bg-emerald-500 text-white"
                         : "bg-slate-100 text-slate-600 hover:bg-slate-200",
@@ -522,7 +522,7 @@ export default function PublicPortfolioPage() {
                   <div className="flex items-end">
                     <button
                       onClick={clearAllFilters}
-                      className="text-sm text-slate-500 hover:text-slate-700 underline"
+                      className="text-sm text-slate-500 hover:text-slate-700 underline cursor-pointer"
                     >
                       {t("clearFilters")}
                     </button>
@@ -600,7 +600,7 @@ export default function PublicPortfolioPage() {
                 <button
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft className="w-5 h-5" />
                 </button>
@@ -617,7 +617,7 @@ export default function PublicPortfolioPage() {
                           key={page}
                           onClick={() => setCurrentPage(page)}
                           className={cn(
-                            "w-10 h-10 rounded-lg font-medium transition-colors",
+                            "w-10 h-10 rounded-lg font-medium transition-colors cursor-pointer",
                             page === currentPage
                               ? "bg-slate-900 text-white"
                               : "border border-slate-200 text-slate-600 hover:bg-slate-50",
@@ -645,7 +645,7 @@ export default function PublicPortfolioPage() {
                     setCurrentPage((p) => Math.min(totalPages, p + 1))
                   }
                   disabled={currentPage === totalPages}
-                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="p-2 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronRight className="w-5 h-5" />
                 </button>
@@ -682,7 +682,7 @@ export default function PublicPortfolioPage() {
                             key={idx}
                             onClick={() => setSelectedImageIndex(idx)}
                             className={cn(
-                              "w-16 h-16 rounded-lg overflow-hidden shrink-0 ring-2 ring-offset-2 transition-all",
+                              "w-16 h-16 rounded-lg overflow-hidden shrink-0 ring-2 ring-offset-2 transition-all cursor-pointer",
                               idx === selectedImageIndex
                                 ? "ring-slate-900"
                                 : "ring-transparent hover:ring-slate-300",
@@ -887,7 +887,7 @@ function ProductCard({
     return (
       <button
         onClick={onViewDetails}
-        className="group bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-lg hover:border-slate-200 transition-all text-left"
+        className="group bg-white rounded-xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-lg hover:border-slate-200 transition-all text-left cursor-pointer"
       >
         <div className="aspect-square bg-slate-50 overflow-hidden">
           {hasValidImage ? (
@@ -916,7 +916,7 @@ function ProductCard({
     <div className="group bg-white rounded-2xl border border-slate-100 overflow-hidden shadow-sm hover:shadow-xl hover:border-slate-200 transition-all duration-300">
       <button
         onClick={onViewDetails}
-        className="w-full aspect-[4/3] bg-slate-50 overflow-hidden relative"
+        className="w-full aspect-[4/3] bg-slate-50 overflow-hidden relative cursor-pointer"
       >
         {hasValidImage ? (
           <img
