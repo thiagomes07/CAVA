@@ -503,13 +503,23 @@ func initMiddlewares(
 	// RBAC Middleware
 	rbacMiddleware := middleware.NewRBACMiddleware(logger)
 
-	// CSRF Middleware
-	csrfMiddleware := middleware.NewCSRFMiddleware(
-		cfg.Auth.CSRFSecret,
-		cfg.Auth.CookieDomain,
-		cfg.Auth.CookieSecure,
-		logger,
-	)
+	// CSRF Middleware (ou No-Op se desabilitado)
+	var csrfMiddleware interface {
+		SetCSRFCookie(http.Handler) http.Handler
+		ValidateCSRF(http.Handler) http.Handler
+	}
+	
+	if cfg.Auth.DisableCSRF {
+		logger.Warn("CSRF protection is DISABLED - use only in development!")
+		csrfMiddleware = middleware.NewNoOpCSRFMiddleware()
+	} else {
+		csrfMiddleware = middleware.NewCSRFMiddleware(
+			cfg.Auth.CSRFSecret,
+			cfg.Auth.CookieDomain,
+			cfg.Auth.CookieSecure,
+			logger,
+		)
+	}
 
 	// Rate Limiters
 	rateAuth := middleware.NewRateLimiter(cfg.Server.RateLimitAuthRPM, logger)

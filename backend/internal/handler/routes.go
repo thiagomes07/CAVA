@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -98,7 +99,10 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 type Middlewares struct {
 	Auth     *appMiddleware.AuthMiddleware
 	RBAC     *appMiddleware.RBACMiddleware
-	CSRF     *appMiddleware.CSRFMiddleware
+	CSRF     interface {
+		SetCSRFCookie(http.Handler) http.Handler
+		ValidateCSRF(http.Handler) http.Handler
+	}
 	RateAuth *appMiddleware.RateLimiter
 	RatePub  *appMiddleware.RateLimiter
 	RateApi  *appMiddleware.RateLimiter

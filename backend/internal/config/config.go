@@ -64,6 +64,7 @@ type AuthConfig struct {
 	CSRFSecret              string
 	CookieSecure            bool
 	CookieDomain            string
+	DisableCSRF             bool // Se true, desabilita proteção CSRF (apenas para desenvolvimento)
 }
 
 // ServerConfig contém configurações do servidor HTTP
@@ -246,6 +247,7 @@ func loadAuthConfig() AuthConfig {
 		CSRFSecret:              getEnv("CSRF_SECRET", ""),
 		CookieSecure:            getEnvAsBool("COOKIE_SECURE", defaultSecure),
 		CookieDomain:            getEnv("COOKIE_DOMAIN", "localhost"),
+		DisableCSRF:             getEnvAsBool("DISABLE_CSRF", false),
 	}
 }
 
