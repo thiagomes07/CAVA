@@ -66,16 +66,16 @@ services:
       JWT_SECRET: "your-super-secret-jwt-key-change-this-in-production-min-32-chars"
       PASSWORD_PEPPER: "your-password-pepper-never-change-after-production"
       CSRF_SECRET: "your-csrf-secret-key-change-this"
-      COOKIE_DOMAIN: "" # Empty means HostOnly cookie (works on any IP/Domain)
+      COOKIE_DOMAIN: "98.86.150.125" # IP público da EC2
       COOKIE_SECURE: "false"
       
       # App
       APP_ENV: development
       APP_PORT: 3001
       DISABLE_CSRF: "true" # Desabilita CSRF para facilitar deploy (apenas desenvolvimento/staging)
-      FRONTEND_URL: http://localhost # This allows redirects to root. If accessing via IP, this might be okay.
-      PUBLIC_LINK_BASE_URL: http://localhost
-      ALLOWED_ORIGINS: "http://localhost,http://frontend:3000"
+      FRONTEND_URL: http://98.86.150.125
+      PUBLIC_LINK_BASE_URL: http://98.86.150.125
+      ALLOWED_ORIGINS: "http://localhost,http://frontend:3000,http://98.86.150.125"
       
       # SES (Email)
       # Set USE_SES=true only if you have verified the sender email in AWS SES or are out of Sandbox
