@@ -848,6 +848,7 @@
       "showContact": "Mostrar Informações de Contato",
       "showLocation": "Mostrar Localização",
       "noLogoWarning": "Adicione uma logo primeiro",
+      "noDataWarning": "Preencha este campo primeiro",
       "locationLevel": "Nível de Detalhe da Localização",
       "locationLevelDesc": "Escolha quanto detalhe de localização exibir publicamente",
       "levelCountry": "Apenas país",
@@ -857,7 +858,11 @@
       "infoTitle": "Sobre o Portfólio Público",
       "infoDesc": "A URL do seu portfólio público é baseada no slug da sua empresa. Compartilhe com clientes potenciais para exibir seus produtos.",
       "portfolioUrl": "Link do seu Portfólio Público",
-      "viewPortfolio": "Visualizar"
+      "viewPortfolio": "Visualizar",
+      "statusPublished": "Público",
+      "statusUnpublished": "Não publicado",
+      "urlVisibleDesc": "Este link está visível para qualquer pessoa na internet.",
+      "urlHiddenDesc": "Este link não está acessível publicamente. Ative a publicação para torná-lo visível."
     }
   },
   "publicPortfolio": {

@@ -847,6 +847,7 @@
       "showContact": "Show Contact Information",
       "showLocation": "Show Location",
       "noLogoWarning": "Add a logo first",
+      "noDataWarning": "Fill this field first",
       "locationLevel": "Location Detail Level",
       "locationLevelDesc": "Choose how much location detail to display publicly",
       "levelCountry": "Country only",
@@ -856,7 +857,11 @@
       "infoTitle": "About Public Portfolio",
       "infoDesc": "Your public portfolio URL is based on your company slug. Share it with potential clients to showcase your products.",
       "portfolioUrl": "Your Public Portfolio Link",
-      "viewPortfolio": "View"
+      "viewPortfolio": "View",
+      "statusPublished": "Public",
+      "statusUnpublished": "Unpublished",
+      "urlVisibleDesc": "This link is visible to anyone on the internet.",
+      "urlHiddenDesc": "This link is not publicly accessible. Enable publishing to make it visible."
     }
   },
   "publicPortfolio": {

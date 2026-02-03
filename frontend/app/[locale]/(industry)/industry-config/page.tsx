@@ -162,6 +162,19 @@ export default function IndustryConfigPage() {
   const watchedCountry = watch("addressCountry");
   const watchedState = watch("addressState");
   const watchedSlug = watch("slug");
+  const watchedName = watch("name");
+  const watchedDescription = watch("description");
+  const watchedContactEmail = watch("contactEmail");
+  const watchedContactPhone = watch("contactPhone");
+  const watchedWhatsapp = watch("whatsapp");
+  const watchedIsPublished = watch("portfolioDisplaySettings.isPublished");
+
+  // Helper to check if data exists for each toggle
+  const hasName = Boolean(watchedName?.trim());
+  const hasDescription = Boolean(watchedDescription?.trim());
+  const hasLogo = Boolean(previewLogoUrl);
+  const hasContact = Boolean(watchedContactEmail?.trim() || watchedContactPhone?.trim() || watchedWhatsapp?.trim());
+  const hasLocation = Boolean(watch("addressCountry")?.trim() || watch("addressState")?.trim() || watch("addressCity")?.trim());
 
   // Detect if logo changed
   const isLogoDirty =
@@ -948,6 +961,11 @@ export default function IndustryConfigPage() {
                     <span className="text-sm text-slate-600">
                       {t("portfolioVisibility.showName")}
                     </span>
+                    {!hasName && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                        {t("portfolioVisibility.noDataWarning")}
+                      </span>
+                    )}
                   </div>
                   <Controller
                     name="portfolioDisplaySettings.showName"
@@ -956,15 +974,17 @@ export default function IndustryConfigPage() {
                       <button
                         type="button"
                         onClick={() => field.onChange(!field.value)}
+                        disabled={!hasName}
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                          field.value ? "bg-[#C2410C]" : "bg-slate-300",
+                          !hasName && "opacity-50 cursor-not-allowed",
+                          field.value && hasName ? "bg-[#C2410C]" : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value ? "translate-x-5" : "translate-x-1",
+                            field.value && hasName ? "translate-x-5" : "translate-x-1",
                           )}
                         />
                       </button>
@@ -978,6 +998,11 @@ export default function IndustryConfigPage() {
                     <span className="text-sm text-slate-600">
                       {t("portfolioVisibility.showDescription")}
                     </span>
+                    {!hasDescription && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                        {t("portfolioVisibility.noDataWarning")}
+                      </span>
+                    )}
                   </div>
                   <Controller
                     name="portfolioDisplaySettings.showDescription"
@@ -986,15 +1011,17 @@ export default function IndustryConfigPage() {
                       <button
                         type="button"
                         onClick={() => field.onChange(!field.value)}
+                        disabled={!hasDescription}
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                          field.value ? "bg-[#C2410C]" : "bg-slate-300",
+                          !hasDescription && "opacity-50 cursor-not-allowed",
+                          field.value && hasDescription ? "bg-[#C2410C]" : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value ? "translate-x-5" : "translate-x-1",
+                            field.value && hasDescription ? "translate-x-5" : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1049,6 +1076,11 @@ export default function IndustryConfigPage() {
                     <span className="text-sm text-slate-600">
                       {t("portfolioVisibility.showContact")}
                     </span>
+                    {!hasContact && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                        {t("portfolioVisibility.noDataWarning")}
+                      </span>
+                    )}
                   </div>
                   <Controller
                     name="portfolioDisplaySettings.showContact"
@@ -1057,15 +1089,17 @@ export default function IndustryConfigPage() {
                       <button
                         type="button"
                         onClick={() => field.onChange(!field.value)}
+                        disabled={!hasContact}
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                          field.value ? "bg-[#C2410C]" : "bg-slate-300",
+                          !hasContact && "opacity-50 cursor-not-allowed",
+                          field.value && hasContact ? "bg-[#C2410C]" : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value ? "translate-x-5" : "translate-x-1",
+                            field.value && hasContact ? "translate-x-5" : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1079,6 +1113,11 @@ export default function IndustryConfigPage() {
                     <span className="text-sm text-slate-600">
                       {t("portfolioVisibility.showLocation")}
                     </span>
+                    {!hasLocation && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                        {t("portfolioVisibility.noDataWarning")}
+                      </span>
+                    )}
                   </div>
                   <Controller
                     name="portfolioDisplaySettings.showLocation"
@@ -1087,15 +1126,17 @@ export default function IndustryConfigPage() {
                       <button
                         type="button"
                         onClick={() => field.onChange(!field.value)}
+                        disabled={!hasLocation}
                         className={cn(
                           "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
-                          field.value ? "bg-[#C2410C]" : "bg-slate-300",
+                          !hasLocation && "opacity-50 cursor-not-allowed",
+                          field.value && hasLocation ? "bg-[#C2410C]" : "bg-slate-300",
                         )}
                       >
                         <span
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
-                            field.value ? "translate-x-5" : "translate-x-1",
+                            field.value && hasLocation ? "translate-x-5" : "translate-x-1",
                           )}
                         />
                       </button>
@@ -1104,7 +1145,7 @@ export default function IndustryConfigPage() {
                 </div>
 
                 {/* Location Level */}
-                {watch("portfolioDisplaySettings.showLocation") && (
+                {watch("portfolioDisplaySettings.showLocation") && hasLocation && (
                   <div className="ml-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
                     <label className="text-xs font-medium text-slate-600 block mb-2">
                       {t("portfolioVisibility.locationLevel")}
@@ -1141,14 +1182,48 @@ export default function IndustryConfigPage() {
 
               {/* Portfolio URL Box */}
               {watchedSlug && (
-                <div className="flex items-start gap-3 p-4 bg-emerald-50 border border-emerald-100 rounded-lg">
-                  <Globe className="h-4 w-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                  <div className="text-xs text-emerald-700 flex-1">
-                    <p className="font-medium mb-1">
-                      {t("portfolioVisibility.portfolioUrl")}
+                <div className={cn(
+                  "flex items-start gap-3 p-4 border rounded-lg",
+                  watchedIsPublished 
+                    ? "bg-emerald-50 border-emerald-100" 
+                    : "bg-slate-50 border-slate-200"
+                )}>
+                  {watchedIsPublished ? (
+                    <Eye className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
+                  ) : (
+                    <EyeOff className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
+                  )}
+                  <div className={cn(
+                    "text-xs flex-1",
+                    watchedIsPublished ? "text-emerald-700" : "text-slate-600"
+                  )}>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-medium">
+                        {t("portfolioVisibility.portfolioUrl")}
+                      </p>
+                      <span className={cn(
+                        "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
+                        watchedIsPublished 
+                          ? "bg-emerald-200 text-emerald-800" 
+                          : "bg-slate-200 text-slate-600"
+                      )}>
+                        {watchedIsPublished 
+                          ? t("portfolioVisibility.statusPublished") 
+                          : t("portfolioVisibility.statusUnpublished")}
+                      </span>
+                    </div>
+                    <p className="text-xs mb-2">
+                      {watchedIsPublished 
+                        ? t("portfolioVisibility.urlVisibleDesc")
+                        : t("portfolioVisibility.urlHiddenDesc")}
                     </p>
                     <div className="flex items-center gap-2 mt-2">
-                      <code className="bg-emerald-100 px-2 py-1 rounded text-emerald-800 font-mono text-xs break-all">
+                      <code className={cn(
+                        "px-2 py-1 rounded font-mono text-xs break-all",
+                        watchedIsPublished 
+                          ? "bg-emerald-100 text-emerald-800" 
+                          : "bg-slate-200 text-slate-500"
+                      )}>
                         {typeof window !== "undefined"
                           ? `${window.location.origin}/portfolio/${watchedSlug}`
                           : `/portfolio/${watchedSlug}`}
@@ -1157,7 +1232,12 @@ export default function IndustryConfigPage() {
                         href={`/portfolio/${industry?.slug || watchedSlug}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white rounded text-xs font-medium hover:bg-emerald-700 transition-colors"
+                        className={cn(
+                          "inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors",
+                          watchedIsPublished 
+                            ? "bg-emerald-600 text-white hover:bg-emerald-700" 
+                            : "bg-slate-300 text-slate-600 hover:bg-slate-400"
+                        )}
                       >
                         <Eye className="h-3 w-3" />
                         {t("portfolioVisibility.viewPortfolio")}
