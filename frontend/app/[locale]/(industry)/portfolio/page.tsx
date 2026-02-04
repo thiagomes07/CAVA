@@ -191,7 +191,7 @@ export default function PortfolioPage() {
                   onView={() =>
                     router.push(`/inventory?productId=${product.id}`)
                   }
-                  onEdit={() => router.push(`/portfolio/${product.id}`)}
+                  onEdit={() => router.push(`/portfolio/edit/${product.id}`)}
                   translations={{
                     noPhoto: t("noPhoto"),
                     edit: t("edit"),
