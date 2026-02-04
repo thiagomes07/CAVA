@@ -936,6 +936,10 @@
     "contactError": "Erro ao enviar mensagem. Tente novamente.",
     "details": "Detalhes",
     "contact": "Contato",
-    "send": "Enviar"
+    "send": "Enviar",
+    "close": "Fechar",
+    "viewBatches": "Ver Lotes",
+    "noBatches": "Nenhum lote disponível no momento.",
+    "availableBatches": "Lotes Disponíveis"
   }
 }

@@ -724,3 +724,96 @@ func (r *batchRepository) FindPublicBatchesByIndustrySlug(ctx context.Context, s
 
 	return batches, nil
 }
+
+// FindPublicBatchesByProductID busca lotes públicos de um produto específico
+func (r *batchRepository) FindPublicBatchesByProductID(ctx context.Context, productID string, limit int) ([]entity.PublicBatch, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 50 {
+		limit = 50
+	}
+
+	query := `
+		SELECT b.batch_code, b.height, b.width, b.thickness, b.net_area, b.available_slabs, b.origin_quarry,
+		       p.name, p.material_type, p.finish_type
+		FROM batches b
+		LEFT JOIN products p ON b.product_id = p.id
+		WHERE b.product_id = $1
+			AND (b.is_public = TRUE OR COALESCE(p.is_public_catalog, FALSE) = TRUE)
+			AND b.deleted_at IS NULL
+			AND b.is_active = TRUE
+			AND b.available_slabs > 0
+		ORDER BY b.entry_date DESC
+		LIMIT $2
+	`
+
+	rows, err := r.db.QueryContext(ctx, query, productID, limit)
+	if err != nil {
+		return nil, errors.DatabaseError(err)
+	}
+	defer rows.Close()
+
+	batchList := []entity.PublicBatch{}
+	batchCodeMap := make(map[string]*entity.PublicBatch)
+
+	for rows.Next() {
+		var pb entity.PublicBatch
+		var productName, material, finish, originQuarry sql.NullString
+
+		if err := rows.Scan(
+			&pb.BatchCode, &pb.Height, &pb.Width, &pb.Thickness, &pb.TotalArea, &pb.AvailableSlabs, &originQuarry,
+			&productName, &material, &finish,
+		); err != nil {
+			return nil, errors.DatabaseError(err)
+		}
+
+		if originQuarry.Valid {
+			pb.OriginQuarry = &originQuarry.String
+		}
+		if productName.Valid {
+			pb.ProductName = productName.String
+		}
+		if material.Valid {
+			pb.Material = material.String
+		}
+		if finish.Valid {
+			pb.Finish = finish.String
+		}
+
+		batchList = append(batchList, pb)
+		batchCodeMap[pb.BatchCode] = &batchList[len(batchList)-1]
+	}
+
+	// Buscar mídias para cada lote
+	if len(batchList) > 0 {
+		batchCodes := make([]string, 0, len(batchList))
+		for _, b := range batchList {
+			batchCodes = append(batchCodes, b.BatchCode)
+		}
+
+		mediaQuery := `
+			SELECT b.batch_code, bm.id, bm.url, bm.display_order
+			FROM batch_medias bm
+			INNER JOIN batches b ON bm.batch_id = b.id
+			WHERE b.batch_code = ANY($1::text[])
+			ORDER BY b.batch_code, bm.display_order, bm.created_at
+		`
+
+		mediaRows, err := r.db.QueryContext(ctx, mediaQuery, pq.Array(batchCodes))
+		if err == nil {
+			defer mediaRows.Close()
+			for mediaRows.Next() {
+				var batchCode string
+				var media entity.Media
+				if err := mediaRows.Scan(&batchCode, &media.ID, &media.URL, &media.DisplayOrder); err == nil {
+					if pb, ok := batchCodeMap[batchCode]; ok {
+						pb.Medias = append(pb.Medias, media)
+					}
+				}
+			}
+		}
+	}
+
+	return batchList, nil
+}

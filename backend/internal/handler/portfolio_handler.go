@@ -22,6 +22,8 @@ type PortfolioHandler struct {
 	userRepo          repository.UserRepository
 	industryRepo      repository.IndustryRepository
 	productRepo       repository.ProductRepository
+	batchRepo         repository.BatchRepository
+	mediaRepo         repository.MediaRepository
 	clienteService    service.ClienteService
 	validator         *validator.Validator
 	logger            *zap.Logger
@@ -33,6 +35,8 @@ func NewPortfolioHandler(
 	userRepo repository.UserRepository,
 	industryRepo repository.IndustryRepository,
 	productRepo repository.ProductRepository,
+	batchRepo repository.BatchRepository,
+	mediaRepo repository.MediaRepository,
 	clienteService service.ClienteService,
 	validator *validator.Validator,
 	logger *zap.Logger,
@@ -42,6 +46,8 @@ func NewPortfolioHandler(
 		userRepo:          userRepo,
 		industryRepo:      industryRepo,
 		productRepo:       productRepo,
+		batchRepo:         batchRepo,
+		mediaRepo:         mediaRepo,
 		clienteService:    clienteService,
 		validator:         validator,
 		logger:            logger,
@@ -326,6 +332,19 @@ func (h *PortfolioHandler) GetPublicPortfolio(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Carregar mídias para cada produto
+	for i := range products {
+		medias, err := h.mediaRepo.FindProductMedias(r.Context(), products[i].ID)
+		if err != nil {
+			h.logger.Warn("erro ao buscar mídias do produto",
+				zap.String("productId", products[i].ID),
+				zap.Error(err),
+			)
+			medias = []entity.Media{}
+		}
+		products[i].Medias = medias
+	}
+
 	// Construir resposta pública (sem preços)
 	publicProducts := make([]map[string]interface{}, 0, len(products))
 	for _, p := range products {
@@ -505,4 +524,69 @@ func stringOrEmpty(s *string) string {
 		return ""
 	}
 	return *s
+}
+
+// GetPublicProductBatches retorna os lotes públicos de um produto específico
+// @Summary Lista lotes públicos de um produto
+// @Description Retorna lotes públicos de um produto específico pelo ID
+// @Tags public
+// @Produce json
+// @Param slug path string true "Slug da indústria"
+// @Param productId path string true "ID do produto"
+// @Param limit query int false "Limite de lotes (padrão 10, máximo 50)"
+// @Success 200 {array} entity.PublicBatch
+// @Router /api/public/portfolio/{slug}/products/{productId}/batches [get]
+func (h *PortfolioHandler) GetPublicProductBatches(w http.ResponseWriter, r *http.Request) {
+	slug := chi.URLParam(r, "slug")
+	productID := chi.URLParam(r, "productId")
+
+	if slug == "" || productID == "" {
+		response.BadRequest(w, "Slug e productId são obrigatórios", nil)
+		return
+	}
+
+	// Verificar se a indústria existe e o portfolio está publicado
+	industry, err := h.industryRepo.FindBySlug(r.Context(), slug)
+	if err != nil {
+		h.logger.Warn("indústria não encontrada", zap.String("slug", slug))
+		response.HandleError(w, err)
+		return
+	}
+
+	if !industry.PortfolioDisplaySettings.IsPublished {
+		response.NotFound(w, "Portfolio não encontrado")
+		return
+	}
+
+	// Verificar se o produto pertence à indústria
+	product, err := h.productRepo.FindByID(r.Context(), productID)
+	if err != nil {
+		h.logger.Warn("produto não encontrado", zap.String("productId", productID))
+		response.NotFound(w, "Produto não encontrado")
+		return
+	}
+
+	if product.IndustryID != industry.ID {
+		response.NotFound(w, "Produto não encontrado nesta indústria")
+		return
+	}
+
+	// Parse limit
+	limit := 10
+	if limitStr := r.URL.Query().Get("limit"); limitStr != "" {
+		var l int
+		if _, err := fmt.Sscanf(limitStr, "%d", &l); err == nil && l > 0 {
+			limit = l
+		}
+	}
+
+	// Buscar lotes públicos do produto
+	batches, err := h.batchRepo.FindPublicBatchesByProductID(r.Context(), productID, limit)
+	if err != nil {
+		h.logger.Error("erro ao buscar lotes do produto", zap.Error(err))
+		response.HandleError(w, err)
+		return
+	}
+
+	response.OK(w, batches)
 }

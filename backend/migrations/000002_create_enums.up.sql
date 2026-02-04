@@ -36,7 +36,8 @@ CREATE TYPE media_type_enum AS ENUM (
 CREATE TYPE interaction_type_enum AS ENUM (
     'INTERESSE_LOTE',
     'INTERESSE_CATALOGO',
-    'DUVIDA_GERAL'
+    'DUVIDA_GERAL',
+    'PORTFOLIO_LEAD'
 );
 
 -- ENUM: Status de reservas
@@ -44,7 +45,10 @@ CREATE TYPE reservation_status_type AS ENUM (
     'ATIVA',
     'CONFIRMADA_VENDA',
     'EXPIRADA',
-    'CANCELADA'
+    'CANCELADA',
+    'PENDENTE_APROVACAO',
+    'APROVADA',
+    'REJEITADA'
 );
 
 -- ENUM: Tipos de acabamento

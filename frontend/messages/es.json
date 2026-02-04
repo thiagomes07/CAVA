@@ -891,6 +891,10 @@
     "contactError": "Error al enviar mensaje. Inténtalo de nuevo.",
     "details": "Detalles",
     "contact": "Contacto",
-    "send": "Enviar"
+    "send": "Enviar",
+    "close": "Cerrar",
+    "viewBatches": "Ver Lotes",
+    "noBatches": "No hay lotes disponibles en este momento.",
+    "availableBatches": "Lotes Disponibles"
   }
 }

@@ -63,6 +63,7 @@ CREATE INDEX idx_batches_entry_date_desc ON batches(industry_id, entry_date DESC
     WHERE is_active = TRUE;
 CREATE INDEX idx_batches_public ON batches(industry_id, is_public, deleted_at) 
     WHERE is_public = TRUE AND deleted_at IS NULL;
+CREATE INDEX idx_batches_activity ON batches(last_activity_at DESC) WHERE is_active = TRUE;
 
 -- =============================================
 -- ÍNDICES: batch_medias
@@ -114,12 +115,14 @@ CREATE INDEX idx_sales_link_items_batch ON sales_link_items(batch_id);
 CREATE INDEX idx_clientes_sales_link ON clientes(sales_link_id);
 CREATE INDEX idx_clientes_email ON clientes(email);
 CREATE INDEX idx_clientes_phone ON clientes(phone);
-
 CREATE INDEX idx_clientes_created_at ON clientes(created_at DESC);
 CREATE INDEX idx_clientes_marketing_opt_in ON clientes(marketing_opt_in) WHERE marketing_opt_in = TRUE;
 CREATE INDEX idx_clientes_created_by ON clientes(created_by) WHERE created_by IS NOT NULL;
 CREATE INDEX idx_clientes_name_trgm ON clientes USING gin(name gin_trgm_ops);
 CREATE INDEX idx_clientes_created_desc ON clientes(sales_link_id, created_at DESC);
+CREATE INDEX idx_clientes_source ON clientes(source);
+CREATE INDEX idx_clientes_industry_id ON clientes(industry_id);
+CREATE INDEX idx_clientes_source_batch ON clientes(source_batch_id) WHERE source_batch_id IS NOT NULL;
 
 -- =============================================
 -- ÍNDICES: cliente_interactions
@@ -151,6 +154,11 @@ CREATE INDEX idx_reservations_active ON reservations(is_active, status)
     WHERE is_active = TRUE;
 CREATE INDEX idx_reservations_expired ON reservations(expires_at, status) 
     WHERE status = 'ATIVA';
+CREATE INDEX idx_reservations_industry ON reservations(industry_id);
+CREATE INDEX idx_reservations_pending_approval ON reservations(status, created_at) 
+    WHERE status = 'PENDENTE_APROVACAO';
+CREATE INDEX idx_reservations_approved ON reservations(status, approved_at) 
+    WHERE status = 'APROVADA';
 
 -- =============================================
 -- ÍNDICES: sales_history
@@ -163,6 +171,8 @@ CREATE INDEX idx_sales_history_sold_at ON sales_history(sold_at DESC);
 CREATE INDEX idx_sales_history_industry_date ON sales_history(industry_id, sold_at DESC);
 CREATE INDEX idx_sales_monthly_summary ON sales_history(industry_id, sold_by_user_id, sold_at);
 CREATE INDEX idx_sales_history_commission_calc ON sales_history(sold_by_user_id, sold_at, broker_commission);
+CREATE INDEX idx_sales_history_reservation ON sales_history(reservation_id) WHERE reservation_id IS NOT NULL;
+CREATE INDEX idx_sales_history_source ON sales_history(source);
 
 -- =============================================
 -- ÍNDICES: user_sessions

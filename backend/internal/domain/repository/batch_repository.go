@@ -68,4 +68,7 @@ type BatchRepository interface {
 
 	// FindPublicBatchesByIndustrySlug busca lotes públicos de um depósito por slug
 	FindPublicBatchesByIndustrySlug(ctx context.Context, slug string) ([]entity.PublicBatch, error)
+
+	// FindPublicBatchesByProductID busca lotes públicos de um produto específico
+	FindPublicBatchesByProductID(ctx context.Context, productID string, limit int) ([]entity.PublicBatch, error)
 }

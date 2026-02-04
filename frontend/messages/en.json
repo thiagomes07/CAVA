@@ -906,6 +906,10 @@
     "contactError": "Error sending message. Please try again.",
     "details": "Details",
     "contact": "Contact",
-    "send": "Send"
+    "send": "Send",
+    "close": "Close",
+    "viewBatches": "View Batches",
+    "noBatches": "No batches available at the moment.",
+    "availableBatches": "Available Batches"
   }
 }

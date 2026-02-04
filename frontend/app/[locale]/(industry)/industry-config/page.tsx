@@ -121,6 +121,10 @@ export default function IndustryConfigPage() {
   const [previewLogoUrl, setPreviewLogoUrl] = useState<string>("");
   const [originalLogoUrl, setOriginalLogoUrl] = useState<string>("");
   const [isUploading, setIsUploading] = useState(false);
+  const [savedPublished, setSavedPublished] = useState<boolean>(false);
+  const [savedDisplaySettings, setSavedDisplaySettings] = useState<
+    FormValues["portfolioDisplaySettings"] | undefined
+  >(undefined);
   const [useCNPJMask, setUseCNPJMask] = useState(true);
   const [showCNPJInfo, setShowCNPJInfo] = useState(false);
 
@@ -131,7 +135,7 @@ export default function IndustryConfigPage() {
       slug: "",
       cnpj: "",
       contactEmail: "",
-      addressCountry: "Brasil",
+      addressCountry: "",
       portfolioDisplaySettings: {
         showName: true,
         showDescription: false,
@@ -168,6 +172,19 @@ export default function IndustryConfigPage() {
   const watchedContactPhone = watch("contactPhone");
   const watchedWhatsapp = watch("whatsapp");
   const watchedIsPublished = watch("portfolioDisplaySettings.isPublished");
+  const watchedDisplaySettings = watch("portfolioDisplaySettings");
+
+  const displaySettingsChanged = (() => {
+    if (!savedDisplaySettings) return false;
+    try {
+      return (
+        JSON.stringify(savedDisplaySettings) !==
+        JSON.stringify(watchedDisplaySettings || {})
+      );
+    } catch {
+      return false;
+    }
+  })();
 
   // Helper to check if data exists for each toggle
   const hasName = Boolean(watchedName?.trim());
@@ -206,7 +223,7 @@ export default function IndustryConfigPage() {
         contactPhone: industry.contactPhone || "",
         whatsapp: industry.whatsapp || "",
         description: industry.description || "",
-        addressCountry: industry.addressCountry || "Brasil",
+        addressCountry: industry.addressCountry || "",
         addressState: industry.addressState || "",
         addressCity: industry.addressCity || "",
         addressStreet: industry.addressStreet || "",
@@ -223,6 +240,25 @@ export default function IndustryConfigPage() {
           isPublished: false,
         },
       });
+
+      // initialize saved published flag from server value
+      setSavedPublished(
+        !!industry.portfolioDisplaySettings &&
+          !!industry.portfolioDisplaySettings.isPublished,
+      );
+
+      // initialize saved display settings
+      setSavedDisplaySettings(
+        industry.portfolioDisplaySettings || {
+          showName: true,
+          showDescription: false,
+          showLogo: false,
+          showContact: false,
+          showLocation: false,
+          locationLevel: "none",
+          isPublished: false,
+        },
+      );
     }
   }, [industry, reset]);
 
@@ -253,7 +289,7 @@ export default function IndustryConfigPage() {
         contactPhone: industry.contactPhone || "",
         whatsapp: industry.whatsapp || "",
         description: industry.description || "",
-        addressCountry: industry.addressCountry || "Brasil",
+        addressCountry: industry.addressCountry || "",
         addressState: industry.addressState || "",
         addressCity: industry.addressCity || "",
         addressStreet: industry.addressStreet || "",
@@ -305,6 +341,22 @@ export default function IndustryConfigPage() {
       } else if (!previewLogoUrl) {
         setOriginalLogoUrl("");
       }
+
+      // Update saved published flag only after a successful save
+      setSavedPublished(!!payload.portfolioDisplaySettings?.isPublished);
+
+      // Update saved display settings after successful save
+      setSavedDisplaySettings(
+        payload.portfolioDisplaySettings || {
+          showName: true,
+          showDescription: false,
+          showLogo: false,
+          showContact: false,
+          showLocation: false,
+          locationLevel: "none",
+          isPublished: false,
+        },
+      );
 
       // Reset local state to clean up
       setSelectedLogo(null);
@@ -957,6 +1009,16 @@ export default function IndustryConfigPage() {
                 />
               </div>
 
+              {/* Save hint when display settings changed but not saved */}
+              {displaySettingsChanged && (
+                <div className="p-3 rounded bg-amber-50 border border-amber-100 text-amber-800 text-sm">
+                  {watchedDisplaySettings?.isPublished &&
+                  !savedDisplaySettings?.isPublished
+                    ? "Clique em salvar para publicar a página"
+                    : "Clique em salvar para aplicar alterações de exibição"}
+                </div>
+              )}
+
               {/* Display Options */}
               <div className="space-y-4">
                 <p className="text-sm font-medium text-slate-700">
@@ -1210,12 +1272,12 @@ export default function IndustryConfigPage() {
                 <div
                   className={cn(
                     "flex items-start gap-3 p-4 border rounded-lg",
-                    watchedIsPublished
+                    savedPublished
                       ? "bg-emerald-50 border-emerald-100"
                       : "bg-slate-50 border-slate-200",
                   )}
                 >
-                  {watchedIsPublished ? (
+                  {savedPublished ? (
                     <Eye className="h-4 w-4 text-emerald-600 mt-0.5 shrink-0" />
                   ) : (
                     <EyeOff className="h-4 w-4 text-slate-400 mt-0.5 shrink-0" />
@@ -1223,9 +1285,7 @@ export default function IndustryConfigPage() {
                   <div
                     className={cn(
                       "text-xs flex-1",
-                      watchedIsPublished
-                        ? "text-emerald-700"
-                        : "text-slate-600",
+                      savedPublished ? "text-emerald-700" : "text-slate-600",
                     )}
                   >
                     <div className="flex items-center gap-2 mb-1">
@@ -1235,18 +1295,18 @@ export default function IndustryConfigPage() {
                       <span
                         className={cn(
                           "px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase",
-                          watchedIsPublished
+                          savedPublished
                             ? "bg-emerald-200 text-emerald-800"
                             : "bg-slate-200 text-slate-600",
                         )}
                       >
-                        {watchedIsPublished
+                        {savedPublished
                           ? t("portfolioVisibility.statusPublished")
                           : t("portfolioVisibility.statusUnpublished")}
                       </span>
                     </div>
                     <p className="text-xs mb-2">
-                      {watchedIsPublished
+                      {savedPublished
                         ? t("portfolioVisibility.urlVisibleDesc")
                         : t("portfolioVisibility.urlHiddenDesc")}
                     </p>
@@ -1254,7 +1314,7 @@ export default function IndustryConfigPage() {
                       <code
                         className={cn(
                           "px-2 py-1 rounded font-mono text-xs break-all",
-                          watchedIsPublished
+                          savedPublished
                             ? "bg-emerald-100 text-emerald-800"
                             : "bg-slate-200 text-slate-500",
                         )}
@@ -1263,20 +1323,29 @@ export default function IndustryConfigPage() {
                           ? `${window.location.origin}/portfolio/${watchedSlug}`
                           : `/portfolio/${watchedSlug}`}
                       </code>
-                      <a
-                        href={`/portfolio/${industry?.slug || watchedSlug}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={cn(
-                          "inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors",
-                          watchedIsPublished
-                            ? "bg-emerald-600 text-white hover:bg-emerald-700"
-                            : "bg-slate-300 text-slate-600 hover:bg-slate-400",
-                        )}
-                      >
-                        <Eye className="h-3 w-3" />
-                        {t("portfolioVisibility.viewPortfolio")}
-                      </a>
+                      {savedPublished ? (
+                        <a
+                          href={`/portfolio/${industry?.slug || watchedSlug}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={cn(
+                            "inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium transition-colors",
+                            "bg-emerald-600 text-white hover:bg-emerald-700",
+                          )}
+                        >
+                          <Eye className="h-3 w-3" />
+                          {t("portfolioVisibility.viewPortfolio")}
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled
+                          className="inline-flex items-center gap-1 px-3 py-1 rounded text-xs font-medium bg-slate-300 text-slate-600 cursor-not-allowed"
+                        >
+                          <Eye className="h-3 w-3" />
+                          {t("portfolioVisibility.viewPortfolio")}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>

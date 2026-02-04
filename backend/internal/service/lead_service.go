@@ -19,6 +19,9 @@ type clienteService struct {
 	clienteRepo     repository.ClienteRepository
 	interactionRepo repository.ClienteInteractionRepository
 	linkRepo        repository.SalesLinkRepository
+	batchRepo       repository.BatchRepository
+	productRepo     repository.ProductRepository
+	mediaRepo       repository.MediaRepository
 	db              DatabaseExecutor
 	emailSender     domainService.EmailSender
 	frontendURL     string
@@ -34,6 +37,9 @@ func NewClienteService(
 	clienteRepo repository.ClienteRepository,
 	interactionRepo repository.ClienteInteractionRepository,
 	linkRepo repository.SalesLinkRepository,
+	batchRepo repository.BatchRepository,
+	productRepo repository.ProductRepository,
+	mediaRepo repository.MediaRepository,
 	db DatabaseExecutor,
 	emailSender domainService.EmailSender,
 	frontendURL string,
@@ -43,6 +49,9 @@ func NewClienteService(
 		clienteRepo:     clienteRepo,
 		interactionRepo: interactionRepo,
 		linkRepo:        linkRepo,
+		batchRepo:       batchRepo,
+		productRepo:     productRepo,
+		mediaRepo:       mediaRepo,
 		db:              db,
 		emailSender:     emailSender,
 		frontendURL:     frontendURL,
@@ -533,11 +542,15 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 			description = *link.CustomMessage
 		}
 
+		// Buscar imagem de preview do lote/produto
+		imageURL := s.getPreviewImageURL(ctx, link)
+
 		offerLinks = append(offerLinks, infraEmail.OfferLink{
 			Title:       title,
 			Description: description,
 			Price:       price,
 			URL:         linkURL,
+			ImageURL:    imageURL,
 		})
 	}
 
@@ -567,6 +580,78 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 	}
 
 	return s.emailSender.Send(ctx, msg)
+}
+
+// getPreviewImageURL busca a URL da imagem de preview para um link de venda
+func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.SalesLink) string {
+	// Para links de LOTE_UNICO ou MULTIPLOS_LOTES, buscar imagem do batch
+	if link.BatchID != nil {
+		batch, err := s.batchRepo.FindByID(ctx, *link.BatchID)
+		if err == nil && batch != nil {
+			// Buscar mídias do batch
+			medias, err := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+			if err == nil && len(medias) > 0 {
+				// Preferir imagem de capa (cover), senão primeira imagem
+				for _, media := range medias {
+					if media.IsCover {
+						return media.URL
+					}
+				}
+				return medias[0].URL
+			}
+
+			// Se não tem mídia no batch, tentar do produto
+			if batch.ProductID != "" {
+				product, err := s.productRepo.FindByID(ctx, batch.ProductID)
+				if err == nil && product != nil {
+					productMedias, err := s.mediaRepo.FindProductMedias(ctx, product.ID)
+					if err == nil && len(productMedias) > 0 {
+						for _, media := range productMedias {
+							if media.IsCover {
+								return media.URL
+							}
+						}
+						return productMedias[0].URL
+					}
+				}
+			}
+		}
+	}
+
+	// Para links de PRODUTO_GERAL, buscar imagem do produto
+	if link.ProductID != nil {
+		product, err := s.productRepo.FindByID(ctx, *link.ProductID)
+		if err == nil && product != nil {
+			medias, err := s.mediaRepo.FindProductMedias(ctx, product.ID)
+			if err == nil && len(medias) > 0 {
+				for _, media := range medias {
+					if media.IsCover {
+						return media.URL
+					}
+				}
+				return medias[0].URL
+			}
+		}
+	}
+
+	// Para MULTIPLOS_LOTES, tentar buscar a imagem do primeiro item
+	if link.LinkType == entity.LinkTypeMultiplosLotes && len(link.Items) > 0 {
+		firstItem := link.Items[0]
+		batch, err := s.batchRepo.FindByID(ctx, firstItem.BatchID)
+		if err == nil && batch != nil {
+			medias, err := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
+			if err == nil && len(medias) > 0 {
+				for _, media := range medias {
+					if media.IsCover {
+						return media.URL
+					}
+				}
+				return medias[0].URL
+			}
+		}
+	}
+
+	return ""
 }
 
 func (s *clienteService) Update(ctx context.Context, id string, input entity.CreateClienteManualInput) (*entity.Cliente, error) {

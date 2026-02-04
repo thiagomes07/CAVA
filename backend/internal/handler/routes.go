@@ -89,7 +89,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Upload:          NewUploadHandler(services.Storage, services.Product, services.Batch, services.MediaRepo, cfg.Logger),
 		Public:          NewPublicHandler(services.SalesLink, services.Cliente, services.IndustryRepo, services.BatchRepo, cfg.Validator, cfg.Logger),
 		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
-		Portfolio:       NewPortfolioHandler(services.SharedCatalogPermRepo, services.UserRepo, services.IndustryRepo, services.ProductRepo, services.Cliente, cfg.Validator, cfg.Logger),
+		Portfolio:       NewPortfolioHandler(services.SharedCatalogPermRepo, services.UserRepo, services.IndustryRepo, services.ProductRepo, services.BatchRepo, services.MediaRepo, services.Cliente, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
 	}
 }
@@ -153,6 +153,7 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 			// Portfolio público da indústria
 			r.Get("/portfolio/{slug}", h.Portfolio.GetPublicPortfolio)
+			r.Get("/portfolio/{slug}/products/{productId}/batches", h.Portfolio.GetPublicProductBatches)
 			r.Post("/portfolio/{slug}/lead", h.Portfolio.CapturePortfolioLead)
 		})
 

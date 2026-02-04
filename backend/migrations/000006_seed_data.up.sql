@@ -13,13 +13,19 @@ BEGIN
     END IF;
 
     -- Inserir indústria demo (apenas ID para vínculo)
-    INSERT INTO industries (id, name, cnpj, slug, contact_email)
+    INSERT INTO industries (id, name, cnpj, slug, contact_email, address_country, address_state, address_city, address_street, address_number, address_zip_code)
     VALUES (
         '00000000-0000-0000-0000-000000000001',
         '', -- Nome vazio
         NULL, -- CNPJ vazio
         'temp-slug', -- Slug placeholder
-        '' -- Email vazio
+        '', -- Email vazio
+        '', -- Endereço vazio
+        '', -- Estado vazio
+        '', -- Cidade vazia
+        '', -- Rua vazia
+        '', -- Número vazio
+        '' -- CEP vazio
     );
 
     -- Inserir usuário Admin Demo
