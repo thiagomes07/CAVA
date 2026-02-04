@@ -27,6 +27,15 @@ CREATE TABLE industries (
     city VARCHAR(100),
     state VARCHAR(2),
     is_public BOOLEAN DEFAULT FALSE,
+    portfolio_display_settings JSONB DEFAULT '{
+        "showName": true,
+        "showDescription": false,
+        "showLogo": false,
+        "showContact": false,
+        "showLocation": false,
+        "locationLevel": "none",
+        "isPublished": false
+    }'::JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -39,6 +48,7 @@ COMMENT ON COLUMN industries.city IS 'Cidade do depósito';
 COMMENT ON COLUMN industries.state IS 'Estado do depósito (UF)';
 COMMENT ON COLUMN industries.banner_url IS 'URL do banner personalizado do depósito';
 COMMENT ON COLUMN industries.is_public IS 'Se o depósito aparece no catálogo público';
+COMMENT ON COLUMN industries.portfolio_display_settings IS 'Configurações de visibilidade do portfolio público: showName, showDescription, showLogo, showContact, showLocation, locationLevel (none|country|state|city|full), isPublished';
 
 -- =============================================
 -- TABELA: users
@@ -77,6 +87,8 @@ CREATE TABLE products (
     material_type VARCHAR(100),
     finish_type finish_type_enum DEFAULT 'POLIDO',
     is_public_catalog BOOLEAN DEFAULT TRUE,
+    base_price DECIMAL(15, 2),
+    price_unit VARCHAR(10) DEFAULT 'M2',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP WITH TIME ZONE
@@ -86,6 +98,8 @@ COMMENT ON TABLE products IS 'Catálogo de produtos (tipos de pedra)';
 COMMENT ON COLUMN products.sku_code IS 'Código interno do produto';
 COMMENT ON COLUMN products.material_type IS 'Tipo de material: GRANITO, MARMORE, QUARTZITO, etc';
 COMMENT ON COLUMN products.is_public_catalog IS 'Se aparece na vitrine pública';
+COMMENT ON COLUMN products.base_price IS 'Preço base por unidade de área (m² ou ft²) definido no produto';
+COMMENT ON COLUMN products.price_unit IS 'Unidade do preço (M2 ou FT2)';
 COMMENT ON COLUMN products.deleted_at IS 'Soft delete - timestamp de exclusão';
 
 -- =============================================
@@ -130,8 +144,15 @@ CREATE TABLE batches (
     -- Preço e status
     industry_price DECIMAL(12,2) NOT NULL CHECK (industry_price > 0),
     price_unit price_unit_type DEFAULT 'M2',
+    price_override BOOLEAN DEFAULT FALSE,
     status batch_status_type DEFAULT 'DISPONIVEL',
     origin_quarry VARCHAR(255),
+    
+    -- Tracking de BI
+    total_views INTEGER DEFAULT 0,
+    total_reservations INTEGER DEFAULT 0,
+    conversion_count INTEGER DEFAULT 0,
+    last_activity_at TIMESTAMP WITH TIME ZONE,
     
     -- Controles
     is_active BOOLEAN DEFAULT TRUE,
@@ -162,6 +183,11 @@ COMMENT ON COLUMN batches.sold_slabs IS 'Quantidade de chapas vendidas';
 COMMENT ON COLUMN batches.inactive_slabs IS 'Quantidade de chapas inativas';
 COMMENT ON COLUMN batches.industry_price IS 'Preço por unidade de área (conforme price_unit)';
 COMMENT ON COLUMN batches.price_unit IS 'Unidade de preço: M2 (metro quadrado) ou FT2 (pé quadrado)';
+COMMENT ON COLUMN batches.price_override IS 'Se TRUE, industry_price foi definido manualmente. Se FALSE, usa o preço do produto';
+COMMENT ON COLUMN batches.total_views IS 'Total de visualizacoes do lote via links';
+COMMENT ON COLUMN batches.total_reservations IS 'Total de reservas criadas para este lote';
+COMMENT ON COLUMN batches.conversion_count IS 'Total de vendas realizadas deste lote';
+COMMENT ON COLUMN batches.last_activity_at IS 'Data da ultima atividade (view, reserva ou venda)';
 COMMENT ON COLUMN batches.origin_quarry IS 'Pedreira de origem';
 COMMENT ON COLUMN batches.is_public IS 'Se o lote aparece na página pública do depósito';
 COMMENT ON COLUMN batches.deleted_at IS 'Data de exclusão (soft delete)';
@@ -238,6 +264,9 @@ CREATE TABLE sales_links (
     
     -- Métricas e controle
     views_count INTEGER DEFAULT 0,
+    unique_visitors INTEGER DEFAULT 0,
+    leads_captured INTEGER DEFAULT 0,
+    conversions INTEGER DEFAULT 0,
     expires_at TIMESTAMP WITH TIME ZONE,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -250,6 +279,9 @@ COMMENT ON COLUMN sales_links.link_type IS 'Tipo: LOTE_UNICO, PRODUTO_GERAL, CAT
 COMMENT ON COLUMN sales_links.display_price IS 'Preço exibido ao cliente final';
 COMMENT ON COLUMN sales_links.show_price IS 'Se exibe preço ou "Sob Consulta"';
 COMMENT ON COLUMN sales_links.views_count IS 'Contador de visualizações';
+COMMENT ON COLUMN sales_links.unique_visitors IS 'Visitantes unicos do link';
+COMMENT ON COLUMN sales_links.leads_captured IS 'Leads capturados via este link';
+COMMENT ON COLUMN sales_links.conversions IS 'Vendas originadas deste link';
 
 -- =============================================
 -- TABELA: sales_link_items
@@ -275,12 +307,22 @@ CREATE TABLE clientes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     sales_link_id UUID REFERENCES sales_links(id) ON DELETE CASCADE,
     created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    industry_id UUID REFERENCES industries(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255),
     phone VARCHAR(20),
     whatsapp VARCHAR(20),
     message TEXT,
     marketing_opt_in BOOLEAN DEFAULT FALSE,
+    source VARCHAR(50) DEFAULT 'MANUAL',
+    
+    -- Tracking de BI
+    created_by_user_id UUID REFERENCES users(id),
+    total_purchases INTEGER DEFAULT 0,
+    total_spent DECIMAL(14,2) DEFAULT 0,
+    source_batch_id UUID REFERENCES batches(id),
+    first_contact_at TIMESTAMP WITH TIME ZONE,
+    converted_at TIMESTAMP WITH TIME ZONE,
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -289,10 +331,16 @@ CREATE TABLE clientes (
 
 COMMENT ON TABLE clientes IS 'Clientes (clientes potenciais) capturados';
 COMMENT ON COLUMN clientes.created_by IS 'Usuário que criou o cliente manualmente (NULL se capturado via link)';
+COMMENT ON COLUMN clientes.industry_id IS 'Indústria dona do cliente (para leads capturados diretamente no portfolio)';
 COMMENT ON COLUMN clientes.email IS 'Email do cliente';
 COMMENT ON COLUMN clientes.phone IS 'Telefone do cliente';
 COMMENT ON COLUMN clientes.whatsapp IS 'Número do WhatsApp do cliente';
 COMMENT ON COLUMN clientes.marketing_opt_in IS 'Se aceitou receber comunicações de marketing';
+COMMENT ON COLUMN clientes.source IS 'Origem do cliente: MANUAL, PORTFOLIO, SALES_LINK, IMPORT';
+COMMENT ON COLUMN clientes.created_by_user_id IS 'Usuario que cadastrou o cliente (se manual)';
+COMMENT ON COLUMN clientes.total_purchases IS 'Total de compras realizadas';
+COMMENT ON COLUMN clientes.total_spent IS 'Valor total gasto em compras';
+COMMENT ON COLUMN clientes.source_batch_id IS 'Lote que gerou o interesse do cliente';
 
 
 -- =============================================
@@ -334,10 +382,22 @@ CREATE TABLE reservations (
     batch_id UUID NOT NULL REFERENCES batches(id) ON DELETE RESTRICT,
     reserved_by_user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     cliente_id UUID REFERENCES clientes(id) ON DELETE SET NULL,
+    industry_id UUID REFERENCES industries(id),
     quantity_slabs_reserved INTEGER NOT NULL DEFAULT 1 CHECK (quantity_slabs_reserved > 0),
     status reservation_status_type DEFAULT 'ATIVA',
     notes TEXT,
     expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    
+    -- Campos de aprovação
+    approved_by UUID REFERENCES users(id),
+    approved_at TIMESTAMP WITH TIME ZONE,
+    rejection_reason TEXT,
+    approval_expires_at TIMESTAMP WITH TIME ZONE,
+    
+    -- Campos de preço
+    reserved_price DECIMAL(14,2),
+    broker_sold_price DECIMAL(14,2),
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN DEFAULT TRUE
 );
@@ -347,6 +407,12 @@ COMMENT ON COLUMN reservations.reserved_by_user_id IS 'Usuário que fez a reserv
 COMMENT ON COLUMN reservations.quantity_slabs_reserved IS 'Quantidade de chapas reservadas nesta reserva';
 COMMENT ON COLUMN reservations.expires_at IS 'Data de expiração da reserva';
 COMMENT ON COLUMN reservations.status IS 'Status: ATIVA, CONFIRMADA_VENDA, EXPIRADA, CANCELADA';
+COMMENT ON COLUMN reservations.approved_by IS 'Usuario admin que aprovou a reserva';
+COMMENT ON COLUMN reservations.approved_at IS 'Data/hora da aprovacao';
+COMMENT ON COLUMN reservations.rejection_reason IS 'Motivo da rejeicao (quando rejeitada)';
+COMMENT ON COLUMN reservations.approval_expires_at IS 'Prazo para admin aprovar a reserva';
+COMMENT ON COLUMN reservations.reserved_price IS 'Preço indicado pelo broker para a reserva (visível para admin)';
+COMMENT ON COLUMN reservations.broker_sold_price IS 'Preço interno do broker - para dashboard própria (não visível para admin)';
 
 -- =============================================
 -- TABELA: sales_history
@@ -357,11 +423,13 @@ CREATE TABLE sales_history (
     sold_by_user_id UUID REFERENCES users(id),
     industry_id UUID NOT NULL REFERENCES industries(id),
     cliente_id UUID REFERENCES clientes(id),
+    reservation_id UUID REFERENCES reservations(id),
     customer_name VARCHAR(255) NOT NULL,
     customer_contact VARCHAR(255) NOT NULL,
     seller_name VARCHAR(255),
     sale_price DECIMAL(12,2) NOT NULL CHECK (sale_price > 0),
     broker_commission DECIMAL(12,2) DEFAULT 0 CHECK (broker_commission >= 0),
+    broker_sold_price DECIMAL(15,2),
     net_industry_value DECIMAL(12,2) NOT NULL CHECK (net_industry_value > 0),
     quantity_slabs_sold INTEGER NOT NULL DEFAULT 1 CHECK (quantity_slabs_sold > 0),
     price_unit price_unit_type DEFAULT 'M2',
@@ -369,6 +437,11 @@ CREATE TABLE sales_history (
     total_area_sold DECIMAL(10,2),
     invoice_url VARCHAR(500),
     notes TEXT,
+    
+    -- Tracking de BI
+    days_to_close INTEGER,
+    source VARCHAR(50) DEFAULT 'RESERVATION',
+    
     sold_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT check_commission_calculation CHECK (sale_price >= net_industry_value)
@@ -377,6 +450,7 @@ CREATE TABLE sales_history (
 COMMENT ON TABLE sales_history IS 'Histórico de vendas realizadas';
 COMMENT ON COLUMN sales_history.sale_price IS 'Preço final pago pelo cliente';
 COMMENT ON COLUMN sales_history.broker_commission IS 'Comissão do broker/vendedor';
+COMMENT ON COLUMN sales_history.broker_sold_price IS 'Valor que o broker vendeu para o cliente final (uso interno do broker)';
 COMMENT ON COLUMN sales_history.net_industry_value IS 'Valor líquido para a indústria';
 COMMENT ON COLUMN sales_history.customer_name IS 'Nome do cliente final';
 COMMENT ON COLUMN sales_history.customer_contact IS 'Contato do cliente final';
@@ -385,6 +459,9 @@ COMMENT ON COLUMN sales_history.quantity_slabs_sold IS 'Quantidade de chapas ven
 COMMENT ON COLUMN sales_history.price_unit IS 'Unidade de preço usada na venda';
 COMMENT ON COLUMN sales_history.price_per_unit IS 'Preço por unidade de área na venda';
 COMMENT ON COLUMN sales_history.total_area_sold IS 'Área total vendida em m²';
+COMMENT ON COLUMN sales_history.reservation_id IS 'Reserva que originou esta venda';
+COMMENT ON COLUMN sales_history.days_to_close IS 'Dias desde criacao da reserva ate confirmacao da venda';
+COMMENT ON COLUMN sales_history.source IS 'Origem da venda: RESERVATION, QUICK_SELL';
 
 -- =============================================
 -- TABELA: user_sessions
