@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -38,6 +39,7 @@ import { useToast } from "@/lib/hooks/useToast";
 import { useProduct } from "@/lib/api/queries/useProducts";
 import { productSchema, type ProductInput } from "@/lib/schemas/product.schema";
 import { materialTypes, finishTypes } from "@/lib/schemas/product.schema";
+import { productKeys } from "@/lib/api/queries/useProducts";
 import { MoneyInput } from "@/components/ui/masked-input";
 import { cn } from "@/lib/utils/cn";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -134,6 +136,7 @@ function SortableMediaItem({
 export default function EditProductPage() {
   const router = useRouter();
   const params = useParams();
+  const queryClient = useQueryClient();
   const productId = params.id as string;
   const { success, error } = useToast();
 
@@ -210,7 +213,9 @@ export default function EditProductPage() {
 
   // State for active dragging item
   const [activeId, setActiveId] = useState<string | null>(null);
-  const activeItem = activeId ? medias.find((item) => item.id === activeId) : null;
+  const activeItem = activeId
+    ? medias.find((item) => item.id === activeId)
+    : null;
 
   const handleDragStart = useCallback(
     (event: { active: { id: string | number } }) => {
@@ -272,17 +277,20 @@ export default function EditProductPage() {
     e.target.value = "";
   };
 
-  const handleRemoveMedia = useCallback((id: string) => {
-    setMedias((prev) => prev.filter((item) => item.id !== id));
-    if (existingMediaIds.has(id)) {
-      setRemovedMediaIds((prev) => new Set([...prev, id]));
-      setExistingMediaIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(id);
-        return newSet;
-      });
-    }
-  }, [existingMediaIds]);
+  const handleRemoveMedia = useCallback(
+    (id: string) => {
+      setMedias((prev) => prev.filter((item) => item.id !== id));
+      if (existingMediaIds.has(id)) {
+        setRemovedMediaIds((prev) => new Set([...prev, id]));
+        setExistingMediaIds((prev) => {
+          const newSet = new Set(prev);
+          newSet.delete(id);
+          return newSet;
+        });
+      }
+    },
+    [existingMediaIds],
+  );
 
   const onSubmit = async (data: ProductInput) => {
     try {
@@ -306,9 +314,6 @@ export default function EditProductPage() {
       const newMedias = medias.filter(
         (m) => "file" in m && !("url" in m),
       ) as UploadedMedia[];
-      const keptMedias = medias.filter(
-        (m) => existingMediaIds.has(m.id),
-      ) as ExistingMedia[];
 
       // Upload new medias if any
       if (newMedias.length > 0) {
@@ -322,39 +327,85 @@ export default function EditProductPage() {
           "/upload/product-medias",
           formData,
         );
+
+        // After upload, refresh product to get new media IDs
+        const updatedProduct = await apiClient.get<typeof product>(
+          `/products/${productId}`,
+        );
+
+        // Update local medias state with new IDs from server
+        if (updatedProduct?.medias) {
+          // Create a mapping of URLs to new media objects
+          const newMediaMap = new Map(
+            updatedProduct.medias
+              .filter(
+                (m) =>
+                  !existingMediaIds.has(m.id) && !removedMediaIds.has(m.id),
+              )
+              .map((m) => [m.url, m]),
+          );
+
+          // Update medias state to replace temp uploads with real server data
+          setMedias((current) =>
+            current.map((m) => {
+              if ("file" in m) {
+                // This is a newly uploaded file, find its server counterpart
+                const serverMedia = Array.from(newMediaMap.values()).find(
+                  (sm) => !current.some((cm) => "url" in cm && cm.id === sm.id),
+                );
+                if (serverMedia) {
+                  newMediaMap.delete(serverMedia.url);
+                  return serverMedia;
+                }
+              }
+              return m;
+            }),
+          );
+
+          // Add any remaining new medias from server
+          if (newMediaMap.size > 0) {
+            setMedias((current) => [...current, ...newMediaMap.values()]);
+          }
+
+          // Update existing media IDs set
+          setExistingMediaIds(new Set(updatedProduct.medias.map((m) => m.id)));
+        }
       }
 
       // Delete removed medias if any
       if (removedMediaIds.size > 0) {
         for (const mediaId of removedMediaIds) {
           try {
-            await apiClient.delete(`/products/${productId}/medias/${mediaId}`);
+            await apiClient.delete(`/product-medias/${mediaId}`);
           } catch (err) {
             console.error(`Failed to delete media ${mediaId}:`, err);
           }
         }
       }
 
-      // Update media order
-      if (keptMedias.length > 0 || newMedias.length > 0) {
-        const mediaOrder = medias
-          .filter((m) => !removedMediaIds.has(m.id))
-          .map((m, index) => ({
-            id: m.id,
-            displayOrder: index,
-          }));
+      // Build media order from current local state (respecting user's drag/drop order)
+      const mediaOrder = medias
+        .filter((m) => !removedMediaIds.has(m.id)) // Exclude removed medias
+        .filter((m) => "id" in m && !("file" in m)) // Only include medias with real IDs (not temp uploads)
+        .map((m, index) => ({
+          id: m.id,
+          displayOrder: index,
+        }));
 
-        if (mediaOrder.length > 0) {
-          try {
-            await apiClient.put(
-              `/products/${productId}/medias/reorder`,
-              { medias: mediaOrder },
-            );
-          } catch (err) {
-            console.error("Failed to update media order:", err);
-          }
+      // Update media order if there are medias to order
+      if (mediaOrder.length > 0) {
+        try {
+          // Send the array directly, not wrapped in an object
+          await apiClient.patch(`/product-medias/order`, mediaOrder);
+        } catch (err) {
+          console.error("Failed to update media order:", err);
         }
       }
+
+      // Invalidate product cache to ensure fresh data is loaded
+      await queryClient.invalidateQueries({
+        queryKey: productKeys.all,
+      });
 
       success("Produto atualizado com sucesso");
       router.push("/portfolio");
