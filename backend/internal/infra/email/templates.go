@@ -52,6 +52,7 @@ type OfferLink struct {
 	Description string
 	Price       string // Já formatado: "R$ 1.500,00"
 	URL         string
+	ImageURL    string // URL da imagem de preview do lote/produto
 }
 
 // OffersEmailData contém os dados para o email de ofertas para clientes
@@ -479,7 +480,14 @@ const (
 {{end}}
 
 {{range .Links}}
-<div style="background: linear-gradient(135deg, #F9F9FB 0%, #F3F3F3 100%); border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #E5E5E5;">
+<div style="background: linear-gradient(135deg, #F9F9FB 0%, #F3F3F3 100%); border-radius: 12px; padding: 24px; margin: 20px 0; border: 1px solid #E5E5E5; overflow: hidden;">
+    {{if .ImageURL}}
+    <div style="margin: -24px -24px 20px -24px; overflow: hidden;">
+        <a href="{{.URL}}" style="display: block;">
+            <img src="{{.ImageURL}}" alt="{{.Title}}" style="width: 100%; height: 200px; object-fit: cover; display: block;" />
+        </a>
+    </div>
+    {{end}}
     <h3 style="margin: 0 0 12px 0; color: #121212; font-size: 18px; font-weight: 600;">{{.Title}}</h3>
     {{if .Description}}
     <p style="color: #4A4A4A; margin: 0 0 12px 0; font-size: 14px;">{{.Description}}</p>
@@ -758,8 +766,12 @@ Temos algumas ofertas que podem te interessar:
 			text += `
    Preço: ` + link.Price
 		}
+		if link.ImageURL != "" {
+			text += `
+   📷 Imagem: ` + link.ImageURL
+		}
 		text += `
-   Link: ` + link.URL
+   🔗 Ver oferta: ` + link.URL
 	}
 
 	text += `
