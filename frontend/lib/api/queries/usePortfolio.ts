@@ -66,6 +66,20 @@ export interface PublicProduct {
   hasAvailable: boolean;
 }
 
+export interface PublicBatch {
+  batchCode: string;
+  height: number;
+  width: number;
+  thickness: number;
+  totalArea: number;
+  availableSlabs: number;
+  originQuarry?: string;
+  medias: Array<{ id: string; url: string; displayOrder: number }>;
+  productName?: string;
+  material?: string;
+  finish?: string;
+}
+
 export interface CaptureLeadInput {
   name: string;
   email?: string;
@@ -82,6 +96,15 @@ export const portfolioKeys = {
   sharedBrokers: () => [...portfolioKeys.all, "shared-brokers"] as const,
   sharedPortfolios: () => [...portfolioKeys.all, "shared-portfolios"] as const,
   public: (slug: string) => [...portfolioKeys.all, "public", slug] as const,
+  productBatches: (slug: string, productId: string) =>
+    [
+      ...portfolioKeys.all,
+      "public",
+      slug,
+      "products",
+      productId,
+      "batches",
+    ] as const,
 };
 
 // Hooks for Admin (Industry)
@@ -170,5 +193,25 @@ export function useCapturePortfolioLead(slug: string) {
       );
       return data;
     },
+  });
+}
+
+// Hook para buscar lotes públicos de um produto específico
+export function usePublicProductBatches(
+  slug: string,
+  productId: string,
+  options?: { enabled?: boolean; limit?: number },
+) {
+  return useQuery({
+    queryKey: portfolioKeys.productBatches(slug, productId),
+    queryFn: async () => {
+      const params = options?.limit ? { limit: options.limit } : {};
+      const data = await apiClient.get<PublicBatch[]>(
+        `/public/portfolio/${slug}/products/${productId}/batches`,
+        { params },
+      );
+      return data;
+    },
+    enabled: (options?.enabled ?? true) && !!slug && !!productId,
   });
 }
