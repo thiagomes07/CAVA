@@ -34,6 +34,7 @@ export interface PublicPortfolioResponse {
     description?: string;
     logoUrl?: string;
     slug?: string;
+    cnpj?: string;
     contact?: {
       email?: string;
       phone?: string;

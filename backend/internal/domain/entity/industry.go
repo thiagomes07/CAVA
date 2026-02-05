@@ -45,6 +45,7 @@ type PortfolioDisplaySettings struct {
 	ShowName        bool   `json:"showName"`
 	ShowDescription bool   `json:"showDescription"`
 	ShowLogo        bool   `json:"showLogo"`
+	ShowCNPJ        bool   `json:"showCNPJ"`
 	ShowContact     bool   `json:"showContact"`
 	ShowLocation    bool   `json:"showLocation"`
 	LocationLevel   string `json:"locationLevel"` // "none", "country", "state", "city", "full"

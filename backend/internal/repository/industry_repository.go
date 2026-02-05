@@ -144,17 +144,17 @@ func (r *industryRepository) FindByCNPJ(ctx context.Context, cnpj string) (*enti
 func (r *industryRepository) Update(ctx context.Context, industry *entity.Industry) error {
 	query := `
 		UPDATE industries
-		SET name = $1, slug = $2, contact_email = $3, contact_phone = $4, whatsapp = $5,
-		    description = $6, city = $7, state = $8, banner_url = $9,
-		    logo_url = $10, social_links = $11, address_country = $12, address_state = $13,
-		    address_city = $14, address_street = $15, address_number = $16,
-		    address_zip_code = $17, portfolio_display_settings = $18, is_public = $19, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $20
+		SET name = $1, cnpj = $2, slug = $3, contact_email = $4, contact_phone = $5, whatsapp = $6,
+		    description = $7, city = $8, state = $9, banner_url = $10,
+		    logo_url = $11, social_links = $12, address_country = $13, address_state = $14,
+		    address_city = $15, address_street = $16, address_number = $17,
+		    address_zip_code = $18, portfolio_display_settings = $19, is_public = $20, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $21
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
-		industry.Name, industry.Slug, industry.ContactEmail, industry.ContactPhone, industry.Whatsapp,
+		industry.Name, industry.CNPJ, industry.Slug, industry.ContactEmail, industry.ContactPhone, industry.Whatsapp,
 		industry.Description, industry.City, industry.State, industry.BannerURL,
 		industry.LogoURL, industry.SocialLinks, industry.AddressCountry, industry.AddressState,
 		industry.AddressCity, industry.AddressStreet, industry.AddressNumber,

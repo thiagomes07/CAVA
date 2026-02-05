@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -522,7 +523,7 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 
 	for _, link := range links {
 		// URL completa do link
-		linkURL := fmt.Sprintf("%s/l/%s", s.frontendURL, link.SlugToken)
+		linkURL := fmt.Sprintf("%s/%s", s.frontendURL, link.SlugToken)
 
 		// Título do link
 		title := "Lote disponível"
@@ -583,6 +584,8 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 }
 
 // getPreviewImageURL busca a URL da imagem de preview para um link de venda
+// IMPORTANTE: URLs localhost não funcionam em emails HTML pois o cliente de email
+// não tem acesso ao localhost do servidor. Em produção, use URLs públicas (CloudFront, etc)
 func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.SalesLink) string {
 	// Para links de LOTE_UNICO ou MULTIPLOS_LOTES, buscar imagem do batch
 	if link.BatchID != nil {
@@ -593,11 +596,14 @@ func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.Sa
 			if err == nil && len(medias) > 0 {
 				// Preferir imagem de capa (cover), senão primeira imagem
 				for _, media := range medias {
-					if media.IsCover {
+					if media.IsCover && !isLocalhostURL(media.URL) {
 						return media.URL
 					}
 				}
-				return medias[0].URL
+				// Retornar primeira imagem válida (não localhost)
+				if !isLocalhostURL(medias[0].URL) {
+					return medias[0].URL
+				}
 			}
 
 			// Se não tem mídia no batch, tentar do produto
@@ -607,11 +613,13 @@ func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.Sa
 					productMedias, err := s.mediaRepo.FindProductMedias(ctx, product.ID)
 					if err == nil && len(productMedias) > 0 {
 						for _, media := range productMedias {
-							if media.IsCover {
+							if media.IsCover && !isLocalhostURL(media.URL) {
 								return media.URL
 							}
 						}
-						return productMedias[0].URL
+						if !isLocalhostURL(productMedias[0].URL) {
+							return productMedias[0].URL
+						}
 					}
 				}
 			}
@@ -625,11 +633,13 @@ func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.Sa
 			medias, err := s.mediaRepo.FindProductMedias(ctx, product.ID)
 			if err == nil && len(medias) > 0 {
 				for _, media := range medias {
-					if media.IsCover {
+					if media.IsCover && !isLocalhostURL(media.URL) {
 						return media.URL
 					}
 				}
-				return medias[0].URL
+				if !isLocalhostURL(medias[0].URL) {
+					return medias[0].URL
+				}
 			}
 		}
 	}
@@ -642,16 +652,26 @@ func (s *clienteService) getPreviewImageURL(ctx context.Context, link *entity.Sa
 			medias, err := s.mediaRepo.FindBatchMedias(ctx, batch.ID)
 			if err == nil && len(medias) > 0 {
 				for _, media := range medias {
-					if media.IsCover {
+					if media.IsCover && !isLocalhostURL(media.URL) {
 						return media.URL
 					}
 				}
-				return medias[0].URL
+				if !isLocalhostURL(medias[0].URL) {
+					return medias[0].URL
+				}
 			}
 		}
 	}
 
 	return ""
+}
+
+// isLocalhostURL verifica se uma URL é localhost (não funciona em emails)
+func isLocalhostURL(url string) bool {
+	return url != "" && (
+		strings.Contains(url, "localhost") ||
+		strings.Contains(url, "127.0.0.1") ||
+		strings.Contains(url, "0.0.0.0"))
 }
 
 func (s *clienteService) Update(ctx context.Context, id string, input entity.CreateClienteManualInput) (*entity.Cliente, error) {

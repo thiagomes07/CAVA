@@ -850,6 +850,7 @@
       "showName": "Show Company Name",
       "showDescription": "Show Company Description",
       "showLogo": "Show Company Logo",
+      "showCNPJ": "Show Company CNPJ",
       "showContact": "Show Contact Information",
       "showLocation": "Show Location",
       "noLogoWarning": "Add a logo first",
