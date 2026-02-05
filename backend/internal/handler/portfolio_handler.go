@@ -476,6 +476,11 @@ func buildPublicIndustryInfo(industry *entity.Industry) map[string]interface{} {
 		}
 	}
 
+	// CNPJ
+	if settings.ShowCNPJ && industry.CNPJ != nil {
+		info["cnpj"] = *industry.CNPJ
+	}
+
 	// Localização
 	if settings.ShowLocation {
 		location := make(map[string]interface{})
@@ -490,17 +495,32 @@ func buildPublicIndustryInfo(industry *entity.Industry) map[string]interface{} {
 			if industry.AddressZipCode != nil {
 				location["zipCode"] = *industry.AddressZipCode
 			}
-			fallthrough
+			if industry.AddressCity != nil {
+				location["city"] = *industry.AddressCity
+			}
+			if industry.AddressState != nil {
+				location["state"] = *industry.AddressState
+			}
+			if industry.AddressCountry != nil {
+				location["country"] = *industry.AddressCountry
+			}
 		case "city":
 			if industry.AddressCity != nil {
 				location["city"] = *industry.AddressCity
 			}
-			fallthrough
+			if industry.AddressState != nil {
+				location["state"] = *industry.AddressState
+			}
+			if industry.AddressCountry != nil {
+				location["country"] = *industry.AddressCountry
+			}
 		case "state":
 			if industry.AddressState != nil {
 				location["state"] = *industry.AddressState
 			}
-			fallthrough
+			if industry.AddressCountry != nil {
+				location["country"] = *industry.AddressCountry
+			}
 		case "country":
 			if industry.AddressCountry != nil {
 				location["country"] = *industry.AddressCountry

@@ -880,6 +880,7 @@
       "showName": "Mostrar Nome da Empresa",
       "showDescription": "Mostrar Descrição da Empresa",
       "showLogo": "Mostrar Logo da Empresa",
+      "showCNPJ": "Mostrar CNPJ da Empresa",
       "showContact": "Mostrar Informações de Contato",
       "showLocation": "Mostrar Localização",
       "noLogoWarning": "Adicione uma logo primeiro",

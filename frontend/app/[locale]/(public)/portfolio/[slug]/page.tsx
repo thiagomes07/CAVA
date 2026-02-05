@@ -311,13 +311,44 @@ export default function PublicPortfolioPage() {
 
   const { industry, products } = portfolio;
 
+  // Compute whether we have visible data to control layout
+  const hasIndustryInfo = Boolean(
+    industry.name ||
+    industry.description ||
+    industry.logoUrl ||
+    industry.cnpj ||
+    industry.location ||
+    industry.contact ||
+    (industry.socialLinks && industry.socialLinks.length > 0),
+  );
+
+  const hasHeaderContent = Boolean(industry.name || industry.description);
+
+  const hasMetaInfo = Boolean(
+    industry.cnpj ||
+    industry.location ||
+    industry.contact?.email ||
+    industry.contact?.phone ||
+    industry.contact?.whatsapp,
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
       {/* Hero Header */}
       <header className="relative bg-white border-b border-slate-100">
         <div className="absolute inset-0 bg-gradient-to-r from-slate-50 via-white to-slate-50" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+        <div
+          className={cn(
+            "relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8",
+            hasIndustryInfo ? "py-12" : "py-6",
+          )}
+        >
+          <div
+            className={cn(
+              "flex flex-col md:flex-row items-start gap-6",
+              industry.logoUrl ? "md:items-center" : "md:items-start",
+            )}
+          >
             {industry.logoUrl && (
               <div className="shrink-0">
                 <div className="w-24 h-24 md:w-36 md:h-36 lg:w-48 lg:h-48 rounded-2xl bg-white shadow-lg border border-slate-100 p-2 overflow-hidden">
@@ -337,52 +368,80 @@ export default function PublicPortfolioPage() {
                 </h1>
               )}
               {industry.description && (
-                <p className="text-slate-600 text-lg leading-relaxed max-w-2xl">
+                <p className="text-slate-600 text-lg leading-relaxed max-w-2xl mb-4">
                   {truncateTextByWord(industry.description, 160)}
                 </p>
               )}
 
-              <div className="flex flex-wrap items-center gap-4 mt-4">
-                {industry.location && (
-                  <div className="flex items-center gap-2 text-sm text-slate-500">
-                    <MapPin className="w-4 h-4" />
-                    <span>
-                      {truncateSingleLine(
-                        [
-                          industry.location.city,
-                          industry.location.state,
-                          industry.location.country,
-                        ]
-                          .filter(Boolean)
-                          .join(", "),
-                        60,
-                      )}
-                    </span>
-                  </div>
-                )}
-                {industry.contact?.email && (
-                  <a
-                    href={`mailto:${industry.contact.email}`}
-                    className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                  >
-                    <Mail className="w-4 h-4" />
-                    <span>
-                      {truncateSingleLine(industry.contact.email, 40)}
-                    </span>
-                  </a>
-                )}
-                {industry.contact?.phone && (
-                  <a
-                    href={`tel:${industry.contact.phone}`}
-                    className="flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
-                  >
-                    <Phone className="w-4 h-4" />
-                    <span>
-                      {truncateSingleLine(industry.contact.phone, 30)}
-                    </span>
-                  </a>
-                )}
-              </div>
+              {hasMetaInfo && (
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+                  {industry.cnpj && (
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">CNPJ:</span>
+                      <span className="font-mono">{industry.cnpj}</span>
+                    </div>
+                  )}
+
+                  {industry.location && (
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      <span>
+                        {truncateSingleLine(
+                          [
+                            industry.location.street && industry.location.number
+                              ? `${industry.location.street}, ${industry.location.number}`
+                              : null,
+                            industry.location.city,
+                            industry.location.state,
+                            industry.location.country,
+                          ]
+                            .filter(Boolean)
+                            .join(", "),
+                          80,
+                        )}
+                      </span>
+                    </div>
+                  )}
+
+                  {industry.contact?.email && (
+                    <a
+                      href={`mailto:${industry.contact.email}`}
+                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                    >
+                      <Mail className="w-4 h-4" />
+                      <span>
+                        {truncateSingleLine(industry.contact.email, 40)}
+                      </span>
+                    </a>
+                  )}
+
+                  {industry.contact?.phone && (
+                    <a
+                      href={`tel:${industry.contact.phone}`}
+                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                    >
+                      <Phone className="w-4 h-4" />
+                      <span>
+                        {truncateSingleLine(industry.contact.phone, 30)}
+                      </span>
+                    </a>
+                  )}
+
+                  {industry.contact?.whatsapp && (
+                    <a
+                      href={`https://wa.me/${industry.contact.whatsapp.replace(/\D/g, "")}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-2 hover:text-slate-700 transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4" />
+                      <span>
+                        {truncateSingleLine(industry.contact.whatsapp, 30)}
+                      </span>
+                    </a>
+                  )}
+                </div>
+              )}
 
               {industry.socialLinks && industry.socialLinks.length > 0 && (
                 <div className="flex items-center gap-3 mt-4">

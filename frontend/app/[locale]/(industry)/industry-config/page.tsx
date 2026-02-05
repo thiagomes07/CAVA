@@ -43,6 +43,7 @@ const portfolioDisplaySettingsSchema = z.object({
   showName: z.boolean(),
   showDescription: z.boolean(),
   showLogo: z.boolean(),
+  showCNPJ: z.boolean(),
   showContact: z.boolean(),
   showLocation: z.boolean(),
   locationLevel: z.enum(["none", "country", "state", "city", "full"]),
@@ -140,6 +141,7 @@ export default function IndustryConfigPage() {
         showName: true,
         showDescription: false,
         showLogo: false,
+        showCNPJ: false,
         showContact: false,
         showLocation: false,
         locationLevel: "none",
@@ -168,6 +170,7 @@ export default function IndustryConfigPage() {
   const watchedSlug = watch("slug");
   const watchedName = watch("name");
   const watchedDescription = watch("description");
+  const watchedCNPJ = watch("cnpj");
   const watchedContactEmail = watch("contactEmail");
   const watchedContactPhone = watch("contactPhone");
   const watchedWhatsapp = watch("whatsapp");
@@ -190,6 +193,7 @@ export default function IndustryConfigPage() {
   const hasName = Boolean(watchedName?.trim());
   const hasDescription = Boolean(watchedDescription?.trim());
   const hasLogo = Boolean(previewLogoUrl);
+  const hasCNPJ = Boolean(watchedCNPJ?.trim());
   const hasContact = Boolean(
     watchedContactEmail?.trim() ||
     watchedContactPhone?.trim() ||
@@ -234,6 +238,7 @@ export default function IndustryConfigPage() {
           showName: true,
           showDescription: false,
           showLogo: false,
+          showCNPJ: false,
           showContact: false,
           showLocation: false,
           locationLevel: "none",
@@ -253,6 +258,7 @@ export default function IndustryConfigPage() {
           showName: true,
           showDescription: false,
           showLogo: false,
+          showCNPJ: false,
           showContact: false,
           showLocation: false,
           locationLevel: "none",
@@ -300,6 +306,7 @@ export default function IndustryConfigPage() {
           showName: true,
           showDescription: false,
           showLogo: false,
+          showCNPJ: false,
           showContact: false,
           showLocation: false,
           locationLevel: "none",
@@ -351,6 +358,7 @@ export default function IndustryConfigPage() {
           showName: true,
           showDescription: false,
           showLogo: false,
+          showCNPJ: false,
           showContact: false,
           showLocation: false,
           locationLevel: "none",
@@ -1139,6 +1147,47 @@ export default function IndustryConfigPage() {
                           className={cn(
                             "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
                             field.value && previewLogoUrl
+                              ? "translate-x-5"
+                              : "translate-x-1",
+                          )}
+                        />
+                      </button>
+                    )}
+                  />
+                </div>
+
+                {/* Show CNPJ */}
+                <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-600">
+                      {t("portfolioVisibility.showCNPJ")}
+                    </span>
+                    {!hasCNPJ && (
+                      <span className="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded">
+                        {t("portfolioVisibility.noDataWarning")}
+                      </span>
+                    )}
+                  </div>
+                  <Controller
+                    name="portfolioDisplaySettings.showCNPJ"
+                    control={control}
+                    render={({ field }) => (
+                      <button
+                        type="button"
+                        onClick={() => field.onChange(!field.value)}
+                        disabled={!hasCNPJ}
+                        className={cn(
+                          "relative inline-flex h-5 w-9 items-center rounded-full transition-colors",
+                          !hasCNPJ && "opacity-50 cursor-not-allowed",
+                          field.value && hasCNPJ
+                            ? "bg-[#C2410C]"
+                            : "bg-slate-300",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "inline-block h-3 w-3 transform rounded-full bg-white transition-transform shadow",
+                            field.value && hasCNPJ
                               ? "translate-x-5"
                               : "translate-x-1",
                           )}

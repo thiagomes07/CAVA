@@ -3,6 +3,7 @@
 ## Problema
 
 Imagens com URLs `localhost` não aparecem em emails HTML porque:
+
 - Emails são visualizados no cliente de email (Gmail, Outlook, etc.)
 - O cliente de email não consegue acessar `localhost:9000` do servidor
 - URLs precisam ser publicamente acessíveis na internet
@@ -38,6 +39,7 @@ Imagens com URLs `localhost` não aparecem em emails HTML porque:
 Em ambiente de desenvolvimento com `localhost`, as imagens **não aparecerão** nos emails enviados. Isso é esperado e não afeta a funcionalidade do sistema.
 
 O sistema já possui validação para:
+
 - Não incluir URLs localhost em emails quando em produção
 - Funcionar normalmente no frontend (localhost funciona para navegador)
 

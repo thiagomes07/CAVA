@@ -835,6 +835,7 @@
       "showName": "Mostrar Nombre de la Empresa",
       "showDescription": "Mostrar Descripción de la Empresa",
       "showLogo": "Mostrar Logo de la Empresa",
+      "showCNPJ": "Mostrar CNPJ de la Empresa",
       "showContact": "Mostrar Información de Contacto",
       "showLocation": "Mostrar Ubicación",
       "noLogoWarning": "Agregue un logo primero",
