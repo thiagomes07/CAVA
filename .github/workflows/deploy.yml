@@ -1,0 +1,202 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
+  ECS_CLUSTER: cava-cluster
+  BACKEND_ECR_REPO: cava/backend
+  FRONTEND_ECR_REPO: cava/frontend
+  BACKEND_SERVICE: cava-backend-service
+  FRONTEND_SERVICE: cava-frontend-service
+  BACKEND_TASK_DEF: cava-backend
+  FRONTEND_TASK_DEF: cava-frontend
+
+permissions:
+  contents: read
+
+jobs:
+  # ========================================
+  # Detectar quais partes mudaram
+  # ========================================
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'frontend/**'
+
+  # ========================================
+  # Build & Deploy Backend
+  # ========================================
+  deploy-backend:
+    name: Deploy Backend
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, push Backend image
+        working-directory: backend
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          docker build \
+            -t $ECR_REGISTRY/$BACKEND_ECR_REPO:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$BACKEND_ECR_REPO:latest \
+            .
+          docker push $ECR_REGISTRY/$BACKEND_ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$BACKEND_ECR_REPO:latest
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition $BACKEND_TASK_DEF \
+            --query 'taskDefinition' \
+            --output json > backend-task-def.json
+
+          # Remover campos que não podem ser re-registrados
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            backend-task-def.json > backend-task-def-clean.json
+
+      - name: Update image in task definition
+        id: task-def-backend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: backend-task-def-clean.json
+          container-name: backend
+          image: ${{ env.ECR_REGISTRY }}/${{ env.BACKEND_ECR_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy Backend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def-backend.outputs.task-definition }}
+          service: ${{ env.BACKEND_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+  # ========================================
+  # Build & Deploy Frontend
+  # ========================================
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, push Frontend image
+        working-directory: frontend
+        run: |
+          IMAGE_TAG="${{ github.sha }}"
+          docker build \
+            --build-arg NEXT_PUBLIC_API_URL=${{ secrets.NEXT_PUBLIC_API_URL }} \
+            --build-arg NEXT_PUBLIC_APP_URL=${{ secrets.NEXT_PUBLIC_APP_URL }} \
+            --build-arg NEXT_PUBLIC_IMAGE_HOSTNAME=${{ secrets.NEXT_PUBLIC_IMAGE_HOSTNAME }} \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPO:$IMAGE_TAG \
+            -t $ECR_REGISTRY/$FRONTEND_ECR_REPO:latest \
+            .
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPO:$IMAGE_TAG
+          docker push $ECR_REGISTRY/$FRONTEND_ECR_REPO:latest
+          echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition $FRONTEND_TASK_DEF \
+            --query 'taskDefinition' \
+            --output json > frontend-task-def.json
+
+          jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' \
+            frontend-task-def.json > frontend-task-def-clean.json
+
+      - name: Update image in task definition
+        id: task-def-frontend
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: frontend-task-def-clean.json
+          container-name: frontend
+          image: ${{ env.ECR_REGISTRY }}/${{ env.FRONTEND_ECR_REPO }}:${{ env.IMAGE_TAG }}
+
+      - name: Deploy Frontend to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.task-def-frontend.outputs.task-definition }}
+          service: ${{ env.FRONTEND_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
+          wait-for-minutes: 10
+
+      - name: Invalidate CloudFront cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id ${{ secrets.CLOUDFRONT_DISTRIBUTION_ID }} \
+            --paths "/*"
+
+  # ========================================
+  # Post-Deploy Validation
+  # ========================================
+  post-deploy:
+    name: Post-Deploy Validation
+    needs: [deploy-backend, deploy-frontend]
+    if: always() && (needs.deploy-backend.result == 'success' || needs.deploy-frontend.result == 'success' || needs.deploy-backend.result == 'skipped' || needs.deploy-frontend.result == 'skipped')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for services to stabilize
+        run: sleep 30
+
+      - name: Health Check Backend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://usecava.com/health)
+          if [ "$STATUS" != "200" ]; then
+            echo "⚠️ Backend health check returned: $STATUS"
+          else
+            echo "✅ Backend healthy"
+          fi
+
+      - name: Health Check Frontend
+        run: |
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L https://usecava.com/)
+          if [ "$STATUS" != "200" ]; then
+            echo "⚠️ Frontend health check returned: $STATUS"
+          else
+            echo "✅ Frontend healthy"
+          fi
