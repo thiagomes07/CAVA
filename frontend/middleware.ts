@@ -135,14 +135,13 @@ async function attemptRefresh(request: NextRequest, pathname: string, locale: Lo
     return NextResponse.redirect(loginUrl);
   }
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
   const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Cookie: `refresh_token=${encodeURIComponent(refreshCookie.value)}`,
     },
-    credentials: 'include',
   });
 
   if (!refreshResponse.ok) {
@@ -154,9 +153,13 @@ async function attemptRefresh(request: NextRequest, pathname: string, locale: Lo
   const redirectUrl = request.nextUrl.clone();
   const response = NextResponse.redirect(redirectUrl);
 
-  const setCookieHeader = refreshResponse.headers.get('set-cookie');
-  if (setCookieHeader) {
-    response.headers.set('set-cookie', setCookieHeader);
+  // Propagar TODOS os Set-Cookie headers (access_token, refresh_token, csrf_token)
+  // headers.get('set-cookie') só retorna o primeiro; getSetCookie() retorna todos
+  const setCookieHeaders = refreshResponse.headers.getSetCookie?.() 
+    ?? [refreshResponse.headers.get('set-cookie')].filter(Boolean) as string[];
+
+  for (const cookie of setCookieHeaders) {
+    response.headers.append('set-cookie', cookie);
   }
 
   return response;

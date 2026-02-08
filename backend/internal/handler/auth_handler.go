@@ -179,7 +179,7 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Expires:  time.Now().Add(h.accessTTL),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Refresh token - 7 dias
@@ -194,7 +194,7 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 		Expires:  time.Now().Add(h.refreshTTL),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 
@@ -210,7 +210,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Limpar refresh token (Path deve coincidir com o usado em setAuthCookies)
@@ -223,7 +223,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
 		HttpOnly: true,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 
 	// Limpar CSRF token para higiene de sessão
@@ -236,7 +236,7 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
 		HttpOnly: false,
-		SameSite: http.SameSiteStrictMode,
+		SameSite: http.SameSiteLaxMode,
 	})
 }
 

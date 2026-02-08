@@ -36,20 +36,30 @@ const nextConfig: NextConfig = {
   images: {
     // Permitir imagens apenas de domínios confiáveis (evita SSRF via /_next/image)
     remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: process.env.NEXT_PUBLIC_IMAGE_HOSTNAME || 'localhost',
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '9000', // MinIO
-      },
-      {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '3001', // Backend API
-      },
+      // Produção: imagens servidas via S3/CloudFront (configurado via env var)
+      ...(process.env.NEXT_PUBLIC_IMAGE_HOSTNAME
+        ? [
+            {
+              protocol: 'https' as const,
+              hostname: process.env.NEXT_PUBLIC_IMAGE_HOSTNAME,
+            },
+          ]
+        : []),
+      // Desenvolvimento: MinIO local e Backend API
+      ...(process.env.NODE_ENV === 'development'
+        ? [
+            {
+              protocol: 'http' as const,
+              hostname: 'localhost',
+              port: '9000', // MinIO
+            },
+            {
+              protocol: 'http' as const,
+              hostname: 'localhost',
+              port: '3001', // Backend API
+            },
+          ]
+        : []),
     ],
     // Formatos de imagem otimizados
     formats: ['image/avif', 'image/webp'],

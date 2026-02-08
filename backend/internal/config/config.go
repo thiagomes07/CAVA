@@ -127,11 +127,9 @@ func (c *Config) Validate() error {
 	if c.Storage.Type == "" {
 		return fmt.Errorf("STORAGE_TYPE é obrigatório")
 	}
-	if c.Storage.AccessKey == "" {
-		return fmt.Errorf("STORAGE_ACCESS_KEY é obrigatório")
-	}
-	if c.Storage.SecretKey == "" {
-		return fmt.Errorf("STORAGE_SECRET_KEY é obrigatório")
+	// AccessKey e SecretKey são opcionais: se ambos vazios, usa IAM Role (produção AWS)
+	if (c.Storage.AccessKey == "") != (c.Storage.SecretKey == "") {
+		return fmt.Errorf("STORAGE_ACCESS_KEY e STORAGE_SECRET_KEY devem ser ambos definidos ou ambos vazios (IAM Role)")
 	}
 	if c.Storage.BucketName == "" {
 		return fmt.Errorf("STORAGE_BUCKET_NAME é obrigatório")
@@ -205,13 +203,21 @@ func loadAppConfig() AppConfig {
 
 // loadDatabaseConfig carrega configurações do banco de dados
 func loadDatabaseConfig() DatabaseConfig {
+	sslMode := getEnv("DB_SSL_MODE", "disable")
+	appEnv := getEnv("APP_ENV", "development")
+
+	// Alertar se SSL está desabilitado em produção (RDS exige SSL)
+	if appEnv == "production" && sslMode == "disable" {
+		fmt.Println("[SECURITY WARNING] DB_SSL_MODE=disable em produção! Configure DB_SSL_MODE=require para conexões seguras com RDS.")
+	}
+
 	return DatabaseConfig{
 		Host:            getEnv("DB_HOST", "postgres"),
 		Port:            getEnvAsInt("DB_PORT", 5432),
 		User:            getEnv("DB_USER", "cava_user"),
 		Password:        getEnv("DB_PASSWORD", ""),
 		Name:            getEnv("DB_NAME", "cava_db"),
-		SSLMode:         getEnv("DB_SSL_MODE", "disable"),
+		SSLMode:         sslMode,
 		MaxOpenConns:    getEnvAsInt("DB_MAX_OPEN_CONNS", 25),
 		MaxIdleConns:    getEnvAsInt("DB_MAX_IDLE_CONNS", 5),
 		ConnMaxLifetime: getEnvAsDuration("DB_CONN_MAX_LIFETIME", 5*time.Minute),

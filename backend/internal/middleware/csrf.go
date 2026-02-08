@@ -53,7 +53,7 @@ func (m *CSRFMiddleware) SetCSRFCookie(next http.Handler) http.Handler {
 				MaxAge:   86400, // 24 horas
 				Secure:   m.cookieSecure,
 				HttpOnly: false, // Precisa ser acessível via JS
-				SameSite: http.SameSiteStrictMode,
+				SameSite: http.SameSiteLaxMode,
 			})
 
 			m.logger.Debug("csrf token gerado")

@@ -46,9 +46,21 @@ func NewS3Adapter(cfg *Config, logger *zap.Logger) (*S3Adapter, error) {
 		}
 	}
 
+	// Escolher credenciais baseado na configuração:
+	// - Com AccessKey/SecretKey: credenciais estáticas (dev com MinIO ou S3 explícito)
+	// - Sem credenciais: IAM Role (produção na AWS - ECS Task Role / EC2 Instance Profile)
+	var creds *credentials.Credentials
+	if cfg.AccessKey != "" && cfg.SecretKey != "" {
+		creds = credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, "")
+	} else {
+		// IAM credentials chain: env vars → shared credentials → IAM Role
+		creds = credentials.NewIAM("")
+		logger.Info("usando IAM credentials para storage (sem AccessKey/SecretKey explícitas)")
+	}
+
 	// Inicializar cliente MinIO (compatível com S3)
 	client, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
+		Creds:  creds,
 		Secure: useSSL,
 		Region: cfg.Region,
 	})
