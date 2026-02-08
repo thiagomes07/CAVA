@@ -62,9 +62,11 @@ export function useAuth() {
     if (!user) return '/login';
 
     switch (user.role) {
+      case 'SUPER_ADMIN':
+        return '/admin/industries';
       case 'ADMIN_INDUSTRIA':
       case 'VENDEDOR_INTERNO':
-        return '/dashboard';
+        return user.industrySlug ? `/${user.industrySlug}/dashboard` : '/login';
       case 'BROKER':
         return '/dashboard';
       default:

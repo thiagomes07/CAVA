@@ -375,6 +375,8 @@ func initServices(
 		repos.Media,
 		repos.SalesHistory,
 		repos.Cliente,
+		repos.SharedInventory,
+		repos.User,
 		repos.DB,
 		logger,
 	)

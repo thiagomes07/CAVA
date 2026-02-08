@@ -19,6 +19,12 @@ const setReadableAuthCookies = (user: User | null) => {
   } else {
     document.cookie = `industry_id=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
   }
+
+  if (user?.industrySlug) {
+    document.cookie = `industry_slug=${encodeURIComponent(user.industrySlug)}${base}`;
+  } else {
+    document.cookie = `industry_slug=; Expires=Thu, 01 Jan 1970 00:00:00 GMT${base}`;
+  }
 };
 
 interface AuthState {

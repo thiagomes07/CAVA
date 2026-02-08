@@ -23,6 +23,8 @@ type batchService struct {
 	mediaRepo   repository.MediaRepository
 	salesRepo   repository.SalesHistoryRepository
 	clienteRepo repository.ClienteRepository
+	sharedRepo  repository.SharedInventoryRepository
+	userRepo    repository.UserRepository
 	db          BatchDB
 	logger      *zap.Logger
 }
@@ -33,6 +35,8 @@ func NewBatchService(
 	mediaRepo repository.MediaRepository,
 	salesRepo repository.SalesHistoryRepository,
 	clienteRepo repository.ClienteRepository,
+	sharedRepo repository.SharedInventoryRepository,
+	userRepo repository.UserRepository,
 	db BatchDB,
 	logger *zap.Logger,
 ) *batchService {
@@ -42,6 +46,8 @@ func NewBatchService(
 		mediaRepo:   mediaRepo,
 		salesRepo:   salesRepo,
 		clienteRepo: clienteRepo,
+		sharedRepo:  sharedRepo,
+		userRepo:    userRepo,
 		db:          db,
 		logger:      logger,
 	}
@@ -187,6 +193,9 @@ func (s *batchService) Create(ctx context.Context, industryID string, input enti
 		zap.String("priceUnit", string(batch.PriceUnit)),
 		zap.Int("quantitySlabs", batch.QuantitySlabs),
 	)
+
+	// Compartilhar automaticamente com todos os vendedores internos da indústria
+	s.shareWithInternalSellers(ctx, batch.ID, industryID)
 
 	return batch, nil
 }
@@ -609,6 +618,63 @@ func minInt(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// shareWithInternalSellers compartilha automaticamente o lote com todos os vendedores internos da indústria
+func (s *batchService) shareWithInternalSellers(ctx context.Context, batchID, industryID string) {
+	// Buscar todos os usuários da indústria com role VENDEDOR_INTERNO
+	vendedorRole := entity.RoleVendedorInterno
+	users, err := s.userRepo.ListByIndustry(ctx, industryID, &vendedorRole)
+	if err != nil {
+		s.logger.Error("erro ao buscar vendedores internos para compartilhamento automático",
+			zap.String("batchId", batchID),
+			zap.String("industryId", industryID),
+			zap.Error(err),
+		)
+		return
+	}
+
+	if len(users) == 0 {
+		s.logger.Debug("nenhum vendedor interno encontrado para compartilhamento automático",
+			zap.String("batchId", batchID),
+			zap.String("industryId", industryID),
+		)
+		return
+	}
+
+	// Compartilhar com cada vendedor interno ativo
+	sharedCount := 0
+	for _, user := range users {
+		if !user.IsActive {
+			continue
+		}
+
+		shared := &entity.SharedInventoryBatch{
+			ID:               uuid.New().String(),
+			BatchID:          batchID,
+			SharedWithUserID: user.ID,
+			IndustryOwnerID:  industryID,
+			SharedAt:         time.Now(),
+			IsActive:         true,
+		}
+
+		if err := s.sharedRepo.CreateSharedBatch(ctx, shared); err != nil {
+			s.logger.Warn("erro ao compartilhar lote automaticamente com vendedor interno",
+				zap.String("batchId", batchID),
+				zap.String("userId", user.ID),
+				zap.String("userName", user.Name),
+				zap.Error(err),
+			)
+			continue
+		}
+		sharedCount++
+	}
+
+	s.logger.Info("lote compartilhado automaticamente com vendedores internos",
+		zap.String("batchId", batchID),
+		zap.Int("vendedoresCompartilhados", sharedCount),
+		zap.Int("totalVendedores", len(users)),
+	)
 }
 
 func deriveBatchStatus(available, reserved, sold, inactive int) entity.BatchStatus {

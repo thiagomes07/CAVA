@@ -8,6 +8,7 @@ import (
 type UserRole string
 
 const (
+	RoleSuperAdmin      UserRole = "SUPER_ADMIN"
 	RoleAdminIndustria  UserRole = "ADMIN_INDUSTRIA"
 	RoleVendedorInterno UserRole = "VENDEDOR_INTERNO"
 	RoleBroker          UserRole = "BROKER"
@@ -16,16 +17,27 @@ const (
 // IsValid verifica se o role é válido
 func (r UserRole) IsValid() bool {
 	switch r {
-	case RoleAdminIndustria, RoleVendedorInterno, RoleBroker:
+	case RoleSuperAdmin, RoleAdminIndustria, RoleVendedorInterno, RoleBroker:
 		return true
 	}
 	return false
 }
 
+// IsSuperAdmin verifica se o role é super admin
+func (r UserRole) IsSuperAdmin() bool {
+	return r == RoleSuperAdmin
+}
+
+// IsIndustryUser verifica se o role pertence a uma indústria
+func (r UserRole) IsIndustryUser() bool {
+	return r == RoleAdminIndustria || r == RoleVendedorInterno
+}
+
 // User representa um usuário do sistema
 type User struct {
 	ID           string     `json:"id"`
-	IndustryID   *string    `json:"industryId,omitempty"` // NULL para brokers freelancers
+	IndustryID   *string    `json:"industryId,omitempty"`   // NULL para brokers freelancers e super admin
+	IndustrySlug *string    `json:"industrySlug,omitempty"` // Slug da indústria para construção de URLs
 	Name         string     `json:"name"`
 	Email        string     `json:"email"`
 	Password     string     `json:"-"` // Nunca serializar senha
@@ -204,4 +216,26 @@ type UserSession struct {
 	LastUsedAt       time.Time `json:"lastUsedAt"`
 	UserAgent        *string   `json:"userAgent,omitempty"`
 	IPAddress        *string   `json:"ipAddress,omitempty"`
+}
+
+// CreateIndustryWithAdminInput representa os dados para criar uma indústria com seu primeiro admin
+// Usado exclusivamente pelo SUPER_ADMIN
+type CreateIndustryWithAdminInput struct {
+	// Dados da indústria
+	IndustryName  string  `json:"industryName" validate:"required,min=2,max=255"`
+	IndustryCNPJ  string  `json:"industryCnpj" validate:"required,len=14"`
+	IndustrySlug  string  `json:"industrySlug" validate:"required,min=3,max=100,alphanumdash"`
+	ContactEmail  *string `json:"contactEmail,omitempty" validate:"omitempty,email"`
+	ContactPhone  *string `json:"contactPhone,omitempty"`
+
+	// Dados do primeiro admin
+	AdminName  string `json:"adminName" validate:"required,min=2,max=255"`
+	AdminEmail string `json:"adminEmail" validate:"required,email"`
+}
+
+// CreateSuperAdminInput representa os dados para criar um super admin
+type CreateSuperAdminInput struct {
+	Name     string `json:"name" validate:"required,min=2,max=255"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
 }

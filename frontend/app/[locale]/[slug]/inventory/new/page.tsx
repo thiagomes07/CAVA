@@ -1,0 +1,914 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useParams } from 'next/navigation';
+import { useForm, Controller } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Upload, X, Package, Plus, Ruler, DollarSign, Camera, Sparkles, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragOverlay,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  rectSortingStrategy,
+  useSortable,
+} from '@dnd-kit/sortable';
+import { restrictToParentElement } from '@dnd-kit/modifiers';
+import { CSS } from '@dnd-kit/utilities';
+import { apiClient } from '@/lib/api/client';
+import { useToast } from '@/lib/hooks/useToast';
+import { batchSchema, type BatchInput, priceUnits } from '@/lib/schemas/batch.schema';
+import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
+import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
+import { MoneyInput } from '@/components/ui/masked-input';
+import type { Product, PriceUnit, MaterialType, FinishType } from '@/lib/types';
+import { cn } from '@/lib/utils/cn';
+import { isPlaceholderUrl } from '@/lib/utils/media';
+
+interface UploadedMedia {
+  id: string;
+  file: File;
+  preview: string;
+}
+
+// Sortable Media Item Component
+function SortableMediaItem({
+  item,
+  onRemove,
+  isFirst
+}: {
+  item: UploadedMedia;
+  onRemove: (id: string) => void;
+  isFirst: boolean;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={cn(
+        'relative aspect-square overflow-hidden border group',
+        isDragging ? 'opacity-50 shadow-xl border-[#C2410C]' : 'border-slate-200'
+      )}
+    >
+      <img
+        src={item.preview}
+        alt="Preview"
+        className="w-full h-full object-cover"
+      />
+
+      {/* Overlay with controls */}
+      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+        <button
+          type="button"
+          className="p-2 bg-white/90 cursor-grab active:cursor-grabbing touch-none"
+          {...attributes}
+          {...listeners}
+        >
+          <GripVertical className="w-4 h-4 text-slate-700" />
+        </button>
+        <button
+          type="button"
+          onClick={() => onRemove(item.id)}
+          className="p-2 bg-rose-500 text-white hover:bg-rose-600 transition-colors"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Cover badge */}
+      {isFirst && (
+        <div className="absolute top-1.5 left-1.5">
+          <span className="px-1.5 py-0.5 bg-[#C2410C] text-white text-[10px] font-bold">
+            CAPA
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function NewBatchPage() {
+  const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
+  const { success, error } = useToast();
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [medias, setMedias] = useState<UploadedMedia[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [calculatedArea, setCalculatedArea] = useState<number>(0);
+  const [showNewProductForm, setShowNewProductForm] = useState(false);
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors },
+    watch,
+    setValue,
+    control,
+  } = useForm<BatchInput>({
+    resolver: zodResolver(batchSchema),
+    defaultValues: {
+      quantitySlabs: 1,
+      entryDate: new Date().toISOString().split('T')[0],
+      priceUnit: 'M2',
+    },
+  });
+
+  const height = watch('height');
+  const width = watch('width');
+  const quantitySlabs = watch('quantitySlabs');
+  const productId = watch('productId');
+  const priceUnit = watch('priceUnit') || 'M2';
+  const industryPrice = watch('industryPrice');
+
+  // Área de uma única chapa (em m²)
+  const slabArea = height && width ? (height * width) / 10000 : 0;
+  // Preço por chapa calculado
+  const slabPrice = slabArea && industryPrice ? slabArea * industryPrice : 0;
+
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  useEffect(() => {
+    if (height && width && quantitySlabs) {
+      const area = calculateTotalArea(height, width, quantitySlabs);
+      setCalculatedArea(area);
+    } else {
+      setCalculatedArea(0);
+    }
+  }, [height, width, quantitySlabs]);
+
+  // Preencher preço base do produto quando selecionado
+  useEffect(() => {
+    if (productId && !showNewProductForm) {
+      const product = products.find(p => p.id === productId);
+      if (product?.basePrice) {
+        setValue('industryPrice', product.basePrice);
+        if (product.priceUnit) {
+          setValue('priceUnit', product.priceUnit);
+        }
+      }
+    }
+  }, [productId, products, showNewProductForm, setValue]);
+
+  const fetchProducts = async () => {
+    try {
+      const data = await apiClient.get<{ products: Product[] }>('/products', {
+        params: { includeInactive: false, limit: 1000 },
+      });
+      setProducts(data.products);
+    } catch (err) {
+      error('Erro ao carregar produtos');
+    }
+  };
+
+  // Drag and drop sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // State for active dragging item
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const activeItem = activeId ? medias.find(item => item.id === activeId) : null;
+
+  const handleDragStart = useCallback((event: { active: { id: string | number } }) => {
+    setActiveId(String(event.active.id));
+  }, []);
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || active.id === over.id) return;
+
+    setMedias((items) => {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+
+      if (oldIndex === -1 || newIndex === -1) return items;
+
+      return arrayMove(items, oldIndex, newIndex);
+    });
+  }, []);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+
+    if (medias.length + files.length > 10) {
+      error('Máximo de 10 fotos por lote');
+      return;
+    }
+
+    files.forEach((file) => {
+      if (!file.type.startsWith('image/')) {
+        error('Formato não suportado. Use JPG, PNG ou WebP');
+        return;
+      }
+
+      if (file.size > 5 * 1024 * 1024) {
+        error('Arquivo excede o limite de 5MB');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setMedias((prev) => [
+          ...prev,
+          {
+            id: `media-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+            file,
+            preview: event.target?.result as string,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  };
+
+  const handleRemoveMedia = useCallback((id: string) => {
+    setMedias((prev) => prev.filter((item) => item.id !== id));
+  }, []);
+
+  const onSubmit = async (data: BatchInput) => {
+    try {
+      setIsSubmitting(true);
+
+      // 1) Cria o lote primeiro
+      const created = await apiClient.post<{ id: string }>('/batches', data);
+
+      // 2) Se houver mídias, faz upload vinculando ao lote criado
+      if (medias.length > 0) {
+        const formData = new FormData();
+        formData.append('batchId', created.id);
+        medias.forEach((media) => {
+          formData.append('medias', media.file);
+        });
+
+        await apiClient.upload<{ urls: string[] }>(
+          '/upload/batch-medias',
+          formData
+        );
+      }
+
+      success('Lote cadastrado com sucesso');\n      router.push(`/${slug}/inventory`);
+    } catch (err) {
+      error('Erro ao cadastrar lote');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const selectedProduct = products.find((p) => p.id === productId);
+
+  return (
+    <div className="min-h-screen bg-mineral">
+      {/* Header */}
+      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+        <h1 className="font-serif text-3xl text-obsidian mb-2">Novo Lote</h1>
+        <p className="text-sm text-slate-500">
+          Cadastre um novo lote físico no estoque
+        </p>
+      </div>
+
+      {/* Form */}
+      <div className="px-8 py-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Vinculação */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">1</span>
+                Vinculação ao Produto
+              </h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNewProductForm(!showNewProductForm);
+                  if (!showNewProductForm) {
+                    setValue('productId', undefined);
+                  } else {
+                    setValue('newProduct', undefined);
+                  }
+                }}
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 text-xs font-medium text-[#C2410C] hover:text-[#a03609] transition-colors"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                {showNewProductForm ? 'Selecionar Existente' : 'Criar Novo Produto'}
+              </button>
+            </div>
+            <div className="p-6">
+              {!showNewProductForm ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      Produto <span className="text-[#C2410C]">*</span>
+                    </label>
+                    <select
+                      {...register('productId')}
+                      disabled={isSubmitting}
+                      className={cn(
+                        'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                        errors.productId ? 'border-rose-500' : 'border-slate-200',
+                        isSubmitting && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <option value="">Selecione o produto...</option>
+                      {products.map((product) => (
+                        <option key={product.id} value={product.id}>
+                          {product.name} {product.sku && `(${product.sku})`}
+                        </option>
+                      ))}
+                    </select>
+                    {errors.productId && <p className="mt-1 text-xs text-rose-500">{errors.productId.message}</p>}
+                  </div>
+
+                  {selectedProduct && (
+                    <div className="flex items-center gap-4 p-4 bg-slate-100 border border-slate-200">
+                      {selectedProduct.medias?.[0] && !isPlaceholderUrl(selectedProduct.medias[0].url) && (
+                        <img
+                          src={selectedProduct.medias[0].url}
+                          alt={selectedProduct.name}
+                          className="w-16 h-16 object-cover"
+                        />
+                      )}
+                      <div>
+                        <p className="font-medium text-slate-800">
+                          {selectedProduct.name}
+                        </p>
+                        <p className="text-sm text-slate-600">
+                          {selectedProduct.material} • {selectedProduct.finish}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-slate-50 border border-slate-200 space-y-4">
+                  <p className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Novo Produto (será criado junto com o lote)
+                  </p>
+                  
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      Nome do Produto <span className="text-[#C2410C]">*</span>
+                    </label>
+                    <input
+                      {...register('newProduct.name')}
+                      placeholder="Ex: Granito Verde Ubatuba"
+                      disabled={isSubmitting}
+                      className={cn(
+                        'w-full px-3 py-2.5 bg-white border focus:border-[#C2410C] outline-none text-sm transition-colors',
+                        errors.newProduct?.name ? 'border-rose-500' : 'border-slate-200'
+                      )}
+                    />
+                    {errors.newProduct?.name && <p className="mt-1 text-xs text-rose-500">{errors.newProduct.name.message}</p>}
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      SKU <span className="text-slate-400">(opcional)</span>
+                    </label>
+                    <input
+                      {...register('newProduct.sku')}
+                      placeholder="Ex: GRN-VU-001"
+                      disabled={isSubmitting}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 block mb-2">
+                        Material <span className="text-[#C2410C]">*</span>
+                      </label>
+                      <select
+                        {...register('newProduct.material')}
+                        disabled={isSubmitting}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="GRANITO">Granito</option>
+                        <option value="MARMORE">Mármore</option>
+                        <option value="QUARTZITO">Quartzito</option>
+                        <option value="LIMESTONE">Limestone</option>
+                        <option value="TRAVERTINO">Travertino</option>
+                        <option value="OUTROS">Outros</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-xs font-medium text-slate-600 block mb-2">
+                        Acabamento <span className="text-[#C2410C]">*</span>
+                      </label>
+                      <select
+                        {...register('newProduct.finish')}
+                        disabled={isSubmitting}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="POLIDO">Polido</option>
+                        <option value="LEVIGADO">Levigado</option>
+                        <option value="BRUTO">Bruto</option>
+                        <option value="APICOADO">Apicoado</option>
+                        <option value="FLAMEADO">Flameado</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      Descrição <span className="text-slate-400">(opcional)</span>
+                    </label>
+                    <input
+                      {...register('newProduct.description')}
+                      placeholder="Descrição do produto..."
+                      disabled={isSubmitting}
+                      className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-medium text-slate-600 block mb-2">
+                      <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+                      Preço Base por m² <span className="text-slate-400">(opcional)</span>
+                    </label>
+                    <Controller
+                      name="newProduct.basePrice"
+                      control={control}
+                      render={({ field }) => (
+                        <MoneyInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          placeholder="Ex: 500,00"
+                          disabled={isSubmitting}
+                          className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                        />
+                      )}
+                    />
+                    <p className="mt-1 text-xs text-slate-500">
+                      Preço de referência para novos lotes deste produto
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Identificação */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">2</span>
+                Identificação do Lote
+              </h2>
+            </div>
+            <div className="p-6 space-y-5">
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Código do Lote <span className="text-[#C2410C]">*</span>
+                </label>
+                <input
+                  {...register('batchCode')}
+                  placeholder="Ex: GRN-000123"
+                  disabled={isSubmitting}
+                  className={cn(
+                    'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors font-mono',
+                    errors.batchCode ? 'border-rose-500' : 'border-slate-200'
+                  )}
+                />
+                <p className="mt-1 text-xs text-slate-400">Use apenas letras maiúsculas, números e hífens</p>
+                {errors.batchCode && <p className="mt-1 text-xs text-rose-500">{errors.batchCode.message}</p>}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Pedreira de Origem <span className="text-slate-400">(opcional)</span>
+                  </label>
+                  <input
+                    {...register('originQuarry')}
+                    placeholder="Ex: Pedreira São Gabriel"
+                    disabled={isSubmitting}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Data de Entrada <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('entryDate')}
+                    type="date"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.entryDate ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.entryDate && <p className="mt-1 text-xs text-rose-500">{errors.entryDate.message}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Dimensões Físicas */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">3</span>
+                <Ruler className="w-4 h-4 text-slate-400" />
+                Dimensões Físicas
+              </h2>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Altura (cm) <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('height', { valueAsNumber: true })}
+                    type="number"
+                    step="0.1"
+                    placeholder="180"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.height ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.height && <p className="mt-1 text-xs text-rose-500">{errors.height.message}</p>}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Largura (cm) <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('width', { valueAsNumber: true })}
+                    type="number"
+                    step="0.1"
+                    placeholder="120"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.width ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.width && <p className="mt-1 text-xs text-rose-500">{errors.width.message}</p>}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Espessura (cm) <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('thickness', { valueAsNumber: true })}
+                    type="number"
+                    step="0.1"
+                    placeholder="3"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.thickness ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.thickness && <p className="mt-1 text-xs text-rose-500">{errors.thickness.message}</p>}
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Qtd. Chapas <span className="text-[#C2410C]">*</span>
+                  </label>
+                  <input
+                    {...register('quantitySlabs', { valueAsNumber: true })}
+                    type="number"
+                    placeholder="1"
+                    disabled={isSubmitting}
+                    className={cn(
+                      'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                      errors.quantitySlabs ? 'border-rose-500' : 'border-slate-200'
+                    )}
+                  />
+                  {errors.quantitySlabs && <p className="mt-1 text-xs text-rose-500">{errors.quantitySlabs.message}</p>}
+                </div>
+              </div>
+
+              {/* Área Total Calculada */}
+              {calculatedArea > 0 && (
+                <div className="mt-5 flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                  <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                    <Package className="w-5 h-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-slate-600">
+                      Área Total Calculada
+                    </p>
+                    <p className="text-xl font-mono font-bold text-slate-800">
+                      {formatArea(calculatedArea)}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Precificação */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">4</span>
+                <DollarSign className="w-4 h-4 text-slate-400" />
+                Precificação
+              </h2>
+            </div>
+            <div className="p-6 space-y-5">
+              {/* Indicador de preço herdado do produto */}
+              {selectedProduct?.basePrice && industryPrice === selectedProduct.basePrice && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-100 border border-slate-200 text-slate-700 text-xs">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>Preço base do produto <strong>{selectedProduct.name}</strong> aplicado. Você pode alterá-lo abaixo.</span>
+                </div>
+              )}
+
+              {/* Unidade de Preço */}
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-3">
+                  Unidade de Preço
+                </label>
+                <Controller
+                  name="priceUnit"
+                  control={control}
+                  render={({ field }) => (
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('M2')}
+                        className={cn(
+                          'px-5 py-2.5 text-sm font-medium transition-all',
+                          field.value === 'M2'
+                            ? 'bg-[#121212] text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/m²
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => field.onChange('FT2')}
+                        className={cn(
+                          'px-5 py-2.5 text-sm font-medium transition-all',
+                          field.value === 'FT2'
+                            ? 'bg-[#121212] text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        )}
+                        disabled={isSubmitting}
+                      >
+                        R$/ft²
+                      </button>
+                    </div>
+                  )}
+                />
+                <p className="text-xs text-slate-400 mt-2">
+                  Selecione a unidade de área para o preço. 1 m² = 10,76 ft²
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Preço por {getPriceUnitLabel(priceUnit as PriceUnit)} <span className="text-[#C2410C]">*</span>
+                </label>
+                <Controller
+                  name="industryPrice"
+                  control={control}
+                  render={({ field }) => (
+                    <MoneyInput
+                      value={field.value}
+                      onChange={field.onChange}
+                      suffix={`/${priceUnit === 'M2' ? 'm²' : 'ft²'}`}
+                      disabled={isSubmitting}
+                      error={errors.industryPrice?.message}
+                    />
+                  )}
+                />
+                <p className="mt-1 text-xs text-slate-400">Este é o preço de repasse para brokers</p>
+              </div>
+
+              {/* Preços Calculados */}
+              {slabArea > 0 && industryPrice > 0 && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Preço por Chapa */}
+                  <div className="flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                    <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                      <Ruler className="w-5 h-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-600">
+                        Preço por Chapa
+                      </p>
+                      <p className="text-xl font-mono font-bold text-slate-800">
+                        {new Intl.NumberFormat('pt-BR', {
+                          style: 'currency',
+                          currency: 'BRL',
+                        }).format(slabPrice)}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {slabArea.toFixed(2)} m²
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Valor Total do Lote */}
+                  {calculatedArea > 0 && (
+                    <div className="flex items-center gap-3 p-4 bg-slate-100 border border-slate-200">
+                      <div className="w-10 h-10 bg-slate-200 flex items-center justify-center">
+                        <DollarSign className="w-5 h-5 text-slate-600" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-slate-600">
+                          Valor Total ({quantitySlabs} {quantitySlabs === 1 ? 'chapa' : 'chapas'})
+                        </p>
+                        <p className="text-xl font-mono font-bold text-slate-800">
+                          {new Intl.NumberFormat('pt-BR', {
+                            style: 'currency',
+                            currency: 'BRL',
+                          }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
+                        </p>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(slabPrice)} × {quantitySlabs}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Fotos do Lote */}
+          <div className="bg-white border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="font-semibold text-[#121212] flex items-center gap-2">
+                <span className="w-6 h-6 bg-[#C2410C] text-white text-xs font-bold flex items-center justify-center">5</span>
+                <Camera className="w-4 h-4 text-slate-400" />
+                Fotos do Lote
+              </h2>
+            </div>
+            <div className="p-6">
+              <label
+                htmlFor="file-upload"
+                className={cn(
+                  'flex flex-col items-center justify-center w-full py-12',
+                  'border-2 border-dashed border-slate-200',
+                  'cursor-pointer transition-all',
+                  'hover:border-[#C2410C] hover:bg-orange-50/30',
+                  isSubmitting && 'opacity-50 cursor-not-allowed'
+                )}
+              >
+                <div className="w-14 h-14 bg-slate-100 flex items-center justify-center mb-4">
+                  <Upload className="w-6 h-6 text-slate-400" />
+                </div>
+                <p className="text-sm font-medium text-slate-700 mb-1">
+                  Adicionar fotos do lote
+                </p>
+                <p className="text-xs text-slate-400">
+                  JPG, PNG ou WebP • Máximo 10 fotos • 5MB por arquivo
+                </p>
+                <input
+                  id="file-upload"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={handleFileSelect}
+                  disabled={isSubmitting}
+                  className="hidden"
+                />
+              </label>
+              {medias.length === 0 && (
+                <p className="text-xs text-slate-500 mt-3">
+                  A primeira foto será a capa do lote
+                </p>
+              )}
+
+              {/* Preview Grid with Drag and Drop */}
+              {medias.length > 0 && (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToParentElement]}
+                  onDragStart={handleDragStart}
+                  onDragEnd={handleDragEnd}
+                >
+                  <SortableContext
+                    items={medias.map(item => item.id)}
+                    strategy={rectSortingStrategy}
+                  >
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                      {medias.map((media, index) => (
+                        <SortableMediaItem
+                          key={media.id}
+                          item={media}
+                          onRemove={handleRemoveMedia}
+                          isFirst={index === 0}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                  <DragOverlay>
+                    {activeItem ? (
+                      <div className="aspect-square overflow-hidden border-2 border-[#C2410C] shadow-2xl opacity-90">
+                        <img
+                          src={activeItem.preview}
+                          alt="Arrastando"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : null}
+                  </DragOverlay>
+                </DndContext>
+              )}
+
+              {medias.length > 0 && (
+                <p className="text-xs text-slate-400 mt-3 flex items-center gap-1">
+                  <GripVertical className="w-3 h-3" />
+                  Arraste as fotos para reordenar
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex items-center justify-between pt-6 border-t border-slate-200">
+            <button
+              type="button"
+              onClick={() => router.back()}
+              disabled={isSubmitting}
+              className="text-slate-500 hover:text-[#121212] text-sm font-medium transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className={cn(
+                'flex items-center gap-2 px-6 py-3 text-white text-sm font-medium transition-all',
+                isSubmitting ? 'bg-slate-300 cursor-not-allowed' : 'bg-[#C2410C] hover:bg-[#a03609]'
+              )}
+            >
+              {isSubmitting ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  SALVAR LOTE
+                </>
+              )}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

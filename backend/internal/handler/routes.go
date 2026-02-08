@@ -33,6 +33,7 @@ type Handler struct {
 	Industry        *IndustryHandler
 	Portfolio       *PortfolioHandler
 	Health          *HealthHandler
+	SuperAdmin      *SuperAdminHandler
 }
 
 // Config contém as configurações para os handlers
@@ -91,6 +92,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Industry:        NewIndustryHandler(services.IndustryRepo, cfg.Validator, cfg.Logger),
 		Portfolio:       NewPortfolioHandler(services.SharedCatalogPermRepo, services.UserRepo, services.IndustryRepo, services.ProductRepo, services.BatchRepo, services.MediaRepo, services.Cliente, cfg.Validator, cfg.Logger),
 		Health:          healthHandler,
+		SuperAdmin:      NewSuperAdminHandler(services.IndustryRepo, services.UserRepo, services.User, cfg.Validator, cfg.Logger),
 	}
 }
 
@@ -132,6 +134,31 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 
 	// API Routes
 	r.Route("/api", func(r chi.Router) {
+		// Health check também dentro de /api para o frontend
+		r.Get("/health", h.Health.Check)
+
+		// ============================================
+		// ROTAS DO SUPER ADMIN
+		// ============================================
+		r.Route("/admin", func(r chi.Router) {
+			r.Use(m.Auth.Authenticate)
+			r.Use(m.RateApi.Limit)
+			r.Use(m.CSRF.ValidateCSRF)
+			r.Use(m.RBAC.RequireSuperAdmin)
+
+			// CRUD de Industries
+			r.Route("/industries", func(r chi.Router) {
+				r.Get("/", h.SuperAdmin.ListIndustries)
+				r.Post("/", h.SuperAdmin.CreateIndustryWithAdmin)
+				r.Get("/{id}", h.SuperAdmin.GetIndustry)
+				r.Patch("/{id}", h.SuperAdmin.UpdateIndustry)
+				r.Delete("/{id}", h.SuperAdmin.DeleteIndustry)
+			})
+		})
+
+		// Endpoint para buscar industry por slug (autenticado)
+		r.With(m.Auth.Authenticate, m.RateApi.Limit).Get("/industries/by-slug/{slug}", h.SuperAdmin.GetIndustryBySlug)
+
 		// ============================================
 		// ROTAS PÚBLICAS
 		// ============================================

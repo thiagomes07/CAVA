@@ -45,15 +45,16 @@ func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
 
 func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, password_hash, phone, whatsapp, role, 
-		       is_active, first_login_at, created_at, updated_at
-		FROM users
-		WHERE id = $1
+		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.password_hash, u.phone, u.whatsapp, u.role, 
+		       u.is_active, u.first_login_at, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN industries i ON u.industry_id = i.id
+		WHERE u.id = $1
 	`
 
 	user := &entity.User{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
-		&user.ID, &user.IndustryID, &user.Name, &user.Email,
+		&user.ID, &user.IndustryID, &user.IndustrySlug, &user.Name, &user.Email,
 		&user.Password, &user.Phone, &user.Whatsapp, &user.Role,
 		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
@@ -70,15 +71,16 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, password_hash, phone, whatsapp, role, 
-		       is_active, first_login_at, created_at, updated_at
-		FROM users
-		WHERE email = $1
+		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.password_hash, u.phone, u.whatsapp, u.role, 
+		       u.is_active, u.first_login_at, u.created_at, u.updated_at
+		FROM users u
+		LEFT JOIN industries i ON u.industry_id = i.id
+		WHERE u.email = $1
 	`
 
 	user := &entity.User{}
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
-		&user.ID, &user.IndustryID, &user.Name, &user.Email,
+		&user.ID, &user.IndustryID, &user.IndustrySlug, &user.Name, &user.Email,
 		&user.Password, &user.Phone, &user.Whatsapp, &user.Role,
 		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)

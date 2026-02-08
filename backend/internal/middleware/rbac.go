@@ -61,6 +61,16 @@ func (m *RBACMiddleware) RequireAdmin(next http.Handler) http.Handler {
 	return m.RequireRoles(entity.RoleAdminIndustria)(next)
 }
 
+// RequireSuperAdmin restringe acesso apenas para SUPER_ADMIN
+func (m *RBACMiddleware) RequireSuperAdmin(next http.Handler) http.Handler {
+	return m.RequireRoles(entity.RoleSuperAdmin)(next)
+}
+
+// RequireSuperAdminOrAdmin permite SUPER_ADMIN ou ADMIN_INDUSTRIA
+func (m *RBACMiddleware) RequireSuperAdminOrAdmin(next http.Handler) http.Handler {
+	return m.RequireRoles(entity.RoleSuperAdmin, entity.RoleAdminIndustria)(next)
+}
+
 // RequireIndustryUser restringe acesso para ADMIN_INDUSTRIA e VENDEDOR_INTERNO
 func (m *RBACMiddleware) RequireIndustryUser(next http.Handler) http.Handler {
 	return m.RequireRoles(entity.RoleAdminIndustria, entity.RoleVendedorInterno)(next)
@@ -74,6 +84,7 @@ func (m *RBACMiddleware) RequireBroker(next http.Handler) http.Handler {
 // RequireAnyAuthenticated permite qualquer usuário autenticado
 func (m *RBACMiddleware) RequireAnyAuthenticated(next http.Handler) http.Handler {
 	return m.RequireRoles(
+		entity.RoleSuperAdmin,
 		entity.RoleAdminIndustria,
 		entity.RoleVendedorInterno,
 		entity.RoleBroker,

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import {
   LayoutDashboard,
@@ -24,6 +24,7 @@ import {
   Menu,
   BarChart3,
   ClipboardList,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import { truncateText } from "@/lib/utils/truncateText";
@@ -33,6 +34,7 @@ import { useUIStore } from "@/store/ui.store";
 import { useToast } from "@/lib/hooks/useToast";
 import { usePendingReservationsCount } from "@/lib/api/queries/useReservations";
 import { LanguageSwitcher } from "./LanguageSwitcher";
+import { extractSlugFromPath, roleRequiresSlug } from "@/lib/utils/routes";
 import type { UserRole } from "@/lib/types";
 
 interface MenuItem {
@@ -85,6 +87,18 @@ const industryMenuItems: MenuItem[] = [
     label: "navigation.clientes",
     href: "/clientes",
     icon: Inbox,
+    roles: ["ADMIN_INDUSTRIA", "VENDEDOR_INTERNO"],
+  },
+  {
+    label: "navigation.links",
+    href: "/links",
+    icon: Link2,
+    roles: ["ADMIN_INDUSTRIA", "VENDEDOR_INTERNO"],
+  },
+  {
+    label: "navigation.catalogos",
+    href: "/catalogos",
+    icon: BookOpen,
     roles: ["ADMIN_INDUSTRIA", "VENDEDOR_INTERNO"],
   },
   {
@@ -158,9 +172,24 @@ const brokerMenuItems: MenuItem[] = [
   },
 ];
 
-export function Sidebar() {
+// Menu items para Super Admin
+const superAdminMenuItems: MenuItem[] = [
+  {
+    label: "navigation.industries",
+    href: "/admin/industries",
+    icon: Building2,
+    roles: ["SUPER_ADMIN"],
+  },
+];
+
+interface SidebarProps {
+  currentSlug?: string;
+}
+
+export function Sidebar({ currentSlug }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const params = useParams();
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const { sidebarOpen, toggleSidebar } = useUIStore();
@@ -173,12 +202,31 @@ export function Sidebar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
-  // Buscar contagem de reservas pendentes (apenas para admin e vendedor interno)
-  const isIndustryUser =
-    user?.role === "ADMIN_INDUSTRIA" || user?.role === "VENDEDOR_INTERNO";
+  // Determinar o slug efetivo (prop > URL > user)
+  const effectiveSlug = currentSlug || (params?.slug as string) || user?.industrySlug;
+
+  // Buscar contagem de reservas pendentes (apenas para admin da indústria)
+  const isAdmin = user?.role === "ADMIN_INDUSTRIA";
   const { data: pendingCount = 0 } = usePendingReservationsCount({
-    enabled: isIndustryUser,
+    enabled: isAdmin,
   });
+
+  // Função para construir href com slug quando necessário
+  const buildHref = (baseHref: string): string => {
+    if (!user) return baseHref;
+
+    // Super admin e broker não usam slug
+    if (user.role === "SUPER_ADMIN" || user.role === "BROKER") {
+      return baseHref;
+    }
+
+    // Admin e vendedor interno usam slug
+    if (effectiveSlug && roleRequiresSlug(user.role)) {
+      return `/${effectiveSlug}${baseHref}`;
+    }
+
+    return baseHref;
+  };
 
   // Handle click outside to close user menu
   useEffect(() => {
@@ -225,7 +273,9 @@ export function Sidebar() {
   const filteredMenuItems = useMemo(() => {
     if (!user) return [];
 
-    if (user.role === "ADMIN_INDUSTRIA") {
+    if (user.role === "SUPER_ADMIN") {
+      return superAdminMenuItems;
+    } else if (user.role === "ADMIN_INDUSTRIA") {
       return industryMenuItems.filter((item) => item.roles.includes(user.role));
     } else if (user.role === "VENDEDOR_INTERNO") {
       return industryMenuItems.filter((item) => item.roles.includes(user.role));
@@ -236,16 +286,18 @@ export function Sidebar() {
     return [];
   }, [user]);
 
-  const isActive = (href: string) => {
-    if (href.endsWith("/dashboard")) {
-      return pathname === href;
+  const isActive = (baseHref: string) => {
+    const fullHref = buildHref(baseHref);
+    if (fullHref.endsWith("/dashboard") || fullHref.endsWith("/admin")) {
+      return pathname === fullHref;
     }
-    return pathname === href || pathname.startsWith(href + "/");
+    return pathname === fullHref || pathname.startsWith(fullHref + "/");
   };
 
   if (!user) return null;
 
   const getRoleLabel = () => {
+    if (user.role === "SUPER_ADMIN") return tRoles("superAdmin");
     if (user.role === "ADMIN_INDUSTRIA") return tRoles("admin");
     if (user.role === "VENDEDOR_INTERNO") return tRoles("seller");
     if (user.role === "BROKER") return tRoles("broker");
@@ -296,13 +348,14 @@ export function Sidebar() {
               {filteredMenuItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const fullHref = buildHref(item.href);
                 const showPendingIndicator =
                   item.href === "/reservations" && pendingCount > 0;
 
                 return (
                   <Link
                     key={item.href}
-                    href={item.href}
+                    href={fullHref}
                     className={cn(
                       "flex items-center space-x-4 px-4 py-4 rounded-sm transition-all",
                       active
@@ -362,7 +415,7 @@ export function Sidebar() {
             </div>
             <div className="flex gap-2">
               <Link
-                href="/profile"
+                href={buildHref("/profile")}
                 className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-white/5 rounded-sm text-slate-300 hover:bg-white/10 transition-colors"
               >
                 <User className="w-4 h-4" />
@@ -437,13 +490,14 @@ export function Sidebar() {
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
+            const fullHref = buildHref(item.href);
             const showPendingIndicator =
               item.href === "/reservations" && pendingCount > 0;
 
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={fullHref}
                 className={cn(
                   "relative w-full flex items-center space-x-3 px-3 py-3 rounded-sm transition-all duration-300 group overflow-hidden",
                   active
@@ -509,7 +563,7 @@ export function Sidebar() {
                 )}
               >
                 <Link
-                  href="/profile"
+                  href={buildHref("/profile")}
                   onClick={() => setUserMenuOpen(false)}
                   className={cn(
                     "w-full px-4 py-3 text-left text-sm transition-colors duration-150",
@@ -569,7 +623,7 @@ export function Sidebar() {
             ) : (
               <div className="flex flex-col gap-1">
                 <Link
-                  href="/profile"
+                  href={buildHref("/profile")}
                   className={cn(
                     "w-full p-3 rounded-sm transition-colors duration-200",
                     "hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/20",

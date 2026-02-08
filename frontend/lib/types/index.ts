@@ -1,4 +1,4 @@
-export type UserRole = "ADMIN_INDUSTRIA" | "BROKER" | "VENDEDOR_INTERNO";
+export type UserRole = "SUPER_ADMIN" | "ADMIN_INDUSTRIA" | "VENDEDOR_INTERNO" | "BROKER";
 
 export type BatchStatus = "DISPONIVEL" | "RESERVADO" | "VENDIDO" | "INATIVO";
 
@@ -42,6 +42,7 @@ export interface User {
   whatsapp?: string;
   role: UserRole;
   industryId?: string;
+  industrySlug?: string;
   isActive: boolean;
   firstLoginAt?: string;
   createdAt: string;
@@ -79,6 +80,17 @@ export interface Industry {
 export interface SocialLink {
   name: string;
   url: string;
+}
+
+export interface PortfolioDisplaySettings {
+  showName: boolean;
+  showDescription: boolean;
+  showLogo: boolean;
+  showCNPJ: boolean;
+  showContact: boolean;
+  showLocation: boolean;
+  locationLevel: 'none' | 'country' | 'state' | 'city' | 'full';
+  isPublished: boolean;
 }
 
 export interface Media {

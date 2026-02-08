@@ -19,6 +19,7 @@ const reservedPrefixes = Array.from(
 // Rotas que requerem redirecionamento baseado em role
 const roleBasedRedirects: Record<string, Record<string, string>> = {
   '/dashboard': {
+    SUPER_ADMIN: '/admin',
     ADMIN_INDUSTRIA: '/dashboard',
     VENDEDOR_INTERNO: '/dashboard',
     BROKER: '/dashboard',
@@ -30,7 +31,7 @@ const roleBasedRedirects: Record<string, Record<string, string>> = {
   },
 };
 
-const allowedRoles: UserRole[] = ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'];
+const allowedRoles: UserRole[] = ['SUPER_ADMIN', 'ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'];
 
 // Create the next-intl middleware
 const intlMiddleware = createMiddleware(routing);
@@ -82,6 +83,13 @@ function isPublicRoute(pathname: string): boolean {
   
   // Rotas de catálogo público: /catalogo/[slug]
   if (pathname.startsWith('/catalogo/')) return true;
+
+  // Rotas de portfolio público: /[slug]/public-portfolio
+  if (segments.length === 2 && segments[1] === 'public-portfolio') {
+    const top = `/${segments[0]}`;
+    const isReserved = [...reservedPrefixes, '/api'].some((p) => top === p || top.startsWith(`${p}/`));
+    if (!isReserved) return true;
+  }
 
   return false;
 }
@@ -275,8 +283,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
+  // Para ADMIN_INDUSTRIA e VENDEDOR_INTERNO, extrair o slug da rota e verificar permissão na rota base
+  let routeToCheck = pathnameWithoutLocale;
+  if (effectiveRole === 'ADMIN_INDUSTRIA' || effectiveRole === 'VENDEDOR_INTERNO') {
+    // Extrair slug da rota (primeiro segmento após locale)
+    const segments = pathnameWithoutLocale.split('/').filter(Boolean);
+    if (segments.length > 0 && !reservedPrefixes.some(p => p === `/${segments[0]}`)) {
+      // O primeiro segmento é um slug, a rota base é o resto
+      routeToCheck = '/' + segments.slice(1).join('/') || '/dashboard';
+    }
+  }
+
   // Check access permission
-  if (!canRoleAccessRoute(effectiveRole, pathnameWithoutLocale)) {
+  if (!canRoleAccessRoute(effectiveRole, routeToCheck)) {
     const dashboardUrl = effectiveRole ? getDashboardForRole(effectiveRole) : '/login';
     const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
     return NextResponse.redirect(redirectUrl);

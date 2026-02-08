@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
 import { Layers, Link2, Inbox, TrendingUp, Plus, Eye, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,8 @@ import { cn } from '@/lib/utils/cn';
 
 export function SellerDashboard() {
   const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
   const { error } = useToast();
   const t = useTranslations('dashboard');
   const tActivities = useTranslations('activities');
@@ -115,7 +117,7 @@ export function SellerDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/inventory')}
+              onClick={() => router.push(`/${slug}/inventory`)}
             >
               <Eye className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -129,7 +131,7 @@ export function SellerDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/links/new')}
+              onClick={() => router.push(`/${slug}/links/new`)}
             >
               <Plus className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -143,7 +145,7 @@ export function SellerDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/clientes')}
+              onClick={() => router.push(`/${slug}/clientes`)}
             >
               <Inbox className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -165,7 +167,7 @@ export function SellerDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/sales')}
+              onClick={() => router.push(`/${slug}/sales`)}
             >
               {t('viewAll')}
             </Button>

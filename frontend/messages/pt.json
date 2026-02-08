@@ -132,9 +132,12 @@
     "brokers": "Parceiros",
     "team": "Equipe",
     "profile": "Meu Perfil",
-    "openMenu": "Abrir menu"
+    "openMenu": "Abrir menu",
+    "adminDashboard": "Painel Admin",
+    "industries": "Empresas"
   },
   "roles": {
+    "superAdmin": "Super Admin",
     "admin": "Administrador",
     "seller": "Vendedor",
     "broker": "Broker"
@@ -184,11 +187,12 @@
     "noSalesYet": "Nenhuma venda registrada ainda",
     "subtitleSeller": "Visão geral das suas vendas",
     "generatedByMe": "GERADOS POR MIM",
-    "publicCatalog": "Catálogo Público",
-    "publicCatalogDescription": "Compartilhe seu catálogo de produtos públicos com clientes e parceiros.",
-    "copyLink": "Copiar Link",
-    "linkCopied": "Link copiado!",
-    "openCatalog": "Abrir Catálogo"
+    "portfolio": "Portfólio",
+    "portfolioDescription": "Gerencie seu catálogo de produtos e materiais disponíveis.",
+    "viewPortfolio": "Ver Portfólio",
+    "publicPortfolio": "Portfólio Público",
+    "publicPortfolioDescription": "Seu catálogo público está disponível para clientes e parceiros.",
+    "viewPublicPortfolio": "Ver Portfólio Público"
   },
   "inventory": {
     "title": "Estoque de Lotes",

@@ -109,6 +109,8 @@
   },
   "navigation": {
     "dashboard": "Panel",
+    "adminDashboard": "Panel Admin",
+    "industries": "Empresas",
     "portfolio": "Portafolio",
     "inventory": "Inventario",
     "sharedInventory": "Inventario Compartido",
@@ -125,6 +127,7 @@
     "openMenu": "Abrir menú"
   },
   "roles": {
+    "superAdmin": "Super Admin",
     "admin": "Administrador",
     "seller": "Vendedor",
     "broker": "Broker"
@@ -173,7 +176,13 @@
     "myCommission": "Mi Comisión",
     "noSalesYet": "Sin ventas registradas aún",
     "subtitleSeller": "Visión general de tus ventas",
-    "generatedByMe": "GENERADOS POR MÍ"
+    "generatedByMe": "GENERADOS POR MÍ",
+    "portfolio": "Portafolio",
+    "portfolioDescription": "Gestiona tu catálogo de productos y materiales disponibles.",
+    "viewPortfolio": "Ver Portafolio",
+    "publicPortfolio": "Portafolio Público",
+    "publicPortfolioDescription": "Tu catálogo público está disponible para clientes y socios.",
+    "viewPublicPortfolio": "Ver Portafolio Público"
   },
   "inventory": {
     "title": "Inventario de Lotes",

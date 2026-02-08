@@ -35,7 +35,7 @@ import { isPlaceholderUrl } from '@/lib/utils/media';
 import { cn } from '@/lib/utils/cn';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
-import { SellBatchModal } from '@/app/[locale]/(industry)/inventory/[id]/components/SellBatchModal';
+import { SellBatchModal } from '@/app/[locale]/[slug]/inventory/[id]/components/SellBatchModal';
 
 interface UploadedMedia {
   id: string;

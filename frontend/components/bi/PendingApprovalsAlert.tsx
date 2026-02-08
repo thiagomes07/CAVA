@@ -7,10 +7,11 @@ import { cn } from '@/lib/utils/cn';
 
 interface PendingApprovalsAlertProps {
   count: number;
+  slug: string;
   className?: string;
 }
 
-export function PendingApprovalsAlert({ count, className }: PendingApprovalsAlertProps) {
+export function PendingApprovalsAlert({ count, slug, className }: PendingApprovalsAlertProps) {
   const router = useRouter();
 
   if (count === 0) return null;
@@ -39,7 +40,7 @@ export function PendingApprovalsAlert({ count, className }: PendingApprovalsAler
         variant="ghost"
         size="sm"
         className="text-amber-700 hover:text-amber-800 hover:bg-amber-100"
-        onClick={() => router.push('/reservations/pending')}
+        onClick={() => router.push(`/${slug}/reservations/pending`)}
       >
         Ver reservas
         <ArrowRight className="w-4 h-4 ml-1" />

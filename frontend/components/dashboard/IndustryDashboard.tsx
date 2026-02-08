@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 import { useTranslations } from 'next-intl';
-import { Package, TrendingUp, Clock, Plus, Eye, Receipt, Globe, Copy, ExternalLink } from 'lucide-react';
+import { Package, TrendingUp, Clock, Plus, Eye, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
@@ -20,6 +20,8 @@ import { cn } from '@/lib/utils/cn';
 
 export function IndustryDashboard() {
   const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
   const { error, success } = useToast();
   const t = useTranslations('dashboard');
   const tActivities = useTranslations('activities');
@@ -117,7 +119,7 @@ export function IndustryDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/inventory/new')}
+              onClick={() => router.push(`/${industry?.slug}/inventory/new`)}
             >
               <Plus className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -131,7 +133,7 @@ export function IndustryDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/inventory')}
+              onClick={() => router.push(`/${industry?.slug}/inventory`)}
             >
               <Eye className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -145,7 +147,7 @@ export function IndustryDashboard() {
             <Button
               variant="secondary"
               className="justify-start h-auto py-4"
-              onClick={() => router.push('/sales')}
+              onClick={() => router.push(`/${slug}/sales`)}
             >
               <Receipt className="w-5 h-5 mr-3" />
               <div className="text-left">
@@ -158,52 +160,32 @@ export function IndustryDashboard() {
           </div>
         </div>
 
-        {/* Public Catalog Card */}
-        {industry?.slug && (
+        {/* Public Portfolio Card - Only shows if portfolio is published */}
+        {industry?.slug && industry?.portfolioDisplaySettings?.isPublished && (
           <div className="mb-8">
-            <Card className="bg-slate-50 border-slate-200">
+            <Card className="bg-white border-slate-200">
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                 <div className="flex items-start gap-4">
-                  <div className="p-3 bg-slate-200 rounded-lg">
-                    <Globe className="w-6 h-6 text-slate-600" />
+                  <div className="p-3 bg-slate-100 rounded-lg">
+                    <Package className="w-6 h-6 text-slate-600" />
                   </div>
                   <div>
                     <h3 className="font-semibold text-obsidian mb-1">
-                      {t('publicCatalog') || 'Catálogo Público'}
+                      {t('publicPortfolio') || 'Portfólio Público'}
                     </h3>
-                    <p className="text-sm text-slate-600 mb-2">
-                      {t('publicCatalogDescription') || 'Compartilhe seu catálogo de produtos públicos com clientes e parceiros.'}
+                    <p className="text-sm text-slate-500">
+                      {t('publicPortfolioDescription') || 'Seu catálogo público está disponível para clientes e parceiros.'}
                     </p>
-                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-white/60 px-3 py-1.5 rounded-md w-fit">
-                      <code className="font-mono">
-                        {typeof window !== 'undefined' 
-                          ? `${window.location.origin}/deposito/${industry.slug}`
-                          : `/deposito/${industry.slug}`
-                        }
-                      </code>
-                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 ml-auto">
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => {
-                      const url = `${window.location.origin}/deposito/${industry.slug}`;
-                      navigator.clipboard.writeText(url);
-                      success(t('linkCopied') || 'Link copiado!');
-                    }}
+                    onClick={() => window.open(`/${industry.slug}/public-portfolio`, '_blank')}
                   >
-                    <Copy className="w-4 h-4 mr-2" />
-                    {t('copyLink') || 'Copiar Link'}
-                  </Button>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    onClick={() => window.open(`/deposito/${industry.slug}`, '_blank')}
-                  >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    {t('openCatalog') || 'Abrir Catálogo'}
+                    <Eye className="w-4 h-4 mr-2" />
+                    {t('viewPublicPortfolio') || 'Ver Portfólio Público'}
                   </Button>
                 </div>
               </div>
@@ -220,7 +202,7 @@ export function IndustryDashboard() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/sales')}
+              onClick={() => router.push(`/${slug}/sales`)}
             >
               {t('viewAll')}
             </Button>
