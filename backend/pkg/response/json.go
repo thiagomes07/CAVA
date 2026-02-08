@@ -147,16 +147,23 @@ func ServiceUnavailable(w http.ResponseWriter, message string) {
 	Error(w, http.StatusServiceUnavailable, "SERVICE_UNAVAILABLE", message, nil)
 }
 
-// ParseJSON faz parse do body JSON da requisição
+// ParseJSON faz parse do body JSON da requisição com limite de tamanho
 func ParseJSON(r *http.Request, v interface{}) error {
 	if r.Body == nil {
 		return appErrors.ValidationError("corpo da requisição vazio")
 	}
 
-	decoder := json.NewDecoder(r.Body)
+	// Limitar tamanho do body a 1MB para prevenir ataques de payload grande
+	const maxBodySize = 1 << 20 // 1 MB
+	limitedReader := http.MaxBytesReader(nil, r.Body, maxBodySize)
+
+	decoder := json.NewDecoder(limitedReader)
 	decoder.DisallowUnknownFields() // Não permitir campos desconhecidos
 
 	if err := decoder.Decode(v); err != nil {
+		if err.Error() == "http: request body too large" {
+			return appErrors.ValidationError("corpo da requisição excede o tamanho máximo permitido")
+		}
 		return appErrors.ValidationError("JSON inválido")
 	}
 

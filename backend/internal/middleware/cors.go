@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"log"
 	"net/http"
 	"strings"
 
@@ -18,8 +19,19 @@ type CORSConfig struct {
 
 // NewCORSMiddleware cria middleware CORS configurado
 func NewCORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
+	// Filtrar wildcard "*" quando credentials estão habilitados
+	// pois AllowCredentials: true + wildcard é uma falha de segurança CORS
+	safeOrigins := make([]string, 0, len(allowedOrigins))
+	for _, origin := range allowedOrigins {
+		if origin == "*" {
+			log.Println("[SECURITY WARNING] CORS wildcard '*' ignorado porque AllowCredentials está habilitado. Configure origens explícitas.")
+			continue
+		}
+		safeOrigins = append(safeOrigins, origin)
+	}
+
 	return cors.Handler(cors.Options{
-		AllowedOrigins: allowedOrigins,
+		AllowedOrigins: safeOrigins,
 		AllowedMethods: []string{
 			http.MethodGet,
 			http.MethodPost,

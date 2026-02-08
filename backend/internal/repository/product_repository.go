@@ -124,11 +124,7 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 		})
 	}
 
-	// Contar total (precisa usar subquery para aggregate filters)
-	countQuery := psql.Select("COUNT(*)").From("(" + buildCountSubquery(psql, industryID, filters) + ") sub")
-	countSQL, countArgs, _ := countQuery.ToSql()
-	
-	// Workaround: contar direto dos produtos filtrados
+	// Contar total dos produtos filtrados (query parametrizada, segura contra SQL injection)
 	countQueryDirect := psql.Select("COUNT(DISTINCT p.id)").
 		From("products p").
 		Where(sq.Eq{"p.industry_id": industryID})
@@ -155,7 +151,7 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 		})
 	}
 
-	countSQL, countArgs, _ = countQueryDirect.ToSql()
+	countSQL, countArgs, _ := countQueryDirect.ToSql()
 	var total int
 	if err := r.db.QueryRowContext(ctx, countSQL, countArgs...).Scan(&total); err != nil {
 		return nil, 0, errors.DatabaseError(err)
@@ -235,11 +231,6 @@ func (r *productRepository) FindByIndustryID(ctx context.Context, industryID str
 	}
 
 	return products, total, nil
-}
-
-// Helper function for count subquery (not currently used but kept for reference)
-func buildCountSubquery(psql sq.StatementBuilderType, industryID string, filters entity.ProductFilters) string {
-	return "SELECT 1 FROM products p WHERE p.industry_id = '" + industryID + "'"
 }
 
 func (r *productRepository) Update(ctx context.Context, product *entity.Product) error {

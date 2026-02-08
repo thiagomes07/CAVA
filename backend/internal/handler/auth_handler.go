@@ -183,10 +183,12 @@ func (h *AuthHandler) setAuthCookies(w http.ResponseWriter, accessToken, refresh
 	})
 
 	// Refresh token - 7 dias
+	// Path restrito a /api/auth para minimizar exposição:
+	// o cookie só é enviado em /api/auth/refresh e /api/auth/logout
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
 		Value:    refreshToken,
-		Path:     "/",
+		Path:     "/api/auth",
 		Domain:   h.cookieDomain,
 		MaxAge:   int(h.refreshTTL.Seconds()),
 		Expires:  time.Now().Add(h.refreshTTL),
@@ -211,16 +213,29 @@ func (h *AuthHandler) clearAuthCookies(w http.ResponseWriter) {
 		SameSite: http.SameSiteStrictMode,
 	})
 
-	// Limpar refresh token
+	// Limpar refresh token (Path deve coincidir com o usado em setAuthCookies)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "refresh_token",
+		Value:    "",
+		Path:     "/api/auth",
+		Domain:   h.cookieDomain,
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		Secure:   h.cookieSecure,
+		HttpOnly: true,
+		SameSite: http.SameSiteStrictMode,
+	})
+
+	// Limpar CSRF token para higiene de sessão
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
 		Value:    "",
 		Path:     "/",
 		Domain:   h.cookieDomain,
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 		Secure:   h.cookieSecure,
-		HttpOnly: true,
+		HttpOnly: false,
 		SameSite: http.SameSiteStrictMode,
 	})
 }

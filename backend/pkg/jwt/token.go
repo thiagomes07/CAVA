@@ -73,7 +73,7 @@ func (tm *TokenManager) ValidateToken(tokenString string) (*Claims, error) {
 			return nil, fmt.Errorf("método de assinatura inválido: %v", token.Header["alg"])
 		}
 		return tm.secret, nil
-	})
+	}, jwt.WithIssuer("cava-api")) // Validar issuer para prevenir cross-service token confusion
 
 	if err != nil {
 		return nil, fmt.Errorf("erro ao validar token: %w", err)

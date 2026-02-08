@@ -5,7 +5,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	chiCors "github.com/go-chi/cors"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
@@ -115,20 +114,22 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 	r.Use(appMiddleware.NewLoggerMiddleware(cfg.Logger).Log)
 
 	// CORS
-	r.Use(chiCors.Handler(chiCors.Options{
-		AllowedOrigins:   cfg.AllowedOrigins,
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		ExposedHeaders:   []string{"Link"},
-		AllowCredentials: true,
-		MaxAge:           300,
-	}))
+	r.Use(appMiddleware.NewCORSMiddleware(cfg.AllowedOrigins))
+
+	// Security Headers
+	r.Use(appMiddleware.SecurityHeaders)
+
+	// Limite de tamanho do body padrão (1 MB) para prevenir ataques de exaustão de memória
+	r.Use(appMiddleware.DefaultBodyLimit)
 
 	r.Use(m.CSRF.SetCSRFCookie)
 
-	// Health check (público) - GET e HEAD para healthchecks Docker
-	r.Get("/health", h.Health.Check)
-	r.Head("/health", h.Health.Check)
+	// Health check (público, com rate limit) - GET e HEAD para healthchecks Docker
+	r.Group(func(r chi.Router) {
+		r.Use(m.RatePub.Limit)
+		r.Get("/health", h.Health.Check)
+		r.Head("/health", h.Health.Check)
+	})
 
 	// API Routes
 	r.Route("/api", func(r chi.Router) {
@@ -369,6 +370,8 @@ func SetupRouter(h *Handler, m Middlewares, cfg Config) *chi.Mux {
 			// UPLOADS
 			// ----------------------------------------
 			r.Route("/upload", func(r chi.Router) {
+				// Limite de body maior para uploads (50 MB)
+				r.Use(appMiddleware.UploadBodyLimit)
 				r.With(m.RBAC.RequireAdmin).Post("/product-medias", h.Upload.UploadProductMedias)
 				r.With(m.RBAC.RequireAdmin).Post("/batch-medias", h.Upload.UploadBatchMedias)
 				r.With(m.RBAC.RequireAdmin).Post("/industry-logo", h.Upload.UploadIndustryLogo)

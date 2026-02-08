@@ -111,6 +111,26 @@ func (h *UploadHandler) UploadProductMedias(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
+	// Verificar se o produto pertence à indústria do solicitante (prevenir IDOR)
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+	product, err := h.productService.GetByID(r.Context(), productID)
+	if err != nil {
+		response.HandleError(w, err)
+		return
+	}
+	if product.IndustryID != industryID {
+		h.logger.Warn("tentativa de upload para produto de outra indústria",
+			zap.String("productId", productID),
+			zap.String("requesterIndustryId", industryID),
+		)
+		response.NotFound(w, "Produto não encontrado")
+		return
+	}
+
 	// Obter arquivos
 	files := r.MultipartForm.File["medias"]
 	if len(files) == 0 {
@@ -246,6 +266,26 @@ func (h *UploadHandler) UploadBatchMedias(w http.ResponseWriter, r *http.Request
 	batchID := r.FormValue("batchId")
 	if batchID == "" {
 		response.BadRequest(w, "Batch ID é obrigatório", nil)
+		return
+	}
+
+	// Verificar se o lote pertence à indústria do solicitante (prevenir IDOR)
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+	batch, err := h.batchService.GetByID(r.Context(), batchID)
+	if err != nil {
+		response.HandleError(w, err)
+		return
+	}
+	if batch.IndustryID != industryID {
+		h.logger.Warn("tentativa de upload para lote de outra indústria",
+			zap.String("batchId", batchID),
+			zap.String("requesterIndustryId", industryID),
+		)
+		response.NotFound(w, "Lote não encontrado")
 		return
 	}
 
@@ -621,7 +661,7 @@ func (h *UploadHandler) UploadIndustryLogo(w http.ResponseWriter, r *http.Reques
 		if err.Error() == "http: request body too large" {
 			response.BadRequest(w, "Arquivo muito grande. Máximo 5MB", nil)
 		} else {
-			response.BadRequest(w, "Erro ao processar envio do arquivo", map[string]interface{}{"error": err.Error()})
+			response.BadRequest(w, "Erro ao processar envio do arquivo", nil)
 		}
 		return
 	}

@@ -1,14 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
+import { apiClient } from "@/lib/api/client";
 
 export function useUsers() {
     return useQuery({
         queryKey: ["users"],
         queryFn: async () => {
-            const res = await fetch("/api/users");
-            if (!res.ok) {
-                throw new Error("Failed to fetch users");
-            }
-            const data = await res.json();
+            const data = await apiClient.get<{ users: unknown[] }>("/users");
             if (Array.isArray(data)) {
                 return { users: data };
             }

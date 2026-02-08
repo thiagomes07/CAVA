@@ -35,8 +35,8 @@ type UserService interface {
 	// Update atualiza dados do usuário
 	Update(ctx context.Context, id string, input entity.UpdateUserInput) (*entity.User, error)
 
-	// UpdateStatus atualiza status ativo/inativo
-	UpdateStatus(ctx context.Context, id string, isActive bool) (*entity.User, error)
+	// UpdateStatus atualiza status ativo/inativo (com verificação de indústria)
+	UpdateStatus(ctx context.Context, id string, industryID string, isActive bool) (*entity.User, error)
 
 	// InviteBroker convida um broker (cria usuário, gera senha temporária, envia email)
 	InviteBroker(ctx context.Context, industryID string, input entity.InviteBrokerInput) (*entity.User, error)
@@ -44,8 +44,8 @@ type UserService interface {
 	// GetBrokers lista brokers com estatísticas
 	GetBrokers(ctx context.Context, industryID string) ([]entity.BrokerWithStats, error)
 
-	// ResendInvite reenvia convite (apenas se usuário nunca logou)
-	ResendInvite(ctx context.Context, userID string, newEmail *string) (*entity.User, error)
+	// ResendInvite reenvia convite (apenas se usuário nunca logou, com verificação de indústria)
+	ResendInvite(ctx context.Context, userID string, industryID string, newEmail *string) (*entity.User, error)
 
 	// UpdateEmail atualiza email do usuário (apenas se nunca logou)
 	UpdateEmail(ctx context.Context, userID string, email string) (*entity.User, error)
@@ -53,8 +53,8 @@ type UserService interface {
 	// UpdateBroker atualiza informações do broker
 	UpdateBroker(ctx context.Context, id string, input entity.UpdateBrokerInput) (*entity.User, error)
 
-	// DeleteBroker deleta um broker (se não houver dependências)
-	DeleteBroker(ctx context.Context, id string) error
+	// DeleteBroker deleta um broker (se não houver dependências, com verificação de indústria)
+	DeleteBroker(ctx context.Context, id string, industryID string) error
 
 	// UpdateSeller atualiza informações do vendedor/admin (email não pode ser alterado)
 	UpdateSeller(ctx context.Context, id string, industryID string, input entity.UpdateSellerInput) (*entity.User, error)

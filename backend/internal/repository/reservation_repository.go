@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
@@ -242,13 +243,13 @@ func (r *reservationRepository) List(ctx context.Context, filters entity.Reserva
 	argCount := 1
 
 	if filters.BatchID != nil {
-		query += ` AND batch_id = $` + string(rune('0'+argCount))
+		query += ` AND batch_id = $` + strconv.Itoa(argCount)
 		args = append(args, *filters.BatchID)
 		argCount++
 	}
 
 	if filters.Status != nil {
-		query += ` AND status = $` + string(rune('0'+argCount))
+		query += ` AND status = $` + strconv.Itoa(argCount)
 		args = append(args, *filters.Status)
 		argCount++
 	}
@@ -256,10 +257,10 @@ func (r *reservationRepository) List(ctx context.Context, filters entity.Reserva
 	// Paginação
 	offset := (filters.Page - 1) * filters.Limit
 	query += ` ORDER BY created_at DESC`
-	query += ` LIMIT $` + string(rune('0'+argCount))
+	query += ` LIMIT $` + strconv.Itoa(argCount)
 	args = append(args, filters.Limit)
 	argCount++
-	query += ` OFFSET $` + string(rune('0'+argCount))
+	query += ` OFFSET $` + strconv.Itoa(argCount)
 	args = append(args, offset)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)

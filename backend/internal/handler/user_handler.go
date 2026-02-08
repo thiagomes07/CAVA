@@ -157,6 +157,17 @@ func (h *UserHandler) GetByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verificar se o usuário pertence à mesma indústria do solicitante (prevenir IDOR)
+	requesterIndustryID := middleware.GetIndustryID(r.Context())
+	if requesterIndustryID != "" && user.IndustryID != nil && *user.IndustryID != requesterIndustryID {
+		h.logger.Warn("tentativa de acesso a usuário de outra indústria",
+			zap.String("requestedUserId", id),
+			zap.String("requesterIndustryId", requesterIndustryID),
+		)
+		response.NotFound(w, "Usuário não encontrado")
+		return
+	}
+
 	response.OK(w, user)
 }
 
@@ -243,6 +254,13 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verificar industryID do solicitante (prevenir IDOR)
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
 	var input entity.UpdateUserStatusInput
 
 	// Parse JSON body
@@ -251,8 +269,8 @@ func (h *UserHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Atualizar status
-	user, err := h.userService.UpdateStatus(r.Context(), id, input.IsActive)
+	// Atualizar status (com verificação de indústria)
+	user, err := h.userService.UpdateStatus(r.Context(), id, industryID, input.IsActive)
 	if err != nil {
 		h.logger.Error("erro ao atualizar status do usuário",
 			zap.String("id", id),
@@ -424,6 +442,13 @@ func (h *UserHandler) ResendInvite(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Verificar industryID do solicitante (prevenir IDOR)
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
 	var input entity.ResendInviteInput
 
 	// Parse JSON body (pode ser vazio)
@@ -432,8 +457,8 @@ func (h *UserHandler) ResendInvite(w http.ResponseWriter, r *http.Request) {
 		input = entity.ResendInviteInput{}
 	}
 
-	// Reenviar convite
-	user, err := h.userService.ResendInvite(r.Context(), id, input.NewEmail)
+	// Reenviar convite (com verificação de indústria)
+	user, err := h.userService.ResendInvite(r.Context(), id, industryID, input.NewEmail)
 	if err != nil {
 		h.logger.Error("erro ao reenviar convite",
 			zap.String("id", id),
@@ -570,8 +595,15 @@ func (h *UserHandler) DeleteBroker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Deletar broker
-	if err := h.userService.DeleteBroker(r.Context(), id); err != nil {
+	// Verificar industryID do solicitante (prevenir IDOR)
+	industryID := middleware.GetIndustryID(r.Context())
+	if industryID == "" {
+		response.Forbidden(w, "Industry ID não encontrado")
+		return
+	}
+
+	// Deletar broker (com verificação de indústria)
+	if err := h.userService.DeleteBroker(r.Context(), id, industryID); err != nil {
 		h.logger.Error("erro ao deletar broker",
 			zap.String("id", id),
 			zap.Error(err),

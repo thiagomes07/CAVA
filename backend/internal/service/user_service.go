@@ -293,11 +293,20 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 	return user, nil
 }
 
-func (s *userService) UpdateStatus(ctx context.Context, id string, isActive bool) (*entity.User, error) {
+func (s *userService) UpdateStatus(ctx context.Context, id string, industryID string, isActive bool) (*entity.User, error) {
 	// Buscar usuário para verificar role antes de alterar status
 	user, err := s.userRepo.FindByID(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+
+	// Verificar se pertence à mesma indústria (prevenir IDOR)
+	if user.IndustryID == nil || *user.IndustryID != industryID {
+		s.logger.Warn("tentativa de alterar status de usuário de outra indústria",
+			zap.String("userId", id),
+			zap.String("requestedIndustryId", industryID),
+		)
+		return nil, domainErrors.NewForbiddenError("Usuário não pertence a esta indústria")
 	}
 
 	// Impedir inativação de contas admin
@@ -421,11 +430,20 @@ func (s *userService) GetBrokers(ctx context.Context, industryID string) ([]enti
 	return brokers, nil
 }
 
-func (s *userService) ResendInvite(ctx context.Context, userID string, newEmail *string) (*entity.User, error) {
+func (s *userService) ResendInvite(ctx context.Context, userID string, industryID string, newEmail *string) (*entity.User, error) {
 	// Buscar usuário
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err
+	}
+
+	// Verificar se pertence à mesma indústria (prevenir IDOR)
+	if user.IndustryID == nil || *user.IndustryID != industryID {
+		s.logger.Warn("tentativa de reenviar convite para usuário de outra indústria",
+			zap.String("userId", userID),
+			zap.String("requestedIndustryId", industryID),
+		)
+		return nil, domainErrors.NewForbiddenError("Usuário não pertence a esta indústria")
 	}
 
 	// Verificar se usuário já logou
@@ -732,7 +750,7 @@ func (s *userService) UpdateBroker(ctx context.Context, id string, input entity.
 	return user, nil
 }
 
-func (s *userService) DeleteBroker(ctx context.Context, id string) error {
+func (s *userService) DeleteBroker(ctx context.Context, id string, industryID string) error {
 	// Buscar usuário
 	user, err := s.userRepo.FindByID(ctx, id)
 	if err != nil {
@@ -746,6 +764,16 @@ func (s *userService) DeleteBroker(ctx context.Context, id string) error {
 			zap.String("role", string(user.Role)),
 		)
 		return domainErrors.NewBadRequestError("Usuário não é um broker")
+	}
+
+	// Verificar se o broker tem vínculo com a indústria do solicitante (prevenir IDOR)
+	// Brokers freelancers podem ter IndustryID nil, nesse caso verificamos via lotes compartilhados
+	if user.IndustryID != nil && *user.IndustryID != industryID {
+		s.logger.Warn("tentativa de deletar broker de outra indústria",
+			zap.String("brokerId", id),
+			zap.String("requestedIndustryId", industryID),
+		)
+		return domainErrors.NewForbiddenError("Broker não pertence a esta indústria")
 	}
 
 	// Verificar se há lotes compartilhados ativos

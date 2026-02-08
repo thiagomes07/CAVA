@@ -197,6 +197,11 @@ func ValidatePasswordStrength(password string) error {
 		return fmt.Errorf("senha deve ter pelo menos 8 caracteres")
 	}
 
+	// Limitar tamanho máximo para prevenir DoS via computação Argon2 com senhas enormes
+	if len(password) > 128 {
+		return fmt.Errorf("senha deve ter no máximo 128 caracteres")
+	}
+
 	var (
 		hasUpper   bool
 		hasLower   bool

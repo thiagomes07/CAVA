@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -11,9 +12,15 @@ import (
 	"golang.org/x/time/rate"
 )
 
+// limiterEntry wraps a rate.Limiter with a last-seen timestamp for cleanup
+type limiterEntry struct {
+	limiter  *rate.Limiter
+	lastSeen time.Time
+}
+
 // RateLimiter implementa rate limiting usando token bucket
 type RateLimiter struct {
-	limiters map[string]*rate.Limiter
+	limiters map[string]*limiterEntry
 	mu       sync.RWMutex
 	rps      rate.Limit
 	burst    int
@@ -21,25 +28,35 @@ type RateLimiter struct {
 }
 
 func NewRateLimiter(requestsPerMinute int, logger *zap.Logger) *RateLimiter {
+	return NewRateLimiterWithBurst(requestsPerMinute, requestsPerMinute, logger)
+}
+
+// NewRateLimiterWithBurst creates a rate limiter with separate RPM and burst values
+func NewRateLimiterWithBurst(requestsPerMinute, burst int, logger *zap.Logger) *RateLimiter {
 	// Converter requests/minuto para requests/segundo
 	rps := rate.Limit(float64(requestsPerMinute) / 60.0)
 
 	return &RateLimiter{
-		limiters: make(map[string]*rate.Limiter),
+		limiters: make(map[string]*limiterEntry),
 		rps:      rps,
-		burst:    requestsPerMinute, // Burst = total de requests por minuto
+		burst:    burst,
 		logger:   logger,
 	}
 }
 
 // getLimiter retorna ou cria um limiter para o identificador
 func (rl *RateLimiter) getLimiter(identifier string) *rate.Limiter {
+	now := time.Now()
+
 	rl.mu.RLock()
-	limiter, exists := rl.limiters[identifier]
+	entry, exists := rl.limiters[identifier]
 	rl.mu.RUnlock()
 
 	if exists {
-		return limiter
+		rl.mu.Lock()
+		entry.lastSeen = now
+		rl.mu.Unlock()
+		return entry.limiter
 	}
 
 	// Criar novo limiter
@@ -47,13 +64,17 @@ func (rl *RateLimiter) getLimiter(identifier string) *rate.Limiter {
 	defer rl.mu.Unlock()
 
 	// Double-check após obter lock de escrita
-	limiter, exists = rl.limiters[identifier]
+	entry, exists = rl.limiters[identifier]
 	if exists {
-		return limiter
+		entry.lastSeen = now
+		return entry.limiter
 	}
 
-	limiter = rate.NewLimiter(rl.rps, rl.burst)
-	rl.limiters[identifier] = limiter
+	limiter := rate.NewLimiter(rl.rps, rl.burst)
+	rl.limiters[identifier] = &limiterEntry{
+		limiter:  limiter,
+		lastSeen: now,
+	}
 
 	return limiter
 }
@@ -95,16 +116,13 @@ func (rl *RateLimiter) Limit(next http.Handler) http.Handler {
 	})
 }
 
-// getIdentifier retorna identificador único para rate limiting
+// getIdentifier retorna identificador único para rate limiting.
+// Usa r.RemoteAddr diretamente pois o middleware.RealIP do Chi já
+// processa X-Forwarded-For/X-Real-IP e define o RemoteAddr correto.
+// Ler os headers manualmente poderia resultar em chaves inconsistentes
+// (e.g., valores multi-IP com vírgulas) e permitir spoofing.
 func (rl *RateLimiter) getIdentifier(r *http.Request) string {
-	// IP do cliente
-	ip := r.Header.Get("X-Forwarded-For")
-	if ip == "" {
-		ip = r.Header.Get("X-Real-IP")
-	}
-	if ip == "" {
-		ip = r.RemoteAddr
-	}
+	ip := r.RemoteAddr
 
 	// Se autenticado, adicionar user ID
 	userID := GetUserID(r.Context())
@@ -115,16 +133,40 @@ func (rl *RateLimiter) getIdentifier(r *http.Request) string {
 	return ip
 }
 
-// Cleanup remove limiters inativos (executar periodicamente)
+// Cleanup remove limiters inativos que não foram acessados dentro de maxAge
 func (rl *RateLimiter) Cleanup(maxAge time.Duration) {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	// Remover limiters que não foram usados recentemente
-	// Nota: golang.org/x/time/rate.Limiter não expõe última vez usado
-	// Para implementação completa, usar estrutura custom com timestamp
+	now := time.Now()
+	evicted := 0
+
+	for id, entry := range rl.limiters {
+		if now.Sub(entry.lastSeen) > maxAge {
+			delete(rl.limiters, id)
+			evicted++
+		}
+	}
 
 	rl.logger.Debug("rate limiter cleanup executed",
-		zap.Int("limiters_count", len(rl.limiters)),
+		zap.Int("evicted", evicted),
+		zap.Int("remaining", len(rl.limiters)),
 	)
+}
+
+// StartCleanupRoutine starts a background goroutine that periodically cleans up stale entries
+func (rl *RateLimiter) StartCleanupRoutine(ctx context.Context, interval, maxAge time.Duration) {
+	go func() {
+		ticker := time.NewTicker(interval)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				rl.Cleanup(maxAge)
+			}
+		}
+	}()
 }

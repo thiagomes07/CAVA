@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -232,7 +233,7 @@ func (r *salesHistoryRepository) CalculateSummary(ctx context.Context, filters e
 	if filters.StartDate != nil {
 		startDate, err := time.Parse(time.RFC3339, *filters.StartDate)
 		if err == nil {
-			query += ` AND sold_at >= $` + string(rune('0'+argCount))
+			query += ` AND sold_at >= $` + strconv.Itoa(argCount)
 			args = append(args, startDate)
 			argCount++
 		}
@@ -241,7 +242,7 @@ func (r *salesHistoryRepository) CalculateSummary(ctx context.Context, filters e
 	if filters.EndDate != nil {
 		endDate, err := time.Parse(time.RFC3339, *filters.EndDate)
 		if err == nil {
-			query += ` AND sold_at <= $` + string(rune('0'+argCount))
+			query += ` AND sold_at <= $` + strconv.Itoa(argCount)
 			args = append(args, endDate)
 			argCount++
 		}

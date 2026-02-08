@@ -34,16 +34,21 @@ const nextConfig: NextConfig = {
 
   // Configuração de imagens para otimização com next/image
   images: {
-    // Permitir imagens de qualquer domínio (para URLs dinâmicas do backend)
+    // Permitir imagens apenas de domínios confiáveis (evita SSRF via /_next/image)
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: '**',
+        hostname: process.env.NEXT_PUBLIC_IMAGE_HOSTNAME || 'localhost',
       },
       {
         protocol: 'http',
         hostname: 'localhost',
-        port: '3001',
+        port: '9000', // MinIO
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
+        port: '3001', // Backend API
       },
     ],
     // Formatos de imagem otimizados

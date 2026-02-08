@@ -200,6 +200,21 @@ func main() {
 	logger.Info("job de expiração de reservas iniciado")
 
 	// ============================================
+	// 10.2 INICIAR CLEANUP DE RATE LIMITERS
+	// ============================================
+	rateLimiterCtx, cancelRateLimiterCleanup := context.WithCancel(context.Background())
+	cleanupInterval := 10 * time.Minute
+	maxIdleAge := 30 * time.Minute
+	middlewares.RateAuth.StartCleanupRoutine(rateLimiterCtx, cleanupInterval, maxIdleAge)
+	middlewares.RatePub.StartCleanupRoutine(rateLimiterCtx, cleanupInterval, maxIdleAge)
+	middlewares.RateApi.StartCleanupRoutine(rateLimiterCtx, cleanupInterval, maxIdleAge)
+
+	logger.Info("rate limiter cleanup routines iniciadas",
+		zap.Duration("interval", cleanupInterval),
+		zap.Duration("maxIdleAge", maxIdleAge),
+	)
+
+	// ============================================
 	// 11. CONFIGURAR E INICIAR SERVIDOR HTTP
 	// ============================================
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -242,6 +257,9 @@ func main() {
 
 		// Cancelar job de expiração de reservas
 		cancelExpiration()
+
+		// Cancelar cleanup de rate limiters
+		cancelRateLimiterCleanup()
 
 		// Contexto com timeout para shutdown
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -515,7 +533,7 @@ func initMiddlewares(
 	)
 
 	// Rate Limiters
-	rateAuth := middleware.NewRateLimiter(cfg.Server.RateLimitAuthRPM, logger)
+	rateAuth := middleware.NewRateLimiterWithBurst(cfg.Server.RateLimitAuthRPM, 3, logger) // Burst 3 for auth to limit rapid brute-force
 	ratePub := middleware.NewRateLimiter(cfg.Server.RateLimitPublicRPM, logger)
 	rateApi := middleware.NewRateLimiter(cfg.Server.RateLimitAuthenticatedRPM, logger)
 
