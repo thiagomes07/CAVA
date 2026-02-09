@@ -294,7 +294,7 @@ export interface MoneyInputProps extends Omit<InputHTMLAttributes<HTMLInputEleme
   error?: string;
   helperText?: string;
   value?: number | string;
-  onChange?: (value: number) => void;
+  onChange?: (value: number | undefined) => void;
   prefix?: string;
   suffix?: string;
   allowDecimals?: boolean;
@@ -321,114 +321,135 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
   }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
     const inputRef = useRef<HTMLInputElement>(null);
+    const setRefs = (node: HTMLInputElement | null) => {
+      inputRef.current = node;
+      if (!ref) return;
+      if (typeof ref === 'function') {
+        ref(node);
+      } else {
+        ref.current = node;
+      }
+    };
+    const MAX_DIGITS = 15;
+    const scale = allowDecimals ? Math.pow(10, decimalPlaces) : 1;
 
-    // Formata número para exibição brasileira (1.234,56)
-    const formatDisplay = (val: number | string | undefined): string => {
-      if (val === undefined || val === '' || val === null) return '';
-      
-      const numVal = typeof val === 'string' ? parseFloat(val) : val;
-      if (isNaN(numVal)) return '';
-      
+    const stripLeadingZeros = (digits: string): string => {
+      if (!digits) return '';
+      const normalized = digits.replace(/^0+(?=\d)/, '');
+      return normalized || '0';
+    };
+
+    const digitsToNumber = (digits: string): number | undefined => {
+      if (!digits) return undefined;
+      const parsed = Number.parseInt(digits, 10);
+      if (!Number.isFinite(parsed)) return undefined;
+      return parsed / scale;
+    };
+
+    const numberToDigits = (num: number | undefined): string => {
+      if (num === undefined || !Number.isFinite(num)) return '';
+      const scaled = Math.round(Math.abs(num) * scale);
+      return scaled > 0 ? String(scaled) : '0';
+    };
+
+    const parseExternalValue = (val: number | string | undefined): number | undefined => {
+      if (val === undefined || val === null || val === '') return undefined;
+      if (typeof val === 'number') return Number.isFinite(val) ? val : undefined;
+
+      const trimmed = val.trim();
+      if (!trimmed) return undefined;
+
+      // Aceita string em pt-BR (1.234,56) e em formato simples (1234.56)
+      const normalized = trimmed.includes(',')
+        ? trimmed.replace(/\./g, '').replace(',', '.')
+        : trimmed;
+
+      const parsed = Number.parseFloat(normalized);
+      return Number.isFinite(parsed) ? parsed : undefined;
+    };
+
+    const valueToDigits = (val: number | string | undefined): string => {
+      const parsed = parseExternalValue(val);
+      return numberToDigits(parsed);
+    };
+
+    const formatDigits = (digits: string): string => {
+      if (!digits) return '';
+      const numeric = digitsToNumber(digits);
+      if (numeric === undefined) return '';
+
       return new Intl.NumberFormat('pt-BR', {
         minimumFractionDigits: allowDecimals ? decimalPlaces : 0,
         maximumFractionDigits: allowDecimals ? decimalPlaces : 0,
-      }).format(numVal);
+      }).format(numeric);
     };
 
-    // Parse de string formatada para número
-    const parseValue = (val: string): number => {
-      if (!val) return 0;
-      // Remove tudo exceto dígitos e vírgula
-      let cleaned = val.replace(/[^\d,]/g, '');
-      // Substitui vírgula por ponto para parseFloat
-      cleaned = cleaned.replace(',', '.');
-      const parsed = parseFloat(cleaned);
-      if (isNaN(parsed)) return 0;
-      // Arredonda para evitar problemas de ponto flutuante
-      return Math.round(parsed * Math.pow(10, decimalPlaces)) / Math.pow(10, decimalPlaces);
-    };
+    const isControlled = value !== undefined;
+    const [internalDigits, setInternalDigits] = useState(() => valueToDigits(value));
+    const rawDigits = isControlled ? valueToDigits(value) : internalDigits;
 
-    const [displayValue, setDisplayValue] = useState(() => formatDisplay(value));
-    const [isFocused, setIsFocused] = useState(false);
-
-    // Atualiza quando valor externo muda (e não está focado)
-    useEffect(() => {
-      if (!isFocused) {
-        setDisplayValue(formatDisplay(value));
+    const applyDigits = (nextDigits: string) => {
+      const limited = stripLeadingZeros(nextDigits.replace(/\D/g, '').slice(0, MAX_DIGITS));
+      if (!isControlled) {
+        setInternalDigits(limited);
       }
-    }, [value, isFocused]);
-
-    const handleFocus = (e: React.FocusEvent<HTMLInputElement>) => {
-      setIsFocused(true);
-      // Remove formatação quando foca (deixa só o número)
-      const numVal = typeof value === 'string' ? parseFloat(value) : value;
-      if (numVal !== undefined && !isNaN(numVal) && numVal !== 0) {
-        setDisplayValue(numVal.toString().replace('.', ','));
-      }
-      props.onFocus?.(e);
+      onChange?.(digitsToNumber(limited));
     };
 
-    const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {
-      setIsFocused(false);
-      // Reformata ao sair do foco
-      const parsed = parseValue(displayValue);
-      setDisplayValue(formatDisplay(parsed));
-      props.onBlur?.(e);
+    const moveCursorToEnd = () => {
+      requestAnimationFrame(() => {
+        const el = inputRef.current;
+        if (!el) return;
+        const end = el.value.length;
+        el.setSelectionRange(end, end);
+      });
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let inputValue = e.target.value;
-      
-      // Permite apenas dígitos, vírgula e ponto
-      inputValue = inputValue.replace(/[^\d.,]/g, '');
-      
-      // Converte pontos para vírgulas (padrão brasileiro)
-      inputValue = inputValue.replace('.', ',');
-      
-      // Permite apenas uma vírgula
-      const parts = inputValue.split(',');
-      if (parts.length > 2) {
-        inputValue = parts[0] + ',' + parts.slice(1).join('');
-      }
-      
-      // Limita casas decimais
-      if (parts.length === 2 && parts[1].length > decimalPlaces) {
-        inputValue = parts[0] + ',' + parts[1].substring(0, decimalPlaces);
-      }
-      
-      setDisplayValue(inputValue);
-      
-      // Notifica mudança
-      const numericValue = parseValue(inputValue);
-      onChange?.(numericValue);
+      // Fallback para teclado mobile/autofill: extrai dígitos e reaplica máscara.
+      applyDigits(e.target.value);
     };
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-      // Permite: backspace, delete, tab, escape, enter, setas
-      if ([8, 46, 9, 27, 13, 37, 38, 39, 40].includes(e.keyCode)) {
+      if (disabled) return;
+
+      if ((e.ctrlKey || e.metaKey) && ['a', 'c', 'v', 'x'].includes(e.key.toLowerCase())) {
         return;
       }
-      // Permite Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+X
-      if ((e.ctrlKey || e.metaKey) && [65, 67, 86, 88].includes(e.keyCode)) {
+
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        applyDigits(rawDigits.slice(0, -1));
+        moveCursorToEnd();
         return;
       }
-      // Permite dígitos
+
+      if (e.key === 'Delete') {
+        e.preventDefault();
+        applyDigits('');
+        moveCursorToEnd();
+        return;
+      }
+
       if (/^\d$/.test(e.key)) {
+        e.preventDefault();
+        applyDigits(rawDigits + e.key);
+        moveCursorToEnd();
         return;
       }
-      // Permite vírgula e ponto (serão convertidos para vírgula)
-      if (e.key === ',' || e.key === '.') {
-        if (!allowDecimals) {
-          e.preventDefault();
-          return;
-        }
-        if (displayValue.includes(',')) {
-          e.preventDefault();
-        }
+
+      if (['Tab', 'Enter', 'Escape', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(e.key)) {
         return;
       }
-      // Bloqueia qualquer outra tecla
+
       e.preventDefault();
+    };
+
+    const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+      e.preventDefault();
+      const pasted = e.clipboardData.getData('text') || '';
+      applyDigits(pasted);
+      moveCursorToEnd();
     };
 
     const baseInputClass = variant === 'minimal' 
@@ -444,7 +465,8 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
           error
             ? 'border-rose-300 bg-rose-50/30 focus:border-rose-400 focus:ring-rose-100'
             : 'border-slate-200 bg-white focus:border-obsidian',
-          (prefix || suffix) && 'pl-10',
+          prefix && 'pl-10',
+          suffix && 'pr-16',
           className
         );
 
@@ -459,15 +481,15 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
           <span className="text-sm text-slate-400 mr-1">{prefix}</span>
         )}
         <input
-          ref={ref || inputRef}
+          ref={setRefs}
           id={inputId}
           type="text"
-          inputMode="decimal"
-          value={displayValue}
+          inputMode="numeric"
+          value={formatDigits(rawDigits)}
           onChange={handleChange}
-          onFocus={handleFocus}
-          onBlur={handleBlur}
+          onBlur={props.onBlur}
           onKeyDown={handleKeyDown}
+          onPaste={handlePaste}
           placeholder="0,00"
           disabled={disabled}
           className={baseInputClass}

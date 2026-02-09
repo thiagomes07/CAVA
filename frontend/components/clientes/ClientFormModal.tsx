@@ -7,6 +7,7 @@ import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose }
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
 import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
+import { PhoneInput } from '@/components/ui/masked-input';
 import { createClienteSchema, CreateClienteForm } from '@/lib/schemas/lead.schema';
 import type { Cliente } from '@/lib/types';
 import {
@@ -169,9 +170,9 @@ export function ClientFormModal({
                             <label className="text-xs font-medium text-slate-600 block mb-2">
                                 {t('phonePlaceholder')}
                             </label>
-                            <input
-                                value={phoneField.value}
-                                onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                            <PhoneInput
+                                value={phoneField.value || ''}
+                                onChange={(value) => phoneField.onChange(value)}
                                 placeholder="(11) 98765-4321"
                                 className={cn(
                                     'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
@@ -204,9 +205,9 @@ export function ClientFormModal({
                                     <span className="text-xs text-slate-500">{t('useSamePhone')}</span>
                                 </label>
                             </div>
-                            <input
-                                value={whatsappField.value}
-                                onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                            <PhoneInput
+                                value={whatsappField.value || ''}
+                                onChange={(value) => whatsappField.onChange(value)}
                                 placeholder="(11) 98765-4321"
                                 disabled={useSamePhoneForWhatsapp}
                                 className={cn(

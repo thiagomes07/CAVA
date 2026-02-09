@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { User, Lock, Save, CheckCircle, Eye, EyeOff, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/masked-input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient, ApiError } from '@/lib/api/client';
@@ -290,18 +291,18 @@ export default function ProfilePage() {
                   helperText="O email não pode ser alterado"
                 />
 
-                <Input
-                  value={phoneField.value}
-                  onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                <PhoneInput
+                  value={phoneField.value || ''}
+                  onChange={(value) => phoneField.onChange(value)}
                   label={t('phone')}
                   placeholder="(11) 98765-4321"
                   error={profileErrors.phone?.message}
                   disabled={isUpdatingProfile}
                 />
 
-                <Input
-                  value={whatsappField.value}
-                  onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                <PhoneInput
+                  value={whatsappField.value || ''}
+                  onChange={(value) => whatsappField.onChange(value)}
                   label="WhatsApp"
                   placeholder="(11) 98765-4321"
                   error={profileErrors.whatsapp?.message}

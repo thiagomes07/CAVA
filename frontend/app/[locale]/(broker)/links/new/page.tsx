@@ -415,7 +415,7 @@ export default function CreateSalesLinkPage() {
                                     <div className="flex items-center border border-slate-200 rounded px-2 py-1">
                                       <MoneyInput
                                         value={item.unitPrice}
-                                        onChange={(val) => handleUpdatePrice(item.batch.id, val)}
+                                        onChange={(val) => handleUpdatePrice(item.batch.id, val ?? 0)}
                                         variant="minimal"
                                         className="w-20 text-sm"
                                       />

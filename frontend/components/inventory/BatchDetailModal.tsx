@@ -841,7 +841,7 @@ export const BatchDetailModal: React.FC<BatchDetailModalProps> = ({
                             <div className="relative group">
                               <MoneyInput
                                 value={formData.industryPrice}
-                                onChange={(val) => setFormData({ ...formData, industryPrice: val })}
+                                onChange={(val) => setFormData({ ...formData, industryPrice: val ?? 0 })}
                                 suffix={`/${formData.priceUnit === 'M2' ? 'm²' : 'ft²'}`}
                                 className="text-xl font-medium"
                               />

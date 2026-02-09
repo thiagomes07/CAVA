@@ -8,6 +8,7 @@ import { useTranslations } from 'next-intl';
 import { Plus, Mail, Phone, MessageCircle, Share2, Eye, UserX, RefreshCw, Clock, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { PhoneInput } from '@/components/ui/masked-input';
 import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -28,7 +29,7 @@ import { SortableTableHead } from '@/components/shared/SortableTableHead';
 import { apiClient, ApiError } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
 import { inviteBrokerSchema, type InviteBrokerInput, type UpdateBrokerInput } from '@/lib/schemas/auth.schema';
-import formatPhoneInput, { sanitizePhone } from '@/lib/utils/formatPhoneInput';
+import { sanitizePhone } from '@/lib/utils/formatPhoneInput';
 import { BrokerFormModal } from '@/components/brokers/BrokerFormModal';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatPhone } from '@/lib/utils/validators';
@@ -607,9 +608,9 @@ export default function BrokersManagementPage() {
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   {tTeam('phoneOptional')}
                 </label>
-                <input
-                  value={phoneField.value}
-                  onChange={(e) => phoneField.onChange(formatPhoneInput(e.target.value))}
+                <PhoneInput
+                  value={phoneField.value || ''}
+                  onChange={(value) => phoneField.onChange(value)}
                   placeholder="(11) 98765-4321"
                   disabled={isSubmitting}
                   className={cn(
@@ -626,9 +627,9 @@ export default function BrokersManagementPage() {
                 <label className="text-xs font-medium text-slate-600 block mb-2">
                   {t('whatsappOptional')}
                 </label>
-                <input
-                  value={whatsappField.value}
-                  onChange={(e) => whatsappField.onChange(formatPhoneInput(e.target.value))}
+                <PhoneInput
+                  value={whatsappField.value || ''}
+                  onChange={(value) => whatsappField.onChange(value)}
                   placeholder="(11) 98765-4321"
                   disabled={isSubmitting}
                   className={cn(

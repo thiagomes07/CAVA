@@ -14,6 +14,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils/cn";
 import formatPhoneInput, { sanitizePhone } from "@/lib/utils/formatPhoneInput";
+import { PhoneInput } from "@/components/ui/masked-input";
 import {
   updateBrokerSchema,
   UpdateBrokerInput,
@@ -126,15 +127,9 @@ export function BrokerFormModal({
     onClose();
   };
 
-  const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatPhoneInput(e.target.value);
-    phoneField.onChange(formatted);
-  };
-
-  const handleWhatsappChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleWhatsappChange = (value: string) => {
     if (!useSamePhoneForWhatsapp) {
-      const formatted = formatPhoneInput(e.target.value);
-      whatsappField.onChange(formatted);
+      whatsappField.onChange(value);
     }
   };
 
@@ -204,11 +199,10 @@ export function BrokerFormModal({
                   <Phone className="h-4 w-4" />
                   {tCommon("phone")}
                 </label>
-                <input
-                  {...phoneField}
+                <PhoneInput
                   id="phone"
-                  type="tel"
-                  onChange={handlePhoneChange}
+                  value={phoneField.value || ""}
+                  onChange={(value) => phoneField.onChange(value)}
                   className={cn(
                     "w-full px-4 py-2.5 rounded-lg border transition-colors",
                     errors.phone
@@ -231,10 +225,9 @@ export function BrokerFormModal({
                   <Phone className="h-4 w-4" />
                   WhatsApp
                 </label>
-                <input
-                  {...whatsappField}
+                <PhoneInput
                   id="whatsapp"
-                  type="tel"
+                  value={whatsappField.value || ""}
                   onChange={handleWhatsappChange}
                   disabled={useSamePhoneForWhatsapp}
                   className={cn(
