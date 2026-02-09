@@ -916,5 +916,182 @@
     "viewBatches": "View Batches",
     "noBatches": "No batches available at the moment.",
     "availableBatches": "Available Batches"
+  },
+  "landing": {
+    "meta": {
+      "title": "CAVA - B2B Platform for Ornamental Stones",
+      "description": "Complete system for inventory management and sales of ornamental stones. Connect industries, sellers and brokers in a single platform.",
+      "keywords": "ornamental stones, marble, granite, inventory management, B2B, sales, brokers"
+    },
+    "nav": {
+      "features": "Features",
+      "forWho": "For Who",
+      "testimonials": "Testimonials",
+      "login": "Login",
+      "getStarted": "Get Started",
+      "dashboard": "Go to Dashboard"
+    },
+    "hero": {
+      "badge": "Premium B2B Platform",
+      "title": "Smart management of ornamental stones",
+      "subtitle": "Connect your industry to a network of sellers and brokers. Manage inventory, share catalogs and track sales in real time.",
+      "cta": "Start for Free",
+      "learnMore": "Learn More"
+    },
+    "stats": {
+      "founded": "Founded in",
+      "batches": "Managed Batches",
+      "companies": "Companies",
+      "countries": "Countries"
+    },
+    "features": {
+      "badge": "Features",
+      "title": "Everything you need in one place",
+      "subtitle": "CAVA brings together all the tools needed to efficiently manage your ornamental stone business.",
+      "items": {
+        "inventory": {
+          "title": "Inventory Management",
+          "description": "Complete control of your slab and batch inventory. Track entries, exits, dimensions and availability in real time."
+        },
+        "portfolio": {
+          "title": "Product Portfolio",
+          "description": "Create and manage your material catalog with high-quality photos, technical specifications and prices."
+        },
+        "links": {
+          "title": "Sales Links",
+          "description": "Generate personalized links to share specific products with customers. Track views and interests."
+        },
+        "dashboard": {
+          "title": "Analytical Dashboard",
+          "description": "View sales metrics, inventory and team performance in intuitive, real-time updated panels."
+        },
+        "clients": {
+          "title": "Client Management",
+          "description": "Automatically capture leads through sales links. Track interaction history and status."
+        },
+        "sharing": {
+          "title": "Broker Sharing",
+          "description": "Share your inventory with business partners. Set prices, commissions and manage access."
+        },
+        "qrcode": {
+          "title": "QR Codes",
+          "description": "Generate QR codes for your batches and materials. Facilitate access to information in the showroom or warehouse."
+        },
+        "multilang": {
+          "title": "Multilingual",
+          "description": "System available in Portuguese, English and Spanish. Serve international customers in their language."
+        },
+        "responsive": {
+          "title": "100% Responsive",
+          "description": "Access from any device. Interface optimized for desktop, tablet and smartphone."
+        }
+      }
+    },
+    "forWho": {
+      "badge": "For Who",
+      "title": "Made for the entire market chain",
+      "subtitle": "CAVA serves different profiles of the ornamental stone market, each with specific features.",
+      "types": {
+        "industry": {
+          "title": "Industries",
+          "description": "Manage all your inventory, sales team and partner network in a single centralized platform.",
+          "benefits": {
+            "1": "Total control of inventory and product catalog",
+            "2": "Management of internal sellers and external brokers",
+            "3": "Dashboard with sales and performance metrics"
+          }
+        },
+        "seller": {
+          "title": "Sellers",
+          "description": "Access company inventory, create personalized sales links and track your customers.",
+          "benefits": {
+            "1": "Access to the industry's complete inventory",
+            "2": "Creation of personalized links and catalogs",
+            "3": "Customer management and sales history"
+          }
+        },
+        "broker": {
+          "title": "Brokers",
+          "description": "Receive access to inventories from multiple partner industries and manage your sales independently.",
+          "benefits": {
+            "1": "Access to shared inventories from various industries",
+            "2": "Creation of own links with custom prices",
+            "3": "Independent management of customers and commissions"
+          }
+        }
+      }
+    },
+    "painPoints": {
+      "badge": "Problems Solved",
+      "title": "We understand your pain",
+      "subtitle": "We developed CAVA thinking about the real challenges of the ornamental stone market.",
+      "items": {
+        "stockControl": {
+          "title": "Inventory Control",
+          "description": "No more outdated spreadsheets and duplicate sales. Have precise control of each slab in real time."
+        },
+        "spreadsheets": {
+          "title": "Endless Spreadsheets",
+          "description": "Replace dozens of spreadsheets with an integrated system. All information in one place."
+        },
+        "time": {
+          "title": "Wasted Time",
+          "description": "Automate repetitive tasks. Generate links, catalogs and reports in seconds."
+        },
+        "sales": {
+          "title": "Disorganized Sales",
+          "description": "Track each opportunity from start to finish. Never lose a customer due to lack of follow-up."
+        }
+      }
+    },
+    "testimonials": {
+      "badge": "Testimonials",
+      "title": "What our customers say",
+      "subtitle": "Companies that have already transformed their operation with CAVA.",
+      "items": {
+        "testimonial1": {
+          "quote": "CAVA revolutionized our inventory management. Before we lost hours updating spreadsheets, now everything is automatic and in real time.",
+          "author": "Carlos Silva"
+        },
+        "testimonial2": {
+          "quote": "As a broker, being able to access inventory from multiple industries in a single platform completely changed my business.",
+          "author": "Ana Santos"
+        },
+        "testimonial3": {
+          "quote": "The ease of sharing catalogs with customers and tracking who viewed each material is incredible. We close many more sales.",
+          "author": "Roberto Mendes"
+        }
+      }
+    },
+    "security": {
+      "badge": "Security",
+      "title": "Your data protected",
+      "description": "We implement the best security practices to protect your information and that of your customers.",
+      "items": {
+        "jwt": "Secure authentication with JWT tokens",
+        "encryption": "Encryption of data in transit and at rest",
+        "csrf": "Protection against CSRF attacks",
+        "rateLimit": "Rate limiting per user"
+      },
+      "trust": {
+        "title": "Total Trust",
+        "subtitle": "Modern and secure infrastructure"
+      }
+    },
+    "cta": {
+      "title": "Ready to transform your business?",
+      "subtitle": "Join dozens of companies that are already managing their operations more intelligently with CAVA.",
+      "button": "Get Started Now",
+      "notice": "No credit card required"
+    },
+    "footer": {
+      "description": "B2B platform for complete management of ornamental stones. Connecting industries, sellers and brokers.",
+      "product": "Product",
+      "legal": "Legal",
+      "privacy": "Privacy Policy",
+      "contact": "Contact",
+      "rights": "All rights reserved.",
+      "madeWith": "Made with dedication in Brazil"
+    }
   }
 }

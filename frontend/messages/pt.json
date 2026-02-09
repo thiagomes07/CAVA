@@ -946,5 +946,182 @@
     "viewBatches": "Ver Lotes",
     "noBatches": "Nenhum lote disponível no momento.",
     "availableBatches": "Lotes Disponíveis"
+  },
+  "landing": {
+    "meta": {
+      "title": "CAVA - Plataforma B2B para Rochas Ornamentais",
+      "description": "Sistema completo para gestão de estoque e vendas de rochas ornamentais. Conecte indústrias, vendedores e brokers em uma única plataforma.",
+      "keywords": "pedras ornamentais, mármores, granitos, gestão de estoque, B2B, vendas, brokers"
+    },
+    "nav": {
+      "features": "Funcionalidades",
+      "forWho": "Para Quem",
+      "testimonials": "Depoimentos",
+      "login": "Entrar",
+      "getStarted": "Começar Agora",
+      "dashboard": "Acessar Dashboard"
+    },
+    "hero": {
+      "badge": "Plataforma Premium B2B",
+      "title": "Gestão inteligente de rochas ornamentais",
+      "subtitle": "Conecte sua indústria a uma rede de vendedores e brokers. Gerencie estoque, compartilhe catálogos e acompanhe vendas em tempo real.",
+      "cta": "Começar Gratuitamente",
+      "learnMore": "Saiba Mais"
+    },
+    "stats": {
+      "founded": "Fundado em",
+      "batches": "Lotes Gerenciados",
+      "companies": "Empresas",
+      "countries": "Países"
+    },
+    "features": {
+      "badge": "Funcionalidades",
+      "title": "Tudo que você precisa em um só lugar",
+      "subtitle": "O CAVA reúne todas as ferramentas necessárias para gerenciar seu negócio de rochas ornamentais de forma eficiente.",
+      "items": {
+        "inventory": {
+          "title": "Gestão de Estoque",
+          "description": "Controle completo do seu estoque de chapas e lotes. Rastreie entradas, saídas, dimensões e disponibilidade em tempo real."
+        },
+        "portfolio": {
+          "title": "Portfólio de Produtos",
+          "description": "Crie e gerencie seu catálogo de materiais com fotos de alta qualidade, especificações técnicas e preços."
+        },
+        "links": {
+          "title": "Links de Venda",
+          "description": "Gere links personalizados para compartilhar produtos específicos com clientes. Acompanhe visualizações e interesses."
+        },
+        "dashboard": {
+          "title": "Dashboard Analítico",
+          "description": "Visualize métricas de vendas, estoque e performance da equipe em painéis intuitivos e atualizados em tempo real."
+        },
+        "clients": {
+          "title": "Gestão de Clientes",
+          "description": "Capture leads automaticamente através dos links de venda. Acompanhe histórico de interações e status."
+        },
+        "sharing": {
+          "title": "Compartilhamento com Brokers",
+          "description": "Compartilhe seu estoque com parceiros comerciais. Defina preços, comissões e gerencie acessos."
+        },
+        "qrcode": {
+          "title": "QR Codes",
+          "description": "Gere QR codes para seus lotes e materiais. Facilite o acesso a informações no showroom ou depósito."
+        },
+        "multilang": {
+          "title": "Multilíngue",
+          "description": "Sistema disponível em Português, Inglês e Espanhol. Atenda clientes internacionais no idioma deles."
+        },
+        "responsive": {
+          "title": "100% Responsivo",
+          "description": "Acesse de qualquer dispositivo. Interface otimizada para desktop, tablet e smartphone."
+        }
+      }
+    },
+    "forWho": {
+      "badge": "Para Quem",
+      "title": "Feito para toda a cadeia do mercado",
+      "subtitle": "O CAVA atende diferentes perfis do mercado de rochas ornamentais, cada um com funcionalidades específicas.",
+      "types": {
+        "industry": {
+          "title": "Indústrias",
+          "description": "Gerencie todo seu estoque, equipe de vendas e rede de parceiros em uma única plataforma centralizada.",
+          "benefits": {
+            "1": "Controle total do estoque e catálogo de produtos",
+            "2": "Gestão de vendedores internos e brokers externos",
+            "3": "Dashboard com métricas de vendas e performance"
+          }
+        },
+        "seller": {
+          "title": "Vendedores",
+          "description": "Acesse o estoque da empresa, crie links de venda personalizados e acompanhe seus clientes.",
+          "benefits": {
+            "1": "Acesso ao estoque completo da indústria",
+            "2": "Criação de links e catálogos personalizados",
+            "3": "Gestão de clientes e histórico de vendas"
+          }
+        },
+        "broker": {
+          "title": "Brokers",
+          "description": "Receba acesso a estoques de múltiplas indústrias parceiras e gerencie suas vendas de forma independente.",
+          "benefits": {
+            "1": "Acesso a estoques compartilhados de várias indústrias",
+            "2": "Criação de links próprios com preços personalizados",
+            "3": "Gestão independente de clientes e comissões"
+          }
+        }
+      }
+    },
+    "painPoints": {
+      "badge": "Problemas Resolvidos",
+      "title": "Entendemos suas dores",
+      "subtitle": "Desenvolvemos o CAVA pensando nos desafios reais do mercado de rochas ornamentais.",
+      "items": {
+        "stockControl": {
+          "title": "Controle de Estoque",
+          "description": "Chega de planilhas desatualizadas e vendas duplicadas. Tenha controle preciso de cada chapa em tempo real."
+        },
+        "spreadsheets": {
+          "title": "Planilhas Infinitas",
+          "description": "Substitua dezenas de planilhas por um sistema integrado. Todas as informações em um só lugar."
+        },
+        "time": {
+          "title": "Tempo Perdido",
+          "description": "Automatize tarefas repetitivas. Gere links, catálogos e relatórios em segundos."
+        },
+        "sales": {
+          "title": "Vendas Desorganizadas",
+          "description": "Acompanhe cada oportunidade do início ao fim. Nunca perca um cliente por falta de follow-up."
+        }
+      }
+    },
+    "testimonials": {
+      "badge": "Depoimentos",
+      "title": "O que nossos clientes dizem",
+      "subtitle": "Empresas que já transformaram sua operação com o CAVA.",
+      "items": {
+        "testimonial1": {
+          "quote": "O CAVA revolucionou nossa gestão de estoque. Antes perdíamos horas atualizando planilhas, agora tudo é automático e em tempo real.",
+          "author": "Carlos Silva"
+        },
+        "testimonial2": {
+          "quote": "Como broker, poder acessar o estoque de várias indústrias em uma única plataforma mudou completamente meu negócio.",
+          "author": "Ana Santos"
+        },
+        "testimonial3": {
+          "quote": "A facilidade de compartilhar catálogos com clientes e acompanhar quem visualizou cada material é incrível. Fechamos muito mais vendas.",
+          "author": "Roberto Mendes"
+        }
+      }
+    },
+    "security": {
+      "badge": "Segurança",
+      "title": "Seus dados protegidos",
+      "description": "Implementamos as melhores práticas de segurança para proteger suas informações e as de seus clientes.",
+      "items": {
+        "jwt": "Autenticação segura com tokens JWT",
+        "encryption": "Criptografia de dados em trânsito e repouso",
+        "csrf": "Proteção contra ataques CSRF",
+        "rateLimit": "Limitação de requisições por usuário"
+      },
+      "trust": {
+        "title": "Confiança Total",
+        "subtitle": "Infraestrutura moderna e segura"
+      }
+    },
+    "cta": {
+      "title": "Pronto para transformar seu negócio?",
+      "subtitle": "Junte-se a dezenas de empresas que já estão gerenciando suas operações de forma mais inteligente com o CAVA.",
+      "button": "Começar Agora",
+      "notice": "Sem necessidade de cartão de crédito"
+    },
+    "footer": {
+      "description": "Plataforma B2B para gestão completa de rochas ornamentais. Conectando indústrias, vendedores e brokers.",
+      "product": "Produto",
+      "legal": "Legal",
+      "privacy": "Política de Privacidade",
+      "contact": "Contato",
+      "rights": "Todos os direitos reservados.",
+      "madeWith": "Feito com dedicação no Brasil"
+    }
   }
 }

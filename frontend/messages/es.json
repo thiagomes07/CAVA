@@ -906,5 +906,182 @@
     "viewBatches": "Ver Lotes",
     "noBatches": "No hay lotes disponibles en este momento.",
     "availableBatches": "Lotes Disponibles"
+  },
+  "landing": {
+    "meta": {
+      "title": "CAVA - Plataforma B2B para Piedras Ornamentales",
+      "description": "Sistema completo para gestión de inventario y ventas de piedras ornamentales. Conecta industrias, vendedores y brokers en una única plataforma.",
+      "keywords": "piedras ornamentales, mármoles, granitos, gestión de inventario, B2B, ventas, brokers"
+    },
+    "nav": {
+      "features": "Funcionalidades",
+      "forWho": "Para Quién",
+      "testimonials": "Testimonios",
+      "login": "Entrar",
+      "getStarted": "Empezar Ahora",
+      "dashboard": "Ir al Dashboard"
+    },
+    "hero": {
+      "badge": "Plataforma Premium B2B",
+      "title": "Gestión inteligente de piedras ornamentales",
+      "subtitle": "Conecta tu industria a una red de vendedores y brokers. Gestiona inventario, comparte catálogos y sigue las ventas en tiempo real.",
+      "cta": "Empezar Gratis",
+      "learnMore": "Saber Más"
+    },
+    "stats": {
+      "founded": "Fundado en",
+      "batches": "Lotes Gestionados",
+      "companies": "Empresas",
+      "countries": "Países"
+    },
+    "features": {
+      "badge": "Funcionalidades",
+      "title": "Todo lo que necesitas en un solo lugar",
+      "subtitle": "CAVA reúne todas las herramientas necesarias para gestionar tu negocio de piedras ornamentales de forma eficiente.",
+      "items": {
+        "inventory": {
+          "title": "Gestión de Inventario",
+          "description": "Control completo de tu inventario de chapas y lotes. Rastrea entradas, salidas, dimensiones y disponibilidad en tiempo real."
+        },
+        "portfolio": {
+          "title": "Portafolio de Productos",
+          "description": "Crea y gestiona tu catálogo de materiales con fotos de alta calidad, especificaciones técnicas y precios."
+        },
+        "links": {
+          "title": "Enlaces de Venta",
+          "description": "Genera enlaces personalizados para compartir productos específicos con clientes. Sigue visualizaciones e intereses."
+        },
+        "dashboard": {
+          "title": "Dashboard Analítico",
+          "description": "Visualiza métricas de ventas, inventario y rendimiento del equipo en paneles intuitivos y actualizados en tiempo real."
+        },
+        "clients": {
+          "title": "Gestión de Clientes",
+          "description": "Captura leads automáticamente a través de los enlaces de venta. Sigue el historial de interacciones y estado."
+        },
+        "sharing": {
+          "title": "Compartir con Brokers",
+          "description": "Comparte tu inventario con socios comerciales. Define precios, comisiones y gestiona accesos."
+        },
+        "qrcode": {
+          "title": "Códigos QR",
+          "description": "Genera códigos QR para tus lotes y materiales. Facilita el acceso a información en el showroom o depósito."
+        },
+        "multilang": {
+          "title": "Multilingüe",
+          "description": "Sistema disponible en Portugués, Inglés y Español. Atiende a clientes internacionales en su idioma."
+        },
+        "responsive": {
+          "title": "100% Responsivo",
+          "description": "Accede desde cualquier dispositivo. Interfaz optimizada para escritorio, tablet y smartphone."
+        }
+      }
+    },
+    "forWho": {
+      "badge": "Para Quién",
+      "title": "Hecho para toda la cadena del mercado",
+      "subtitle": "CAVA atiende diferentes perfiles del mercado de piedras ornamentales, cada uno con funcionalidades específicas.",
+      "types": {
+        "industry": {
+          "title": "Industrias",
+          "description": "Gestiona todo tu inventario, equipo de ventas y red de socios en una única plataforma centralizada.",
+          "benefits": {
+            "1": "Control total del inventario y catálogo de productos",
+            "2": "Gestión de vendedores internos y brokers externos",
+            "3": "Dashboard con métricas de ventas y rendimiento"
+          }
+        },
+        "seller": {
+          "title": "Vendedores",
+          "description": "Accede al inventario de la empresa, crea enlaces de venta personalizados y sigue a tus clientes.",
+          "benefits": {
+            "1": "Acceso al inventario completo de la industria",
+            "2": "Creación de enlaces y catálogos personalizados",
+            "3": "Gestión de clientes e historial de ventas"
+          }
+        },
+        "broker": {
+          "title": "Brokers",
+          "description": "Recibe acceso a inventarios de múltiples industrias socias y gestiona tus ventas de forma independiente.",
+          "benefits": {
+            "1": "Acceso a inventarios compartidos de varias industrias",
+            "2": "Creación de enlaces propios con precios personalizados",
+            "3": "Gestión independiente de clientes y comisiones"
+          }
+        }
+      }
+    },
+    "painPoints": {
+      "badge": "Problemas Resueltos",
+      "title": "Entendemos tu dolor",
+      "subtitle": "Desarrollamos CAVA pensando en los desafíos reales del mercado de piedras ornamentales.",
+      "items": {
+        "stockControl": {
+          "title": "Control de Inventario",
+          "description": "Basta de hojas de cálculo desactualizadas y ventas duplicadas. Ten control preciso de cada chapa en tiempo real."
+        },
+        "spreadsheets": {
+          "title": "Hojas de Cálculo Infinitas",
+          "description": "Sustituye decenas de hojas de cálculo por un sistema integrado. Toda la información en un solo lugar."
+        },
+        "time": {
+          "title": "Tiempo Perdido",
+          "description": "Automatiza tareas repetitivas. Genera enlaces, catálogos e informes en segundos."
+        },
+        "sales": {
+          "title": "Ventas Desorganizadas",
+          "description": "Sigue cada oportunidad de inicio a fin. Nunca pierdas un cliente por falta de seguimiento."
+        }
+      }
+    },
+    "testimonials": {
+      "badge": "Testimonios",
+      "title": "Lo que dicen nuestros clientes",
+      "subtitle": "Empresas que ya transformaron su operación con CAVA.",
+      "items": {
+        "testimonial1": {
+          "quote": "CAVA revolucionó nuestra gestión de inventario. Antes perdíamos horas actualizando hojas de cálculo, ahora todo es automático y en tiempo real.",
+          "author": "Carlos Silva"
+        },
+        "testimonial2": {
+          "quote": "Como broker, poder acceder al inventario de varias industrias en una única plataforma cambió completamente mi negocio.",
+          "author": "Ana Santos"
+        },
+        "testimonial3": {
+          "quote": "La facilidad de compartir catálogos con clientes y seguir quién visualizó cada material es increíble. Cerramos muchas más ventas.",
+          "author": "Roberto Mendes"
+        }
+      }
+    },
+    "security": {
+      "badge": "Seguridad",
+      "title": "Tus datos protegidos",
+      "description": "Implementamos las mejores prácticas de seguridad para proteger tu información y la de tus clientes.",
+      "items": {
+        "jwt": "Autenticación segura con tokens JWT",
+        "encryption": "Encriptación de datos en tránsito y en reposo",
+        "csrf": "Protección contra ataques CSRF",
+        "rateLimit": "Limitación de solicitudes por usuario"
+      },
+      "trust": {
+        "title": "Confianza Total",
+        "subtitle": "Infraestructura moderna y segura"
+      }
+    },
+    "cta": {
+      "title": "¿Listo para transformar tu negocio?",
+      "subtitle": "Únete a decenas de empresas que ya están gestionando sus operaciones de forma más inteligente con CAVA.",
+      "button": "Empezar Ahora",
+      "notice": "Sin necesidad de tarjeta de crédito"
+    },
+    "footer": {
+      "description": "Plataforma B2B para gestión completa de piedras ornamentales. Conectando industrias, vendedores y brokers.",
+      "product": "Producto",
+      "legal": "Legal",
+      "privacy": "Política de Privacidad",
+      "contact": "Contacto",
+      "rights": "Todos los derechos reservados.",
+      "madeWith": "Hecho con dedicación en Brasil"
+    }
   }
 }

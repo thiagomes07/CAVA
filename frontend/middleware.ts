@@ -9,7 +9,7 @@ import { routing, locales, defaultLocale, type Locale } from '@/i18n/routing';
 const authRoutes = ['/login'];
 
 // Prefixos de rotas públicas
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo', '/deposito'];
+const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo', '/deposito', '/landing'];
 
 // Prefixos reservados (rotas internas) derivados do mapa de permissões
 const reservedPrefixes = Array.from(
@@ -72,6 +72,9 @@ function isAuthRoute(pathname: string): boolean {
 function isPublicRoute(pathname: string): boolean {
   if (isAuthRoute(pathname)) return true;
   if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
+
+  // Root path is public (handled by page.tsx)
+  if (pathname === '/') return true;
 
   // Rotas públicas de landing page: /[slug] ou /catalogo/[slug]
   const segments = pathname.split('/').filter(Boolean);
@@ -235,6 +238,12 @@ export async function middleware(request: NextRequest) {
   const userRole = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
   const hasValidAccessToken = !!accessToken && !isTokenExpired(accessToken);
 
+  // Helper to add pathname header
+  const addPathnameHeader = (response: NextResponse) => {
+    response.headers.set('x-pathname', pathnameWithoutLocale);
+    return response;
+  };
+
   // Auth routes are public, but redirect if already authenticated
   if (isAuthRoute(pathnameWithoutLocale)) {
     // Allow access to login when the access token is missing or expired to avoid redirect loops
@@ -243,12 +252,12 @@ export async function middleware(request: NextRequest) {
       const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
       return NextResponse.redirect(redirectUrl);
     }
-    return intlResponse;
+    return addPathnameHeader(intlResponse);
   }
 
   // Public routes - allow access
   if (isPublicRoute(pathnameWithoutLocale)) {
-    return intlResponse;
+    return addPathnameHeader(intlResponse);
   }
 
   // No token or expired token - try refresh or redirect to login
@@ -301,7 +310,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  return intlResponse;
+  return addPathnameHeader(intlResponse);
 }
 
 export const config = {

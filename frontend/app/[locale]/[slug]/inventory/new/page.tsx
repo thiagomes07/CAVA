@@ -285,7 +285,8 @@ export default function NewBatchPage() {
         );
       }
 
-      success('Lote cadastrado com sucesso');\n      router.push(`/${slug}/inventory`);
+      success('Lote cadastrado com sucesso');
+      router.push(`/${slug}/inventory`);
     } catch (err) {
       error('Erro ao cadastrar lote');
     } finally {
