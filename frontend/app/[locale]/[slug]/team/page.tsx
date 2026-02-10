@@ -302,7 +302,7 @@ export default function TeamManagementPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+      <div className="page-header">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">

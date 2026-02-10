@@ -12,7 +12,6 @@ import { LanguageSwitcher } from '@/components/shared/LanguageSwitcher';
 import { useAuthStore } from '@/store/auth.store';
 import { useToast } from '@/lib/hooks/useToast';
 import { loginSchema, type LoginInput } from '@/lib/schemas/auth.schema';
-import { useAuth } from '@/lib/hooks/useAuth';
 
 import { toCanonicalPath } from '@/lib/utils/routes';
 
@@ -25,10 +24,25 @@ function getSafeRedirectTarget(callbackUrl: string | null): string | null {
   return toCanonicalPath(callbackUrl);
 }
 
+function getDashboardRouteForUser(user: { role: string; industrySlug?: string | null } | null): string {
+  if (!user) return '/login';
+
+  switch (user.role) {
+    case 'SUPER_ADMIN':
+      return '/admin/industries';
+    case 'ADMIN_INDUSTRIA':
+    case 'VENDEDOR_INTERNO':
+      return user.industrySlug ? `/${user.industrySlug}/dashboard` : '/login';
+    case 'BROKER':
+      return '/dashboard';
+    default:
+      return '/login';
+  }
+}
+
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { getDashboardRoute } = useAuth();
   const t = useTranslations('auth');
 
   const [showPassword, setShowPassword] = useState(false);
@@ -36,16 +50,18 @@ export default function LoginPage() {
 
   const login = useAuthStore((state) => state.login);
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
+  const user = useAuthStore((state) => state.user);
   const { success, error } = useToast();
 
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
       const callbackUrl = searchParams.get('callbackUrl');
-      const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
+      const redirectTo =
+        getSafeRedirectTarget(callbackUrl) || getDashboardRouteForUser(user);
       router.replace(redirectTo);
     }
-  }, [isAuthenticated, router, searchParams, getDashboardRoute]);
+  }, [isAuthenticated, router, searchParams, user]);
 
   const {
     register,
@@ -73,8 +89,10 @@ export default function LoginPage() {
 
       // Use callback URL if provided, otherwise use role-based dashboard
       const callbackUrl = searchParams.get('callbackUrl');
-      const redirectTo = getSafeRedirectTarget(callbackUrl) || getDashboardRoute();
-      router.push(redirectTo);
+      const freshUser = useAuthStore.getState().user;
+      const redirectTo =
+        getSafeRedirectTarget(callbackUrl) || getDashboardRouteForUser(freshUser);
+      router.replace(redirectTo);
     } catch (err) {
       console.error('Login error:', err);
       const message = err instanceof Error ? err.message : t('invalidCredentials');

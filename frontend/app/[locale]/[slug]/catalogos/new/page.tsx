@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Check, Search, Package, Copy, Link2, FileText, Calendar, Layers } from 'lucide-react';
+import { Check, Search, Copy, Link2, FileText, Calendar, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Modal, ModalHeader, ModalTitle, ModalContent, ModalFooter, ModalClose } from '@/components/ui/modal';
 import { apiClient } from '@/lib/api/client';
@@ -191,7 +191,7 @@ export default function CreateCatalogLinkPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+      <div className="page-header">
         <div className="flex items-center gap-4">
           <div>
             <h1 className="font-serif text-3xl text-obsidian mb-2">Novo Catálogo</h1>

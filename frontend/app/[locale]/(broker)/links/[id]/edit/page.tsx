@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ArrowLeft, Save } from 'lucide-react';
+import { Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -138,22 +138,14 @@ export default function EditSalesLinkPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push(`/${locale}/links`)}
-            className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <div>
-            <h1 className="font-serif text-3xl text-obsidian mb-2">
-              Editar Link de Venda
-            </h1>
-            <p className="text-sm text-slate-500">
-              {productName} • {link.slugToken}
-            </p>
-          </div>
+      <div className="page-header">
+        <div>
+          <h1 className="font-serif text-3xl text-obsidian mb-2">
+            Editar Link de Venda
+          </h1>
+          <p className="text-sm text-slate-500">
+            {productName} • {link.slugToken}
+          </p>
         </div>
       </div>
 

@@ -317,6 +317,7 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
     decimalPlaces = 2,
     variant = 'default',
     disabled,
+    style,
     ...props 
   }, ref) => {
     const inputId = id || label?.toLowerCase().replace(/\s+/g, '-');
@@ -493,6 +494,15 @@ export const MoneyInput = forwardRef<HTMLInputElement, MoneyInputProps>(
           placeholder="0,00"
           disabled={disabled}
           className={baseInputClass}
+          style={
+            variant === 'minimal'
+              ? style
+              : {
+                  ...style,
+                  ...(prefix ? { paddingLeft: '3rem' } : {}),
+                  ...(suffix ? { paddingRight: '4rem' } : {}),
+                }
+          }
           {...props}
         />
         {suffix && (

@@ -13,7 +13,6 @@ import {
   Sparkles,
   GripVertical,
   DollarSign,
-  ArrowLeft,
 } from "lucide-react";
 import {
   DndContext,
@@ -419,7 +418,7 @@ export default function EditProductPage() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-mineral">
-        <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+        <div className="page-header">
           <h1 className="font-serif text-3xl text-obsidian mb-2">
             Editar Produto
           </h1>
@@ -435,7 +434,7 @@ export default function EditProductPage() {
   if (!product) {
     return (
       <div className="min-h-screen bg-mineral">
-        <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+        <div className="page-header">
           <h1 className="font-serif text-3xl text-obsidian mb-2">Produto</h1>
           <p className="text-sm text-slate-500">Produto não encontrado</p>
         </div>
@@ -446,20 +445,12 @@ export default function EditProductPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
-        <div className="flex items-center gap-4 mb-2">
-          <button
-            onClick={() => router.back()}
-            className="p-2 hover:bg-slate-100 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5 text-slate-600" />
-          </button>
-          <div>
-            <h1 className="font-serif text-3xl text-obsidian">
-              Editar Produto
-            </h1>
-            <p className="text-sm text-slate-500">{product.name}</p>
-          </div>
+      <div className="page-header">
+        <div>
+          <h1 className="font-serif text-3xl text-obsidian">
+            Editar Produto
+          </h1>
+          <p className="text-sm text-slate-500">{product.name}</p>
         </div>
       </div>
 

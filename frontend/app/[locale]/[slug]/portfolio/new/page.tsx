@@ -277,7 +277,7 @@ export default function NewProductPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
+      <div className="page-header">
         <h1 className="font-serif text-3xl text-obsidian mb-2">Novo Produto</h1>
         <p className="text-sm text-slate-500">
           Cadastre um novo tipo de pedra no catálogo

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
-import { ArrowLeft, Plus, X, Search, Package, DollarSign, Ruler } from 'lucide-react';
+import { Plus, X, Search, Package, DollarSign, Ruler } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { MoneyInput } from '@/components/ui/masked-input';
@@ -167,25 +167,17 @@ export default function BrokerSharedInventoryPage() {
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
-      <div className="bg-porcelain border-b border-slate-100 px-8 py-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-slate-100 rounded-sm transition-colors"
-            >
-              <ArrowLeft className="w-5 h-5 text-slate-600" />
-            </button>
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <h1 className="font-serif text-3xl text-obsidian">
-                  Estoque Compartilhado
-                </h1>
-              </div>
-              <p className="text-sm text-slate-500">
-                Gerenciar compartilhamentos com <strong title={broker.name}>{truncateText(broker.name, TRUNCATION_LIMITS.USER_NAME)}</strong>
-              </p>
+      <div className="page-header">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <h1 className="font-serif text-3xl text-obsidian">
+                Estoque Compartilhado
+              </h1>
             </div>
+            <p className="text-sm text-slate-500">
+              Gerenciar compartilhamentos com <strong title={broker.name}>{truncateText(broker.name, TRUNCATION_LIMITS.USER_NAME)}</strong>
+            </p>
           </div>
 
           <Button
