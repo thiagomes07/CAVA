@@ -28,6 +28,7 @@ function buildQueryParams(filters?: BIFilters): string {
   const params = new URLSearchParams();
   if (filters.startDate) params.append('startDate', filters.startDate);
   if (filters.endDate) params.append('endDate', filters.endDate);
+  if (filters.currency) params.append('currency', filters.currency);
   if (filters.brokerId) params.append('brokerId', filters.brokerId);
   if (filters.productId) params.append('productId', filters.productId);
   if (filters.granularity) params.append('granularity', filters.granularity);
@@ -70,11 +71,12 @@ export function useConversionMetrics(filters?: BIFilters) {
   });
 }
 
-export function useInventoryMetrics() {
+export function useInventoryMetrics(filters?: Pick<BIFilters, 'currency'>) {
   return useQuery({
-    queryKey: biKeys.inventory(),
+    queryKey: [...biKeys.inventory(), filters] as const,
     queryFn: async () => {
-      const data = await apiClient.get<InventoryMetrics>('/bi/inventory');
+      const queryParams = buildQueryParams(filters);
+      const data = await apiClient.get<InventoryMetrics>(`/bi/inventory${queryParams}`);
       return data;
     },
   });

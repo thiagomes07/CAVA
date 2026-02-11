@@ -3,6 +3,7 @@ export type UserRole = "SUPER_ADMIN" | "ADMIN_INDUSTRIA" | "VENDEDOR_INTERNO" | 
 export type BatchStatus = "DISPONIVEL" | "RESERVADO" | "VENDIDO" | "INATIVO";
 
 export type PriceUnit = "M2" | "FT2";
+export type CurrencyCode = "BRL" | "USD";
 
 export type MaterialType =
   | "GRANITO"
@@ -38,6 +39,7 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  preferredCurrency: CurrencyCode;
   phone?: string;
   whatsapp?: string;
   role: UserRole;
@@ -167,6 +169,8 @@ export interface SalesLinkItem {
   salesLinkId: string;
   batchId: string;
   quantity: number;
+  unitPriceAmount: number;
+  currency: CurrencyCode;
   unitPrice: number;
   createdAt: string;
   batch?: Batch;
@@ -180,6 +184,8 @@ export interface SalesLink {
   productId?: string;
   title?: string;
   customMessage?: string;
+  displayPriceAmount?: number;
+  displayCurrency: CurrencyCode;
   slugToken: string;
   displayPrice?: number;
   showPrice: boolean;
@@ -318,6 +324,7 @@ export interface SalesMetrics {
   totalSlabs: number;
   totalArea: number;
   commissionRate: number;
+  currency: CurrencyCode;
 }
 
 export interface ConversionMetrics {
@@ -343,6 +350,7 @@ export interface InventoryMetrics {
   lowStockCount: number;
   staleBatchCount: number;
   turnover: number;
+  currency: CurrencyCode;
 }
 
 export interface BrokerPerformance {
@@ -355,12 +363,14 @@ export interface BrokerPerformance {
   approvalRate: number;
   conversionRate: number;
   rank: number;
+  currency: CurrencyCode;
 }
 
 export interface TrendPoint {
   date: string;
   value: number;
   count: number;
+  currency: CurrencyCode;
 }
 
 export interface ProductMetric {
@@ -372,10 +382,13 @@ export interface ProductMetric {
   slabsSold: number;
   areaSold: number;
   rank?: number;
+  currency: CurrencyCode;
 }
 
 export interface BIDashboard {
   period: string;
+  currency: CurrencyCode;
+  exchangeRateUsed?: number;
   sales: SalesMetrics;
   conversion: ConversionMetrics;
   inventory: InventoryMetrics;
@@ -389,6 +402,7 @@ export interface BIDashboard {
 export interface BIFilters {
   startDate?: string;
   endDate?: string;
+  currency?: CurrencyCode;
   brokerId?: string;
   productId?: string;
   granularity?: "day" | "week" | "month";

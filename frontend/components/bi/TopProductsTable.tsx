@@ -31,6 +31,7 @@ const materialColors: Record<string, string> = {
 };
 
 export function TopProductsTable({ data, title = 'Produtos Mais Vendidos', className }: TopProductsTableProps) {
+  const currency = data?.[0]?.currency || 'BRL';
   if (!data || data.length === 0) {
     return (
       <Card variant="elevated" className={className}>
@@ -84,7 +85,7 @@ export function TopProductsTable({ data, title = 'Produtos Mais Vendidos', class
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-medium text-emerald-600">
-                    {formatCurrency(product.totalRevenue)}
+                    {formatCurrency(product.totalRevenue, 'pt', currency)}
                   </span>
                 </TableCell>
               </TableRow>

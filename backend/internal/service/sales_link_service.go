@@ -70,6 +70,19 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 		return nil, domainErrors.SlugExistsError(input.SlugToken)
 	}
 
+	if !input.DisplayCurrency.IsValid() {
+		if input.DisplayCurrency == "" {
+			input.DisplayCurrency = entity.CurrencyBRL
+		} else {
+			return nil, domainErrors.ValidationError("Moeda de exibição inválida")
+		}
+	}
+
+	if input.DisplayPriceAmount == nil && input.DisplayPrice != nil {
+		amount := entity.AmountFromFloat(*input.DisplayPrice)
+		input.DisplayPriceAmount = &amount
+	}
+
 	// Para MULTIPLOS_LOTES, validar itens
 	if input.LinkType == entity.LinkTypeMultiplosLotes {
 		return s.createMultipleBatchesLink(ctx, userID, industryID, input)
@@ -84,7 +97,7 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 	industryID = updatedIndustryID
 
 	// Validar preço de exibição (se fornecido)
-	if input.DisplayPrice != nil && *input.DisplayPrice <= 0 {
+	if input.DisplayPriceAmount != nil && *input.DisplayPriceAmount <= 0 {
 		return nil, domainErrors.ValidationError("Preço de exibição deve ser maior que 0")
 	}
 
@@ -112,7 +125,8 @@ func (s *salesLinkService) Create(ctx context.Context, userID, industryID string
 		SlugToken:       input.SlugToken,
 		Title:           input.Title,
 		CustomMessage:   input.CustomMessage,
-		DisplayPrice:    input.DisplayPrice,
+		DisplayPriceAmount: valueOrZero(input.DisplayPriceAmount),
+		DisplayCurrency: input.DisplayCurrency,
 		ShowPrice:       input.ShowPrice,
 		ViewsCount:      0,
 		ExpiresAt:       expiresAt,
@@ -153,7 +167,7 @@ func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID
 	}
 
 	// Validar cada item e verificar disponibilidade
-	var totalPrice float64
+	var totalPriceAmount int64
 	items := make([]entity.SalesLinkItem, 0, len(input.Items))
 
 	for _, itemInput := range input.Items {
@@ -162,8 +176,12 @@ func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID
 			return nil, domainErrors.ValidationError("Quantidade deve ser maior que 0")
 		}
 
+		if itemInput.UnitPriceAmount == 0 && itemInput.UnitPrice > 0 {
+			itemInput.UnitPriceAmount = entity.AmountFromFloat(itemInput.UnitPrice)
+		}
+
 		// Validar preço unitário
-		if itemInput.UnitPrice < 0 {
+		if itemInput.UnitPriceAmount < 0 {
 			return nil, domainErrors.ValidationError("Preço unitário não pode ser negativo")
 		}
 
@@ -206,13 +224,14 @@ func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID
 
 		// Criar item
 		item := entity.SalesLinkItem{
-			ID:        uuid.New().String(),
-			BatchID:   itemInput.BatchID,
-			Quantity:  itemInput.Quantity,
-			UnitPrice: itemInput.UnitPrice,
+			ID:              uuid.New().String(),
+			BatchID:         itemInput.BatchID,
+			Quantity:        itemInput.Quantity,
+			UnitPriceAmount: itemInput.UnitPriceAmount,
+			Currency:        input.DisplayCurrency,
 		}
 		items = append(items, item)
-		totalPrice += float64(itemInput.Quantity) * itemInput.UnitPrice
+		totalPriceAmount += int64(itemInput.Quantity) * itemInput.UnitPriceAmount
 	}
 
 	// Validar data de expiração
@@ -229,9 +248,9 @@ func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID
 	}
 
 	// Se displayPrice não foi fornecido, usar total calculado
-	displayPrice := input.DisplayPrice
-	if displayPrice == nil {
-		displayPrice = &totalPrice
+	displayPriceAmount := input.DisplayPriceAmount
+	if displayPriceAmount == nil {
+		displayPriceAmount = &totalPriceAmount
 	}
 
 	// Criar link
@@ -245,7 +264,8 @@ func (s *salesLinkService) createMultipleBatchesLink(ctx context.Context, userID
 		SlugToken:       input.SlugToken,
 		Title:           input.Title,
 		CustomMessage:   input.CustomMessage,
-		DisplayPrice:    displayPrice,
+		DisplayPriceAmount: *displayPriceAmount,
+		DisplayCurrency: input.DisplayCurrency,
 		ShowPrice:       input.ShowPrice,
 		ViewsCount:      0,
 		ExpiresAt:       expiresAt,
@@ -365,7 +385,9 @@ func (s *salesLinkService) GetPublicBySlug(ctx context.Context, slug string) (*e
 	}
 
 	result := &entity.PublicSalesLink{
-		ShowPrice: link.ShowPrice,
+		ShowPrice:          link.ShowPrice,
+		DisplayCurrency:    link.DisplayCurrency,
+		DisplayPriceAmount: link.DisplayPriceAmount,
 	}
 
 	if link.Title != nil {
@@ -414,8 +436,14 @@ func (s *salesLinkService) GetPublicBySlug(ctx context.Context, slug string) (*e
 
 				// Se showPrice, incluir preços
 				if link.ShowPrice {
-					publicItem.UnitPrice = item.UnitPrice
-					publicItem.TotalPrice = float64(item.Quantity) * item.UnitPrice
+					publicItem.Currency = item.Currency
+					if !publicItem.Currency.IsValid() {
+						publicItem.Currency = link.DisplayCurrency
+					}
+					publicItem.UnitPriceAmount = item.UnitPriceAmount
+					publicItem.TotalPriceAmount = int64(item.Quantity) * item.UnitPriceAmount
+					publicItem.UnitPrice = entity.AmountToFloat(item.UnitPriceAmount)
+					publicItem.TotalPrice = entity.AmountToFloat(publicItem.TotalPriceAmount)
 				}
 
 				publicItems = append(publicItems, publicItem)
@@ -519,11 +547,26 @@ func (s *salesLinkService) Update(ctx context.Context, id string, input entity.U
 		link.CustomMessage = input.CustomMessage
 	}
 
-	if input.DisplayPrice != nil {
-		if *input.DisplayPrice <= 0 {
+	if input.DisplayPriceAmount != nil {
+		if *input.DisplayPriceAmount <= 0 {
 			return nil, domainErrors.ValidationError("Preço de exibição deve ser maior que 0")
 		}
-		link.DisplayPrice = input.DisplayPrice
+		link.DisplayPriceAmount = *input.DisplayPriceAmount
+		legacy := entity.AmountToFloat(link.DisplayPriceAmount)
+		link.DisplayPrice = &legacy
+	}
+	if input.DisplayPriceAmount == nil && input.DisplayPrice != nil {
+		amount := entity.AmountFromFloat(*input.DisplayPrice)
+		link.DisplayPriceAmount = amount
+		legacy := entity.AmountToFloat(amount)
+		link.DisplayPrice = &legacy
+	}
+
+	if input.DisplayCurrency != nil {
+		if !input.DisplayCurrency.IsValid() {
+			return nil, domainErrors.ValidationError("Moeda de exibição inválida")
+		}
+		link.DisplayCurrency = *input.DisplayCurrency
 	}
 
 	if input.ShowPrice != nil {
@@ -749,4 +792,11 @@ func (s *salesLinkService) populateLinkData(ctx context.Context, link *entity.Sa
 	}
 
 	return nil
+}
+
+func valueOrZero(v *int64) int64 {
+	if v == nil {
+		return 0
+	}
+	return *v
 }

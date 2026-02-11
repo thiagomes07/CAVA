@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/thiagomes07/CAVA/backend/internal/domain/entity"
+	"github.com/thiagomes07/CAVA/backend/internal/domain/repository"
 	"github.com/thiagomes07/CAVA/backend/internal/domain/service"
 	"github.com/thiagomes07/CAVA/backend/internal/middleware"
 	"github.com/thiagomes07/CAVA/backend/pkg/response"
@@ -15,16 +16,19 @@ import (
 // BIHandler gerencia requisições de Business Intelligence
 type BIHandler struct {
 	biService service.BIService
+	userRepo  repository.UserRepository
 	logger    *zap.Logger
 }
 
 // NewBIHandler cria uma nova instância de BIHandler
 func NewBIHandler(
 	biService service.BIService,
+	userRepo repository.UserRepository,
 	logger *zap.Logger,
 ) *BIHandler {
 	return &BIHandler{
 		biService: biService,
+		userRepo:  userRepo,
 		logger:    logger,
 	}
 }
@@ -33,6 +37,15 @@ func NewBIHandler(
 func (h *BIHandler) parseFilters(r *http.Request, industryID string) entity.BIFilters {
 	filters := entity.BIFilters{
 		IndustryID: industryID,
+		Currency:   entity.CurrencyBRL,
+	}
+
+	userID := middleware.GetUserID(r.Context())
+	if userID != "" && h.userRepo != nil {
+		user, err := h.userRepo.FindByID(r.Context(), userID)
+		if err == nil && user != nil && user.PreferredCurrency.IsValid() {
+			filters.Currency = user.PreferredCurrency
+		}
 	}
 
 	// StartDate
@@ -59,6 +72,13 @@ func (h *BIHandler) parseFilters(r *http.Request, industryID string) entity.BIFi
 	// ProductID
 	if productID := r.URL.Query().Get("productId"); productID != "" {
 		filters.ProductID = &productID
+	}
+
+	if currency := r.URL.Query().Get("currency"); currency != "" {
+		cc := entity.CurrencyCode(currency)
+		if cc.IsValid() {
+			filters.Currency = cc
+		}
 	}
 
 	// Granularity
@@ -184,7 +204,8 @@ func (h *BIHandler) GetInventoryMetrics(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	metrics, err := h.biService.GetInventoryMetrics(r.Context(), industryID)
+	filters := h.parseFilters(r, industryID)
+	metrics, err := h.biService.GetInventoryMetrics(r.Context(), industryID, filters.Currency)
 	if err != nil {
 		h.logger.Error("erro ao buscar métricas de inventário",
 			zap.String("industryId", industryID),

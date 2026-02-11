@@ -28,14 +28,14 @@ func (r *catalogLinkRepository) Create(ctx context.Context, link *entity.Catalog
 	query := `
 		INSERT INTO catalog_links (
 			id, created_by_user_id, industry_id, slug_token, title,
-			custom_message, expires_at, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+			custom_message, display_currency, expires_at, is_active
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING created_at, updated_at
 	`
 
 	err = tx.QueryRowContext(ctx, query,
 		link.ID, link.CreatedByUserID, link.IndustryID, link.SlugToken,
-		link.Title, link.CustomMessage, link.ExpiresAt, link.IsActive,
+		link.Title, link.CustomMessage, link.DisplayCurrency, link.ExpiresAt, link.IsActive,
 	).Scan(&link.CreatedAt, &link.UpdatedAt)
 
 	if err != nil {
@@ -73,7 +73,7 @@ func (r *catalogLinkRepository) Create(ctx context.Context, link *entity.Catalog
 func (r *catalogLinkRepository) FindByID(ctx context.Context, id string) (*entity.CatalogLink, error) {
 	query := `
 		SELECT id, created_by_user_id, industry_id, slug_token, title,
-		       custom_message, views_count, expires_at, is_active,
+		       custom_message, display_currency, views_count, expires_at, is_active,
 		       created_at, updated_at
 		FROM catalog_links
 		WHERE id = $1
@@ -82,7 +82,7 @@ func (r *catalogLinkRepository) FindByID(ctx context.Context, id string) (*entit
 	link := &entity.CatalogLink{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.SlugToken,
-		&link.Title, &link.CustomMessage, &link.ViewsCount, &link.ExpiresAt,
+		&link.Title, &link.CustomMessage, &link.DisplayCurrency, &link.ViewsCount, &link.ExpiresAt,
 		&link.IsActive, &link.CreatedAt, &link.UpdatedAt,
 	)
 
@@ -106,7 +106,7 @@ func (r *catalogLinkRepository) FindByID(ctx context.Context, id string) (*entit
 func (r *catalogLinkRepository) FindBySlug(ctx context.Context, slug string) (*entity.CatalogLink, error) {
 	query := `
 		SELECT id, created_by_user_id, industry_id, slug_token, title,
-		       custom_message, views_count, expires_at, is_active,
+		       custom_message, display_currency, views_count, expires_at, is_active,
 		       created_at, updated_at
 		FROM catalog_links
 		WHERE slug_token = $1
@@ -115,7 +115,7 @@ func (r *catalogLinkRepository) FindBySlug(ctx context.Context, slug string) (*e
 	link := &entity.CatalogLink{}
 	err := r.db.QueryRowContext(ctx, query, slug).Scan(
 		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.SlugToken,
-		&link.Title, &link.CustomMessage, &link.ViewsCount, &link.ExpiresAt,
+		&link.Title, &link.CustomMessage, &link.DisplayCurrency, &link.ViewsCount, &link.ExpiresAt,
 		&link.IsActive, &link.CreatedAt, &link.UpdatedAt,
 	)
 
@@ -144,7 +144,7 @@ func (r *catalogLinkRepository) List(ctx context.Context, industryID string, use
 		// Filtrar por usuário (para brokers)
 		query = `
 			SELECT id, created_by_user_id, industry_id, slug_token, title,
-			       custom_message, views_count, expires_at, is_active,
+			       custom_message, display_currency, views_count, expires_at, is_active,
 			       created_at, updated_at
 			FROM catalog_links
 			WHERE created_by_user_id = $1
@@ -155,7 +155,7 @@ func (r *catalogLinkRepository) List(ctx context.Context, industryID string, use
 		// Filtrar por indústria (para admins/vendedores)
 		query = `
 			SELECT id, created_by_user_id, industry_id, slug_token, title,
-			       custom_message, views_count, expires_at, is_active,
+			       custom_message, display_currency, views_count, expires_at, is_active,
 			       created_at, updated_at
 			FROM catalog_links
 			WHERE industry_id = $1
@@ -175,7 +175,7 @@ func (r *catalogLinkRepository) List(ctx context.Context, industryID string, use
 		var link entity.CatalogLink
 		if err := rows.Scan(
 			&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.SlugToken,
-			&link.Title, &link.CustomMessage, &link.ViewsCount, &link.ExpiresAt,
+			&link.Title, &link.CustomMessage, &link.DisplayCurrency, &link.ViewsCount, &link.ExpiresAt,
 			&link.IsActive, &link.CreatedAt, &link.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
@@ -196,14 +196,14 @@ func (r *catalogLinkRepository) Update(ctx context.Context, link *entity.Catalog
 	// Atualizar o link
 	query := `
 		UPDATE catalog_links
-		SET title = $1, custom_message = $2, expires_at = $3, is_active = $4,
+		SET title = $1, custom_message = $2, display_currency = $3, expires_at = $4, is_active = $5,
 		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $5
+		WHERE id = $6
 		RETURNING updated_at
 	`
 
 	err = tx.QueryRowContext(ctx, query,
-		link.Title, link.CustomMessage, link.ExpiresAt, link.IsActive, link.ID,
+		link.Title, link.CustomMessage, link.DisplayCurrency, link.ExpiresAt, link.IsActive, link.ID,
 	).Scan(&link.UpdatedAt)
 
 	if err == sql.ErrNoRows {

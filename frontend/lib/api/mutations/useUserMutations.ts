@@ -22,9 +22,10 @@ export function useCreateSeller() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: { name: string; email: string; phone?: string }) => {
+    mutationFn: async (data: { name: string; email: string; phone?: string; preferredCurrency?: 'BRL' | 'USD' }) => {
       const response = await apiClient.post<User>('/users', {
         ...data,
+        preferredCurrency: data.preferredCurrency || 'BRL',
         role: 'VENDEDOR_INTERNO',
       });
       return response;

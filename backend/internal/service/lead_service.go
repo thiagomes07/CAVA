@@ -533,8 +533,12 @@ func (s *clienteService) sendLinksEmail(ctx context.Context, cliente *entity.Cli
 
 		// Preço (se mostrar)
 		price := ""
-		if link.ShowPrice && link.DisplayPrice != nil {
-			price = fmt.Sprintf("R$ %.2f", *link.DisplayPrice)
+		if link.ShowPrice && link.DisplayPriceAmount > 0 {
+			symbol := "R$"
+			if link.DisplayCurrency == entity.CurrencyUSD {
+				symbol = "US$"
+			}
+			price = fmt.Sprintf("%s %.2f", symbol, entity.AmountToFloat(link.DisplayPriceAmount))
 		}
 
 		// Descrição do link

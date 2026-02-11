@@ -4,6 +4,21 @@ import (
 	"time"
 )
 
+type CurrencyCode string
+
+const (
+	CurrencyBRL CurrencyCode = "BRL"
+	CurrencyUSD CurrencyCode = "USD"
+)
+
+func (c CurrencyCode) IsValid() bool {
+	switch c {
+	case CurrencyBRL, CurrencyUSD:
+		return true
+	}
+	return false
+}
+
 // LinkType representa os tipos de link de venda
 type LinkType string
 
@@ -34,7 +49,9 @@ type SalesLink struct {
 	SlugToken       string           `json:"slugToken"`
 	Title           *string          `json:"title,omitempty"`
 	CustomMessage   *string          `json:"customMessage,omitempty"`
-	DisplayPrice    *float64         `json:"displayPrice,omitempty"`
+	DisplayPriceAmount int64         `json:"displayPriceAmount"` // Em centavos da moeda do link
+	DisplayCurrency CurrencyCode     `json:"displayCurrency"`
+	DisplayPrice    *float64         `json:"displayPrice,omitempty"` // Campo legado para compatibilidade
 	ShowPrice       bool             `json:"showPrice"`
 	ViewsCount      int              `json:"viewsCount"`
 	ExpiresAt       *time.Time       `json:"expiresAt,omitempty"`
@@ -62,16 +79,19 @@ type SalesLinkItem struct {
 	SalesLinkID string    `json:"salesLinkId"`
 	BatchID     string    `json:"batchId"`
 	Quantity    int       `json:"quantity"`
-	UnitPrice   float64   `json:"unitPrice"`
+	UnitPriceAmount int64 `json:"unitPriceAmount"` // Em centavos da moeda do link
+	Currency    CurrencyCode `json:"currency"`
+	UnitPrice   float64   `json:"unitPrice"` // Campo legado para compatibilidade
 	CreatedAt   time.Time `json:"createdAt"`
 	Batch       *Batch    `json:"batch,omitempty"` // Populated quando necessário
 }
 
 // SalesLinkItemInput representa os dados de um item na criação
 type SalesLinkItemInput struct {
-	BatchID   string  `json:"batchId" validate:"required,uuid"`
-	Quantity  int     `json:"quantity" validate:"required,min=1"`
-	UnitPrice float64 `json:"unitPrice" validate:"required,min=0"`
+	BatchID         string `json:"batchId" validate:"required,uuid"`
+	Quantity        int    `json:"quantity" validate:"required,min=1"`
+	UnitPriceAmount int64  `json:"unitPriceAmount" validate:"required,min=0"`
+	UnitPrice       float64 `json:"unitPrice,omitempty"` // Campo legado
 }
 
 // CreateSalesLinkInput representa os dados para criar um link de venda
@@ -83,7 +103,9 @@ type CreateSalesLinkInput struct {
 	Title         *string              `json:"title,omitempty" validate:"omitempty,max=100"`
 	CustomMessage *string              `json:"customMessage,omitempty" validate:"omitempty,max=500"`
 	SlugToken     string               `json:"slugToken" validate:"required,min=3,max=50,slug"`
-	DisplayPrice  *float64             `json:"displayPrice,omitempty" validate:"omitempty,gt=0"`
+	DisplayPriceAmount *int64          `json:"displayPriceAmount,omitempty" validate:"omitempty,gt=0"`
+	DisplayPrice  *float64             `json:"displayPrice,omitempty" validate:"omitempty,gt=0"` // Campo legado
+	DisplayCurrency CurrencyCode       `json:"displayCurrency" validate:"required,oneof=BRL USD"`
 	ShowPrice     bool                 `json:"showPrice"`
 	ExpiresAt     *string              `json:"expiresAt,omitempty"` // ISO date
 	IsActive      bool                 `json:"isActive"`
@@ -91,12 +113,14 @@ type CreateSalesLinkInput struct {
 
 // UpdateSalesLinkInput representa os dados para atualizar um link de venda
 type UpdateSalesLinkInput struct {
-	Title         *string  `json:"title,omitempty" validate:"omitempty,max=100"`
-	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
-	DisplayPrice  *float64 `json:"displayPrice,omitempty" validate:"omitempty,gt=0"`
-	ShowPrice     *bool    `json:"showPrice,omitempty"`
-	ExpiresAt     *string  `json:"expiresAt,omitempty"` // ISO date
-	IsActive      *bool    `json:"isActive,omitempty"`
+	Title              *string       `json:"title,omitempty" validate:"omitempty,max=100"`
+	CustomMessage      *string       `json:"customMessage,omitempty" validate:"omitempty,max=500"`
+	DisplayPriceAmount *int64        `json:"displayPriceAmount,omitempty" validate:"omitempty,gt=0"`
+	DisplayPrice       *float64      `json:"displayPrice,omitempty" validate:"omitempty,gt=0"` // Campo legado
+	DisplayCurrency    *CurrencyCode `json:"displayCurrency,omitempty" validate:"omitempty,oneof=BRL USD"`
+	ShowPrice          *bool         `json:"showPrice,omitempty"`
+	ExpiresAt          *string       `json:"expiresAt,omitempty"` // ISO date
+	IsActive           *bool         `json:"isActive,omitempty"`
 }
 
 // SalesLinkFilters representa os filtros para busca de links
@@ -160,26 +184,31 @@ type PublicProduct struct {
 
 // PublicSalesLink representa dados seguros de um link para exibição pública
 type PublicSalesLink struct {
-	Title         string              `json:"title,omitempty"`
-	CustomMessage string              `json:"customMessage,omitempty"`
-	DisplayPrice  *float64            `json:"displayPrice,omitempty"`
-	ShowPrice     bool                `json:"showPrice"`
-	Batch         *PublicBatch        `json:"batch,omitempty"`
-	Product       *PublicProduct      `json:"product,omitempty"`
-	Items         []PublicLinkItem    `json:"items,omitempty"` // Para MULTIPLOS_LOTES
+	Title              string           `json:"title,omitempty"`
+	CustomMessage      string           `json:"customMessage,omitempty"`
+	DisplayPriceAmount int64            `json:"displayPriceAmount,omitempty"`
+	DisplayCurrency    CurrencyCode     `json:"displayCurrency"`
+	DisplayPrice       *float64         `json:"displayPrice,omitempty"` // Campo legado para compatibilidade
+	ShowPrice          bool             `json:"showPrice"`
+	Batch              *PublicBatch     `json:"batch,omitempty"`
+	Product            *PublicProduct   `json:"product,omitempty"`
+	Items              []PublicLinkItem `json:"items,omitempty"` // Para MULTIPLOS_LOTES
 }
 
 // PublicLinkItem representa dados seguros de um item de link para exibição pública
 type PublicLinkItem struct {
-	BatchCode    string   `json:"batchCode"`
-	ProductName  string   `json:"productName"`
-	Material     string   `json:"material"`
-	Finish       string   `json:"finish"`
-	Height       float64  `json:"height"`
-	Width        float64  `json:"width"`
-	Thickness    float64  `json:"thickness"`
-	Quantity     int      `json:"quantity"`
-	UnitPrice    float64  `json:"unitPrice,omitempty"`
-	TotalPrice   float64  `json:"totalPrice,omitempty"`
-	Medias       []Media  `json:"medias"`
+	BatchCode       string       `json:"batchCode"`
+	ProductName     string       `json:"productName"`
+	Material        string       `json:"material"`
+	Finish          string       `json:"finish"`
+	Height          float64      `json:"height"`
+	Width           float64      `json:"width"`
+	Thickness       float64      `json:"thickness"`
+	Quantity        int          `json:"quantity"`
+	UnitPriceAmount int64        `json:"unitPriceAmount,omitempty"`
+	TotalPriceAmount int64       `json:"totalPriceAmount,omitempty"`
+	Currency        CurrencyCode `json:"currency"`
+	UnitPrice       float64      `json:"unitPrice,omitempty"` // Campo legado para compatibilidade
+	TotalPrice      float64      `json:"totalPrice,omitempty"` // Campo legado para compatibilidade
+	Medias          []Media      `json:"medias"`
 }

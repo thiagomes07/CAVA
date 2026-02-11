@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatArea } from '@/lib/utils/formatDimensions';
@@ -22,12 +23,15 @@ import { cn } from '@/lib/utils/cn';
 export default function BrokerSalesPage() {
   const router = useRouter();
   const { error } = useToast();
+  const { user } = useAuth();
   const t = useTranslations('sales');
   const tDashboard = useTranslations('dashboard');
+  const preferredCurrency = user?.preferredCurrency || 'BRL';
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   // Calculate summary from sales
   const summary = React.useMemo(() => {
@@ -40,6 +44,24 @@ export default function BrokerSalesPage() {
   useEffect(() => {
     fetchSales();
   }, []);
+
+  useEffect(() => {
+    if (preferredCurrency !== 'USD') return;
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+        if (!response.ok) return;
+        const data = (await response.json()) as { USDBRL?: { bid?: string } };
+        const bid = Number(data?.USDBRL?.bid || 0);
+        if (Number.isFinite(bid) && bid > 0) {
+          setUsdBrlRate(bid);
+        }
+      } catch {
+        setUsdBrlRate(null);
+      }
+    };
+    fetchExchangeRate();
+  }, [preferredCurrency]);
 
   const fetchSales = async () => {
     try {
@@ -58,6 +80,12 @@ export default function BrokerSalesPage() {
   };
 
   const isEmpty = sales.length === 0;
+
+  const formatPreferredCurrency = (value: number) => {
+    const canUseUSD = preferredCurrency === 'USD' && !!usdBrlRate && usdBrlRate > 0;
+    const converted = canUseUSD ? value / usdBrlRate : value;
+    return formatCurrency(converted, 'pt', canUseUSD ? 'USD' : 'BRL');
+  };
 
   return (
     <div className="min-h-screen bg-mineral">
@@ -86,7 +114,7 @@ export default function BrokerSalesPage() {
               <TrendingUp className="w-5 h-5 text-slate-400" />
             </div>
             <p className="font-serif text-4xl text-obsidian">
-              {formatCurrency(summary.totalSales)}
+              {formatPreferredCurrency(summary.totalSales)}
             </p>
           </Card>
 
@@ -207,7 +235,7 @@ export default function BrokerSalesPage() {
                       </TableCell>
                       <TableCell>
                         <span className="font-semibold text-obsidian tabular-nums">
-                          {formatCurrency(sale.brokerSoldPrice || sale.salePrice || 0)}
+                          {formatPreferredCurrency(sale.brokerSoldPrice || sale.salePrice || 0)}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -241,7 +269,7 @@ export default function BrokerSalesPage() {
                                   {t('industryPrice')}
                                 </p>
                                 <p className="text-sm font-medium text-obsidian">
-                                  {formatCurrency(sale.salePrice || 0)}
+                                  {formatPreferredCurrency(sale.salePrice || 0)}
                                 </p>
                               </div>
                               <div>
@@ -249,7 +277,7 @@ export default function BrokerSalesPage() {
                                   {t('pricePerUnit')}
                                 </p>
                                 <p className="text-sm text-slate-600">
-                                  {formatCurrency(sale.pricePerUnit || 0)}/{sale.priceUnit || 'm²'}
+                                  {formatPreferredCurrency(sale.pricePerUnit || 0)}/{sale.priceUnit || 'm²'}
                                 </p>
                               </div>
                               <div>

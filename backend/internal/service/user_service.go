@@ -41,6 +41,10 @@ func NewUserService(
 }
 
 func (s *userService) Create(ctx context.Context, input entity.CreateUserInput) (*entity.User, error) {
+	if input.PreferredCurrency == "" {
+		input.PreferredCurrency = entity.CurrencyBRL
+	}
+
 	// Validar força da senha
 	if err := password.ValidatePasswordStrength(input.Password); err != nil {
 		return nil, domainErrors.ValidationError(err.Error())
@@ -74,6 +78,7 @@ func (s *userService) Create(ctx context.Context, input entity.CreateUserInput) 
 		IndustryID: input.IndustryID,
 		Name:       input.Name,
 		Email:      input.Email,
+		PreferredCurrency: input.PreferredCurrency,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
 		Role:       input.Role,
@@ -100,6 +105,10 @@ func (s *userService) Create(ctx context.Context, input entity.CreateUserInput) 
 }
 
 func (s *userService) CreateSeller(ctx context.Context, industryID string, input entity.CreateSellerInput) (*entity.User, error) {
+	if input.PreferredCurrency == "" {
+		input.PreferredCurrency = entity.CurrencyBRL
+	}
+
 	// Determinar role baseado no campo isAdmin
 	role := entity.RoleVendedorInterno
 	if input.IsAdmin {
@@ -142,6 +151,7 @@ func (s *userService) CreateSeller(ctx context.Context, industryID string, input
 		IndustryID: &industryID,
 		Name:       input.Name,
 		Email:      input.Email,
+		PreferredCurrency: input.PreferredCurrency,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
 		Whatsapp:   input.Whatsapp,
@@ -275,6 +285,13 @@ func (s *userService) Update(ctx context.Context, id string, input entity.Update
 		user.Whatsapp = input.Whatsapp
 	}
 
+	if input.PreferredCurrency != nil {
+		if !input.PreferredCurrency.IsValid() {
+			return nil, domainErrors.ValidationError("Moeda preferida inválida")
+		}
+		user.PreferredCurrency = *input.PreferredCurrency
+	}
+
 	user.UpdatedAt = time.Now()
 
 	// Salvar alterações
@@ -337,6 +354,10 @@ func (s *userService) UpdateStatus(ctx context.Context, id string, isActive bool
 }
 
 func (s *userService) InviteBroker(ctx context.Context, industryID string, input entity.InviteBrokerInput) (*entity.User, error) {
+	if input.PreferredCurrency == "" {
+		input.PreferredCurrency = entity.CurrencyBRL
+	}
+
 	// Verificar se email já existe
 	exists, err := s.userRepo.ExistsByEmail(ctx, input.Email)
 	if err != nil {
@@ -373,6 +394,7 @@ func (s *userService) InviteBroker(ctx context.Context, industryID string, input
 		IndustryID: nil, // Broker freelancer
 		Name:       input.Name,
 		Email:      input.Email,
+		PreferredCurrency: input.PreferredCurrency,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
 		Role:       entity.RoleBroker,

@@ -2,7 +2,6 @@
 
 import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
-import { cn } from '@/lib/utils/cn';
 import { Package, AlertTriangle, Clock, RotateCcw } from 'lucide-react';
 import type { InventoryMetrics as InventoryMetricsType } from '@/lib/types';
 
@@ -24,6 +23,7 @@ export function InventoryMetrics({ data, title = 'Metricas de Inventario', class
     );
   }
 
+  const currency = data.currency || 'BRL';
   const hasAlerts = data.lowStockCount > 0 || data.staleBatchCount > 0;
 
   return (
@@ -64,7 +64,7 @@ export function InventoryMetrics({ data, title = 'Metricas de Inventario', class
       <div className="pt-4 border-t border-slate-100 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm text-slate-600">Valor em Estoque</span>
-          <span className="font-semibold text-obsidian">{formatCurrency(data.inventoryValue)}</span>
+          <span className="font-semibold text-obsidian">{formatCurrency(data.inventoryValue, 'pt', currency)}</span>
         </div>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">

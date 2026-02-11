@@ -10,6 +10,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { LoadingState, LoadingSpinner } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { formatArea } from '@/lib/utils/formatDimensions';
@@ -32,6 +33,8 @@ export function BrokerDashboard() {
   const { error } = useToast();
   const t = useTranslations('dashboard');
   const tSales = useTranslations('sales');
+  const { user } = useAuth();
+  const preferredCurrency = user?.preferredCurrency || 'BRL';
 
   const [metrics, setMetrics] = useState<BrokerMetrics | null>(null);
   const [recentBatches, setRecentBatches] = useState<SharedInventoryBatch[]>([]);
@@ -40,6 +43,7 @@ export function BrokerDashboard() {
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
   const [isLoadingSales, setIsLoadingSales] = useState(true);
   const [isMounted, setIsMounted] = useState(false);
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   useEffect(() => {
     setIsMounted(true);
@@ -52,6 +56,34 @@ export function BrokerDashboard() {
     fetchRecentBatches();
     fetchRecentSales();
   }, [isMounted]);
+
+  useEffect(() => {
+    if (preferredCurrency !== 'USD') return;
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+        if (!response.ok) return;
+        const data = (await response.json()) as { USDBRL?: { bid?: string } };
+        const bid = Number(data?.USDBRL?.bid || 0);
+        if (Number.isFinite(bid) && bid > 0) {
+          setUsdBrlRate(bid);
+        }
+      } catch {
+        setUsdBrlRate(null);
+      }
+    };
+    fetchExchangeRate();
+  }, [preferredCurrency]);
+
+  const convertToPreferred = (value: number) => {
+    const canUseUSD = preferredCurrency === 'USD' && !!usdBrlRate && usdBrlRate > 0;
+    return canUseUSD ? value / usdBrlRate : value;
+  };
+
+  const formatPreferredCurrency = (value: number) => {
+    const canUseUSD = preferredCurrency === 'USD' && !!usdBrlRate && usdBrlRate > 0;
+    return formatCurrency(convertToPreferred(value), 'pt', canUseUSD ? 'USD' : 'BRL');
+  };
 
   const fetchMetrics = async () => {
     try {
@@ -145,7 +177,7 @@ export function BrokerDashboard() {
               <MetricCard
                 icon={TrendingUp}
                 title={t('monthlySales')}
-                value={formatCurrency(metrics?.monthlySales || 0)}
+                value={formatPreferredCurrency(metrics?.monthlySales || 0)}
                 subtitle={t('myRevenue')}
                 color="slate"
               />
@@ -273,8 +305,8 @@ export function BrokerDashboard() {
                     </p>
                     <div className="flex items-center gap-4 text-xs text-slate-500 mt-1">
                       <span>{formatArea(shared.batch.totalArea)}</span>
-                      <span className="text-obsidian">{formatCurrency(pricePerM2)}/m²</span>
-                      <span className="font-semibold text-slate-700">{formatCurrency(slabPrice)}/chapa</span>
+                      <span className="text-obsidian">{formatPreferredCurrency(pricePerM2)}/m²</span>
+                      <span className="font-semibold text-slate-700">{formatPreferredCurrency(slabPrice)}/chapa</span>
                     </div>
                   </div>
                   <Button
@@ -342,12 +374,12 @@ export function BrokerDashboard() {
                       </TableCell>
                       <TableCell>
                         <span className="font-serif text-obsidian tabular-nums">
-                          {formatCurrency(sale.salePrice)}
+                          {formatPreferredCurrency(sale.salePrice)}
                         </span>
                       </TableCell>
                       <TableCell>
                         <span className="font-semibold text-obsidian tabular-nums">
-                          {formatCurrency(sale.brokerCommission || 0)}
+                          {formatPreferredCurrency(sale.brokerCommission || 0)}
                         </span>
                       </TableCell>
                       <TableCell>

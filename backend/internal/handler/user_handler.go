@@ -185,6 +185,9 @@ func (h *UserHandler) Create(w http.ResponseWriter, r *http.Request) {
 	} else {
 		input.Role = entity.RoleVendedorInterno
 	}
+	if input.PreferredCurrency == "" {
+		input.PreferredCurrency = entity.CurrencyBRL
+	}
 
 	// Validar input
 	if err := h.validator.Validate(input); err != nil {

@@ -58,6 +58,10 @@ func NewAuthService(
 }
 
 func (s *authService) Register(ctx context.Context, input entity.CreateUserInput) (*entity.User, error) {
+	if input.PreferredCurrency == "" {
+		input.PreferredCurrency = entity.CurrencyBRL
+	}
+
 	// Validar força da senha
 	if err := password.ValidatePasswordStrength(input.Password); err != nil {
 		return nil, domainErrors.ValidationError(err.Error())
@@ -86,6 +90,7 @@ func (s *authService) Register(ctx context.Context, input entity.CreateUserInput
 		IndustryID: input.IndustryID,
 		Name:       input.Name,
 		Email:      input.Email,
+		PreferredCurrency: input.PreferredCurrency,
 		Password:   hashedPassword,
 		Phone:      input.Phone,
 		Role:       input.Role,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter, useParams } from "next/navigation";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -38,6 +38,7 @@ import { productSchema, type ProductInput } from "@/lib/schemas/product.schema";
 import { materialTypes, finishTypes } from "@/lib/schemas/product.schema";
 import { MoneyInput } from "@/components/ui/masked-input";
 import { cn } from "@/lib/utils/cn";
+import type { CurrencyCode } from "@/lib/types";
 
 interface UploadedMedia {
   id: string;
@@ -120,10 +121,14 @@ function SortableMediaItem({
 
 export default function NewProductPage() {
   const router = useRouter();
+  const params = useParams();
+  const slug = params.slug as string;
   const { success, error } = useToast();
 
   const [medias, setMedias] = useState<UploadedMedia[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [priceCurrency, setPriceCurrency] = useState<CurrencyCode>("BRL");
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   const {
     register,
@@ -147,6 +152,23 @@ export default function NewProductPage() {
   });
 
   const isPublic = watch("isPublic");
+
+  useEffect(() => {
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL");
+        if (!response.ok) return;
+        const data = (await response.json()) as { USDBRL?: { bid?: string } };
+        const bid = Number(data?.USDBRL?.bid || 0);
+        if (Number.isFinite(bid) && bid > 0) {
+          setUsdBrlRate(bid);
+        }
+      } catch {
+        setUsdBrlRate(null);
+      }
+    };
+    fetchExchangeRate();
+  }, []);
 
   // Drag and drop sensors
   const sensors = useSensors(
@@ -233,8 +255,16 @@ export default function NewProductPage() {
   const onSubmit = async (data: ProductInput) => {
     try {
       setIsSubmitting(true);
+      if (priceCurrency === "USD" && (!usdBrlRate || usdBrlRate <= 0)) {
+        error("Não foi possível obter câmbio USD/BRL agora. Tente novamente.");
+        return;
+      }
 
       // 1. Criar o produto primeiro (sem mídias)
+      const basePriceInBrl = typeof data.basePrice === "number"
+        ? (priceCurrency === "USD" ? data.basePrice * (usdBrlRate as number) : data.basePrice)
+        : null;
+
       const productData = {
         name: data.name,
         sku: data.sku || undefined,
@@ -242,7 +272,7 @@ export default function NewProductPage() {
         finish: data.finish,
         description: data.description || undefined,
         isPublic: data.isPublic,
-        basePrice: data.basePrice || null,
+        basePrice: basePriceInBrl,
         priceUnit: data.priceUnit || "M2",
       };
 
@@ -440,8 +470,22 @@ export default function NewProductPage() {
               </h2>
             </div>
             <div className="p-6">
+              <div className="mb-4">
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Moeda do preço
+                </label>
+                <select
+                  value={priceCurrency}
+                  onChange={(e) => setPriceCurrency(e.target.value as CurrencyCode)}
+                  disabled={isSubmitting}
+                  className="w-full md:w-1/2 px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                >
+                  <option value="BRL">Real (BRL)</option>
+                  <option value="USD">Dollar (USD)</option>
+                </select>
+              </div>
               <label className="text-xs font-medium text-slate-600 block mb-2">
-                Preço por m² <span className="text-slate-400">(opcional)</span>
+                Preço por m² ({priceCurrency}) <span className="text-slate-400">(opcional)</span>
               </label>
               <Controller
                 name="basePrice"
@@ -469,6 +513,11 @@ export default function NewProductPage() {
                 Este preço será usado como referência ao criar novos lotes deste
                 produto
               </p>
+              {priceCurrency === "USD" && (
+                <p className="mt-1 text-xs text-slate-500">
+                  O sistema converte e salva em BRL usando a cotação atual.
+                </p>
+              )}
             </div>
           </div>
 

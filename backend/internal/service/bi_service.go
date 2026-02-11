@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"sync"
 	"time"
 
@@ -15,6 +17,10 @@ import (
 type biService struct {
 	biRepo repository.BIRepository
 	logger *zap.Logger
+	fxMu        sync.Mutex
+	cachedRate  float64
+	cachedAt    time.Time
+	fxCacheTTL  time.Duration
 }
 
 func NewBIService(
@@ -24,6 +30,7 @@ func NewBIService(
 	return &biService{
 		biRepo: biRepo,
 		logger: logger,
+		fxCacheTTL: time.Hour,
 	}
 }
 
@@ -36,6 +43,7 @@ func (s *biService) GetDashboard(ctx context.Context, filters entity.BIFilters) 
 			filters.StartDate.Format("2006-01-02"),
 			filters.EndDate.Format("2006-01-02"),
 		),
+		Currency: filters.Currency,
 	}
 
 	var wg sync.WaitGroup
@@ -158,6 +166,10 @@ func (s *biService) GetDashboard(ctx context.Context, filters entity.BIFilters) 
 		}
 	}
 
+	if err := s.applyCurrencyToDashboard(ctx, dashboard, filters.Currency); err != nil {
+		return nil, domainErrors.InternalError(err)
+	}
+
 	s.logger.Info("dashboard de BI carregado com sucesso",
 		zap.String("industryId", filters.IndustryID),
 		zap.String("period", dashboard.Period),
@@ -173,6 +185,11 @@ func (s *biService) GetSalesMetrics(ctx context.Context, filters entity.BIFilter
 	metrics, err := s.biRepo.GetSalesMetrics(ctx, filters)
 	if err != nil {
 		s.logger.Error("erro ao buscar métricas de vendas", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+
+	metrics.Currency = entity.CurrencyBRL
+	if err := s.applyCurrencyToSales(ctx, metrics, filters.Currency); err != nil {
 		return nil, domainErrors.InternalError(err)
 	}
 
@@ -193,11 +210,20 @@ func (s *biService) GetConversionMetrics(ctx context.Context, filters entity.BIF
 }
 
 // GetInventoryMetrics retorna apenas métricas de inventário
-func (s *biService) GetInventoryMetrics(ctx context.Context, industryID string) (*entity.InventoryMetrics, error) {
+func (s *biService) GetInventoryMetrics(ctx context.Context, industryID string, currency entity.CurrencyCode) (*entity.InventoryMetrics, error) {
 	metrics, err := s.biRepo.GetInventoryMetrics(ctx, industryID)
 	if err != nil {
 		s.logger.Error("erro ao buscar métricas de inventário", zap.Error(err))
 		return nil, domainErrors.InternalError(err)
+	}
+
+	metrics.Currency = entity.CurrencyBRL
+	if currency == entity.CurrencyUSD {
+		rate, err := s.getUSDBRLRate(ctx)
+		if err != nil {
+			return nil, domainErrors.InternalError(err)
+		}
+		s.convertInventory(metrics, rate)
 	}
 
 	return metrics, nil
@@ -210,6 +236,10 @@ func (s *biService) GetBrokerRanking(ctx context.Context, filters entity.BIFilte
 	brokers, err := s.biRepo.GetBrokerPerformance(ctx, filters)
 	if err != nil {
 		s.logger.Error("erro ao buscar ranking de brokers", zap.Error(err))
+		return nil, domainErrors.InternalError(err)
+	}
+
+	if err := s.applyCurrencyToBrokers(ctx, brokers, filters.Currency); err != nil {
 		return nil, domainErrors.InternalError(err)
 	}
 
@@ -226,6 +256,10 @@ func (s *biService) GetSalesTrend(ctx context.Context, filters entity.BIFilters)
 		return nil, domainErrors.InternalError(err)
 	}
 
+	if err := s.applyCurrencyToTrend(ctx, trend, filters.Currency); err != nil {
+		return nil, domainErrors.InternalError(err)
+	}
+
 	return trend, nil
 }
 
@@ -239,7 +273,193 @@ func (s *biService) GetTopProducts(ctx context.Context, filters entity.BIFilters
 		return nil, domainErrors.InternalError(err)
 	}
 
+	if err := s.applyCurrencyToProducts(ctx, products, filters.Currency); err != nil {
+		return nil, domainErrors.InternalError(err)
+	}
+
 	return products, nil
+}
+
+func (s *biService) applyCurrencyToDashboard(ctx context.Context, dashboard *entity.BIDashboard, target entity.CurrencyCode) error {
+	dashboard.Sales.Currency = entity.CurrencyBRL
+	dashboard.Inventory.Currency = entity.CurrencyBRL
+	for i := range dashboard.TopBrokers {
+		dashboard.TopBrokers[i].Currency = entity.CurrencyBRL
+	}
+	for i := range dashboard.SalesTrend {
+		dashboard.SalesTrend[i].Currency = entity.CurrencyBRL
+	}
+	for i := range dashboard.TopProducts {
+		dashboard.TopProducts[i].Currency = entity.CurrencyBRL
+	}
+
+	if target == "" || target == entity.CurrencyBRL {
+		dashboard.Currency = entity.CurrencyBRL
+		return nil
+	}
+	if target != entity.CurrencyUSD {
+		return nil
+	}
+
+	rate, err := s.getUSDBRLRate(ctx)
+	if err != nil {
+		return err
+	}
+	dashboard.ExchangeRateUsed = &rate
+	dashboard.Currency = entity.CurrencyUSD
+
+	s.convertSales(&dashboard.Sales, rate)
+	s.convertInventory(&dashboard.Inventory, rate)
+	for i := range dashboard.TopBrokers {
+		dashboard.TopBrokers[i].TotalRevenue /= rate
+		dashboard.TopBrokers[i].TotalCommission /= rate
+		dashboard.TopBrokers[i].AverageTicket /= rate
+		dashboard.TopBrokers[i].Currency = entity.CurrencyUSD
+	}
+	for i := range dashboard.SalesTrend {
+		dashboard.SalesTrend[i].Value /= rate
+		dashboard.SalesTrend[i].Currency = entity.CurrencyUSD
+	}
+	for i := range dashboard.TopProducts {
+		dashboard.TopProducts[i].Revenue /= rate
+		dashboard.TopProducts[i].Currency = entity.CurrencyUSD
+	}
+	return nil
+}
+
+func (s *biService) applyCurrencyToSales(ctx context.Context, metrics *entity.SalesMetrics, target entity.CurrencyCode) error {
+	metrics.Currency = entity.CurrencyBRL
+	if target == "" || target == entity.CurrencyBRL {
+		return nil
+	}
+	if target != entity.CurrencyUSD {
+		return nil
+	}
+	rate, err := s.getUSDBRLRate(ctx)
+	if err != nil {
+		return err
+	}
+	s.convertSales(metrics, rate)
+	return nil
+}
+
+func (s *biService) applyCurrencyToBrokers(ctx context.Context, brokers []entity.BrokerPerformance, target entity.CurrencyCode) error {
+	for i := range brokers {
+		brokers[i].Currency = entity.CurrencyBRL
+	}
+	if target == "" || target == entity.CurrencyBRL {
+		return nil
+	}
+	if target != entity.CurrencyUSD {
+		return nil
+	}
+	rate, err := s.getUSDBRLRate(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range brokers {
+		brokers[i].TotalRevenue /= rate
+		brokers[i].TotalCommission /= rate
+		brokers[i].AverageTicket /= rate
+		brokers[i].Currency = entity.CurrencyUSD
+	}
+	return nil
+}
+
+func (s *biService) applyCurrencyToTrend(ctx context.Context, trend []entity.TrendPoint, target entity.CurrencyCode) error {
+	for i := range trend {
+		trend[i].Currency = entity.CurrencyBRL
+	}
+	if target == "" || target == entity.CurrencyBRL {
+		return nil
+	}
+	if target != entity.CurrencyUSD {
+		return nil
+	}
+	rate, err := s.getUSDBRLRate(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range trend {
+		trend[i].Value /= rate
+		trend[i].Currency = entity.CurrencyUSD
+	}
+	return nil
+}
+
+func (s *biService) applyCurrencyToProducts(ctx context.Context, products []entity.ProductMetric, target entity.CurrencyCode) error {
+	for i := range products {
+		products[i].Currency = entity.CurrencyBRL
+	}
+	if target == "" || target == entity.CurrencyBRL {
+		return nil
+	}
+	if target != entity.CurrencyUSD {
+		return nil
+	}
+	rate, err := s.getUSDBRLRate(ctx)
+	if err != nil {
+		return err
+	}
+	for i := range products {
+		products[i].Revenue /= rate
+		products[i].Currency = entity.CurrencyUSD
+	}
+	return nil
+}
+
+func (s *biService) convertSales(metrics *entity.SalesMetrics, usdBrl float64) {
+	metrics.TotalRevenue /= usdBrl
+	metrics.TotalCommissions /= usdBrl
+	metrics.NetRevenue /= usdBrl
+	metrics.AverageTicket /= usdBrl
+	metrics.Currency = entity.CurrencyUSD
+}
+
+func (s *biService) convertInventory(metrics *entity.InventoryMetrics, usdBrl float64) {
+	metrics.InventoryValue /= usdBrl
+	metrics.Currency = entity.CurrencyUSD
+}
+
+func (s *biService) getUSDBRLRate(ctx context.Context) (float64, error) {
+	s.fxMu.Lock()
+	if s.cachedRate > 0 && time.Since(s.cachedAt) <= s.fxCacheTTL {
+		rate := s.cachedRate
+		s.fxMu.Unlock()
+		return rate, nil
+	}
+	s.fxMu.Unlock()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
+	if err != nil {
+		return 0, err
+	}
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	var fxResp struct {
+		USDBRL struct {
+			Bid string `json:"bid"`
+		} `json:"USDBRL"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&fxResp); err != nil {
+		return 0, err
+	}
+	var rate float64
+	if _, err := fmt.Sscanf(fxResp.USDBRL.Bid, "%f", &rate); err != nil || rate <= 0 {
+		return 0, fmt.Errorf("cotacao USD/BRL invalida")
+	}
+
+	s.fxMu.Lock()
+	s.cachedRate = rate
+	s.cachedAt = time.Now()
+	s.fxMu.Unlock()
+
+	return rate, nil
 }
 
 // RefreshViews atualiza as views materializadas

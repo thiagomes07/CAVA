@@ -10,6 +10,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -25,16 +26,43 @@ export function SellerDashboard() {
   const t = useTranslations('dashboard');
   const tActivities = useTranslations('activities');
   const tSales = useTranslations('sales');
+  const { user } = useAuth();
+  const preferredCurrency = user?.preferredCurrency || 'BRL';
 
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingMetrics, setIsLoadingMetrics] = useState(true);
   const [isLoadingActivities, setIsLoadingActivities] = useState(true);
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   useEffect(() => {
     fetchMetrics();
     fetchActivities();
   }, []);
+
+  useEffect(() => {
+    if (preferredCurrency !== 'USD') return;
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+        if (!response.ok) return;
+        const data = (await response.json()) as { USDBRL?: { bid?: string } };
+        const bid = Number(data?.USDBRL?.bid || 0);
+        if (Number.isFinite(bid) && bid > 0) {
+          setUsdBrlRate(bid);
+        }
+      } catch {
+        setUsdBrlRate(null);
+      }
+    };
+    fetchExchangeRate();
+  }, [preferredCurrency]);
+
+  const formatPreferredCurrency = (value: number) => {
+    const canUseUSD = preferredCurrency === 'USD' && !!usdBrlRate && usdBrlRate > 0;
+    const converted = canUseUSD ? value / usdBrlRate : value;
+    return formatCurrency(converted, 'pt', canUseUSD ? 'USD' : 'BRL');
+  };
 
   const fetchMetrics = async () => {
     try {
@@ -93,7 +121,7 @@ export function SellerDashboard() {
               <MetricCard
                 icon={TrendingUp}
                 title={t('monthlySales')}
-                value={formatCurrency(metrics?.monthlySales || 0)}
+                value={formatPreferredCurrency(metrics?.monthlySales || 0)}
                 subtitle={t('monthlyRevenue')}
                 color="slate"
               />

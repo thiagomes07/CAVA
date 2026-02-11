@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Check, Search, Copy, Link2, FileText, Calendar, Layers } from 'lucide-react';
@@ -21,6 +21,7 @@ const catalogLinkSchema = z.object({
   slugToken: z.string().min(3).max(50),
   title: z.string().max(100).optional(),
   customMessage: z.string().max(500).optional(),
+  displayCurrency: z.enum(['BRL', 'USD']),
   expiresAt: z.string().optional(),
   isActive: z.boolean(),
   batchIds: z.array(z.string().uuid()).min(1, 'Selecione pelo menos um lote'),
@@ -30,8 +31,6 @@ type CatalogLinkInput = z.infer<typeof catalogLinkSchema>;
 
 export default function CreateCatalogLinkPage() {
   const locale = useLocale();
-  const params = useParams();
-  const slug = params.slug as string;
   const router = useRouter();
   const { success, error } = useToast();
 
@@ -55,6 +54,7 @@ export default function CreateCatalogLinkPage() {
     resolver: zodResolver(catalogLinkSchema),
     defaultValues: {
       slugToken: nanoid(10).toLowerCase(),
+      displayCurrency: 'BRL',
       isActive: true,
       batchIds: [],
     },
@@ -148,7 +148,7 @@ export default function CreateCatalogLinkPage() {
     try {
       setIsSubmitting(true);
 
-      const payload: any = {
+      const payload: CatalogLinkInput = {
         ...data,
         batchIds: selectedBatchIds,
       };
@@ -170,9 +170,8 @@ export default function CreateCatalogLinkPage() {
 
       await navigator.clipboard.writeText(fullUrl);
       success('Link copiado para a área de transferência!');
-    } catch (err: any) {
-      const errorMessage =
-        err?.response?.data?.message || err?.message || 'Erro ao criar catálogo';
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Erro ao criar catálogo';
       error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -314,6 +313,26 @@ export default function CreateCatalogLinkPage() {
                   />
                 </div>
               </div>
+
+              <div className="max-w-xs">
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Moeda de Exibição <span className="text-[#C2410C]">*</span>
+                </label>
+                <select
+                  {...register('displayCurrency')}
+                  disabled={isSubmitting}
+                  className={cn(
+                    'w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <option value="BRL">Real (BRL)</option>
+                  <option value="USD">Dólar (USD)</option>
+                </select>
+                {errors.displayCurrency && (
+                  <p className="mt-1 text-xs text-rose-500">{errors.displayCurrency.message}</p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -418,7 +437,7 @@ export default function CreateCatalogLinkPage() {
             <Button
               type="button"
               variant="secondary"
-              onClick={() => router.push(`/${slug}/catalogos`)}
+              onClick={() => router.push(`/${locale}/catalogos`)}
               disabled={isSubmitting}
             >
               Cancelar
@@ -459,7 +478,7 @@ export default function CreateCatalogLinkPage() {
             variant="primary"
             onClick={() => {
               setShowSuccessModal(false);
-              router.push(`/${slug}/catalogos`);
+              router.push(`/${locale}/catalogos`);
             }}
           >
             Ver Catálogos

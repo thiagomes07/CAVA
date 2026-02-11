@@ -2,8 +2,8 @@
 
 import { useState, type ReactNode } from 'react';
 import { QueryClient, QueryClientProvider, QueryCache, MutationCache } from '@tanstack/react-query';
-import { toast } from 'sonner';
 import { ApiError } from '@/lib/api/client';
+import { showErrorToast } from '@/lib/hooks/useToast';
 
 interface QueryProviderProps {
   children: ReactNode;
@@ -54,21 +54,31 @@ const handleError = (error: unknown) => {
   }
 
   const message = getErrorMessage(error);
-  
-  toast.error(message, {
-    duration: 5000,
-    position: 'top-right',
-  });
+
+  showErrorToast(message);
 };
 
 // Factory function to create QueryClient with proper configuration
 function makeQueryClient() {
   return new QueryClient({
     queryCache: new QueryCache({
-      onError: handleError,
+      onError: (error, query) => {
+        // Erros de carga inicial costumam ter tratamento local na tela (estado de erro/empty state).
+        // Aqui mostramos apenas falhas de refetch quando já havia dados previamente.
+        if (query.state.data === undefined) {
+          return;
+        }
+        handleError(error);
+      },
     }),
     mutationCache: new MutationCache({
-      onError: handleError,
+      onError: (error, _variables, _context, mutation) => {
+        // Se a mutation já definiu onError local, evita toast duplicado.
+        if (mutation.options.onError) {
+          return;
+        }
+        handleError(error);
+      },
     }),
     defaultOptions: {
       queries: {

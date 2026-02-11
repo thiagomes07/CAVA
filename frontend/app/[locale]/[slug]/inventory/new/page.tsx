@@ -30,7 +30,7 @@ import { batchSchema, type BatchInput, priceUnits } from '@/lib/schemas/batch.sc
 import { calculateTotalArea, formatArea } from '@/lib/utils/formatDimensions';
 import { formatPricePerUnit, getPriceUnitLabel, calculateTotalBatchPrice } from '@/lib/utils/priceConversion';
 import { MoneyInput } from '@/components/ui/masked-input';
-import type { Product, PriceUnit, MaterialType, FinishType } from '@/lib/types';
+import type { Product, PriceUnit, MaterialType, FinishType, CurrencyCode } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 
@@ -122,6 +122,9 @@ export default function NewBatchPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [calculatedArea, setCalculatedArea] = useState<number>(0);
   const [showNewProductForm, setShowNewProductForm] = useState(false);
+  const [batchPriceCurrency, setBatchPriceCurrency] = useState<CurrencyCode>('BRL');
+  const [newProductPriceCurrency, setNewProductPriceCurrency] = useState<CurrencyCode>('BRL');
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   const {
     register,
@@ -153,7 +156,25 @@ export default function NewBatchPage() {
 
   useEffect(() => {
     fetchProducts();
+    fetchExchangeRate();
   }, []);
+
+  const fetchExchangeRate = async () => {
+    try {
+      const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+      if (!response.ok) {
+        setUsdBrlRate(null);
+        return;
+      }
+      const data = (await response.json()) as { USDBRL?: { bid?: string } };
+      const bid = Number(data?.USDBRL?.bid || 0);
+      if (Number.isFinite(bid) && bid > 0) {
+        setUsdBrlRate(bid);
+      }
+    } catch {
+      setUsdBrlRate(null);
+    }
+  };
 
   useEffect(() => {
     if (height && width && quantitySlabs) {
@@ -267,9 +288,26 @@ export default function NewBatchPage() {
   const onSubmit = async (data: BatchInput) => {
     try {
       setIsSubmitting(true);
+      if ((batchPriceCurrency === 'USD' || newProductPriceCurrency === 'USD') && (!usdBrlRate || usdBrlRate <= 0)) {
+        error('Não foi possível obter câmbio USD/BRL agora. Tente novamente.');
+        return;
+      }
+
+      const payload: BatchInput = {
+        ...data,
+        industryPrice: batchPriceCurrency === 'USD'
+          ? data.industryPrice * (usdBrlRate as number)
+          : data.industryPrice,
+      };
+
+      if (payload.newProduct?.basePrice) {
+        payload.newProduct.basePrice = newProductPriceCurrency === 'USD'
+          ? payload.newProduct.basePrice * (usdBrlRate as number)
+          : payload.newProduct.basePrice;
+      }
 
       // 1) Cria o lote primeiro
-      const created = await apiClient.post<{ id: string }>('/batches', data);
+      const created = await apiClient.post<{ id: string }>('/batches', payload);
 
       // 2) Se houver mídias, faz upload vinculando ao lote criado
       if (medias.length > 0) {
@@ -465,11 +503,22 @@ export default function NewBatchPage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="text-xs font-medium text-slate-600 block mb-2">
-                      <DollarSign className="w-3.5 h-3.5 inline mr-1" />
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  <DollarSign className="w-3.5 h-3.5 inline mr-1" />
                       Preço Base por m² <span className="text-slate-400">(opcional)</span>
-                    </label>
+                </label>
+                    <div className="mb-2">
+                      <select
+                        value={newProductPriceCurrency}
+                        onChange={(e) => setNewProductPriceCurrency(e.target.value as CurrencyCode)}
+                        disabled={isSubmitting}
+                        className="w-full px-3 py-2.5 bg-white border border-slate-200 focus:border-[#C2410C] outline-none text-sm transition-colors"
+                      >
+                        <option value="BRL">Real (BRL)</option>
+                        <option value="USD">Dollar (USD)</option>
+                      </select>
+                    </div>
                     <Controller
                       name="newProduct.basePrice"
                       control={control}
@@ -486,6 +535,11 @@ export default function NewBatchPage() {
                     <p className="mt-1 text-xs text-slate-500">
                       Preço de referência para novos lotes deste produto
                     </p>
+                    {newProductPriceCurrency === 'USD' && (
+                      <p className="mt-1 text-xs text-slate-500">
+                        O sistema converte e salva em BRL usando a cotação atual.
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -672,6 +726,22 @@ export default function NewBatchPage() {
 
               {/* Unidade de Preço */}
               <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Moeda do preço
+                </label>
+                <select
+                  value={batchPriceCurrency}
+                  onChange={(e) => setBatchPriceCurrency(e.target.value as CurrencyCode)}
+                  disabled={isSubmitting}
+                  className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors"
+                >
+                  <option value="BRL">Real (BRL)</option>
+                  <option value="USD">Dollar (USD)</option>
+                </select>
+              </div>
+
+              {/* Unidade de Preço */}
+              <div>
                 <label className="text-xs font-medium text-slate-600 block mb-3">
                   Unidade de Preço
                 </label>
@@ -691,7 +761,7 @@ export default function NewBatchPage() {
                         )}
                         disabled={isSubmitting}
                       >
-                        R$/m²
+                        {batchPriceCurrency === 'USD' ? 'US$' : 'R$'}/m²
                       </button>
                       <button
                         type="button"
@@ -704,7 +774,7 @@ export default function NewBatchPage() {
                         )}
                         disabled={isSubmitting}
                       >
-                        R$/ft²
+                        {batchPriceCurrency === 'USD' ? 'US$' : 'R$'}/ft²
                       </button>
                     </div>
                   )}
@@ -716,7 +786,7 @@ export default function NewBatchPage() {
 
               <div>
                 <label className="text-xs font-medium text-slate-600 block mb-2">
-                  Preço por {getPriceUnitLabel(priceUnit as PriceUnit)} <span className="text-[#C2410C]">*</span>
+                  Preço por {getPriceUnitLabel(priceUnit as PriceUnit)} ({batchPriceCurrency}) <span className="text-[#C2410C]">*</span>
                 </label>
                 <Controller
                   name="industryPrice"
@@ -749,11 +819,11 @@ export default function NewBatchPage() {
                       <p className="text-xl font-mono font-bold text-slate-800">
                         {new Intl.NumberFormat('pt-BR', {
                           style: 'currency',
-                          currency: 'BRL',
+                          currency: batchPriceCurrency,
                         }).format(slabPrice)}
                       </p>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        {formatPricePerUnit(industryPrice, priceUnit as PriceUnit)} × {slabArea.toFixed(2)} m²
+                        {formatPricePerUnit(industryPrice, priceUnit as PriceUnit, 'pt-BR', batchPriceCurrency)} × {slabArea.toFixed(2)} m²
                       </p>
                     </div>
                   </div>
@@ -771,16 +841,21 @@ export default function NewBatchPage() {
                         <p className="text-xl font-mono font-bold text-slate-800">
                           {new Intl.NumberFormat('pt-BR', {
                             style: 'currency',
-                            currency: 'BRL',
+                            currency: batchPriceCurrency,
                           }).format(calculateTotalBatchPrice(calculatedArea, industryPrice, priceUnit as PriceUnit))}
                         </p>
                         <p className="text-xs text-slate-500 mt-0.5">
-                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(slabPrice)} × {quantitySlabs}
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: batchPriceCurrency }).format(slabPrice)} × {quantitySlabs}
                         </p>
                       </div>
                     </div>
                   )}
                 </div>
+              )}
+              {batchPriceCurrency === 'USD' && (
+                <p className="text-xs text-slate-500">
+                  O sistema converte e salva em BRL usando a cotação atual.
+                </p>
               )}
             </div>
           </div>

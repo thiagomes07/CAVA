@@ -12,6 +12,7 @@ type CatalogLink struct {
 	SlugToken       string    `json:"slugToken"`
 	Title           *string   `json:"title,omitempty"`
 	CustomMessage   *string   `json:"customMessage,omitempty"`
+	DisplayCurrency CurrencyCode `json:"displayCurrency"`
 	ViewsCount      int       `json:"viewsCount"`
 	ExpiresAt       *time.Time `json:"expiresAt,omitempty"`
 	IsActive        bool      `json:"isActive"`
@@ -35,6 +36,7 @@ type CreateCatalogLinkInput struct {
 	SlugToken     string   `json:"slugToken" validate:"required,min=3,max=50,slug"`
 	Title         *string  `json:"title,omitempty" validate:"omitempty,max=100"`
 	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
+	DisplayCurrency CurrencyCode `json:"displayCurrency" validate:"required,oneof=BRL USD"`
 	BatchIDs      []string `json:"batchIds" validate:"required,min=1,dive,uuid"` // IDs dos lotes a incluir
 	ExpiresAt     *string  `json:"expiresAt,omitempty"` // ISO date
 	IsActive      bool     `json:"isActive"`
@@ -42,17 +44,19 @@ type CreateCatalogLinkInput struct {
 
 // UpdateCatalogLinkInput representa os dados para atualizar um link de catálogo
 type UpdateCatalogLinkInput struct {
-	Title         *string  `json:"title,omitempty" validate:"omitempty,max=100"`
-	CustomMessage *string  `json:"customMessage,omitempty" validate:"omitempty,max=500"`
-	BatchIDs      *[]string `json:"batchIds,omitempty" validate:"omitempty,min=1,dive,uuid"`
-	ExpiresAt     *string  `json:"expiresAt,omitempty"` // ISO date
-	IsActive      *bool    `json:"isActive,omitempty"`
+	Title           *string       `json:"title,omitempty" validate:"omitempty,max=100"`
+	CustomMessage   *string       `json:"customMessage,omitempty" validate:"omitempty,max=500"`
+	DisplayCurrency *CurrencyCode `json:"displayCurrency,omitempty" validate:"omitempty,oneof=BRL USD"`
+	BatchIDs        *[]string     `json:"batchIds,omitempty" validate:"omitempty,min=1,dive,uuid"`
+	ExpiresAt       *string       `json:"expiresAt,omitempty"` // ISO date
+	IsActive        *bool         `json:"isActive,omitempty"`
 }
 
 // PublicCatalogLink representa dados sanitizados de um catálogo para exibição pública
 type PublicCatalogLink struct {
 	Title         *string      `json:"title,omitempty"`
 	CustomMessage *string      `json:"customMessage,omitempty"`
+	DisplayCurrency CurrencyCode `json:"displayCurrency"`
 	Batches       []PublicBatch `json:"batches"`
 	DepositName   string        `json:"depositName"`
 	DepositCity   *string       `json:"depositCity,omitempty"`

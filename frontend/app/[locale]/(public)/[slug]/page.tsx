@@ -17,7 +17,7 @@ import { useToast } from '@/lib/hooks/useToast';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { cn } from '@/lib/utils/cn';
-import type { Media } from '@/lib/types';
+import type { CurrencyCode, Media } from '@/lib/types';
 
 // Resposta pública sanitizada do backend
 interface PublicBatch {
@@ -52,6 +52,7 @@ interface PublicLinkItem {
   thickness: number;
   quantity: number;
   unitPrice?: number;
+  currency?: CurrencyCode;
   totalPrice?: number;
   medias: Media[];
 }
@@ -60,6 +61,7 @@ interface PublicSalesLink {
   title?: string;
   customMessage?: string;
   displayPrice?: number;
+  displayCurrency?: CurrencyCode;
   showPrice: boolean;
   batch?: PublicBatch;
   product?: PublicProduct;
@@ -229,7 +231,7 @@ export default function PublicLinkPage() {
                 
                 {!isMultipleBatches && (batch?.material || product?.material) && (
                   <p className="text-lg sm:text-xl md:text-2xl text-slate-500 leading-relaxed font-light font-serif italic max-w-xl">
-                    "{batch?.material || product?.material} • {batch?.finish || product?.finish}"
+                    &quot;{batch?.material || product?.material} • {batch?.finish || product?.finish}&quot;
                   </p>
                 )}
                 
@@ -271,9 +273,9 @@ export default function PublicLinkPage() {
                   {link.showPrice && link.displayPrice && (
                     <div className="pt-8 border-t border-slate-200">
                       <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-400 mb-3">Valor</p>
-                      <p className="text-4xl font-serif text-[#121212]">{formatCurrency(link.displayPrice)}</p>
+                      <p className="text-4xl font-serif text-[#121212]">{formatCurrency(link.displayPrice, 'pt', link.displayCurrency || 'BRL')}</p>
                       {batch.totalArea > 0 && (
-                        <p className="text-sm text-slate-400 mt-2">≈ {formatCurrency(link.displayPrice / batch.totalArea)}/m²</p>
+                        <p className="text-sm text-slate-400 mt-2">≈ {formatCurrency(link.displayPrice / batch.totalArea, 'pt', link.displayCurrency || 'BRL')}/m²</p>
                       )}
                     </div>
                   )}
@@ -318,7 +320,7 @@ export default function PublicLinkPage() {
                               </span>
                               {link.showPrice && item.totalPrice && (
                                 <span className="text-sm font-semibold text-[#121212]">
-                                  {formatCurrency(item.totalPrice)}
+                                  {formatCurrency(item.totalPrice, 'pt', item.currency || link.displayCurrency || 'BRL')}
                                 </span>
                               )}
                             </div>
@@ -333,7 +335,7 @@ export default function PublicLinkPage() {
                       <div className="flex items-center justify-between">
                         <span className="text-sm text-white/60">Total: {totals.totalPieces} peça(s)</span>
                         {link.showPrice && totals.totalValue > 0 && (
-                          <span className="text-2xl font-serif">{formatCurrency(totals.totalValue)}</span>
+                          <span className="text-2xl font-serif">{formatCurrency(totals.totalValue, 'pt', link.displayCurrency || 'BRL')}</span>
                         )}
                       </div>
                     </div>
@@ -436,7 +438,7 @@ export default function PublicLinkPage() {
         {link.customMessage && (
           <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 mt-12 border-t border-slate-200 pt-8">
             <p className="text-center text-slate-500 font-light italic max-w-2xl mx-auto">
-              "{link.customMessage}"
+              &quot;{link.customMessage}&quot;
             </p>
           </div>
         )}

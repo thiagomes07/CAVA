@@ -51,6 +51,9 @@ func (s *catalogLinkService) Create(ctx context.Context, industryID, userID stri
 	if exists {
 		return nil, domainErrors.SlugExistsError(input.SlugToken)
 	}
+	if !input.DisplayCurrency.IsValid() {
+		return nil, domainErrors.ValidationError("Moeda de exibição inválida")
+	}
 
 	// Se industryID estiver vazio (broker), obter do primeiro lote
 	if industryID == "" {
@@ -99,6 +102,7 @@ func (s *catalogLinkService) Create(ctx context.Context, industryID, userID stri
 		SlugToken:       input.SlugToken,
 		Title:           input.Title,
 		CustomMessage:   input.CustomMessage,
+		DisplayCurrency: input.DisplayCurrency,
 		ExpiresAt:       expiresAt,
 		IsActive:        input.IsActive,
 		ViewsCount:      0,
@@ -175,13 +179,14 @@ func (s *catalogLinkService) GetPublicBySlug(ctx context.Context, slug string) (
 
 	// Construir resposta pública
 	result := &entity.PublicCatalogLink{
-		Title:        link.Title,
-		CustomMessage: link.CustomMessage,
-		DepositName:  depositName,
-		DepositCity:  industry.AddressCity,
-		DepositState: industry.AddressState,
-		DepositLogo:  industry.LogoURL,
-		Batches:      []entity.PublicBatch{},
+		Title:           link.Title,
+		CustomMessage:   link.CustomMessage,
+		DisplayCurrency: link.DisplayCurrency,
+		DepositName:     depositName,
+		DepositCity:     industry.AddressCity,
+		DepositState:    industry.AddressState,
+		DepositLogo:     industry.LogoURL,
+		Batches:         []entity.PublicBatch{},
 	}
 
 	// Converter lotes para formato público
@@ -257,6 +262,12 @@ func (s *catalogLinkService) Update(ctx context.Context, id, industryID string, 
 	}
 	if input.CustomMessage != nil {
 		link.CustomMessage = input.CustomMessage
+	}
+	if input.DisplayCurrency != nil {
+		if !input.DisplayCurrency.IsValid() {
+			return nil, domainErrors.ValidationError("Moeda de exibição inválida")
+		}
+		link.DisplayCurrency = *input.DisplayCurrency
 	}
 	if input.ExpiresAt != nil {
 		if *input.ExpiresAt == "" {

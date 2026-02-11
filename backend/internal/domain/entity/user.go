@@ -40,6 +40,7 @@ type User struct {
 	IndustrySlug *string    `json:"industrySlug,omitempty"` // Slug da indústria para construção de URLs
 	Name         string     `json:"name"`
 	Email        string     `json:"email"`
+	PreferredCurrency CurrencyCode `json:"preferredCurrency"`
 	Password     string     `json:"-"` // Nunca serializar senha
 	Phone        *string    `json:"phone,omitempty"`
 	Whatsapp     *string    `json:"whatsapp,omitempty"`
@@ -52,30 +53,33 @@ type User struct {
 
 // CreateUserInput representa os dados para criar um usuário (com senha manual)
 type CreateUserInput struct {
-	IndustryID *string  `json:"industryId,omitempty" validate:"omitempty,uuid"`
-	Name       string   `json:"name" validate:"required,min=2,max=255"`
-	Email      string   `json:"email" validate:"required,email"`
-	Password   string   `json:"password" validate:"required,min=8"`
-	Phone      *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Whatsapp   *string  `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
-	Role       UserRole `json:"role" validate:"required,oneof=ADMIN_INDUSTRIA VENDEDOR_INTERNO BROKER"`
+	IndustryID         *string      `json:"industryId,omitempty" validate:"omitempty,uuid"`
+	Name               string       `json:"name" validate:"required,min=2,max=255"`
+	Email              string       `json:"email" validate:"required,email"`
+	Password           string       `json:"password" validate:"required,min=8"`
+	PreferredCurrency  CurrencyCode `json:"preferredCurrency" validate:"required,oneof=BRL USD"`
+	Phone              *string      `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp           *string      `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	Role               UserRole     `json:"role" validate:"required,oneof=ADMIN_INDUSTRIA VENDEDOR_INTERNO BROKER"`
 }
 
 // CreateSellerInput representa os dados para criar um vendedor interno (senha gerada automaticamente)
 type CreateSellerInput struct {
-	Name     string   `json:"name" validate:"required,min=2,max=255"`
-	Email    string   `json:"email" validate:"required,email"`
-	Phone    *string  `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Whatsapp *string  `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
-	Role     UserRole `json:"role" validate:"required,oneof=VENDEDOR_INTERNO ADMIN_INDUSTRIA"`
-	IsAdmin  bool     `json:"isAdmin"`
+	Name              string       `json:"name" validate:"required,min=2,max=255"`
+	Email             string       `json:"email" validate:"required,email"`
+	PreferredCurrency CurrencyCode `json:"preferredCurrency" validate:"required,oneof=BRL USD"`
+	Phone             *string      `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp          *string      `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	Role              UserRole     `json:"role" validate:"required,oneof=VENDEDOR_INTERNO ADMIN_INDUSTRIA"`
+	IsAdmin           bool         `json:"isAdmin"`
 }
 
 // UpdateUserInput representa os dados para atualizar um usuário
 type UpdateUserInput struct {
-	Name     *string `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
-	Phone    *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Whatsapp *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	Name              *string       `json:"name,omitempty" validate:"omitempty,min=2,max=255"`
+	Phone             *string       `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp          *string       `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	PreferredCurrency *CurrencyCode `json:"preferredCurrency,omitempty" validate:"omitempty,oneof=BRL USD"`
 }
 
 // UpdateUserStatusInput representa os dados para atualizar status do usuário
@@ -112,10 +116,11 @@ type RefreshTokenResponse struct {
 
 // InviteBrokerInput representa os dados para convidar um broker
 type InviteBrokerInput struct {
-	Name     string  `json:"name" validate:"required,min=2,max=255"`
-	Email    string  `json:"email" validate:"required,email"`
-	Phone    *string `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
-	Whatsapp *string `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
+	Name              string       `json:"name" validate:"required,min=2,max=255"`
+	Email             string       `json:"email" validate:"required,email"`
+	PreferredCurrency CurrencyCode `json:"preferredCurrency" validate:"required,oneof=BRL USD"`
+	Phone             *string      `json:"phone,omitempty" validate:"omitempty,min=10,max=11"`
+	Whatsapp          *string      `json:"whatsapp,omitempty" validate:"omitempty,min=10,max=11"`
 }
 
 // UpdateBrokerInput representa os dados para atualizar um broker

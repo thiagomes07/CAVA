@@ -85,6 +85,7 @@ type CreateIndustryWithAdminInput struct {
 	AdminName     *string `json:"adminName,omitempty" validate:"omitempty,min=2,max=255"`
 	AdminEmail    string  `json:"adminEmail" validate:"required,email"`
 	AdminPassword string  `json:"adminPassword" validate:"required,min=8"`
+	AdminPreferredCurrency entity.CurrencyCode `json:"adminPreferredCurrency" validate:"omitempty,oneof=BRL USD"`
 }
 
 // CreateIndustryWithAdmin godoc
@@ -208,6 +209,7 @@ func (h *SuperAdminHandler) CreateIndustryWithAdmin(w http.ResponseWriter, r *ht
 		Name:       adminName,
 		Email:      strings.TrimSpace(input.AdminEmail),
 		Password:   input.AdminPassword,
+		PreferredCurrency: input.AdminPreferredCurrency,
 		Role:       entity.RoleAdminIndustria,
 	}
 

@@ -175,6 +175,7 @@ export default function TeamManagementPage() {
         email: data.email,
         phone: sanitizePhone(data.phone),
         whatsapp: sanitizePhone(data.whatsapp),
+        preferredCurrency: data.preferredCurrency || 'BRL',
         isAdmin: data.isAdmin || false,
       });
 

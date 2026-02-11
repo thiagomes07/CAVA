@@ -12,6 +12,7 @@ type SalesMetrics struct {
 	TotalSlabs       int     `json:"totalSlabs"`
 	TotalArea        float64 `json:"totalArea"`
 	CommissionRate   float64 `json:"commissionRate"` // Porcentagem média de comissão
+	Currency         CurrencyCode `json:"currency"`
 }
 
 // ConversionMetrics representa métricas do funil de conversão (reservas)
@@ -42,6 +43,7 @@ type InventoryMetrics struct {
 	StaleBatchCount int     `json:"staleBatchCount"` // Lotes > 90 dias sem movimento
 	Turnover        float64 `json:"turnover"`        // Rotatividade do estoque
 	OccupancyRate   float64 `json:"occupancyRate"`   // Taxa de ocupação (reserved/available)
+	Currency        CurrencyCode `json:"currency"`
 }
 
 // BrokerPerformance representa performance de um broker/vendedor
@@ -57,6 +59,7 @@ type BrokerPerformance struct {
 	AvgDaysToClose  float64 `json:"avgDaysToClose"`  // Dias médios para fechar venda
 	Rank            int     `json:"rank"`            // Posição no ranking
 	TrendPercent    float64 `json:"trendPercent"`    // % variação vs período anterior
+	Currency        CurrencyCode `json:"currency"`
 }
 
 // TrendPoint representa um ponto de dados em série temporal
@@ -64,6 +67,7 @@ type TrendPoint struct {
 	Date  string  `json:"date"`  // Formato: YYYY-MM-DD ou YYYY-MM
 	Value float64 `json:"value"` // Valor (ex: receita)
 	Count int     `json:"count"` // Contagem (ex: número de vendas)
+	Currency CurrencyCode `json:"currency"`
 }
 
 // ProductMetric representa métricas de um produto
@@ -75,11 +79,14 @@ type ProductMetric struct {
 	Revenue     float64 `json:"revenue"`
 	SlabsSold   int     `json:"slabsSold"`
 	AreaSold    float64 `json:"areaSold"`
+	Currency    CurrencyCode `json:"currency"`
 }
 
 // BIDashboard representa o dashboard completo de BI
 type BIDashboard struct {
 	Period           string              `json:"period"` // Ex: "2024-01-01 a 2024-01-31"
+	Currency         CurrencyCode        `json:"currency"`
+	ExchangeRateUsed *float64            `json:"exchangeRateUsed,omitempty"`
 	Sales            SalesMetrics        `json:"sales"`
 	Conversion       ConversionMetrics   `json:"conversion"`
 	Inventory        InventoryMetrics    `json:"inventory"`
@@ -92,6 +99,7 @@ type BIDashboard struct {
 // BIFilters representa filtros para queries de BI
 type BIFilters struct {
 	IndustryID  string     `json:"industryId"`
+	Currency    CurrencyCode `json:"currency"`
 	StartDate   *time.Time `json:"startDate,omitempty"`
 	EndDate     *time.Time `json:"endDate,omitempty"`
 	BrokerID    *string    `json:"brokerId,omitempty"`
@@ -104,6 +112,9 @@ type BIFilters struct {
 func (f *BIFilters) SetDefaults() {
 	if f.Limit == 0 {
 		f.Limit = 10
+	}
+	if f.Currency == "" {
+		f.Currency = CurrencyBRL
 	}
 	if f.Granularity == "" {
 		f.Granularity = "day"

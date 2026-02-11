@@ -14,6 +14,7 @@ interface BrokerRankingProps {
 }
 
 export function BrokerRanking({ data, title = 'Ranking de Vendedores', className }: BrokerRankingProps) {
+  const currency = data?.[0]?.currency || 'BRL';
   const getRankIcon = (rank: number) => {
     switch (rank) {
       case 1:
@@ -82,12 +83,12 @@ export function BrokerRanking({ data, title = 'Ranking de Vendedores', className
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="font-medium text-emerald-600">
-                    {formatCurrency(broker.totalRevenue)}
+                    {formatCurrency(broker.totalRevenue, 'pt', currency)}
                   </span>
                 </TableCell>
                 <TableCell className="text-right">
                   <span className="text-slate-600">
-                    {formatCurrency(broker.averageTicket)}
+                    {formatCurrency(broker.averageTicket, 'pt', currency)}
                   </span>
                 </TableCell>
               </TableRow>

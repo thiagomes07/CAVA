@@ -19,7 +19,7 @@ type BIService interface {
 	GetConversionMetrics(ctx context.Context, filters entity.BIFilters) (*entity.ConversionMetrics, error)
 
 	// GetInventoryMetrics retorna apenas métricas de inventário
-	GetInventoryMetrics(ctx context.Context, industryID string) (*entity.InventoryMetrics, error)
+	GetInventoryMetrics(ctx context.Context, industryID string, currency entity.CurrencyCode) (*entity.InventoryMetrics, error)
 
 	// GetBrokerRanking retorna ranking de performance dos brokers
 	GetBrokerRanking(ctx context.Context, filters entity.BIFilters) ([]entity.BrokerPerformance, error)

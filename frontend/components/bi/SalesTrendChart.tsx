@@ -30,6 +30,7 @@ export function SalesTrendChart({
     );
   }
 
+  const currency = data?.[0]?.currency || 'BRL';
   const maxValue = Math.max(...data.map((d) => d.value), 1);
   const totalValue = data.reduce((sum, d) => sum + d.value, 0);
   const totalCount = data.reduce((sum, d) => sum + d.count, 0);
@@ -54,7 +55,7 @@ export function SalesTrendChart({
         <h3 className="text-lg font-semibold text-obsidian">{title}</h3>
         <div className="text-right">
           <p className="text-sm text-slate-500">Total do periodo</p>
-          <p className="text-lg font-semibold text-emerald-600">{formatCurrency(totalValue)}</p>
+          <p className="text-lg font-semibold text-emerald-600">{formatCurrency(totalValue, 'pt', currency)}</p>
         </div>
       </div>
 
@@ -79,7 +80,7 @@ export function SalesTrendChart({
               {/* Tooltip */}
               <div className="absolute bottom-full mb-2 hidden group-hover:block z-10">
                 <div className="bg-obsidian text-porcelain px-3 py-2 rounded-sm text-xs whitespace-nowrap">
-                  <p className="font-medium">{formatCurrency(point.value)}</p>
+                  <p className="font-medium">{formatCurrency(point.value, 'pt', currency)}</p>
                   <p className="text-porcelain/70">{point.count} venda{point.count !== 1 ? 's' : ''}</p>
                 </div>
               </div>
@@ -114,7 +115,7 @@ export function SalesTrendChart({
           <p className="text-xs text-slate-500 uppercase tracking-wider">Vendas</p>
         </div>
         <div className="text-center">
-          <p className="text-2xl font-serif text-obsidian">{formatCurrency(avgValue)}</p>
+          <p className="text-2xl font-serif text-obsidian">{formatCurrency(avgValue, 'pt', currency)}</p>
           <p className="text-xs text-slate-500 uppercase tracking-wider">Media/dia</p>
         </div>
         <div className="text-center">

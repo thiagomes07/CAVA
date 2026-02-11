@@ -22,17 +22,17 @@ func (r *salesLinkRepository) Create(ctx context.Context, link *entity.SalesLink
 	query := `
 		INSERT INTO sales_links (
 			id, created_by_user_id, industry_id, batch_id, product_id,
-			link_type, slug_token, title, custom_message, display_price,
+			link_type, slug_token, title, custom_message, display_price_amount, display_currency, display_price,
 			show_price, expires_at, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING created_at, updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		link.ID, link.CreatedByUserID, link.IndustryID, link.BatchID,
 		link.ProductID, link.LinkType, link.SlugToken, link.Title,
-		link.CustomMessage, link.DisplayPrice, link.ShowPrice,
-		link.ExpiresAt, link.IsActive,
+		link.CustomMessage, link.DisplayPriceAmount, link.DisplayCurrency, entity.AmountToFloat(link.DisplayPriceAmount),
+		link.ShowPrice, link.ExpiresAt, link.IsActive,
 	).Scan(&link.CreatedAt, &link.UpdatedAt)
 
 	if err != nil {
@@ -50,7 +50,7 @@ func (r *salesLinkRepository) Create(ctx context.Context, link *entity.SalesLink
 func (r *salesLinkRepository) FindByID(ctx context.Context, id string) (*entity.SalesLink, error) {
 	query := `
 		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
-		       link_type, slug_token, title, custom_message, display_price,
+		       link_type, slug_token, title, custom_message, display_price_amount, display_currency, display_price,
 		       show_price, views_count, expires_at, is_active, 
 		       created_at, updated_at
 		FROM sales_links
@@ -61,7 +61,7 @@ func (r *salesLinkRepository) FindByID(ctx context.Context, id string) (*entity.
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.BatchID,
 		&link.ProductID, &link.LinkType, &link.SlugToken, &link.Title,
-		&link.CustomMessage, &link.DisplayPrice, &link.ShowPrice,
+		&link.CustomMessage, &link.DisplayPriceAmount, &link.DisplayCurrency, &link.DisplayPrice, &link.ShowPrice,
 		&link.ViewsCount, &link.ExpiresAt, &link.IsActive,
 		&link.CreatedAt, &link.UpdatedAt,
 	)
@@ -72,6 +72,10 @@ func (r *salesLinkRepository) FindByID(ctx context.Context, id string) (*entity.
 	if err != nil {
 		return nil, errors.DatabaseError(err)
 	}
+	if link.DisplayPrice == nil {
+		legacy := entity.AmountToFloat(link.DisplayPriceAmount)
+		link.DisplayPrice = &legacy
+	}
 
 	return link, nil
 }
@@ -79,7 +83,7 @@ func (r *salesLinkRepository) FindByID(ctx context.Context, id string) (*entity.
 func (r *salesLinkRepository) FindBySlug(ctx context.Context, slug string) (*entity.SalesLink, error) {
 	query := `
 		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
-		       link_type, slug_token, title, custom_message, display_price,
+		       link_type, slug_token, title, custom_message, display_price_amount, display_currency, display_price,
 		       show_price, views_count, expires_at, is_active, 
 		       created_at, updated_at
 		FROM sales_links
@@ -90,7 +94,7 @@ func (r *salesLinkRepository) FindBySlug(ctx context.Context, slug string) (*ent
 	err := r.db.QueryRowContext(ctx, query, slug).Scan(
 		&link.ID, &link.CreatedByUserID, &link.IndustryID, &link.BatchID,
 		&link.ProductID, &link.LinkType, &link.SlugToken, &link.Title,
-		&link.CustomMessage, &link.DisplayPrice, &link.ShowPrice,
+		&link.CustomMessage, &link.DisplayPriceAmount, &link.DisplayCurrency, &link.DisplayPrice, &link.ShowPrice,
 		&link.ViewsCount, &link.ExpiresAt, &link.IsActive,
 		&link.CreatedAt, &link.UpdatedAt,
 	)
@@ -100,6 +104,10 @@ func (r *salesLinkRepository) FindBySlug(ctx context.Context, slug string) (*ent
 	}
 	if err != nil {
 		return nil, errors.DatabaseError(err)
+	}
+	if link.DisplayPrice == nil {
+		legacy := entity.AmountToFloat(link.DisplayPriceAmount)
+		link.DisplayPrice = &legacy
 	}
 
 	return link, nil
@@ -113,7 +121,7 @@ func (r *salesLinkRepository) FindByCreatorID(ctx context.Context, userID string
 func (r *salesLinkRepository) FindByType(ctx context.Context, linkType entity.LinkType) ([]entity.SalesLink, error) {
 	query := `
 		SELECT id, created_by_user_id, industry_id, batch_id, product_id,
-		       link_type, slug_token, title, custom_message, display_price,
+		       link_type, slug_token, title, custom_message, display_price_amount, display_currency, display_price,
 		       show_price, views_count, expires_at, is_active, 
 		       created_at, updated_at
 		FROM sales_links
@@ -139,7 +147,7 @@ func (r *salesLinkRepository) listWithFilters(ctx context.Context, filters entit
 
 	query := psql.Select(
 		"id", "created_by_user_id", "industry_id", "batch_id", "product_id",
-		"link_type", "slug_token", "title", "custom_message", "display_price",
+		"link_type", "slug_token", "title", "custom_message", "display_price_amount", "display_currency", "display_price",
 		"show_price", "views_count", "expires_at", "is_active",
 		"created_at", "updated_at",
 	).From("sales_links")
@@ -225,15 +233,15 @@ func (r *salesLinkRepository) listWithFilters(ctx context.Context, filters entit
 func (r *salesLinkRepository) Update(ctx context.Context, link *entity.SalesLink) error {
 	query := `
 		UPDATE sales_links
-		SET title = $1, custom_message = $2, display_price = $3,
-		    show_price = $4, expires_at = $5, is_active = $6,
+		SET title = $1, custom_message = $2, display_price_amount = $3, display_currency = $4, display_price = $5,
+		    show_price = $6, expires_at = $7, is_active = $8,
 		    updated_at = CURRENT_TIMESTAMP
-		WHERE id = $7
+		WHERE id = $9
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
-		link.Title, link.CustomMessage, link.DisplayPrice,
+		link.Title, link.CustomMessage, link.DisplayPriceAmount, link.DisplayCurrency, entity.AmountToFloat(link.DisplayPriceAmount),
 		link.ShowPrice, link.ExpiresAt, link.IsActive, link.ID,
 	).Scan(&link.UpdatedAt)
 
@@ -323,10 +331,14 @@ func (r *salesLinkRepository) scanLinks(rows *sql.Rows) ([]entity.SalesLink, err
 		if err := rows.Scan(
 			&l.ID, &l.CreatedByUserID, &l.IndustryID, &l.BatchID, &l.ProductID,
 			&l.LinkType, &l.SlugToken, &l.Title, &l.CustomMessage,
-			&l.DisplayPrice, &l.ShowPrice, &l.ViewsCount, &l.ExpiresAt,
+			&l.DisplayPriceAmount, &l.DisplayCurrency, &l.DisplayPrice, &l.ShowPrice, &l.ViewsCount, &l.ExpiresAt,
 			&l.IsActive, &l.CreatedAt, &l.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
+		}
+		if l.DisplayPrice == nil {
+			legacy := entity.AmountToFloat(l.DisplayPriceAmount)
+			l.DisplayPrice = &legacy
 		}
 		links = append(links, l)
 	}
@@ -345,17 +357,17 @@ func (r *salesLinkRepository) CreateWithItems(ctx context.Context, link *entity.
 	linkQuery := `
 		INSERT INTO sales_links (
 			id, created_by_user_id, industry_id, batch_id, product_id,
-			link_type, slug_token, title, custom_message, display_price,
+			link_type, slug_token, title, custom_message, display_price_amount, display_currency, display_price,
 			show_price, expires_at, is_active
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING created_at, updated_at
 	`
 
 	err = tx.QueryRowContext(ctx, linkQuery,
 		link.ID, link.CreatedByUserID, link.IndustryID, link.BatchID,
 		link.ProductID, link.LinkType, link.SlugToken, link.Title,
-		link.CustomMessage, link.DisplayPrice, link.ShowPrice,
-		link.ExpiresAt, link.IsActive,
+		link.CustomMessage, link.DisplayPriceAmount, link.DisplayCurrency, entity.AmountToFloat(link.DisplayPriceAmount),
+		link.ShowPrice, link.ExpiresAt, link.IsActive,
 	).Scan(&link.CreatedAt, &link.UpdatedAt)
 
 	if err != nil {
@@ -369,8 +381,8 @@ func (r *salesLinkRepository) CreateWithItems(ctx context.Context, link *entity.
 
 	// Inserir itens
 	itemQuery := `
-		INSERT INTO sales_link_items (id, sales_link_id, batch_id, quantity, unit_price)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO sales_link_items (id, sales_link_id, batch_id, quantity, unit_price_amount, currency, unit_price)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING created_at
 	`
 
@@ -378,7 +390,7 @@ func (r *salesLinkRepository) CreateWithItems(ctx context.Context, link *entity.
 		items[i].SalesLinkID = link.ID
 		err = tx.QueryRowContext(ctx, itemQuery,
 			items[i].ID, items[i].SalesLinkID, items[i].BatchID,
-			items[i].Quantity, items[i].UnitPrice,
+			items[i].Quantity, items[i].UnitPriceAmount, items[i].Currency, entity.AmountToFloat(items[i].UnitPriceAmount),
 		).Scan(&items[i].CreatedAt)
 		if err != nil {
 			return errors.DatabaseError(err)
@@ -396,7 +408,7 @@ func (r *salesLinkRepository) CreateWithItems(ctx context.Context, link *entity.
 // FindItemsByLinkID busca todos os itens de um link
 func (r *salesLinkRepository) FindItemsByLinkID(ctx context.Context, linkID string) ([]entity.SalesLinkItem, error) {
 	query := `
-		SELECT id, sales_link_id, batch_id, quantity, unit_price, created_at
+		SELECT id, sales_link_id, batch_id, quantity, unit_price_amount, currency, unit_price, created_at
 		FROM sales_link_items
 		WHERE sales_link_id = $1
 		ORDER BY created_at ASC
@@ -413,9 +425,12 @@ func (r *salesLinkRepository) FindItemsByLinkID(ctx context.Context, linkID stri
 		var item entity.SalesLinkItem
 		if err := rows.Scan(
 			&item.ID, &item.SalesLinkID, &item.BatchID,
-			&item.Quantity, &item.UnitPrice, &item.CreatedAt,
+			&item.Quantity, &item.UnitPriceAmount, &item.Currency, &item.UnitPrice, &item.CreatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
+		}
+		if item.UnitPrice == 0 && item.UnitPriceAmount > 0 {
+			item.UnitPrice = entity.AmountToFloat(item.UnitPriceAmount)
 		}
 		items = append(items, item)
 	}

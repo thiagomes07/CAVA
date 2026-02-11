@@ -271,7 +271,7 @@ export const LinkDetailsModal: React.FC<LinkDetailsModalProps> = ({
                             </div>
                             {link.showPrice && item.unitPrice > 0 && (
                               <p className="text-sm font-medium text-obsidian">
-                                {formatCurrency(item.unitPrice * item.quantity, locale as 'pt' | 'en' | 'es')}
+                                {formatCurrency(item.unitPrice * item.quantity, locale as 'pt' | 'en' | 'es', item.currency || link.displayCurrency || 'BRL')}
                               </p>
                             )}
                           </div>
@@ -296,7 +296,7 @@ export const LinkDetailsModal: React.FC<LinkDetailsModalProps> = ({
                     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-2">{t('price')}</p>
                     <p className="text-2xl md:text-3xl lg:text-4xl font-serif text-obsidian">
                       {link.showPrice && link.displayPrice 
-                        ? formatCurrency(link.displayPrice, locale as 'pt' | 'en' | 'es')
+                        ? formatCurrency(link.displayPrice, locale as 'pt' | 'en' | 'es', link.displayCurrency || 'BRL')
                         : '-'
                       }
                     </p>

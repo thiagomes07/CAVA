@@ -85,6 +85,7 @@ export function createInviteBrokerSchema(t: TranslationFunction) {
         (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, "")),
         t("whatsapp"),
       ),
+    preferredCurrency: z.enum(["BRL", "USD"]).default("BRL"),
   });
 }
 
@@ -172,6 +173,7 @@ export const inviteBrokerSchema = z.object({
       (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, "")),
       "WhatsApp inválido",
     ),
+  preferredCurrency: z.enum(['BRL', 'USD']).default('BRL'),
 });
 
 export const updateBrokerSchema = z.object({
@@ -248,6 +250,7 @@ export const inviteSellerSchema = z.object({
       (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, "")),
       "WhatsApp inválido",
     ),
+  preferredCurrency: z.enum(['BRL', 'USD']).default('BRL'),
   isAdmin: z.boolean().default(false),
 });
 

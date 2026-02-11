@@ -81,7 +81,7 @@ func NewHandler(cfg Config, services Services, healthHandler *HealthHandler) *Ha
 		Batch:           NewBatchHandler(services.Batch, services.SharedInventory, cfg.Validator, cfg.Logger),
 		Reservation:     NewReservationHandler(services.Reservation, cfg.Validator, cfg.Logger),
 		Dashboard:       NewDashboardHandler(services.Dashboard, cfg.Logger),
-		BI:              NewBIHandler(services.BI, cfg.Logger),
+		BI:              NewBIHandler(services.BI, services.UserRepo, cfg.Logger),
 		SalesLink:       NewSalesLinkHandler(services.SalesLink, cfg.Validator, cfg.Logger),
 		CatalogLink:     NewCatalogLinkHandler(services.CatalogLink, cfg.Validator, cfg.Logger),
 		Cliente:         NewClienteHandler(services.Cliente, cfg.Validator, cfg.Logger),

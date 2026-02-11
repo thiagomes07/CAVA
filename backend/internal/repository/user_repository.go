@@ -21,14 +21,14 @@ func NewUserRepository(db *DB) *userRepository {
 
 func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
 	query := `
-		INSERT INTO users (id, industry_id, name, email, password_hash, phone, whatsapp, role, is_active)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		INSERT INTO users (id, industry_id, name, email, preferred_currency, password_hash, phone, whatsapp, role, is_active)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		RETURNING created_at, updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
 		user.ID, user.IndustryID, user.Name, user.Email,
-		user.Password, user.Phone, user.Whatsapp, user.Role, user.IsActive,
+		user.PreferredCurrency, user.Password, user.Phone, user.Whatsapp, user.Role, user.IsActive,
 	).Scan(&user.CreatedAt, &user.UpdatedAt)
 
 	if err != nil {
@@ -45,7 +45,7 @@ func (r *userRepository) Create(ctx context.Context, user *entity.User) error {
 
 func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User, error) {
 	query := `
-		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.password_hash, u.phone, u.whatsapp, u.role, 
+		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.preferred_currency, u.password_hash, u.phone, u.whatsapp, u.role,
 		       u.is_active, u.first_login_at, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN industries i ON u.industry_id = i.id
@@ -55,7 +55,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 	user := &entity.User{}
 	err := r.db.QueryRowContext(ctx, query, id).Scan(
 		&user.ID, &user.IndustryID, &user.IndustrySlug, &user.Name, &user.Email,
-		&user.Password, &user.Phone, &user.Whatsapp, &user.Role,
+		&user.PreferredCurrency, &user.Password, &user.Phone, &user.Whatsapp, &user.Role,
 		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 
@@ -71,7 +71,7 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*entity.User,
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity.User, error) {
 	query := `
-		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.password_hash, u.phone, u.whatsapp, u.role, 
+		SELECT u.id, u.industry_id, i.slug as industry_slug, u.name, u.email, u.preferred_currency, u.password_hash, u.phone, u.whatsapp, u.role,
 		       u.is_active, u.first_login_at, u.created_at, u.updated_at
 		FROM users u
 		LEFT JOIN industries i ON u.industry_id = i.id
@@ -81,7 +81,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 	user := &entity.User{}
 	err := r.db.QueryRowContext(ctx, query, email).Scan(
 		&user.ID, &user.IndustryID, &user.IndustrySlug, &user.Name, &user.Email,
-		&user.Password, &user.Phone, &user.Whatsapp, &user.Role,
+		&user.PreferredCurrency, &user.Password, &user.Phone, &user.Whatsapp, &user.Role,
 		&user.IsActive, &user.FirstLoginAt, &user.CreatedAt, &user.UpdatedAt,
 	)
 
@@ -97,7 +97,7 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*entity
 
 func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string) ([]entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		SELECT id, industry_id, name, email, preferred_currency, phone, whatsapp, role,
 		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE industry_id = $1
@@ -115,7 +115,7 @@ func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+			&u.PreferredCurrency, &u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -127,7 +127,7 @@ func (r *userRepository) FindByIndustryID(ctx context.Context, industryID string
 
 func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) ([]entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		SELECT id, industry_id, name, email, preferred_currency, phone, whatsapp, role,
 		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE role = $1 AND is_active = TRUE
@@ -145,7 +145,7 @@ func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) (
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+			&u.PreferredCurrency, &u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -158,7 +158,7 @@ func (r *userRepository) FindByRole(ctx context.Context, role entity.UserRole) (
 func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]entity.BrokerWithStats, error) {
 	query := `
 		SELECT 
-			u.id, u.name, u.email, u.phone, u.whatsapp, u.role, 
+			u.id, u.name, u.email, u.preferred_currency, u.phone, u.whatsapp, u.role,
 			u.is_active, u.first_login_at, u.created_at, u.updated_at,
 			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
 		FROM users u
@@ -181,7 +181,7 @@ func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]
 	for rows.Next() {
 		var b entity.BrokerWithStats
 		if err := rows.Scan(
-			&b.ID, &b.Name, &b.Email, &b.Phone, &b.Whatsapp, &b.Role,
+			&b.ID, &b.Name, &b.Email, &b.PreferredCurrency, &b.Phone, &b.Whatsapp, &b.Role,
 			&b.IsActive, &b.FirstLoginAt, &b.CreatedAt, &b.UpdatedAt,
 			&b.SharedBatchesCount,
 		); err != nil {
@@ -196,13 +196,13 @@ func (r *userRepository) FindBrokers(ctx context.Context, industryID string) ([]
 func (r *userRepository) Update(ctx context.Context, user *entity.User) error {
 	query := `
 		UPDATE users
-		SET name = $1, phone = $2, whatsapp = $3, updated_at = CURRENT_TIMESTAMP
-		WHERE id = $4
+		SET name = $1, phone = $2, whatsapp = $3, preferred_currency = $4, updated_at = CURRENT_TIMESTAMP
+		WHERE id = $5
 		RETURNING updated_at
 	`
 
 	err := r.db.QueryRowContext(ctx, query,
-		user.Name, user.Phone, user.Whatsapp, user.ID,
+		user.Name, user.Phone, user.Whatsapp, user.PreferredCurrency, user.ID,
 	).Scan(&user.UpdatedAt)
 
 	if err == sql.ErrNoRows {
@@ -277,7 +277,7 @@ func (r *userRepository) ExistsByNameGlobally(ctx context.Context, name string) 
 
 func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		SELECT id, industry_id, name, email, preferred_currency, phone, whatsapp, role,
 		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE 1=1
@@ -302,7 +302,7 @@ func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]ent
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+			&u.PreferredCurrency, &u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -314,7 +314,7 @@ func (r *userRepository) List(ctx context.Context, role *entity.UserRole) ([]ent
 
 func (r *userRepository) ListByIndustry(ctx context.Context, industryID string, role *entity.UserRole) ([]entity.User, error) {
 	query := `
-		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		SELECT id, industry_id, name, email, preferred_currency, phone, whatsapp, role,
 		       is_active, first_login_at, created_at, updated_at
 		FROM users
 		WHERE industry_id = $1
@@ -339,7 +339,7 @@ func (r *userRepository) ListByIndustry(ctx context.Context, industryID string, 
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+			&u.PreferredCurrency, &u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, errors.DatabaseError(err)
 		}
@@ -583,7 +583,7 @@ func (r *userRepository) ListByIndustryWithFilters(ctx context.Context, industry
 
 	// Build select query with sorting and pagination
 	selectQuery := fmt.Sprintf(`
-		SELECT id, industry_id, name, email, phone, whatsapp, role, 
+		SELECT id, industry_id, name, email, preferred_currency, phone, whatsapp, role,
 		       is_active, first_login_at, created_at, updated_at
 	%s
 		ORDER BY %s %s
@@ -612,7 +612,7 @@ func (r *userRepository) ListByIndustryWithFilters(ctx context.Context, industry
 		var u entity.User
 		if err := rows.Scan(
 			&u.ID, &u.IndustryID, &u.Name, &u.Email,
-			&u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
+			&u.PreferredCurrency, &u.Phone, &u.Whatsapp, &u.Role, &u.IsActive, &u.FirstLoginAt, &u.CreatedAt, &u.UpdatedAt,
 		); err != nil {
 			return nil, 0, errors.DatabaseError(err)
 		}
@@ -682,7 +682,7 @@ func (r *userRepository) FindBrokersWithFilters(ctx context.Context, industryID 
 	// Build select query with sorting and pagination
 	selectQuery := fmt.Sprintf(`
 		SELECT 
-			u.id, u.name, u.email, u.phone, u.whatsapp, u.role, 
+			u.id, u.name, u.email, u.preferred_currency, u.phone, u.whatsapp, u.role,
 			u.is_active, u.first_login_at, u.created_at, u.updated_at,
 			COALESCE(COUNT(DISTINCT sib.id), 0) as shared_batches_count
 	%s%s
@@ -711,7 +711,7 @@ func (r *userRepository) FindBrokersWithFilters(ctx context.Context, industryID 
 	for rows.Next() {
 		var b entity.BrokerWithStats
 		if err := rows.Scan(
-			&b.ID, &b.Name, &b.Email, &b.Phone, &b.Whatsapp, &b.Role,
+			&b.ID, &b.Name, &b.Email, &b.PreferredCurrency, &b.Phone, &b.Whatsapp, &b.Role,
 			&b.IsActive, &b.FirstLoginAt, &b.CreatedAt, &b.UpdatedAt,
 			&b.SharedBatchesCount,
 		); err != nil {

@@ -344,7 +344,7 @@ export function ShareLinksModal({
                           </p>
                           {link.showPrice && link.displayPrice && (
                             <p className="text-sm text-emerald-600 font-semibold mt-1">
-                              {formatCurrency(link.displayPrice)}
+                              {formatCurrency(link.displayPrice, locale as 'pt' | 'en' | 'es', link.displayCurrency || 'BRL')}
                             </p>
                           )}
                         </div>

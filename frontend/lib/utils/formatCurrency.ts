@@ -1,24 +1,26 @@
 export type CurrencyLocale = 'pt' | 'en' | 'es';
+export type CurrencyCode = 'BRL' | 'USD';
 
 // Locale to Intl configuration mapping
-const localeConfig: Record<CurrencyLocale, { locale: string; currency: string; symbol: string }> = {
+const localeConfig: Record<CurrencyLocale, { locale: string; currency: CurrencyCode; symbol: string }> = {
   pt: { locale: 'pt-BR', currency: 'BRL', symbol: 'R$' },
   en: { locale: 'en-US', currency: 'USD', symbol: '$' },
-  es: { locale: 'es-ES', currency: 'EUR', symbol: '€' },
+  es: { locale: 'es-ES', currency: 'USD', symbol: 'US$' },
 };
 
-export function formatCurrency(value: number, locale: CurrencyLocale = 'pt'): string {
+export function formatCurrency(value: number, locale: CurrencyLocale = 'pt', currency?: CurrencyCode): string {
   try {
     const config = localeConfig[locale];
     return new Intl.NumberFormat(config.locale, {
       style: 'currency',
-      currency: config.currency,
+      currency: currency || config.currency,
     }).format(value);
-  } catch (error) {
+  } catch {
     // Fallback for environments that don't support the specific locale
     const config = localeConfig[locale] || localeConfig.pt;
     const safeValue = Number.isFinite(value) ? value.toFixed(2) : '0.00';
-    return `${config.symbol} ${safeValue}`;
+    const symbol = currency === 'USD' ? 'US$' : config.symbol;
+    return `${symbol} ${safeValue}`;
   }
 }
 

@@ -1,4 +1,5 @@
 import type { SalesLink } from '@/lib/types';
+import { formatCurrency } from '@/lib/utils/formatCurrency';
 
 const WHATSAPP_MAX_LENGTH = 4096;
 const WHATSAPP_WARNING_LENGTH = 4000;
@@ -31,10 +32,11 @@ export function formatWhatsAppMessage(
 
     // Adicionar informações de preço se disponível
     if (link.showPrice && link.displayPrice) {
-      const price = link.displayPrice.toLocaleString('pt-BR', {
-        style: 'currency',
-        currency: 'BRL'
-      });
+      const price = formatCurrency(
+        link.displayPrice,
+        locale === 'en' ? 'en' : locale === 'es' ? 'es' : 'pt',
+        link.displayCurrency || 'BRL'
+      );
       details += ` | \uD83D\uDCB0 ${price}`; // Money bag
     }
 

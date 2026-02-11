@@ -19,10 +19,12 @@ export const salesLinkSchema = z
       .string()
       .max(50, 'Slug deve ter no máximo 50 caracteres')
       .optional(),
-    displayPrice: z
+    displayPriceAmount: z
       .number({ message: 'Preço deve ser um número' })
+      .int('Preço deve estar em centavos')
       .positive('Preço deve ser maior que zero')
       .optional(),
+    displayCurrency: z.enum(['BRL', 'USD']),
     showPrice: z.boolean(),
     expiresAt: z
       .string()

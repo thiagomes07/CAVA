@@ -15,6 +15,7 @@ import { EmptyState } from '@/components/shared/EmptyState';
 import { LoadingState } from '@/components/shared/LoadingState';
 import { apiClient } from '@/lib/api/client';
 import { useToast } from '@/lib/hooks/useToast';
+import { useAuth } from '@/lib/hooks/useAuth';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { formatDate } from '@/lib/utils/formatDate';
 import { truncateText } from '@/lib/utils/truncateText';
@@ -40,8 +41,10 @@ interface SalesSummary {
 export default function SalesHistoryPage() {
   const router = useRouter();
   const { error, success } = useToast();
+  const { user } = useAuth();
   const t = useTranslations('sales');
   const tCommon = useTranslations('common');
+  const preferredCurrency = user?.preferredCurrency || 'BRL';
 
   const [sales, setSales] = useState<Sale[]>([]);
   const [summary, setSummary] = useState<SalesSummary | null>(null);
@@ -49,6 +52,7 @@ export default function SalesHistoryPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalItems, setTotalItems] = useState(0);
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   const [filters, setFilters] = useState<SalesFilter>({
     startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -63,6 +67,24 @@ export default function SalesHistoryPage() {
   useEffect(() => {
     fetchSellers();
   }, []);
+
+  useEffect(() => {
+    if (preferredCurrency !== 'USD') return;
+    const fetchExchangeRate = async () => {
+      try {
+        const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+        if (!response.ok) return;
+        const data = (await response.json()) as { USDBRL?: { bid?: string } };
+        const bid = Number(data?.USDBRL?.bid || 0);
+        if (Number.isFinite(bid) && bid > 0) {
+          setUsdBrlRate(bid);
+        }
+      } catch {
+        setUsdBrlRate(null);
+      }
+    };
+    fetchExchangeRate();
+  }, [preferredCurrency]);
 
   useEffect(() => {
     fetchSales();
@@ -126,6 +148,12 @@ export default function SalesHistoryPage() {
 
   const isEmpty = sales.length === 0;
 
+  const formatPreferredCurrency = (value: number) => {
+    const canUseUSD = preferredCurrency === 'USD' && !!usdBrlRate && usdBrlRate > 0;
+    const converted = canUseUSD ? value / usdBrlRate : value;
+    return formatCurrency(converted, 'pt', canUseUSD ? 'USD' : 'BRL');
+  };
+
   return (
     <div className="min-h-screen bg-mineral">
       {/* Header */}
@@ -158,7 +186,7 @@ export default function SalesHistoryPage() {
                 <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
-                {formatCurrency(summary.totalSales)}
+                {formatPreferredCurrency(summary.totalSales)}
               </p>
             </Card>
 
@@ -170,7 +198,7 @@ export default function SalesHistoryPage() {
                 <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
-                {formatCurrency(summary.totalCommissions)}
+                {formatPreferredCurrency(summary.totalCommissions)}
               </p>
             </Card>
 
@@ -182,7 +210,7 @@ export default function SalesHistoryPage() {
                 <Receipt className="w-5 h-5 text-slate-400" />
               </div>
               <p className="font-serif text-4xl text-obsidian">
-                {formatCurrency(summary.averageTicket)}
+                {formatPreferredCurrency(summary.averageTicket)}
               </p>
             </Card>
           </div>
@@ -323,19 +351,19 @@ export default function SalesHistoryPage() {
                         </TableCell>
                         <TableCell>
                           <span className="font-serif text-obsidian tabular-nums">
-                            {formatCurrency(sale.salePrice)}
+                            {formatPreferredCurrency(sale.salePrice)}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span className="text-[#C2410C] tabular-nums">
                             {sale.brokerCommission
-                              ? formatCurrency(sale.brokerCommission)
+                              ? formatPreferredCurrency(sale.brokerCommission)
                               : '-'}
                           </span>
                         </TableCell>
                         <TableCell>
                           <span className="font-semibold text-obsidian tabular-nums">
-                            {formatCurrency(sale.netIndustryValue)}
+                            {formatPreferredCurrency(sale.netIndustryValue)}
                           </span>
                         </TableCell>
                         <TableCell>

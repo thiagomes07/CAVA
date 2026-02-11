@@ -23,6 +23,7 @@ import { Card } from '@/components/ui/card';
 import { formatCurrency } from '@/lib/utils/formatCurrency';
 import { useToast } from '@/lib/hooks/useToast';
 import { cn } from '@/lib/utils/cn';
+import { useAuth } from '@/lib/hooks/useAuth';
 
 import {
   useBIDashboard,
@@ -33,6 +34,7 @@ import { DateRangeFilter, type DateRange } from '@/components/bi';
 
 export default function BIDashboardPage() {
   const { success, error } = useToast();
+  const { user } = useAuth();
 
   const [dateRange, setDateRange] = useState<DateRange>({
     startDate: format(subDays(new Date(), 30), 'yyyy-MM-dd'),
@@ -42,7 +44,9 @@ export default function BIDashboardPage() {
   const { data: dashboard, isLoading, refetch } = useBIDashboard({
     startDate: dateRange.startDate,
     endDate: dateRange.endDate,
+    currency: user?.preferredCurrency,
   });
+  const biCurrency = dashboard?.currency || 'BRL';
 
   const refreshMutation = useRefreshBIViews();
 
@@ -121,14 +125,14 @@ export default function BIDashboardPage() {
                   </div>
                 </div>
                 <p className="font-serif text-2xl lg:text-3xl text-obsidian">
-                  {formatCurrency(dashboard.sales.netRevenue)}
+                  {formatCurrency(dashboard.sales.netRevenue, 'pt', biCurrency)}
                 </p>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
                   Receita Líquida
                 </p>
                 {dashboard.sales.totalCommissions > 0 && (
                   <p className="text-xs text-slate-400 mt-2">
-                    -{formatCurrency(dashboard.sales.totalCommissions)} comissões
+                    -{formatCurrency(dashboard.sales.totalCommissions, 'pt', biCurrency)} comissões
                   </p>
                 )}
               </Card>
@@ -146,7 +150,7 @@ export default function BIDashboardPage() {
                   Vendas
                 </p>
                 <p className="text-xs text-slate-400 mt-2">
-                  Ticket médio: {formatCurrency(dashboard.sales.averageTicket)}
+                  Ticket médio: {formatCurrency(dashboard.sales.averageTicket, 'pt', biCurrency)}
                 </p>
               </Card>
 
@@ -174,7 +178,7 @@ export default function BIDashboardPage() {
                   </div>
                 </div>
                 <p className="font-serif text-2xl lg:text-3xl text-obsidian">
-                  {formatCurrency(dashboard.inventory.inventoryValue)}
+                  {formatCurrency(dashboard.inventory.inventoryValue, 'pt', biCurrency)}
                 </p>
                 <p className="text-xs text-slate-500 uppercase tracking-wider mt-1">
                   Valor em Estoque
@@ -268,7 +272,7 @@ export default function BIDashboardPage() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-sm text-obsidian">
-                            {formatCurrency(broker.totalRevenue)}
+                            {formatCurrency(broker.totalRevenue, 'pt', biCurrency)}
                           </p>
                         </div>
                       </div>
@@ -308,7 +312,7 @@ export default function BIDashboardPage() {
                         </div>
                         <div className="text-right">
                           <p className="font-semibold text-sm text-obsidian">
-                            {formatCurrency(product.revenue)}
+                            {formatCurrency(product.revenue, 'pt', biCurrency)}
                           </p>
                         </div>
                       </div>

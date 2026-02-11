@@ -53,6 +53,7 @@ export function TeamMemberInviteModal({
             email: '',
             phone: '',
             whatsapp: '',
+            preferredCurrency: 'BRL',
             isAdmin: false,
         },
     });
@@ -70,6 +71,7 @@ export function TeamMemberInviteModal({
                 email: '',
                 phone: '',
                 whatsapp: '',
+                preferredCurrency: 'BRL',
                 isAdmin: false,
             });
             setUseSamePhoneForWhatsapp(false);
@@ -157,6 +159,23 @@ export function TeamMemberInviteModal({
                                 {errors.name && (
                                     <p className="text-sm text-red-600">{errors.name.message}</p>
                                 )}
+                            </div>
+
+                            <div className="space-y-2">
+                                <label
+                                    htmlFor="preferredCurrency"
+                                    className="text-sm font-medium text-slate-700"
+                                >
+                                    Moeda preferida para BI
+                                </label>
+                                <select
+                                    {...register('preferredCurrency')}
+                                    id="preferredCurrency"
+                                    className="w-full px-4 py-2.5 rounded-lg border border-slate-300 focus:border-blue-500 focus:ring-blue-500"
+                                >
+                                    <option value="BRL">Real (BRL)</option>
+                                    <option value="USD">Dólar (USD)</option>
+                                </select>
                             </div>
 
                             {/* Email */}

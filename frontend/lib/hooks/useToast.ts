@@ -5,47 +5,136 @@ import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 interface ToastOptions {
   description?: string;
   duration?: number;
+  dedupeWindowMs?: number;
   action?: {
     label: string;
     onClick: () => void;
   };
 }
 
+type ToastType = 'success' | 'error' | 'warning' | 'info';
+
+const DEFAULT_DURATION: Record<ToastType, number> = {
+  success: 3000,
+  error: 5000,
+  warning: 4000,
+  info: 3000,
+};
+
+const DEFAULT_DEDUPE_WINDOW_MS = 1500;
+const recentToastTimestamps = new Map<string, number>();
+
+const normalizeToastText = (value: string): string => {
+  return value.replace(/\s+/g, ' ').trim();
+};
+
+const formatToastText = (value: string): string => {
+  const normalized = normalizeToastText(value);
+  if (!normalized) return '';
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
+
+const normalizeToastKeyPart = (value: string): string => {
+  return normalizeToastText(value).toLowerCase().replace(/[.!?]+$/, '');
+};
+
+const getToastKey = (type: ToastType, message: string, description?: string) => {
+  return `${type}:${normalizeToastKeyPart(message)}:${normalizeToastKeyPart(description || '')}`;
+};
+
+const shouldSkipDuplicateToast = (key: string, dedupeWindowMs: number) => {
+  const now = Date.now();
+  const lastShownAt = recentToastTimestamps.get(key);
+
+  if (lastShownAt && now - lastShownAt < dedupeWindowMs) {
+    return true;
+  }
+
+  recentToastTimestamps.set(key, now);
+
+  // Limpeza simples para evitar crescimento indefinido do mapa em sessão longa
+  for (const [entryKey, timestamp] of recentToastTimestamps.entries()) {
+    if (now - timestamp > 60_000) {
+      recentToastTimestamps.delete(entryKey);
+    }
+  }
+
+  return false;
+};
+
+function showToast(
+  type: ToastType,
+  message: string,
+  options?: ToastOptions & { icon?: ReturnType<typeof createElement> }
+) {
+  const formattedMessage = formatToastText(message);
+  const formattedDescription = options?.description
+    ? formatToastText(options.description)
+    : undefined;
+
+  if (!formattedMessage) {
+    return;
+  }
+
+  const key = getToastKey(type, formattedMessage, formattedDescription);
+  const dedupeWindowMs = options?.dedupeWindowMs ?? DEFAULT_DEDUPE_WINDOW_MS;
+
+  if (shouldSkipDuplicateToast(key, dedupeWindowMs)) {
+    return;
+  }
+
+  sonnerToast[type](formattedMessage, {
+    id: key,
+    description: formattedDescription,
+    duration: options?.duration ?? DEFAULT_DURATION[type],
+    icon: options?.icon,
+    action: options?.action,
+  });
+}
+
+export function showSuccessToast(message: string, options?: ToastOptions) {
+  showToast('success', message, {
+    ...options,
+    icon: createElement(CheckCircle, { className: 'w-5 h-5' }),
+  });
+}
+
+export function showErrorToast(message: string, options?: ToastOptions) {
+  showToast('error', message, {
+    ...options,
+    icon: createElement(XCircle, { className: 'w-5 h-5' }),
+  });
+}
+
+export function showWarningToast(message: string, options?: ToastOptions) {
+  showToast('warning', message, {
+    ...options,
+    icon: createElement(AlertTriangle, { className: 'w-5 h-5' }),
+  });
+}
+
+export function showInfoToast(message: string, options?: ToastOptions) {
+  showToast('info', message, {
+    ...options,
+    icon: createElement(Info, { className: 'w-5 h-5' }),
+  });
+}
+
 export function useToast() {
   const success = (message: string, options?: ToastOptions) => {
-    sonnerToast.success(message, {
-      description: options?.description,
-      duration: options?.duration || 3000, // 3 segundos conforme doc
-      icon: createElement(CheckCircle, { className: 'w-5 h-5' }),
-      action: options?.action,
-    });
+    showSuccessToast(message, options);
   };
 
   const error = (message: string, options?: ToastOptions) => {
-    sonnerToast.error(message, {
-      description: options?.description,
-      duration: options?.duration || 5000, // 5 segundos conforme doc
-      icon: createElement(XCircle, { className: 'w-5 h-5' }),
-      action: options?.action,
-    });
+    showErrorToast(message, options);
   };
 
   const warning = (message: string, options?: ToastOptions) => {
-    sonnerToast.warning(message, {
-      description: options?.description,
-      duration: options?.duration || 4000, // 4 segundos conforme doc
-      icon: createElement(AlertTriangle, { className: 'w-5 h-5' }),
-      action: options?.action,
-    });
+    showWarningToast(message, options);
   };
 
   const info = (message: string, options?: ToastOptions) => {
-    sonnerToast.info(message, {
-      description: options?.description,
-      duration: options?.duration || 3000, // 3 segundos conforme doc
-      icon: createElement(Info, { className: 'w-5 h-5' }),
-      action: options?.action,
-    });
+    showInfoToast(message, options);
   };
 
   const promise = <T,>(

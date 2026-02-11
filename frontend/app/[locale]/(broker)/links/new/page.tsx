@@ -14,7 +14,7 @@ import { MoneyInput } from '@/components/ui/masked-input';
 import { formatArea } from '@/lib/utils/formatDimensions';
 import { nanoid } from 'nanoid';
 import { QRCodeCanvas } from 'qrcode.react';
-import type { Batch, Product, LinkType, SharedInventoryBatch } from '@/lib/types';
+import type { Batch, CurrencyCode, LinkType, SharedInventoryBatch } from '@/lib/types';
 import { cn } from '@/lib/utils/cn';
 import { isPlaceholderUrl } from '@/lib/utils/media';
 import { useLocale } from 'next-intl';
@@ -52,13 +52,46 @@ export default function CreateSalesLinkPage() {
   const [isActive, setIsActive] = useState(true);
   const [title, setTitle] = useState('');
   const [customMessage, setCustomMessage] = useState('');
+  const [displayCurrency, setDisplayCurrency] = useState<CurrencyCode>('BRL');
+  const [usdBrlRate, setUsdBrlRate] = useState<number | null>(null);
 
   // Generate slug once on mount
   const [generatedSlug] = useState(() => nanoid(10).toLowerCase());
 
+  const pricePrefix = displayCurrency === 'USD' ? 'US$' : 'R$';
+  const toCents = (value: number) => Math.round(value * 100);
+  const convertPrice = (value: number, from: CurrencyCode, to: CurrencyCode) => {
+    if (from === to) return value;
+    if (!usdBrlRate || usdBrlRate <= 0) return value;
+    if (from === 'BRL' && to === 'USD') return value / usdBrlRate;
+    if (from === 'USD' && to === 'BRL') return value * usdBrlRate;
+    return value;
+  };
+
   useEffect(() => {
     fetchAvailableContent();
+    fetchExchangeRate();
   }, []);
+
+  const fetchExchangeRate = async () => {
+    try {
+      const response = await fetch('https://economia.awesomeapi.com.br/json/last/USD-BRL');
+      if (!response.ok) {
+        setUsdBrlRate(null);
+        return;
+      }
+      const data = (await response.json()) as {
+        USDBRL?: { bid?: string };
+      };
+      const bid = Number(data?.USDBRL?.bid || 0);
+      if (Number.isFinite(bid) && bid > 0) {
+        setUsdBrlRate(bid);
+      }
+    } catch {
+      // mantém fluxo com BRL como fallback
+      setUsdBrlRate(null);
+    }
+  };
 
   const fetchAvailableContent = async () => {
     try {
@@ -98,7 +131,7 @@ export default function CreateSalesLinkPage() {
     setSelectedItems(prev => [...prev, {
       batch,
       quantity: 1,
-      unitPrice: batch.industryPrice
+      unitPrice: convertPrice(batch.industryPrice, 'BRL', displayCurrency)
     }]);
   };
 
@@ -127,6 +160,15 @@ export default function CreateSalesLinkPage() {
       }
       return item;
     }));
+  };
+
+  const handleCurrencyChange = (nextCurrency: CurrencyCode) => {
+    if (nextCurrency === displayCurrency) return;
+    setSelectedItems(prev => prev.map(item => ({
+      ...item,
+      unitPrice: Math.max(0, convertPrice(item.unitPrice, displayCurrency, nextCurrency)),
+    })));
+    setDisplayCurrency(nextCurrency);
   };
 
   // Calculate totals
@@ -217,12 +259,13 @@ export default function CreateSalesLinkPage() {
             items: selectedItems.map(item => ({
               batchId: item.batch.id,
               quantity: item.quantity,
-              unitPrice: item.unitPrice,
+              unitPriceAmount: toCents(item.unitPrice),
             })),
             title: title || `Pedido com ${selectedItems.length} lote(s)`,
             customMessage: customMessage || undefined,
             slugToken: generatedSlug,
-            displayPrice: totalDisplayPrice,
+            displayPriceAmount: toCents(totalDisplayPrice),
+            displayCurrency,
             showPrice,
             isActive,
             expiresAt: expirationDate ? expirationDate.toISOString() : undefined,
@@ -233,7 +276,8 @@ export default function CreateSalesLinkPage() {
             title: title || selectedItems[0].batch.product?.name || 'Link de Venda',
             customMessage: customMessage || buildItemsDescription(),
             slugToken: generatedSlug,
-            displayPrice: totalDisplayPrice,
+            displayPriceAmount: toCents(totalDisplayPrice),
+            displayCurrency,
             showPrice,
             isActive,
             expiresAt: expirationDate ? expirationDate.toISOString() : undefined,
@@ -249,9 +293,9 @@ export default function CreateSalesLinkPage() {
       setShowSuccessModal(true);
 
       await navigator.clipboard.writeText(fullUrl);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Erro ao criar link:', err);
-      error(err?.message || 'Erro ao criar link');
+      error(err instanceof Error ? err.message : 'Erro ao criar link');
     } finally {
       setIsSubmitting(false);
     }
@@ -259,7 +303,7 @@ export default function CreateSalesLinkPage() {
 
   const buildItemsDescription = () => {
     return selectedItems.map(item => 
-      `• ${item.batch.batchCode} (${item.batch.product?.name}) - ${item.quantity} peça(s) x ${formatCurrency(item.unitPrice)} = ${formatCurrency(item.quantity * item.unitPrice)}`
+      `• ${item.batch.batchCode} (${item.batch.product?.name}) - ${item.quantity} peça(s) x ${formatCurrency(item.unitPrice, locale as 'pt' | 'en' | 'es', displayCurrency)} = ${formatCurrency(item.quantity * item.unitPrice, locale as 'pt' | 'en' | 'es', displayCurrency)}`
     ).join('\n');
   };
 
@@ -327,7 +371,7 @@ export default function CreateSalesLinkPage() {
                         Itens Selecionados ({selectedItems.length})
                       </h3>
                       <div className="text-sm text-emerald-600 font-semibold">
-                        Total: {formatCurrency(totals.totalValue)}
+                        Total: {formatCurrency(totals.totalValue, locale as 'pt' | 'en' | 'es', displayCurrency)}
                       </div>
                     </div>
                     
@@ -416,6 +460,7 @@ export default function CreateSalesLinkPage() {
                                       <MoneyInput
                                         value={item.unitPrice}
                                         onChange={(val) => handleUpdatePrice(item.batch.id, val ?? 0)}
+                                        prefix={pricePrefix}
                                         variant="minimal"
                                         className="w-20 text-sm"
                                       />
@@ -424,7 +469,7 @@ export default function CreateSalesLinkPage() {
 
                                   {/* Subtotal */}
                                   <div className="ml-auto text-sm font-medium text-emerald-600">
-                                    {formatCurrency(itemTotal)}
+                                    {formatCurrency(itemTotal, locale as 'pt' | 'en' | 'es', displayCurrency)}
                                   </div>
                                 </div>
 
@@ -448,7 +493,7 @@ export default function CreateSalesLinkPage() {
                         {totals.totalPieces} peça(s) em {selectedItems.length} lote(s)
                       </span>
                       <span className="text-lg font-bold text-[#121212]">
-                        {formatCurrency(totals.totalValue)}
+                        {formatCurrency(totals.totalValue, locale as 'pt' | 'en' | 'es', displayCurrency)}
                       </span>
                     </div>
                   </div>
@@ -513,7 +558,7 @@ export default function CreateSalesLinkPage() {
                           <p className="font-medium text-sm text-[#121212] truncate">{batch.product?.name}</p>
                           <p className="font-mono text-xs text-slate-400">{batch.batchCode}</p>
                           <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs text-emerald-600 font-medium">{formatCurrency(batch.industryPrice)}</span>
+                            <span className="text-xs text-emerald-600 font-medium">{formatCurrency(convertPrice(batch.industryPrice, 'BRL', displayCurrency), locale as 'pt' | 'en' | 'es', displayCurrency)}</span>
                             <span className="text-xs text-slate-400">• {batch.availableSlabs} disponível(is)</span>
                           </div>
                         </div>
@@ -541,14 +586,33 @@ export default function CreateSalesLinkPage() {
                         <span className="text-slate-600">
                           {item.batch.batchCode} ({item.quantity}x)
                         </span>
-                        <span className="font-medium">{formatCurrency(item.quantity * item.unitPrice)}</span>
+                        <span className="font-medium">{formatCurrency(item.quantity * item.unitPrice, locale as 'pt' | 'en' | 'es', displayCurrency)}</span>
                       </div>
                     ))}
                   </div>
                   <div className="border-t border-slate-200 mt-3 pt-3 flex justify-between">
                     <span className="font-semibold">Total ({totals.totalPieces} peças)</span>
-                    <span className="font-bold text-lg text-emerald-600">{formatCurrency(totals.totalValue)}</span>
+                    <span className="font-bold text-lg text-emerald-600">{formatCurrency(totals.totalValue, locale as 'pt' | 'en' | 'es', displayCurrency)}</span>
                   </div>
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-slate-600 block mb-2">
+                    Moeda de Exibição
+                  </label>
+                  <select
+                    value={displayCurrency}
+                    onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
+                    className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors rounded"
+                  >
+                    <option value="BRL">Real (BRL)</option>
+                    <option value="USD">Dólar (USD)</option>
+                  </select>
+                  {displayCurrency === 'USD' && !usdBrlRate && (
+                    <p className="mt-1 text-xs text-amber-600">
+                      Cotação USD/BRL indisponível no momento. Valores atuais foram mantidos.
+                    </p>
+                  )}
                 </div>
 
                 {/* Show Price Toggle */}
@@ -741,11 +805,11 @@ export default function CreateSalesLinkPage() {
               <p className="font-medium mb-2">Itens incluídos:</p>
               {selectedItems.map(item => (
                 <p key={item.batch.id} className="text-slate-600">
-                  • {item.batch.batchCode} - {item.quantity} peça(s) x {formatCurrency(item.unitPrice)}
+                  • {item.batch.batchCode} - {item.quantity} peça(s) x {formatCurrency(item.unitPrice, locale as 'pt' | 'en' | 'es', displayCurrency)}
                 </p>
               ))}
               <p className="font-semibold mt-2 pt-2 border-t border-slate-200">
-                Total: {formatCurrency(totals.totalValue)}
+                Total: {formatCurrency(totals.totalValue, locale as 'pt' | 'en' | 'es', displayCurrency)}
               </p>
             </div>
           </div>

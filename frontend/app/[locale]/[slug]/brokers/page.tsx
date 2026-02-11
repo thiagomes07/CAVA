@@ -93,6 +93,9 @@ export default function BrokersManagementPage() {
     control,
   } = useForm<InviteBrokerInput>({
     resolver: zodResolver(inviteBrokerSchema),
+    defaultValues: {
+      preferredCurrency: 'BRL',
+    },
   });
 
   const { field: phoneField } = useController({ name: 'phone', control, defaultValue: '' });
@@ -187,6 +190,7 @@ export default function BrokersManagementPage() {
         ...data,
         phone: sanitizePhone(data.phone),
         whatsapp: sanitizePhone(data.whatsapp),
+        preferredCurrency: data.preferredCurrency || 'BRL',
       });
 
       success(t('inviteSent', { email: data.email }));
@@ -640,6 +644,27 @@ export default function BrokersManagementPage() {
                 />
                 <p className="mt-1 text-xs text-slate-400">{t('whatsappHelperText')}</p>
                 {errors.whatsapp && <p className="mt-1 text-xs text-rose-500">{errors.whatsapp.message}</p>}
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-slate-600 block mb-2">
+                  Moeda preferida para BI
+                </label>
+                <select
+                  {...register('preferredCurrency')}
+                  disabled={isSubmitting}
+                  className={cn(
+                    'w-full px-3 py-2.5 bg-slate-50 border focus:border-[#C2410C] focus:bg-white outline-none text-sm transition-colors',
+                    errors.preferredCurrency ? 'border-rose-500' : 'border-slate-200',
+                    isSubmitting && 'opacity-50 cursor-not-allowed'
+                  )}
+                >
+                  <option value="BRL">Real (BRL)</option>
+                  <option value="USD">Dólar (USD)</option>
+                </select>
+                {errors.preferredCurrency && (
+                  <p className="mt-1 text-xs text-rose-500">{errors.preferredCurrency.message}</p>
+                )}
               </div>
             </div>
           </ModalContent>

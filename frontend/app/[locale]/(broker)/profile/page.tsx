@@ -38,6 +38,7 @@ const updateProfileSchema = z.object({
       (val) => !val || /^\d{10,11}$/.test(val.replace(/\D/g, '')),
       'WhatsApp inválido'
     ),
+  preferredCurrency: z.enum(['BRL', 'USD']),
 });
 
 // Schema para alteração de senha
@@ -72,7 +73,7 @@ function RequirementItem({ met, label }: { met: boolean; label: string }) {
   );
 }
 
-function PasswordRequirementsIndicator({ password, confirmPassword, t }: { password: string; confirmPassword: string; t: any }) {
+function PasswordRequirementsIndicator({ password, confirmPassword, t }: { password: string; confirmPassword: string; t: (key: string) => string }) {
   if (!password) return null;
   const requirements = checkPasswordRequirements(password);
   const allMet = requirements.minLength && requirements.hasUppercase && requirements.hasNumber;
@@ -127,6 +128,9 @@ export default function ProfilePage() {
     control: profileControl,
   } = useForm<UpdateProfileInput>({
     resolver: zodResolver(updateProfileSchema),
+    defaultValues: {
+      preferredCurrency: 'BRL',
+    },
   });
 
   const { field: phoneField } = useController({
@@ -168,6 +172,7 @@ export default function ProfilePage() {
         name: data.name,
         phone: data.phone ? formatPhoneInput(data.phone) : '',
         whatsapp: data.whatsapp ? formatPhoneInput(data.whatsapp) : '',
+        preferredCurrency: data.preferredCurrency || 'BRL',
       });
     } catch {
       error(t('loadError'));
@@ -185,6 +190,7 @@ export default function ProfilePage() {
         name: data.name,
         phone: sanitizePhone(data.phone) || null,
         whatsapp: sanitizePhone(data.whatsapp) || null,
+        preferredCurrency: data.preferredCurrency,
       });
 
       setProfile(updatedUser);
@@ -195,6 +201,7 @@ export default function ProfilePage() {
           ...authUser,
           name: updatedUser.name,
           phone: updatedUser.phone,
+          preferredCurrency: updatedUser.preferredCurrency,
         });
       }
 
@@ -308,6 +315,23 @@ export default function ProfilePage() {
                   error={profileErrors.whatsapp?.message}
                   disabled={isUpdatingProfile}
                 />
+
+                <div>
+                  <label className="text-sm font-medium text-slate-700 block mb-2">
+                    Moeda preferida
+                  </label>
+                  <select
+                    {...registerProfile('preferredCurrency')}
+                    disabled={isUpdatingProfile}
+                    className="w-full h-10 px-3 bg-white border border-slate-200 focus:border-slate-400 focus:outline-none text-sm"
+                  >
+                    <option value="BRL">Real (BRL)</option>
+                    <option value="USD">Dollar (USD)</option>
+                  </select>
+                  {profileErrors.preferredCurrency && (
+                    <p className="mt-1 text-xs text-rose-500">{profileErrors.preferredCurrency.message}</p>
+                  )}
+                </div>
 
                 <div className="flex justify-end">
                   <Button

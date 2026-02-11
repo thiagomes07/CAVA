@@ -312,7 +312,7 @@ export default function LinksManagementPage() {
                         <TableCell>
                           {link.showPrice && link.displayPrice ? (
                             <span className="font-serif text-obsidian">
-                              {formatCurrency(link.displayPrice)}
+                              {formatCurrency(link.displayPrice, locale as 'pt' | 'en' | 'es', link.displayCurrency || 'BRL')}
                             </span>
                           ) : (
                             <span className="text-slate-400 text-sm">{t('onRequest')}</span>
