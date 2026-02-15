@@ -1,45 +1,101 @@
-import createMiddleware from 'next-intl/middleware';
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import type { UserRole } from '@/lib/types';
-import { canRoleAccessRoute, getDashboardForRole, routesByRole } from '@/lib/utils/routes';
-import { routing, locales, defaultLocale, type Locale } from '@/i18n/routing';
+import createMiddleware from "next-intl/middleware";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
+import type { UserRole } from "@/lib/types";
+import {
+  canRoleAccessRoute,
+  getDashboardForRole,
+  routesByRole,
+} from "@/lib/utils/routes";
+import { routing, locales, defaultLocale, type Locale } from "@/i18n/routing";
 
 // Rotas de autenticação (públicas)
-const authRoutes = ['/login'];
+const authRoutes = ["/login"];
 
 // Prefixos de rotas públicas
-const publicPrefixes = ['/api/public', '/_next', '/static', '/favicon.ico', '/privacy', '/catalogo', '/deposito'];
+const publicPrefixes = [
+  "/api/public",
+  "/_next",
+  "/static",
+  "/favicon.ico",
+  "/privacy",
+  "/catalogo",
+  "/deposito",
+];
 
 // Prefixos reservados (rotas internas) derivados do mapa de permissões
 const reservedPrefixes = Array.from(
-  new Set(Object.values(routesByRole).flatMap((routes) => routes.map((route) => route.split('/')[1])).filter(Boolean))
+  new Set(
+    Object.values(routesByRole)
+      .flatMap((routes) => routes.map((route) => route.split("/")[1]))
+      .filter(Boolean),
+  ),
 ).map((segment) => `/${segment}`);
 
 // Rotas que requerem redirecionamento baseado em role
 const roleBasedRedirects: Record<string, Record<string, string>> = {
-  '/dashboard': {
-    ADMIN_INDUSTRIA: '/dashboard',
-    VENDEDOR_INTERNO: '/dashboard',
-    BROKER: '/dashboard',
+  "/dashboard": {
+    ADMIN_INDUSTRIA: "/dashboard",
+    VENDEDOR_INTERNO: "/dashboard",
+    BROKER: "/dashboard",
   },
-  '/inventory': {
-    ADMIN_INDUSTRIA: '/inventory',
-    VENDEDOR_INTERNO: '/inventory',
-    BROKER: '/shared-inventory',
+  "/inventory": {
+    ADMIN_INDUSTRIA: "/inventory",
+    VENDEDOR_INTERNO: "/inventory",
+    BROKER: "/shared-inventory",
   },
 };
 
-const allowedRoles: UserRole[] = ['ADMIN_INDUSTRIA', 'VENDEDOR_INTERNO', 'BROKER'];
+const allowedRoles: UserRole[] = [
+  "ADMIN_INDUSTRIA",
+  "VENDEDOR_INTERNO",
+  "BROKER",
+];
 
 // Create the next-intl middleware
 const intlMiddleware = createMiddleware(routing);
 
 // Cookie name for user's language preference
-const LOCALE_COOKIE = 'NEXT_LOCALE';
+const LOCALE_COOKIE = "NEXT_LOCALE";
+
+/**
+ * Returns the canonical public origin (e.g. "https://usecava.com") so that
+ * redirect URLs never expose the internal ALB / ECS hostname.
+ *
+ * Resolution order:
+ *  1. NEXT_PUBLIC_APP_URL env var (most reliable – set once in the task def)
+ *  2. X-Forwarded-Host + X-Forwarded-Proto headers (injected by CloudFront / ALB)
+ *  3. Host header + X-Forwarded-Proto
+ *  4. request.url as a last-resort fallback (dev / direct access)
+ */
+function getCanonicalOrigin(request: NextRequest): string {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+  if (appUrl) {
+    return appUrl.replace(/\/$/, ""); // strip trailing slash
+  }
+
+  const forwardedHost = request.headers.get("x-forwarded-host");
+  const proto = request.headers.get("x-forwarded-proto") || "https";
+
+  if (forwardedHost) {
+    return `${proto}://${forwardedHost}`;
+  }
+
+  const hostHeader = request.headers.get("host");
+  if (hostHeader) {
+    return `${proto}://${hostHeader}`;
+  }
+
+  return new URL(request.url).origin;
+}
+
+/** Build a redirect URL using the canonical public origin instead of request.url */
+function buildRedirectUrl(request: NextRequest, path: string): URL {
+  return new URL(path, getCanonicalOrigin(request));
+}
 
 function getLocaleFromPath(pathname: string): Locale | null {
-  const segments = pathname.split('/').filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean);
   if (segments.length > 0 && locales.includes(segments[0] as Locale)) {
     return segments[0] as Locale;
   }
@@ -49,9 +105,9 @@ function getLocaleFromPath(pathname: string): Locale | null {
 function stripLocaleFromPath(pathname: string): string {
   const locale = getLocaleFromPath(pathname);
   if (locale) {
-    const segments = pathname.split('/').filter(Boolean);
+    const segments = pathname.split("/").filter(Boolean);
     segments.shift(); // Remove locale
-    return '/' + segments.join('/') || '/';
+    return "/" + segments.join("/") || "/";
   }
   return pathname;
 }
@@ -61,7 +117,7 @@ function addLocaleToPath(pathname: string, locale: Locale): string {
   if (locale === defaultLocale) {
     return pathname;
   }
-  return `/${locale}${pathname === '/' ? '' : pathname}`;
+  return `/${locale}${pathname === "/" ? "" : pathname}`;
 }
 
 function isAuthRoute(pathname: string): boolean {
@@ -73,15 +129,17 @@ function isPublicRoute(pathname: string): boolean {
   if (publicPrefixes.some((prefix) => pathname.startsWith(prefix))) return true;
 
   // Rotas públicas de landing page: /[slug] ou /catalogo/[slug]
-  const segments = pathname.split('/').filter(Boolean);
+  const segments = pathname.split("/").filter(Boolean);
   if (segments.length === 1) {
     const top = `/${segments[0]}`;
-    const isReserved = [...reservedPrefixes, '/api'].some((p) => top === p || top.startsWith(`${p}/`));
+    const isReserved = [...reservedPrefixes, "/api"].some(
+      (p) => top === p || top.startsWith(`${p}/`),
+    );
     if (!isReserved) return true;
   }
-  
+
   // Rotas de catálogo público: /catalogo/[slug]
-  if (pathname.startsWith('/catalogo/')) return true;
+  if (pathname.startsWith("/catalogo/")) return true;
 
   return false;
 }
@@ -106,12 +164,13 @@ function getRedirectForRole(pathname: string, role: string): string | null {
 
 function decodeJwt(token: string): { exp?: number; role?: string } | null {
   try {
-    const payload = token.split('.')[1];
-    const decoded = typeof atob === 'function'
-      ? atob(payload)
-      : typeof Buffer !== 'undefined'
-        ? Buffer.from(payload, 'base64').toString('utf8')
-        : '';
+    const payload = token.split(".")[1];
+    const decoded =
+      typeof atob === "function"
+        ? atob(payload)
+        : typeof Buffer !== "undefined"
+          ? Buffer.from(payload, "base64").toString("utf8")
+          : "";
     return JSON.parse(decoded);
   } catch {
     return null;
@@ -126,40 +185,57 @@ function isTokenExpired(token: string): boolean {
   return payload.exp <= nowSeconds + SKEW_SECONDS;
 }
 
-async function attemptRefresh(request: NextRequest, pathname: string, locale: Locale) {
-  const refreshCookie = request.cookies.get('refresh_token');
+async function attemptRefresh(
+  request: NextRequest,
+  pathname: string,
+  locale: Locale,
+) {
+  const refreshCookie = request.cookies.get("refresh_token");
 
   if (!refreshCookie) {
-    const loginUrl = new URL(addLocaleToPath('/login', locale), request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    const loginUrl = buildRedirectUrl(
+      request,
+      addLocaleToPath("/login", locale),
+    );
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001/api';
+  const apiUrl =
+    process.env.INTERNAL_API_URL ||
+    process.env.NEXT_PUBLIC_API_URL ||
+    "http://localhost:3001/api";
   const refreshResponse = await fetch(`${apiUrl}/auth/refresh`, {
-    method: 'POST',
+    method: "POST",
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
       Cookie: `refresh_token=${encodeURIComponent(refreshCookie.value)}`,
     },
   });
 
   if (!refreshResponse.ok) {
-    const loginUrl = new URL(addLocaleToPath('/login', locale), request.url);
-    loginUrl.searchParams.set('callbackUrl', pathname);
+    const loginUrl = buildRedirectUrl(
+      request,
+      addLocaleToPath("/login", locale),
+    );
+    loginUrl.searchParams.set("callbackUrl", pathname);
     return NextResponse.redirect(loginUrl);
   }
 
-  const redirectUrl = request.nextUrl.clone();
+  const redirectUrl = buildRedirectUrl(
+    request,
+    request.nextUrl.pathname + request.nextUrl.search,
+  );
   const response = NextResponse.redirect(redirectUrl);
 
   // Propagar TODOS os Set-Cookie headers (access_token, refresh_token, csrf_token)
   // headers.get('set-cookie') só retorna o primeiro; getSetCookie() retorna todos
-  const setCookieHeaders = refreshResponse.headers.getSetCookie?.() 
-    ?? [refreshResponse.headers.get('set-cookie')].filter(Boolean) as string[];
+  const setCookieHeaders =
+    refreshResponse.headers.getSetCookie?.() ??
+    ([refreshResponse.headers.get("set-cookie")].filter(Boolean) as string[]);
 
   for (const cookie of setCookieHeaders) {
-    response.headers.append('set-cookie', cookie);
+    response.headers.append("set-cookie", cookie);
   }
 
   return response;
@@ -173,12 +249,12 @@ function getPreferredLocale(request: NextRequest): Locale {
   }
 
   // 2. Check Accept-Language header
-  const acceptLanguage = request.headers.get('Accept-Language');
+  const acceptLanguage = request.headers.get("Accept-Language");
   if (acceptLanguage) {
-    const languages = acceptLanguage.split(',').map((lang) => {
-      const [code, priority] = lang.trim().split(';q=');
+    const languages = acceptLanguage.split(",").map((lang) => {
+      const [code, priority] = lang.trim().split(";q=");
       return {
-        code: code.split('-')[0].toLowerCase(),
+        code: code.split("-")[0].toLowerCase(),
         priority: priority ? parseFloat(priority) : 1,
       };
     });
@@ -186,9 +262,9 @@ function getPreferredLocale(request: NextRequest): Locale {
     languages.sort((a, b) => b.priority - a.priority);
 
     for (const { code } of languages) {
-      if (code === 'pt') return 'pt';
-      if (code === 'en') return 'en';
-      if (code === 'es') return 'es';
+      if (code === "pt") return "pt";
+      if (code === "en") return "en";
+      if (code === "es") return "es";
     }
   }
 
@@ -201,10 +277,10 @@ export async function middleware(request: NextRequest) {
 
   // Skip static files and API routes
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.') ||
-    pathname.startsWith('/favicon.ico')
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api") ||
+    pathname.includes(".") ||
+    pathname.startsWith("/favicon.ico")
   ) {
     return NextResponse.next();
   }
@@ -213,21 +289,23 @@ export async function middleware(request: NextRequest) {
   const pathLocale = getLocaleFromPath(pathname);
   const preferredLocale = getPreferredLocale(request);
   const currentLocale = pathLocale || preferredLocale;
-  
+
   // Get the pathname without locale
   const pathnameWithoutLocale = stripLocaleFromPath(pathname);
 
   // Handle i18n first - let next-intl handle locale routing
   const intlResponse = intlMiddleware(request);
-  
+
   // If next-intl wants to redirect (e.g., to add locale prefix), follow that
   if (intlResponse.status === 307 || intlResponse.status === 308) {
     return intlResponse;
   }
 
-  const accessToken = request.cookies.get('access_token')?.value;
-  const rawRole = request.cookies.get('user_role')?.value;
-  const userRole = allowedRoles.includes(rawRole as UserRole) ? (rawRole as UserRole) : null;
+  const accessToken = request.cookies.get("access_token")?.value;
+  const rawRole = request.cookies.get("user_role")?.value;
+  const userRole = allowedRoles.includes(rawRole as UserRole)
+    ? (rawRole as UserRole)
+    : null;
   const hasValidAccessToken = !!accessToken && !isTokenExpired(accessToken);
 
   // Auth routes are public, but redirect if already authenticated
@@ -235,7 +313,10 @@ export async function middleware(request: NextRequest) {
     // Allow access to login when the access token is missing or expired to avoid redirect loops
     if (hasValidAccessToken && userRole) {
       const dashboardUrl = getDashboardForRole(userRole);
-      const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
+      const redirectUrl = buildRedirectUrl(
+        request,
+        addLocaleToPath(dashboardUrl, currentLocale),
+      );
       return NextResponse.redirect(redirectUrl);
     }
     return intlResponse;
@@ -249,13 +330,20 @@ export async function middleware(request: NextRequest) {
   // No token or expired token - try refresh or redirect to login
   if (!hasValidAccessToken) {
     try {
-      return await attemptRefresh(request, pathnameWithoutLocale, currentLocale);
+      return await attemptRefresh(
+        request,
+        pathnameWithoutLocale,
+        currentLocale,
+      );
     } catch (error) {
-      if (process.env.NODE_ENV !== 'production') {
-        console.error('Token refresh error:', error);
+      if (process.env.NODE_ENV !== "production") {
+        console.error("Token refresh error:", error);
       }
-      const loginUrl = new URL(addLocaleToPath('/login', currentLocale), request.url);
-      loginUrl.searchParams.set('callbackUrl', pathnameWithoutLocale);
+      const loginUrl = buildRedirectUrl(
+        request,
+        addLocaleToPath("/login", currentLocale),
+      );
+      loginUrl.searchParams.set("callbackUrl", pathnameWithoutLocale);
       return NextResponse.redirect(loginUrl);
     }
   }
@@ -263,25 +351,37 @@ export async function middleware(request: NextRequest) {
   // Verify role from token
   const tokenPayload = accessToken ? decodeJwt(accessToken) : null;
   const tokenRole = tokenPayload?.role as UserRole | undefined;
-  const effectiveRole = tokenRole && allowedRoles.includes(tokenRole) ? tokenRole : userRole;
+  const effectiveRole =
+    tokenRole && allowedRoles.includes(tokenRole) ? tokenRole : userRole;
 
   if (!effectiveRole || (tokenRole && tokenRole !== effectiveRole)) {
-    const loginUrl = new URL(addLocaleToPath('/login', currentLocale), request.url);
-    loginUrl.searchParams.set('callbackUrl', pathnameWithoutLocale);
+    const loginUrl = buildRedirectUrl(
+      request,
+      addLocaleToPath("/login", currentLocale),
+    );
+    loginUrl.searchParams.set("callbackUrl", pathnameWithoutLocale);
     return NextResponse.redirect(loginUrl);
   }
 
   // Check role-based redirects
   const redirect = getRedirectForRole(pathnameWithoutLocale, effectiveRole);
   if (redirect) {
-    const redirectUrl = new URL(addLocaleToPath(redirect, currentLocale), request.url);
+    const redirectUrl = buildRedirectUrl(
+      request,
+      addLocaleToPath(redirect, currentLocale),
+    );
     return NextResponse.redirect(redirectUrl);
   }
 
   // Check access permission
   if (!canRoleAccessRoute(effectiveRole, pathnameWithoutLocale)) {
-    const dashboardUrl = effectiveRole ? getDashboardForRole(effectiveRole) : '/login';
-    const redirectUrl = new URL(addLocaleToPath(dashboardUrl, currentLocale), request.url);
+    const dashboardUrl = effectiveRole
+      ? getDashboardForRole(effectiveRole)
+      : "/login";
+    const redirectUrl = buildRedirectUrl(
+      request,
+      addLocaleToPath(dashboardUrl, currentLocale),
+    );
     return NextResponse.redirect(redirectUrl);
   }
 
@@ -290,6 +390,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

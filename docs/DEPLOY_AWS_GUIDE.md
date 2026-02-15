@@ -73,25 +73,27 @@
 
 ### Por que esta arquitetura?
 
-| Decisão | Motivo |
-|---------|--------|
-| **ECS Fargate** (não EC2) | Sem gerenciar servidores, paga por uso, auto-scaling |
-| **CloudFront na frente** | SSL gratuito, cache de assets, DDoS básico (Shield Standard) |
-| **Same-domain proxy** | Cookies `SameSite=Lax` funcionam sem CORS cross-origin |
-| **ALB** (não API Gateway) | Mais barato pra tráfego contínuo, suporta WebSocket futuro |
-| **RDS** (não Aurora) | Mais barato para início, migra pra Aurora se precisar |
-| **S3 direto** (não MinIO) | Gerenciado, 99.999999999% durabilidade, IAM nativo |
+| Decisão                   | Motivo                                                       |
+| ------------------------- | ------------------------------------------------------------ |
+| **ECS Fargate** (não EC2) | Sem gerenciar servidores, paga por uso, auto-scaling         |
+| **CloudFront na frente**  | SSL gratuito, cache de assets, DDoS básico (Shield Standard) |
+| **Same-domain proxy**     | Cookies `SameSite=Lax` funcionam sem CORS cross-origin       |
+| **ALB** (não API Gateway) | Mais barato pra tráfego contínuo, suporta WebSocket futuro   |
+| **RDS** (não Aurora)      | Mais barato para início, migra pra Aurora se precisar        |
+| **S3 direto** (não MinIO) | Gerenciado, 99.999999999% durabilidade, IAM nativo           |
 
 ---
 
 ## 2. Pré-requisitos
 
 ### 2.1 Conta AWS
+
 - Conta AWS ativa com **cartão de crédito** cadastrado
 - **MFA habilitado** no root user (obrigatório: vá em `IAM > Security credentials > MFA`)
 - **AWS Organizations**: não é necessário agora, mas recomendado no futuro
 
 ### 2.2 Ferramentas Locais
+
 ```bash
 # AWS CLI v2 (Windows)
 winget install Amazon.AWSCLI
@@ -108,6 +110,7 @@ git --version
 ```
 
 ### 2.3 Configurar AWS CLI
+
 ```bash
 aws configure
 # AWS Access Key ID: (da IAM user que vamos criar)
@@ -117,6 +120,7 @@ aws configure
 ```
 
 ### 2.4 Repositório GitHub
+
 - Repositório `thiagomes07/CAVA` deve estar no GitHub
 - Branch `main` é a branch de produção
 - GitHub Actions habilitado (já vem por padrão)
@@ -187,17 +191,12 @@ aws configure
       "Sid": "PassRole",
       "Effect": "Allow",
       "Action": "iam:PassRole",
-      "Resource": [
-        "arn:aws:iam::*:role/cava-*"
-      ]
+      "Resource": ["arn:aws:iam::*:role/cava-*"]
     },
     {
       "Sid": "CloudFrontInvalidation",
       "Effect": "Allow",
-      "Action": [
-        "cloudfront:CreateInvalidation",
-        "cloudfront:GetInvalidation"
-      ],
+      "Action": ["cloudfront:CreateInvalidation", "cloudfront:GetInvalidation"],
       "Resource": "*"
     }
   ]
@@ -230,10 +229,7 @@ aws configure
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": [
-        "ssm:GetParameters",
-        "secretsmanager:GetSecretValue"
-      ],
+      "Action": ["ssm:GetParameters", "secretsmanager:GetSecretValue"],
       "Resource": "arn:aws:ssm:us-east-1:*:parameter/cava/*"
     }
   ]
@@ -275,10 +271,7 @@ aws configure
     {
       "Sid": "SESEmailAccess",
       "Effect": "Allow",
-      "Action": [
-        "ses:SendEmail",
-        "ses:SendRawEmail"
-      ],
+      "Action": ["ses:SendEmail", "ses:SendRawEmail"],
       "Resource": "*",
       "Condition": {
         "StringEquals": {
@@ -422,7 +415,7 @@ psql -h cava-db.abc123xyz.us-east-1.rds.amazonaws.com \
 4. **Object Ownership**: ACLs disabled (recommended)
 5. **Block Public Access settings**:
    - ✅ **Mantenha TUDO bloqueado** (Block all public access = ON)
-   
+
 > ✅ **SEGURANÇA**: O bucket fica 100% privado. Somente o CloudFront (via OAC) e o backend (via IAM Role) acessam os objetos. Ninguém consegue acessar diretamente pela URL do S3.
 
 6. **Bucket Versioning**: Disable (para economia; habilite se precisar de versionamento)
@@ -634,7 +627,7 @@ docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cava/frontend:latest
 5. **Task size**:
    - **CPU**: 0.25 vCPU (256)
    - **Memory**: 0.5 GB (512)
-   
+
 > O backend Go é muito leve. 256 CPU / 512 MB é suficiente para início.
 
 6. **Task role**: `cava-backend-task-role` (a que criamos com S3+SES)
@@ -650,65 +643,65 @@ docker push <ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/cava/frontend:latest
      - App protocol: HTTP
    - **Environment variables** (⚠️ cada variável é crítica):
 
-| Key | Value | Observação |
-|-----|-------|------------|
-| `APP_ENV` | `production` | |
-| `APP_HOST` | `0.0.0.0` | |
-| `APP_PORT` | `3001` | |
-| `DB_HOST` | `cava-db.xxx.us-east-1.rds.amazonaws.com` | Endpoint RDS |
-| `DB_PORT` | `5432` | |
-| `DB_USER` | `cava_admin` | |
-| `DB_PASSWORD` | `<sua-senha-rds>` | ⚠️ Em prod, use Secrets Manager |
-| `DB_NAME` | `cava_db` | |
-| `DB_SSL_MODE` | `require` | ⚠️ OBRIGATÓRIO com RDS |
-| `DB_MAX_OPEN_CONNS` | `25` | |
-| `DB_MAX_IDLE_CONNS` | `5` | |
-| `DB_CONN_MAX_LIFETIME` | `5m` | |
-| `STORAGE_TYPE` | `s3` | |
-| `STORAGE_ENDPOINT` | `https://s3.us-east-1.amazonaws.com` | |
-| `STORAGE_ACCESS_KEY` | ` ` (vazio) | IAM Role |
-| `STORAGE_SECRET_KEY` | ` ` (vazio) | IAM Role |
-| `STORAGE_BUCKET_NAME` | `cava-media-prod` | |
-| `STORAGE_REGION` | `us-east-1` | |
-| `STORAGE_USE_SSL` | `true` | |
-| `STORAGE_PUBLIC_URL` | `https://usecava.com/media` | Via CloudFront |
-| `JWT_SECRET` | `<gerar com: openssl rand -base64 64>` | ≥32 chars |
-| `JWT_ACCESS_TOKEN_DURATION` | `15m` | |
-| `JWT_REFRESH_TOKEN_DURATION` | `168h` | 7 dias |
-| `PASSWORD_PEPPER` | `<gerar com: openssl rand -base64 32>` | ≥16 chars |
-| `CSRF_SECRET` | `<gerar com: openssl rand -base64 32>` | ≥32 chars |
-| `BCRYPT_COST` | `12` | |
-| `COOKIE_SECURE` | `true` | HTTPS em produção |
-| `COOKIE_DOMAIN` | `usecava.com` | |
-| `FRONTEND_URL` | `https://usecava.com` | |
-| `PUBLIC_LINK_BASE_URL` | `https://usecava.com` | |
-| `ALLOWED_ORIGINS` | `https://usecava.com` | |
-| `RATE_LIMIT_AUTH_RPM` | `5` | |
-| `RATE_LIMIT_PUBLIC_RPM` | `30` | |
-| `RATE_LIMIT_AUTHENTICATED_RPM` | `100` | |
-| `LOG_LEVEL` | `info` | Não use debug em prod |
-| `LOG_FORMAT` | `json` | CloudWatch precisa JSON |
-| `MIGRATIONS_PATH` | `file://migrations` | |
-| `AUTO_MIGRATE` | `true` | |
-| `USE_SES` | `true` | |
-| `SES_REGION` | `us-east-1` | |
-| `SES_SENDER_EMAIL` | `noreply@usecava.com` | Deve estar verificado |
-| `SES_SENDER_NAME` | `CAVA` | |
+| Key                            | Value                                     | Observação                      |
+| ------------------------------ | ----------------------------------------- | ------------------------------- |
+| `APP_ENV`                      | `production`                              |                                 |
+| `APP_HOST`                     | `0.0.0.0`                                 |                                 |
+| `APP_PORT`                     | `3001`                                    |                                 |
+| `DB_HOST`                      | `cava-db.xxx.us-east-1.rds.amazonaws.com` | Endpoint RDS                    |
+| `DB_PORT`                      | `5432`                                    |                                 |
+| `DB_USER`                      | `cava_admin`                              |                                 |
+| `DB_PASSWORD`                  | `<sua-senha-rds>`                         | ⚠️ Em prod, use Secrets Manager |
+| `DB_NAME`                      | `cava_db`                                 |                                 |
+| `DB_SSL_MODE`                  | `require`                                 | ⚠️ OBRIGATÓRIO com RDS          |
+| `DB_MAX_OPEN_CONNS`            | `25`                                      |                                 |
+| `DB_MAX_IDLE_CONNS`            | `5`                                       |                                 |
+| `DB_CONN_MAX_LIFETIME`         | `5m`                                      |                                 |
+| `STORAGE_TYPE`                 | `s3`                                      |                                 |
+| `STORAGE_ENDPOINT`             | `https://s3.us-east-1.amazonaws.com`      |                                 |
+| `STORAGE_ACCESS_KEY`           | ` ` (vazio)                               | IAM Role                        |
+| `STORAGE_SECRET_KEY`           | ` ` (vazio)                               | IAM Role                        |
+| `STORAGE_BUCKET_NAME`          | `cava-media-prod`                         |                                 |
+| `STORAGE_REGION`               | `us-east-1`                               |                                 |
+| `STORAGE_USE_SSL`              | `true`                                    |                                 |
+| `STORAGE_PUBLIC_URL`           | `https://usecava.com/media`               | Via CloudFront                  |
+| `JWT_SECRET`                   | `<gerar com: openssl rand -base64 64>`    | ≥32 chars                       |
+| `JWT_ACCESS_TOKEN_DURATION`    | `15m`                                     |                                 |
+| `JWT_REFRESH_TOKEN_DURATION`   | `168h`                                    | 7 dias                          |
+| `PASSWORD_PEPPER`              | `<gerar com: openssl rand -base64 32>`    | ≥16 chars                       |
+| `CSRF_SECRET`                  | `<gerar com: openssl rand -base64 32>`    | ≥32 chars                       |
+| `BCRYPT_COST`                  | `12`                                      |                                 |
+| `COOKIE_SECURE`                | `true`                                    | HTTPS em produção               |
+| `COOKIE_DOMAIN`                | `usecava.com`                             |                                 |
+| `FRONTEND_URL`                 | `https://usecava.com`                     |                                 |
+| `PUBLIC_LINK_BASE_URL`         | `https://usecava.com`                     |                                 |
+| `ALLOWED_ORIGINS`              | `https://usecava.com`                     |                                 |
+| `RATE_LIMIT_AUTH_RPM`          | `5`                                       |                                 |
+| `RATE_LIMIT_PUBLIC_RPM`        | `30`                                      |                                 |
+| `RATE_LIMIT_AUTHENTICATED_RPM` | `100`                                     |                                 |
+| `LOG_LEVEL`                    | `info`                                    | Não use debug em prod           |
+| `LOG_FORMAT`                   | `json`                                    | CloudWatch precisa JSON         |
+| `MIGRATIONS_PATH`              | `file://migrations`                       |                                 |
+| `AUTO_MIGRATE`                 | `true`                                    |                                 |
+| `USE_SES`                      | `true`                                    |                                 |
+| `SES_REGION`                   | `us-east-1`                               |                                 |
+| `SES_SENDER_EMAIL`             | `noreply@usecava.com`                     | Deve estar verificado           |
+| `SES_SENDER_NAME`              | `CAVA`                                    |                                 |
 
 > ⚠️ **SEGURANÇA**: Para `DB_PASSWORD`, `JWT_SECRET`, `PASSWORD_PEPPER`, `CSRF_SECRET`, é **altamente recomendado** usar **AWS Secrets Manager** em vez de plain text. Veja seção 8.2.1.
 
-   - **HealthCheck**:
-     - Command: `CMD-SHELL,wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1`
-     - Interval: 30s
-     - Timeout: 10s
-     - Retries: 3
-     - Start period: 40s
+- **HealthCheck**:
+  - Command: `CMD-SHELL,wget --no-verbose --tries=1 --spider http://localhost:3001/health || exit 1`
+  - Interval: 30s
+  - Timeout: 10s
+  - Retries: 3
+  - Start period: 40s
 
-   - **Log configuration**:
-     - **Log driver**: awslogs
-     - **awslogs-group**: `/ecs/cava-backend`
-     - **awslogs-region**: `us-east-1`
-     - **awslogs-stream-prefix**: `backend`
+- **Log configuration**:
+  - **Log driver**: awslogs
+  - **awslogs-group**: `/ecs/cava-backend`
+  - **awslogs-region**: `us-east-1`
+  - **awslogs-stream-prefix**: `backend`
 
 9. Click **Create**
 
@@ -731,6 +724,7 @@ Em vez de colocar senhas como plain text nas env vars da Task Definition:
    - **Key**: `DB_PASSWORD`
    - **ValueFrom**: `arn:aws:secretsmanager:us-east-1:ACCOUNT_ID:secret:cava/backend/secrets:DB_PASSWORD::`
 7. Adicione na `cava-ecs-task-execution-role` a policy:
+
 ```json
 {
   "Effect": "Allow",
@@ -764,7 +758,7 @@ Em vez de colocar senhas como plain text nas env vars da Task Definition:
 7. **Listeners**:
    - HTTP:80 → Redirect to HTTPS:443
    - HTTPS:443 → Forward to target group (criaremos abaixo)
-   
+
 > ⚠️ Para o HTTPS listener, você precisa do certificado ACM. Crie-o ANTES (seção 12) ou adicione depois.
 
 8. **Create load balancer**
@@ -772,6 +766,7 @@ Em vez de colocar senhas como plain text nas env vars da Task Definition:
 ### 8.5 Criar Target Groups
 
 **Target Group — Backend:**
+
 1. **EC2** → **Target Groups** → **Create target group**
 2. **Target type**: IP addresses (Fargate usa IPs)
 3. **Name**: `cava-backend-tg`
@@ -788,6 +783,7 @@ Em vez de colocar senhas como plain text nas env vars da Task Definition:
 8. **Create**
 
 **Target Group — Frontend:**
+
 1. Repita:
    - **Name**: `cava-frontend-tg`
    - **Port**: 3000
@@ -857,17 +853,17 @@ Em vez de colocar senhas como plain text nas env vars da Task Definition:
    - **Port**: 3000, TCP, HTTP
    - **Environment variables**:
 
-| Key | Value |
-|-----|-------|
+| Key                | Value                                                     |
+| ------------------ | --------------------------------------------------------- |
 | `INTERNAL_API_URL` | `http://cava-backend-service.cava-cluster.local:3001/api` |
-| `NODE_ENV` | `production` |
+| `NODE_ENV`         | `production`                                              |
 
 > ⚠️ **INTERNAL_API_URL**: Este é o endereço de service discovery dentro do ECS. Veja a nota 9.1.1 abaixo.
 
-> ⚠️ **NEXT_PUBLIC_*** não vai aqui: Essas variáveis são inlined no build do Docker (build args).
+> ⚠️ **NEXT*PUBLIC*\*** não vai aqui: Essas variáveis são inlined no build do Docker (build args).
 
-   - **HealthCheck**: `CMD-SHELL,wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1`
-   - **Logs**: awslogs, group `/ecs/cava-frontend`, region `us-east-1`, prefix `frontend`
+- **HealthCheck**: `CMD-SHELL,wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1`
+- **Logs**: awslogs, group `/ecs/cava-frontend`, region `us-east-1`, prefix `frontend`
 
 9. **Create**
 
@@ -930,13 +926,13 @@ Para que o frontend acesse o backend internamente (sem sair pela internet):
    - **Origin name**: `s3-media`
    - ⚠️ Após salvar, o CloudFront exibirá um banner: "The S3 bucket policy needs to be updated". Click **Copy policy** e aplique no bucket (seção 5.2).
 
-4. **Default cache behavior** (/* → ALB → Frontend):
+4. **Default cache behavior** (/\* → ALB → Frontend):
    - **Origin**: `alb-origin`
    - **Viewer protocol policy**: Redirect HTTP to HTTPS
    - **Allowed HTTP methods**: GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE
    - **Cache policy**: `CachingDisabled` (SSR precisa bypasear cache)
    - **Origin request policy**: `AllViewerExceptHostHeader`
-   
+
 > ⚠️ **ARMADILHA CRÍTICA**: Se usar cache no default behavior, o SSR do Next.js não funcionará (páginas estáticas serão servidas para todos os usuários). Use `CachingDisabled`.
 
 5. **Behaviors adicionais** (clicar **Add behavior**):
@@ -993,10 +989,10 @@ Para que o frontend acesse o backend internamente (sem sair pela internet):
 
 ```javascript
 function handler(event) {
-    var request = event.request;
-    // Remove /media prefix: /media/products/x/y.jpg → /products/x/y.jpg
-    request.uri = request.uri.replace(/^\/media/, '');
-    return request;
+  var request = event.request;
+  // Remove /media prefix: /media/products/x/y.jpg → /products/x/y.jpg
+  request.uri = request.uri.replace(/^\/media/, "");
+  return request;
 }
 ```
 
@@ -1088,15 +1084,15 @@ O CloudFront **deve** forward cookies para o ALB (frontend/backend), caso contr�
 1. Vá ao repositório no GitHub → **Settings** → **Secrets and variables** → **Actions**
 2. Adicione os seguintes **Repository secrets**:
 
-| Secret Name | Valor |
-|-------------|-------|
-| `AWS_ACCESS_KEY_ID` | Access Key do user `cava-github-deployer` |
-| `AWS_SECRET_ACCESS_KEY` | Secret Key do user `cava-github-deployer` |
-| `AWS_REGION` | `us-east-1` |
-| `AWS_ACCOUNT_ID` | Seu Account ID (12 dígitos) |
-| `NEXT_PUBLIC_API_URL` | `https://usecava.com/api` |
-| `NEXT_PUBLIC_APP_URL` | `https://usecava.com` |
-| `NEXT_PUBLIC_IMAGE_HOSTNAME` | `usecava.com` |
+| Secret Name                  | Valor                                             |
+| ---------------------------- | ------------------------------------------------- |
+| `AWS_ACCESS_KEY_ID`          | Access Key do user `cava-github-deployer`         |
+| `AWS_SECRET_ACCESS_KEY`      | Secret Key do user `cava-github-deployer`         |
+| `AWS_REGION`                 | `us-east-1`                                       |
+| `AWS_ACCOUNT_ID`             | Seu Account ID (12 dígitos)                       |
+| `NEXT_PUBLIC_API_URL`        | `https://usecava.com/api`                         |
+| `NEXT_PUBLIC_APP_URL`        | `https://usecava.com`                             |
+| `NEXT_PUBLIC_IMAGE_HOSTNAME` | `usecava.com`                                     |
 | `CLOUDFRONT_DISTRIBUTION_ID` | ID da distribuição CloudFront (ex: `E1234ABCDEF`) |
 
 ### 13.2 Criar Workflow File
@@ -1397,6 +1393,7 @@ AUTO_MIGRATE=true
 ### 14.2 Frontend (Build Args + Runtime)
 
 **Build time** (Docker build args, definidos no CI/CD):
+
 ```
 NEXT_PUBLIC_API_URL=https://usecava.com/api
 NEXT_PUBLIC_APP_URL=https://usecava.com
@@ -1404,6 +1401,7 @@ NEXT_PUBLIC_IMAGE_HOSTNAME=usecava.com
 ```
 
 **Runtime** (ECS Task Definition env vars):
+
 ```
 INTERNAL_API_URL=http://backend.cava.local:3001/api
 NODE_ENV=production
@@ -1416,6 +1414,7 @@ NODE_ENV=production
 Execute cada item ANTES de liberar o domínio para usuários:
 
 ### Infraestrutura
+
 - [ ] RDS criado e acessível na VPC
 - [ ] S3 bucket criado com policy de leitura pública
 - [ ] SES domínio verificado e fora do Sandbox
@@ -1429,6 +1428,7 @@ Execute cada item ANTES de liberar o domínio para usuários:
 - [ ] Certificado ACM validado e associado
 
 ### Segurança
+
 - [ ] MFA habilitado no root user
 - [ ] IAM Roles com least privilege
 - [ ] RDS não é público (Public access: No)
@@ -1444,6 +1444,7 @@ Execute cada item ANTES de liberar o domínio para usuários:
 - [ ] Deletion protection habilitada no RDS
 
 ### Funcionalidade
+
 - [ ] `https://usecava.com/health` retorna 200
 - [ ] `https://usecava.com/` carrega o frontend
 - [ ] Login funciona (cookies são setados)
@@ -1455,6 +1456,7 @@ Execute cada item ANTES de liberar o domínio para usuários:
 - [ ] Logout limpa cookies
 
 ### CI/CD
+
 - [ ] GitHub Secrets configurados
 - [ ] Push para `main` dispara deploy
 - [ ] Backend deploya com sucesso
@@ -1469,14 +1471,17 @@ Execute cada item ANTES de liberar o domínio para usuários:
 ### 16.1 CloudWatch Logs
 
 Os logs já vão para CloudWatch automaticamente via awslogs driver:
+
 - **Backend**: `/ecs/cava-backend`
 - **Frontend**: `/ecs/cava-frontend`
 
 Para visualizar:
+
 1. **CloudWatch** → **Log groups** → `/ecs/cava-backend`
 2. Click num log stream para ver os logs
 
 O backend usa **JSON logging em produção** (`LOG_FORMAT=json`), o que permite:
+
 - Queries estruturadas no CloudWatch Insights
 - Filtros por level, error, user, etc.
 
@@ -1485,25 +1490,30 @@ O backend usa **JSON logging em produção** (`LOG_FORMAT=json`), o que permite:
 1. **CloudWatch** → **Alarms** → **Create alarm**
 
 **Alarm 1 — Backend Unhealthy**:
+
 - **Metric**: ECS → Service → `CPUUtilization`
 - **Condition**: ≥ 80% por 5 minutos
 - **Action**: SNS → seu email
 
 **Alarm 2 — RDS CPU**:
+
 - **Metric**: RDS → `CPUUtilization` para `cava-db`
 - **Condition**: ≥ 80% por 10 minutos
 
 **Alarm 3 — RDS Free Storage**:
+
 - **Metric**: RDS → `FreeStorageSpace`
 - **Condition**: ≤ 5 GB
 
 **Alarm 4 — ALB 5xx Errors**:
+
 - **Metric**: ALB → `HTTPCode_Target_5XX_Count`
 - **Condition**: ≥ 10 em 5 minutos
 
 ### 16.3 Container Insights
 
 Já habilitado na criação do cluster. Visualize em:
+
 - **CloudWatch** → **Container Insights** → **Performance monitoring**
 - Métricas: CPU, Memory, Network, Task count
 
@@ -1513,21 +1523,21 @@ Já habilitado na criação do cluster. Visualize em:
 
 ### Estimativa mensal (us-east-1, fev 2026)
 
-| Serviço | Especificação | Custo/mês (USD) |
-|---------|--------------|-----------------|
-| **ECS Fargate — Backend** | 0.25 vCPU, 0.5 GB, 24/7 | ~$9 |
-| **ECS Fargate — Frontend** | 0.25 vCPU, 0.5 GB, 24/7 | ~$9 |
-| **RDS PostgreSQL** | db.t4g.micro, 20GB gp3 | ~$12 |
-| **ALB** | 1 ALB + LCUs | ~$16 + ~$5 LCU |
-| **CloudFront** | 50GB transfer + 1M requests | ~$5 |
-| **S3** | 10GB storage + requests | ~$0.25 |
-| **ECR** | 2 repos, ~5GB images | ~$0.50 |
-| **SES** | <1000 emails/mês | ~$0.10 |
-| **Route 53** | 1 hosted zone | $0.50 |
-| **CloudWatch** | Logs + metrics | ~$3 |
-| **Data Transfer** | VPC + internet | ~$5 |
-| **Total estimado** | | **~$65-75 USD** |
-| **Em reais (BRL ~5.5)** | | **~R$ 360-415/mês** |
+| Serviço                    | Especificação               | Custo/mês (USD)     |
+| -------------------------- | --------------------------- | ------------------- |
+| **ECS Fargate — Backend**  | 0.25 vCPU, 0.5 GB, 24/7     | ~$9                 |
+| **ECS Fargate — Frontend** | 0.25 vCPU, 0.5 GB, 24/7     | ~$9                 |
+| **RDS PostgreSQL**         | db.t4g.micro, 20GB gp3      | ~$12                |
+| **ALB**                    | 1 ALB + LCUs                | ~$16 + ~$5 LCU      |
+| **CloudFront**             | 50GB transfer + 1M requests | ~$5                 |
+| **S3**                     | 10GB storage + requests     | ~$0.25              |
+| **ECR**                    | 2 repos, ~5GB images        | ~$0.50              |
+| **SES**                    | <1000 emails/mês            | ~$0.10              |
+| **Route 53**               | 1 hosted zone               | $0.50               |
+| **CloudWatch**             | Logs + metrics              | ~$3                 |
+| **Data Transfer**          | VPC + internet              | ~$5                 |
+| **Total estimado**         |                             | **~$65-75 USD**     |
+| **Em reais (BRL ~5.5)**    |                             | **~R$ 360-415/mês** |
 
 ### Otimizações de custo
 
@@ -1539,13 +1549,13 @@ Já habilitado na criação do cluster. Visualize em:
 
 ### O que NÃO pagar no início
 
-| Serviço | Quando adicionar |
-|---------|-----------------|
-| NAT Gateway ($32/mês) | Só se precisar de IP fixo de saída |
-| WAF ($5/mês + regras) | Quando tiver tráfego significativo |
-| ElastiCache/Redis | Se precisar de cache centralizado |
-| Multi-AZ RDS | Quando uptime 99.95% for necessário |
-| Aurora | Quando precisar de mais performance de DB |
+| Serviço               | Quando adicionar                          |
+| --------------------- | ----------------------------------------- |
+| NAT Gateway ($32/mês) | Só se precisar de IP fixo de saída        |
+| WAF ($5/mês + regras) | Quando tiver tráfego significativo        |
+| ElastiCache/Redis     | Se precisar de cache centralizado         |
+| Multi-AZ RDS          | Quando uptime 99.95% for necessário       |
+| Aurora                | Quando precisar de mais performance de DB |
 
 ---
 
@@ -1556,6 +1566,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Causa**: Health check falhando.
 
 **Diagnóstico**:
+
 1. **EC2** → **Target Groups** → selecione o TG → **Targets** → veja o status
 2. Se status é "unhealthy":
    - Verifique se o container está rodando: **ECS** → **Cluster** → **Tasks** → veja logs
@@ -1565,11 +1576,13 @@ Já habilitado na criação do cluster. Visualize em:
 ### 🔴 "Task stopped" no ECS
 
 **Diagnóstico**:
+
 1. **ECS** → **Cluster** → **Tasks** → tab **Stopped** → click na task
 2. Veja **Stopped reason** e **Containers** → **Exit code**
 3. Exit code 1 = erro da aplicação → veja logs no CloudWatch
 
 **Causas comuns**:
+
 - `DB_HOST` errado → container não conecta ao RDS
 - Security Group do RDS não permite tráfego do ECS
 - `DB_SSL_MODE=disable` mas RDS exige SSL → mude para `require`
@@ -1580,6 +1593,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Causa**: CloudFront não consegue alcançar o ALB.
 
 **Fix**:
+
 1. Verifique se o ALB está healthy
 2. Confirme que o Origin no CloudFront aponta para o ALB correto
 3. Protocol Match: CloudFront → ALB deve ser HTTPS (se ALB tem certificado) ou HTTP
@@ -1590,6 +1604,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Causa**: OAC não configurado corretamente ou bucket policy incorreta.
 
 **Fix**:
+
 1. Verifique se o **OAC** está associado ao origin S3 no CloudFront (seção 10.1)
 2. Verifique se a **Bucket Policy** contém o `Condition` com o ARN da distribuição (seção 5.2)
 3. Confirme que "Block Public Access" está **habilitado** (tudo bloqueado — acesso é só via OAC)
@@ -1601,6 +1616,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Diagnóstico**: Abra DevTools → Application → Cookies.
 
 **Causas comuns**:
+
 - `COOKIE_DOMAIN` não é `usecava.com`
 - `COOKIE_SECURE=false` mas site usa HTTPS
 - CloudFront não está encaminhando cookies → verifique Origin Request Policy
@@ -1611,6 +1627,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Causa**: O cookie `csrf_token` não foi setado.
 
 **Fix**:
+
 1. Acesse `https://usecava.com/health` (qualquer GET seta o cookie CSRF)
 2. Confirme que o CloudFront encaminha cookies
 3. Confirme que `COOKIE_DOMAIN=usecava.com`
@@ -1618,10 +1635,12 @@ Já habilitado na criação do cluster. Visualize em:
 ### 🔴 Emails não chegam (SES)
 
 **Diagnóstico**:
+
 1. **SES** → **Account dashboard** → veja se está em Sandbox
 2. Verifique logs do backend: procure por `[SES_EMAIL_ERROR]`
 
 **Causas comuns**:
+
 - SES em modo Sandbox (só envia para emails verificados)
 - `SES_SENDER_EMAIL` não verificado no SES
 - IAM Role do backend sem permissão `ses:SendEmail`
@@ -1632,6 +1651,7 @@ Já habilitado na criação do cluster. Visualize em:
 **Diagnóstico**: Logs do backend → procure "erro ao aplicar migrations"
 
 **Causas comuns**:
+
 - RDS não acessível (Security Group)
 - Extensão `uuid-ossp` não disponível no RDS → **RDS suporta por padrão**, mas precisa ser public
 - User `cava_admin` sem permissão → confira que é o master user
@@ -1639,6 +1659,7 @@ Já habilitado na criação do cluster. Visualize em:
 ### 🟡 Deploy lento no GitHub Actions
 
 **Otimizações**:
+
 1. Cache Docker layers: use `docker/build-push-action` com cache
 2. Parallel builds: backend e frontend deployam em paralelo (já configurado)
 3. Imagem menor: Alpine base images (já usado)
@@ -1646,6 +1667,7 @@ Já habilitado na criação do cluster. Visualize em:
 ### 🟡 CloudFront cache serve conteúdo antigo
 
 **Fix**:
+
 1. O CI/CD já faz invalidation automática (`/*`)
 2. Para invalidar manualmente:
    ```bash
